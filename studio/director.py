@@ -17,6 +17,7 @@ import os
 import random
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -26,9 +27,11 @@ from .scene import compile_scene, split_scenes, static_overlays
 from .util import ROOT, load_scene
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
-GEMINI_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]   # first that exists wins
+# tried in order: a retired model (404) or one that stays busy (503/429) hands over to the next
+GEMINI_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.0-flash"]
 BACKGROUNDS = {"kitchen", "room", "street", "school", "night_road", "plain", "image"}
 MAX_SECONDS = 30.0
+_sleep = time.sleep     # tests replace it
 
 
 # ------------------------------------------------------------------ model providers
@@ -68,6 +71,9 @@ class AnthropicLLM:
 
 class GeminiLLM:
     URL = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent"
+    BUSY = {429, 500, 502, 503, 504}    # overloaded / rate limited: wait and retry, then try another model
+    TRIES = 3
+    WAIT = 10
 
     def __init__(self, model=None, key=None):
         chosen = model or os.environ.get("GEMINI_MODEL")
@@ -84,21 +90,31 @@ class GeminiLLM:
             "generationConfig": {"responseMimeType": "application/json" if json_mode else "text/plain",
                                  "maxOutputTokens": 8192, "temperature": 0.9},
         }
-        while True:
-            req = urllib.request.Request(self.URL % self.models[0], data=json.dumps(body).encode("utf-8"),
-                                         headers={"Content-Type": "application/json", "x-goog-api-key": self.key})
-            try:
-                with urllib.request.urlopen(req, timeout=180) as r:
-                    data = json.loads(r.read().decode("utf-8"))
-                break
-            except urllib.error.HTTPError as e:
-                if e.code == 404 and len(self.models) > 1:     # model retired / renamed: try the next one
-                    self.models.pop(0)
-                    continue
-                raise SystemExit("Gemini error %d (%s): %s" % (e.code, self.models[0],
-                                                              e.read().decode("utf-8", "replace")[:400]))
-        parts = (data.get("candidates") or [{}])[0].get("content", {}).get("parts", [])
-        return "".join(p.get("text", "") for p in parts)
+        last = None
+        for i, model in enumerate(self.models):
+            for attempt in range(self.TRIES):
+                req = urllib.request.Request(self.URL % model, data=json.dumps(body).encode("utf-8"),
+                                             headers={"Content-Type": "application/json", "x-goog-api-key": self.key})
+                try:
+                    with urllib.request.urlopen(req, timeout=180) as r:
+                        data = json.loads(r.read().decode("utf-8"))
+                    self.models = self.models[i:]       # stick with the model that answered
+                    parts = (data.get("candidates") or [{}])[0].get("content", {}).get("parts", [])
+                    return "".join(p.get("text", "") for p in parts)
+                except urllib.error.HTTPError as e:
+                    last = "Gemini error %d (%s): %s" % (e.code, model, e.read().decode("utf-8", "replace")[:300])
+                    if e.code == 404:                   # model retired / renamed: next model
+                        break
+                    if e.code not in self.BUSY:
+                        raise SystemExit(last)
+                except (urllib.error.URLError, TimeoutError) as e:
+                    last = "Gemini network error (%s): %s" % (model, e)
+                if attempt + 1 < self.TRIES:
+                    wait = self.WAIT * (attempt + 1)
+                    print("  [gemini] %s busy, %ds baad dobara..." % (model, wait), file=sys.stderr)
+                    _sleep(wait)
+            print("  [gemini] %s se jawab nahi mila, agla model..." % model, file=sys.stderr)
+        raise SystemExit("%s\nSaare Gemini models abhi busy hain; 2-5 minute baad dobara try karo." % last)
 
 
 def make_llm(provider=None, model=None):

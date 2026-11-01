@@ -3,11 +3,14 @@
     python -m unittest discover -s tests -v
 """
 import glob
+import io
 import json
 import os
 import random
 import tempfile
 import unittest
+import urllib.error
+from unittest import mock
 
 from studio import director, hooks, script
 from studio.characters import LOOKS, build_character, render_ops
@@ -116,6 +119,33 @@ class DirectorTests(unittest.TestCase):
                 os.environ.pop(k, None)
                 if v is not None:
                     os.environ[k] = v
+
+    def test_gemini_busy_retries_then_next_model(self):
+        tried, waits = [], []
+
+        class Reply(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        def fake_urlopen(req, timeout=None):
+            model = req.full_url.split("/models/")[1].split(":")[0]
+            tried.append(model)
+            if model == "busy-model":
+                raise urllib.error.HTTPError(req.full_url, 503, "busy", {}, io.BytesIO(b'{"error": "high demand"}'))
+            return Reply(json.dumps({"candidates": [{"content": {"parts": [{"text": "HOOK: ok"}]}}]}).encode())
+
+        llm = director.GeminiLLM(key="AIzaFAKE")
+        llm.models = ["busy-model", "good-model"]
+        with mock.patch.object(director.urllib.request, "urlopen", fake_urlopen), \
+                mock.patch.object(director, "_sleep", waits.append):
+            text = llm("sys", [{"role": "user", "content": "x"}], json_mode=False)
+        self.assertEqual(text, "HOOK: ok")
+        self.assertEqual(tried, ["busy-model"] * 3 + ["good-model"])
+        self.assertEqual(waits, [10, 20])
+        self.assertEqual(llm.models, ["good-model"])
 
     def test_hook_pick(self):
         key, h = hooks.pick("auto", random.Random(3), avoid=list(hooks.HOOKS)[:-1])
