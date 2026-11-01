@@ -25,6 +25,16 @@ Script format (one thing per line):
   any action / expression.  `ALL -> ...` does it for everybody in the scene.
 - `SCENE: background | title` starts a new place (kitchen, room, street, school, night_road, plain).
 - `wait 1.5` (or `...`) pauses.
+
+Just lyrics (no format at all): if the text has no CAST/SCENE line, no `A = ...`, no `A -> ...` and no
+`NAME: ...` speaker line, every line is a lyric shown on screen while one singer walks down a night road:
+
+    Raat lambi hai, raasta khamosh
+    Chalta hu bina manzil ke
+    Chaand bhi saath chal raha hai
+
+Optional lines still work in that mode: `SECONDS: 60` (total length; default 3.2 s per lyric), `MUSIC: beat 76` /
+`MUSIC: none` / `MUSIC: path`, `HOOK:`, `CTA:`, `CAPTION:`, `HASHTAGS:`.
 """
 import argparse
 import os
@@ -175,8 +185,86 @@ def _slot_x(cast, name):
     return slots[names[min(cast.index(name), len(names) - 1)]], names[min(cast.index(name), len(names) - 1)]
 
 
+LYRIC_META = ("HOOK", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "SECONDS")
+LYRIC_STEP = 3.2          # seconds each lyric stays on screen when SECONDS is not given
+
+
+def _split_lyrics(text):
+    """(meta, lyric lines) if `text` is just lyrics, else None (it is a structured script)."""
+    meta, lyrics = {}, []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("//"):
+            continue
+        m = re.match(r"^([A-Za-z_]+)\s*:\s*(.*)$", line)
+        if m and m.group(1).upper() in LYRIC_META:
+            meta[m.group(1).upper()] = m.group(2).strip()
+            continue
+        if (m and m.group(1).upper() in HEADERS) \
+                or re.match(r"^[A-Za-z_]\w*\s*(=|->)\s*\S", line) \
+                or re.match(r"^(?:wait\s*[\d.]+|\.\.\.+)$", line, re.I) \
+                or re.match(r"^[A-Za-z_]\w*\s*(?:\([^)]*\))?\s*:\s*\S", line):
+            return None
+        lyrics.append(line.partition("|")[0].strip() or line)     # `Roman | देवनागरी`: show the first part
+    return (meta, lyrics) if lyrics else None
+
+
+def parse_lyrics(meta, lyrics):
+    """Plain lyrics -> a one-singer night-road reel (same look as templates/song_reel.json)."""
+    warnings = []
+    try:
+        total = float(meta["SECONDS"]) if meta.get("SECONDS") else len(lyrics) * LYRIC_STEP + 1.0
+    except ValueError:
+        warnings.append("SECONDS: %r number nahi hai, default length use hui" % meta["SECONDS"])
+        total = len(lyrics) * LYRIC_STEP + 1.0
+    total = max(6.0, min(total, 180.0))
+    step = (total - 1.0) / len(lyrics)
+    if step < 1.6:
+        warnings.append("%d lyrics %.0f sec me bahut tez hain (har line %.1f sec): SECONDS badhao ya lines kam karo"
+                        % (len(lyrics), total, step))
+    overlays = [{"text": t, "style": "lyric", "pos": [540, 610],
+                 "from": round(0.3 + i * step, 2), "to": round(0.3 + (i + 1) * step - 0.1, 2)}
+                for i, t in enumerate(lyrics)]
+    hook = meta.get("HOOK", "")
+    if hook:
+        overlays.append({"text": hook, "style": "hook", "pos": [540, 330], "from": 0.0, "to": 2.0})
+    if meta.get("CTA"):
+        overlays.append({"text": meta["CTA"], "style": "card", "pos": [540, 1000], "color": [236, 90, 70],
+                         "from": round(total - 2.6, 2)})
+    timeline = [{"t": 0.0, "who": "M", "action": "walk", "hands": "pockets", "expression": "smug",
+                 "speed": 0.9, "look": "right"}]
+    for i in range(1, len(lyrics), 2):          # a smile every other line, so the face is not frozen
+        timeline.append({"t": round(0.3 + i * step, 2), "who": "M", "expression": "smile" if i % 4 == 1 else "smug"})
+    mv = meta.get("MUSIC", "").strip()
+    if mv.lower() == "none":
+        music = None
+    elif mv and not mv.lower().startswith("beat"):
+        music = {"path": mv, "volume": 0.55}
+    else:
+        bpm = re.findall(r"\d+", mv)
+        music = {"type": "beat", "bpm": int(bpm[0]) if bpm else 76, "style": "soft", "volume": 0.45}
+    scene = {
+        "hook": hook,
+        "meta": {"fps": 30, "duration": round(total, 1), "fade_in": 0.6, "fade_out": 0.8},
+        "background": {"type": "night_road", "scroll": 220},
+        "characters": {"M": {"look": "college_boy", "outfit": "kurta", "color": "teal", "pants": "white",
+                             "hair": "side_part", "accessories": ["beard"], "slot": "center",
+                             "facing": "right", "y": 1690}},
+        "overlays": overlays,
+        "timeline": timeline,
+        "post": {"caption": meta.get("CAPTION") or hook or lyrics[0],
+                 "hashtags": meta.get("HASHTAGS", "#songreel #desivibes #indianreels").split()},
+    }
+    if music:
+        scene["music"] = music
+    return scene, warnings
+
+
 def parse_script(text):
     """Return (scene dict, warnings)."""
+    lyr = _split_lyrics(text)
+    if lyr:
+        return parse_lyrics(*lyr)
     meta = {}
     cast = {}
     scenes = []
