@@ -72,11 +72,12 @@ def pick(style="auto", rng=None, avoid=()):
     return k, HOOKS[k]
 
 
-def prompt_block(key):
+def prompt_block(key, fmt="json"):
     h = HOOKS[key]
-    return ("# Hook for THIS video: %s (%s)\n%s\nExample hook texts (write your own, do not copy): %s\n"
-            "Put the hook text in the top-level \"hook\" field AND show it as an overlay with style \"hook\" "
-            "from t=0 to about 2 seconds." % (h["name"], key, h["how"], " | ".join(h["examples"])))
+    where = ("Put the hook text in the top-level \"hook\" field AND show it as an overlay with style \"hook\" "
+             "from t=0 to about 2 seconds." if fmt == "json" else "Write it on the HOOK: line.")
+    return ("# Hook for THIS video: %s (%s)\n%s\nExample hook texts (write your own, do not copy): %s\n%s"
+            % (h["name"], key, h["how"], " | ".join(h["examples"]), where))
 
 
 def random_topic(rng=None):

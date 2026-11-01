@@ -111,8 +111,11 @@ python -m unittest discover -s tests                                            
 `index.html` (repo root) GitHub Pages pe chalta hai: https://boidbit.github.io/insta-shorts/
 
 1. Page pe "⚙️ GitHub connection" kholo → fine-grained token banao (sirf is repo ke liye, **Actions: Read and write**, **Contents: Read-only**) → paste → Save. Token sirf aapke browser me rehta hai.
-2. Idea likho (AI) ya script paste karo → **Banao**. Page `render.yml` workflow chalata hai aur har step ki progress dikhata hai (~4-6 min).
-3. Video GitHub **Release** (`reel-…`) me publish hoti hai; page wahi chalata hai, download + caption copy deta hai. "Pichli reels" me sab purani videos.
+2. **Idea tab** → idea likho → **Script likho ✍️**. AI sirf script likhta hai (~1 min, workflow `stage=script`, pre-release `draft-…`), video nahi.
+3. Script **Apni script** tab me aa jati hai: padho, jo badalna ho badlo → **✅ Approve: Video banao 🎬** (`stage=video`, ~4-6 min). Apni likhi script bhi seedha yahin se approve kar sakte ho, ya "AI se sudharo" se pehle AI ka version dekh sakte ho.
+4. Video GitHub **Release** (`reel-…`) me publish hoti hai; page wahi chalata hai, download + caption copy deta hai. Approve hua draft apne aap hat jata hai. "Pichli reels" me sab purani videos.
+
+**AI key kahan daalni hai:** repo → Settings → Secrets and variables → Actions → **Repository secrets** → New repository secret → Name `GEMINI_API_KEY` (ya `ANTHROPIC_API_KEY`). `GOOGLE_API_KEY`, `GEMINI_KEY`, `AI_API_KEY` naam bhi chalte hain. *Environment* (`github-pages`), Codespaces ya Dependabot secrets workflow ko nahi dikhte.
 
 Branch: page us branch pe workflow chalata hai jo settings me likha hai (default `desi-toons-studio`). Repo public hai to releases (videos) bhi public dikhte hain.
 

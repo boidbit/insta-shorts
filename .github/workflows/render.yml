@@ -1,37 +1,38 @@
 name: Render video
-run-name: ${{ inputs.request_id && format('web-{0}', inputs.request_id) || format('Render video ({0})', github.event_name) }}
+run-name: ${{ inputs.request_id && format('web-{0}-{1}', inputs.stage, inputs.request_id) || format('Render video ({0})', github.event_name) }}
 
+# Two stages:
+#   stage=script  AI writes a readable script only (~1 min) and publishes it as a
+#                 pre-release "draft-<id>" for a human to read / edit / approve.
+#   stage=video   renders a video (from script_text, an AI idea, or a file) and
+#                 publishes it as release "reel-<id>".
 on:
   workflow_dispatch:
     inputs:
+      stage:
+        description: "script = AI writes a script for approval, video = make the video"
+        type: choice
+        options: [video, script]
+        default: video
       instruction:
-        description: "AI director: idea (empty + count = AI picks topics). Needs GEMINI_API_KEY or ANTHROPIC_API_KEY secret."
+        description: "Idea for the AI (empty + count = AI picks topics). Needs an AI key secret."
+        required: false
+        default: ""
+      script_text:
+        description: "The script itself (stage=video: render it; stage=script: AI improves it)"
         required: false
         default: ""
       hook:
-        description: "Hook style for AI videos"
+        description: "Hook style for AI"
         type: choice
         options: [auto, pattern_interrupt, pov, relatable, curiosity, list, question, cold_open, expectation]
         default: auto
       count:
-        description: "AI: how many different videos (1-5)"
+        description: "AI straight to video: how many different videos (1-5)"
         required: false
         default: "1"
-      script:
-        description: "Or a script file, e.g. scripts/doodh_story.txt (no AI needed)"
-        required: false
-        default: ""
-      script_text:
-        description: "Or the script itself (used by the web page)"
-        required: false
-        default: ""
-      ai_polish:
-        description: "Script: let the AI add Devanagari + acting (needs an AI key)"
-        type: boolean
-        required: false
-        default: false
-      scene:
-        description: "Or a scene file, e.g. scenes/doodh_story_demo.json (or 'all')"
+      file:
+        description: "Or a file: scripts/x.txt or scenes/x.json (or 'all' scenes)"
         required: false
         default: "scenes/doodh_story_demo.json"
       width:
@@ -47,13 +48,24 @@ on:
         description: "Set by the web page to find this run (leave empty)"
         required: false
         default: ""
+      draft_id:
+        description: "Set by the web page: approved draft to clean up (leave empty)"
+        required: false
+        default: ""
   push:
     paths:
       - "scenes/*.json"
       - "scripts/*.txt"
 
 permissions:
-  contents: write     # publish each finished reel as a GitHub release
+  contents: write     # publish drafts / finished reels as GitHub releases
+
+env:
+  # AI key: any of these repository secrets (or variables) works.
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_API_KEY || vars.ANTHROPIC_API_KEY }}
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GEMINI_KEY || secrets.GOOGLE_AI_KEY || vars.GEMINI_API_KEY }}
+  AI_API_KEY: ${{ secrets.AI_API_KEY || secrets.API_KEY || secrets.AI_KEY }}
+  STAGE: ${{ inputs.stage || 'video' }}
 
 jobs:
   render:
@@ -70,6 +82,7 @@ jobs:
           cache: pip
 
       - name: System packages (ffmpeg, fonts, emoji)
+        if: env.STAGE != 'script'
         run: |
           sudo apt-get update -y
           sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-color-emoji fonts-liberation libraqm0
@@ -78,9 +91,11 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Tests
+        if: env.STAGE != 'script'
         run: python -m unittest discover -s tests
 
       - name: Cache generated voice lines
+        if: env.STAGE != 'script'
         uses: actions/cache@v4
         with:
           path: .cache/tts
@@ -92,39 +107,45 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           INSTRUCTION: ${{ inputs.instruction }}
+          SCRIPT_TEXT: ${{ inputs.script_text }}
           HOOK: ${{ inputs.hook }}
           COUNT: ${{ inputs.count }}
-          SCRIPT: ${{ inputs.script }}
-          SCRIPT_TEXT: ${{ inputs.script_text }}
-          AI_POLISH: ${{ inputs.ai_polish }}
-          SCENE: ${{ inputs.scene }}
+          FILE: ${{ inputs.file }}
           BEFORE: ${{ github.event.before }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           mkdir -p scenes/generated
+          need_ai() {
+            PROVIDER="$(python -c 'from studio.director import provider_name; print(provider_name() or "")')"
+            if [ -z "$PROVIDER" ]; then
+              echo "::error title=AI key nahi mili::Repo -> Settings -> Secrets and variables -> Actions -> Repository secrets -> New repository secret. Name: GEMINI_API_KEY (ya ANTHROPIC_API_KEY), Value: aapki key. Environment (github-pages), Codespaces ya Dependabot secrets yahan nahi milte."
+              exit 1
+            fi
+            echo "AI: $PROVIDER"
+          }
           LIST=""
-          HAVE_AI=""
-          [ -n "$ANTHROPIC_API_KEY$GEMINI_API_KEY$GOOGLE_API_KEY" ] && HAVE_AI=1
-          if [ "$EVENT" = "workflow_dispatch" ]; then
+          if [ "$STAGE" = "script" ]; then
+            need_ai
+            TEXT="$SCRIPT_TEXT"; [ -z "$TEXT" ] && TEXT="$INSTRUCTION"
+            python -m studio.director --script-only "$TEXT" --hook "${HOOK:-auto}" -o scenes/generated/draft.txt
+            cat scenes/generated/draft.txt
+          elif [ "$EVENT" = "workflow_dispatch" ]; then
             if [ -n "$SCRIPT_TEXT" ]; then
               printf '%s\n' "$SCRIPT_TEXT" > scenes/generated/web_script.txt
-              if [ "$AI_POLISH" = "true" ] && [ -n "$HAVE_AI" ]; then
-                LIST="$(python -m studio.director "$SCRIPT_TEXT" --hook "${HOOK:-auto}" -o scenes/generated/web.json)"
-              else
-                python -m studio.script scenes/generated/web_script.txt -o scenes/generated/web.json
-                LIST="scenes/generated/web.json"
-              fi
-            elif [ -n "$SCRIPT" ]; then
-              python -m studio.script "$SCRIPT" -o scenes/generated/script.json
-              LIST="scenes/generated/script.json"
+              python -m studio.script scenes/generated/web_script.txt -o scenes/generated/web.json
+              LIST="scenes/generated/web.json"
             elif [ -n "$INSTRUCTION" ] || [ "${COUNT:-1}" != "1" ]; then
-              [ -z "$HAVE_AI" ] && { echo "::error::No AI key secret (GEMINI_API_KEY / ANTHROPIC_API_KEY)"; exit 1; }
+              need_ai
               N=$(( ${COUNT:-1} > 5 ? 5 : ${COUNT:-1} ))
               LIST="$(python -m studio.director "$INSTRUCTION" --hook "${HOOK:-auto}" --count "$N" -o scenes/generated/ai.json)"
-            elif [ "$SCENE" = "all" ]; then LIST="$(ls scenes/*.json)"
-            else LIST="$SCENE"; fi
+            elif [ "$FILE" = "all" ]; then
+              LIST="$(ls scenes/*.json)"
+            elif [ "${FILE##*.}" = "txt" ]; then
+              out="scenes/generated/$(basename "$FILE" .txt).json"
+              python -m studio.script "$FILE" -o "$out"
+              LIST="$out"
+            else
+              LIST="$FILE"
+            fi
           else
             CHANGED="$(git diff --name-only --diff-filter=AM "$BEFORE" HEAD -- 'scenes/*.json' 'scripts/*.txt' 2>/dev/null || true)"
             [ -z "$CHANGED" ] && CHANGED="$(git diff --name-only --diff-filter=AM HEAD~1 HEAD -- 'scenes/*.json' 'scripts/*.txt' 2>/dev/null || true)"
@@ -140,7 +161,19 @@ jobs:
           echo "Scenes: $LIST"
           { echo "list<<EOF"; echo "$LIST"; echo "EOF"; } >> "$GITHUB_OUTPUT"
 
+      - name: Publish draft script
+        if: env.STAGE == 'script'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: draft-${{ inputs.request_id || github.run_id }}
+        run: |
+          TITLE="$(sed -n 's/^HOOK:[[:space:]]*//Ip' scenes/generated/draft.txt | head -1)"
+          gh release create "$TAG" --prerelease --latest=false --target "$GITHUB_SHA" \
+            --title "Draft: ${TITLE:-script}" --notes-file scenes/generated/draft.txt
+          echo "Draft: $TAG" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Render
+        if: env.STAGE != 'script'
         env:
           LIST: ${{ steps.pick.outputs.list }}
           WIDTH: ${{ inputs.width || '1080' }}
@@ -158,6 +191,7 @@ jobs:
           done
 
       - name: Upload videos
+        if: env.STAGE != 'script'
         uses: actions/upload-artifact@v4
         with:
           name: videos
@@ -169,10 +203,12 @@ jobs:
           if-no-files-found: error
 
       - name: Publish as release (the web page plays it from here)
+        if: env.STAGE != 'script'
         env:
           GH_TOKEN: ${{ github.token }}
           LIST: ${{ steps.pick.outputs.list }}
           TAG: reel-${{ inputs.request_id || github.run_id }}
+          DRAFT: ${{ inputs.draft_id }}
         run: |
           shopt -s nullglob
           files=(out/*.mp4 out/*.png out/*.post.txt)
@@ -182,3 +218,5 @@ jobs:
           [ -s notes.md ] || echo "$TITLE" > notes.md
           gh release create "$TAG" "${files[@]}" --title "$TITLE" --notes-file notes.md --target "$GITHUB_SHA" --latest=false
           echo "Release: $TAG" >> "$GITHUB_STEP_SUMMARY"
+          # the approved draft has done its job
+          [ -n "$DRAFT" ] && gh release delete "draft-$DRAFT" --cleanup-tag -y || true

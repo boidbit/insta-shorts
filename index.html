@@ -45,6 +45,10 @@
   .go:disabled { opacity: .6; cursor: wait; }
   .small { padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
            color: var(--ink); font: inherit; cursor: pointer; }
+  .small.wide { width: 100%; margin-top: 10px; padding: 11px; }
+  .small:disabled { opacity: .6; cursor: wait; }
+  .banner { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--accent); color: var(--accent-ink);
+            font-size: 14px; }
   .bar { height: 10px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 10px 0; }
   .bar > i { display: block; height: 100%; width: 0; background: var(--brand); transition: width .4s; }
   video { width: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: 12px; display: block; }
@@ -118,15 +122,15 @@
             <option value="expectation">Expectation vs reality</option>
           </select>
         </label>
-        <label id="countWrap">Kitni videos <input type="number" id="count" min="1" max="5" value="1" style="width:64px"></label>
-        <label>Quality
+        <label class="videoOpt">Quality
           <select id="width"><option value="1080">1080p (HD)</option><option value="720">720p (jaldi)</option></select>
         </label>
-        <label><input type="checkbox" id="voice" checked> Hindi awaaz</label>
-        <label id="aiWrap" class="hidden"><input type="checkbox" id="aiPolish"> AI se sudharo (Devanagari + acting)</label>
+        <label class="videoOpt"><input type="checkbox" id="voice" checked> Hindi awaaz</label>
       </div>
-      <button class="go" id="go">Banao 🎬</button>
-      <p class="hint">GitHub pe ek video banne me ~4-6 minute lagte hain. Page band kar ke wapas aao to bhi progress yahin milegi.</p>
+      <p class="banner hidden" id="draftNote">✍️ AI ki script taiyar hai. Padho, jo badalna ho yahin badlo, phir <b>Approve</b> dabao. Pasand na aaye to idea badal ke dobara likhwao.</p>
+      <button class="go" id="go">Script likho ✍️</button>
+      <button class="small wide hidden" id="polish">✍️ AI se sudharo (pehle sirf script dikhayega)</button>
+      <p class="hint" id="timeHint"></p>
     </section>
 
     <aside class="card">
@@ -191,11 +195,11 @@ const HINTS = {
 };
 const STEP_NAMES = {
   "System packages (ffmpeg, fonts, emoji)": "Machine taiyar", "Python packages": "Tools install", "Tests": "Check",
-  "Write the story": "Kahani likhna", "Render": "Video banana", "Upload videos": "Upload",
-  "Publish as release (the web page plays it from here)": "Publish",
+  "Write the story": "Kahani likhna", "Publish draft script": "Script bhejna", "Render": "Video banana",
+  "Upload videos": "Upload", "Publish as release (the web page plays it from here)": "Publish",
 };
 const drafts = { idea: "", script: EXAMPLE_SCRIPT };
-let mode = "idea", timer = null;
+let mode = "idea", timer = null, busy = false;
 
 // ---------------------------------------------------------------- GitHub API
 async function gh(path, opts = {}) {
@@ -250,8 +254,20 @@ function setMode(m) {
   $("text").value = drafts[m];
   $("text").placeholder = m === "idea" ? "Idea yahan likho… (khali = AI khud soche)" : "Script yahan likho…";
   $("hint").textContent = HINTS[m];
-  $("countWrap").classList.toggle("hidden", m !== "idea");
-  $("aiWrap").classList.toggle("hidden", m !== "script");
+  $("go").textContent = m === "idea" ? "Script likho ✍️" : "✅ Approve: Video banao 🎬";
+  $("polish").classList.toggle("hidden", m !== "script");
+  $("hookWrap").classList.toggle("hidden", m !== "idea");
+  document.querySelectorAll(".videoOpt").forEach((x) => x.classList.toggle("hidden", m !== "script"));
+  $("timeHint").textContent = m === "idea"
+    ? "AI ko script likhne me ~1 minute lagta hai. Video tabhi banegi jab aap script approve karoge."
+    : "GitHub pe video banne me ~4-6 minute lagte hain. Page band kar ke wapas aao to bhi progress yahin milegi.";
+  if (m !== "script") $("draftNote").classList.add("hidden");
+}
+
+function setBusy(b) {
+  busy = b;
+  $("go").disabled = b;
+  $("polish").disabled = b;
 }
 document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
 
@@ -261,22 +277,21 @@ function showStatus(stage, frac) {
   $("barFill").style.width = Math.max(3, Math.round(frac * 100)) + "%";
 }
 
-async function make() {
-  if (!(await checkConnection())) return;
+// stage "script": AI writes a script (from the idea, or improves the script tab) -> shown for approval.
+// stage "video":  the (approved / own) script in the script tab -> video.
+async function start(stage) {
+  if (busy || !(await checkConnection())) return;
   const text = $("text").value.trim();
-  if (mode === "script" && !text) { showStatus("Script khali hai 🙂", 0); return; }
+  if (stage === "video" && !text) { showStatus("Script khali hai 🙂", 0); return; }
   const rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const inputs = {
-    hook: $("hook").value, width: $("width").value, voice: String($("voice").checked), request_id: rid,
-  };
-  if (mode === "idea") {
-    inputs.instruction = text;
-    inputs.count = String(Math.min(5, Math.max(1, +$("count").value || 1)));
+  const inputs = { stage, hook: $("hook").value, request_id: rid };
+  if (stage === "script") {
+    if (mode === "idea") inputs.instruction = text; else inputs.script_text = text;
   } else {
-    inputs.script_text = text;
-    inputs.ai_polish = String($("aiPolish").checked);
+    Object.assign(inputs, { script_text: text, width: $("width").value, voice: String($("voice").checked),
+                            draft_id: store.get("draft") });
   }
-  $("go").disabled = true;
+  setBusy(true);
   $("errBox").textContent = ""; $("steps").replaceChildren(); $("runLink").classList.add("hidden");
   showStatus("GitHub ko bhej raha hoon…", 0.02);
   try {
@@ -284,24 +299,33 @@ async function make() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ref: store.get("ref", CONFIG.ref), inputs }),
     });
-    store.set("pending", JSON.stringify({ rid, at: Date.now() }));
-    follow(rid, Date.now());
+    store.set("pending", JSON.stringify({ rid, stage, at: Date.now() }));
+    follow(rid, stage, Date.now());
   } catch (e) {
-    $("go").disabled = false;
+    setBusy(false);
     showStatus("Shuru nahi ho paya", 0);
     $("errBox").textContent = e.message + (e.status === 422 ? "\n(Branch ka naam sahi hai? Us branch pe naya render.yml hona chahiye.)" : "");
   }
 }
 
-function follow(rid, startedAt) {
+async function showDraft(rid) {
+  const rel = await gh(`${REPO()}/releases/tags/draft-${rid}`);
+  drafts.script = (rel.body || "").replace(/\r\n/g, "\n").trim() + "\n";
+  store.set("draft", rid);
+  setMode("script");
+  $("draftNote").classList.remove("hidden");
+  $("text").focus();
+}
+
+function follow(rid, stage, startedAt) {
   clearTimeout(timer);
-  $("go").disabled = true;
+  setBusy(true);
   let runId = null;
   const tick = async () => {
     try {
       if (!runId) {
         const runs = await gh(`${REPO()}/actions/workflows/${CONFIG.workflow}/runs?event=workflow_dispatch&per_page=20`);
-        const run = runs.workflow_runs.find((r) => r.display_title === "web-" + rid);
+        const run = runs.workflow_runs.find((r) => r.display_title === `web-${stage}-${rid}`);
         if (!run) {
           if (Date.now() - startedAt > 3 * 60 * 1000) throw new Error("Run nahi mila. Actions tab me dekho.");
           showStatus("Line me hai…", 0.03);
@@ -326,18 +350,25 @@ function follow(rid, startedAt) {
         return;
       }
       store.set("pending", "");
-      $("go").disabled = false;
+      setBusy(false);
       if (run.conclusion !== "success") {
         showStatus("Gadbad ho gayi ❌", 1);
-        $("errBox").textContent = "Run fail hua (" + run.conclusion + "). Upar wale link se log dekho.";
+        $("errBox").textContent = "Run fail hua (" + run.conclusion + "). Upar wale link se log dekho" +
+          " (AI key wali galti ho to wahan likha hoga key kahan daalni hai).";
         return;
       }
-      showStatus("Ho gaya ✅", 1);
+      if (stage === "script") {
+        showStatus("Script taiyar ✍️ — padho aur approve karo", 1);
+        await showDraft(rid);
+        return;
+      }
+      store.set("draft", "");
+      showStatus("Video taiyar ✅", 1);
       const rel = await gh(`${REPO()}/releases/tags/reel-${rid}`);
       showRelease(rel);
       loadGallery();
     } catch (e) {
-      $("go").disabled = false;
+      setBusy(false);
       $("errBox").textContent = e.message;
     }
   };
@@ -388,7 +419,8 @@ $("save").addEventListener("click", async () => {
   if (await checkConnection()) $("setup").open = false;
 });
 $("forget").addEventListener("click", () => { store.set("token", ""); checkConnection(); });
-$("go").addEventListener("click", make);
+$("go").addEventListener("click", () => start(mode === "idea" ? "script" : "video"));
+$("polish").addEventListener("click", () => start("script"));
 $("copy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText($("post").value); $("copy").textContent = "✅ Copy ho gaya"; }
   catch { $("post").select(); }
@@ -400,7 +432,7 @@ checkConnection();
 loadGallery();
 try {
   const p = JSON.parse(store.get("pending") || "null");
-  if (p && Date.now() - p.at < 60 * 60 * 1000 && store.get("token")) follow(p.rid, p.at);
+  if (p && Date.now() - p.at < 60 * 60 * 1000 && store.get("token")) follow(p.rid, p.stage || "video", p.at);
 } catch {}
 </script>
 </body>

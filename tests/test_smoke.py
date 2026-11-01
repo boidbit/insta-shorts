@@ -76,7 +76,7 @@ class DirectorTests(unittest.TestCase):
         replies = iter([json.dumps(bad), good])
         calls = []
 
-        def fake_llm(system, messages):
+        def fake_llm(system, messages, json_mode=True):
             calls.append(messages)
             return next(replies)
 
@@ -86,6 +86,36 @@ class DirectorTests(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         self.assertIn("hook", calls[1][-1]["content"])
         self.assertEqual(scene["meta"]["hook_style"], "cold_open")
+
+    def test_write_script_for_approval(self):
+        with open(os.path.join(ROOT, "scripts", "dadi_phone.txt"), encoding="utf-8") as f:
+            good = f.read()
+        bad = good.replace(" | दादी, बस ये बटन दबाओ!", "")          # a line without Devanagari
+        replies = iter(["```\n" + bad + "```", good])
+        calls = []
+
+        def fake_llm(system, messages, json_mode=True):
+            calls.append(json_mode)
+            return next(replies)
+
+        with tempfile.TemporaryDirectory() as d:
+            text = director.write_script("dadi aur phone", "pov", fake_llm, os.path.join(d, "c.json"),
+                                         rng=random.Random(1), log=lambda m: None)
+        self.assertEqual(calls, [False, False])
+        self.assertTrue(text.startswith("HOOK:"))
+        self.assertIn("दादी, बस ये बटन दबाओ!", text)
+
+    def test_generic_key_is_routed_by_prefix(self):
+        keep = {k: os.environ.pop(k, None) for k in ("AI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY",
+                                                     "GOOGLE_API_KEY", "DIRECTOR_PROVIDER")}
+        try:
+            os.environ["AI_API_KEY"] = "AIzaFAKE"
+            self.assertEqual(director.provider_name(), "gemini")
+        finally:
+            for k, v in keep.items():
+                os.environ.pop(k, None)
+                if v is not None:
+                    os.environ[k] = v
 
     def test_hook_pick(self):
         key, h = hooks.pick("auto", random.Random(3), avoid=list(hooks.HOOKS)[:-1])

@@ -30,7 +30,7 @@ import argparse
 import os
 import re
 
-from . import actions, audio, director
+from . import actions, audio
 from .characters import ACCESSORIES, EXPRESSIONS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE, SKIN_TONES
 from .scene import SLOTS
 
@@ -311,8 +311,9 @@ def main(argv=None):
         scene, warnings = parse_script(f.read())
     for w in warnings:
         print("  [script] " + w)
+    from .director import save
     out = args.out or os.path.splitext(args.script)[0] + ".json"
-    print(director.save(scene, out))     # + .post.txt (Instagram caption + hashtags)
+    print(save(scene, out))     # + .post.txt (Instagram caption + hashtags)
 
 
 if __name__ == "__main__":
