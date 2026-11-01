@@ -1,4 +1,4 @@
 Pillow>=10.0
 numpy>=1.24
 edge-tts>=6.1
-anthropic>=0.40      # only needed for the AI director (studio/director.py)
+anthropic>=0.40      # only for the AI director with ANTHROPIC_API_KEY (Gemini needs nothing extra)

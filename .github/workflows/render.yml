@@ -1,16 +1,29 @@
-name: Render stickman video
+name: Render video
 
 on:
   workflow_dispatch:
     inputs:
-      scene:
-        description: "Scene file to render, e.g. scenes/tag_karo_demo.json (ignored if 'instruction' is filled)"
-        required: false
-        default: "scenes/tag_karo_demo.json"
       instruction:
-        description: "AI director: plain-language idea (needs ANTHROPIC_API_KEY secret). Leave empty to render the scene file."
+        description: "AI director: idea (empty + count = AI picks topics). Needs GEMINI_API_KEY or ANTHROPIC_API_KEY secret."
         required: false
         default: ""
+      hook:
+        description: "Hook style for AI videos"
+        type: choice
+        options: [auto, pattern_interrupt, pov, relatable, curiosity, list, question, cold_open, expectation]
+        default: auto
+      count:
+        description: "AI: how many different videos (1-5)"
+        required: false
+        default: "1"
+      script:
+        description: "Or a script file, e.g. scripts/doodh_story.txt (no AI needed)"
+        required: false
+        default: ""
+      scene:
+        description: "Or a scene file, e.g. scenes/doodh_story_demo.json (or 'all')"
+        required: false
+        default: "scenes/doodh_story_demo.json"
       width:
         description: "Output width in px (1080 = full HD reel, 720 = faster)"
         required: false
@@ -23,11 +36,12 @@ on:
   push:
     paths:
       - "scenes/*.json"
+      - "scripts/*.txt"
 
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,6 +60,9 @@ jobs:
       - name: Python packages
         run: pip install -r requirements.txt
 
+      - name: Tests
+        run: python -m unittest discover -s tests
+
       - name: Cache generated voice lines
         uses: actions/cache@v4
         with:
@@ -53,33 +70,41 @@ jobs:
           key: tts-${{ github.run_id }}
           restore-keys: tts-
 
-      - name: AI director (optional)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.instruction != '' }}
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          INSTRUCTION: ${{ inputs.instruction }}
-        run: |
-          mkdir -p scenes/generated
-          python -m studio.director "$INSTRUCTION" -o scenes/generated/directed.json
-          cat scenes/generated/directed.json
-
-      - name: Decide which scenes to render
+      - name: Decide what to render
         id: pick
         env:
           EVENT: ${{ github.event_name }}
           INSTRUCTION: ${{ inputs.instruction }}
+          HOOK: ${{ inputs.hook }}
+          COUNT: ${{ inputs.count }}
+          SCRIPT: ${{ inputs.script }}
           SCENE: ${{ inputs.scene }}
           BEFORE: ${{ github.event.before }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
+          mkdir -p scenes/generated
+          LIST=""
           if [ "$EVENT" = "workflow_dispatch" ]; then
-            if [ -n "$INSTRUCTION" ]; then LIST="scenes/generated/directed.json"
+            if [ -n "$SCRIPT" ]; then
+              python -m studio.script "$SCRIPT" -o scenes/generated/script.json
+              LIST="scenes/generated/script.json"
+            elif [ -n "$INSTRUCTION" ] || [ "${COUNT:-1}" != "1" ]; then
+              N=$(( ${COUNT:-1} > 5 ? 5 : ${COUNT:-1} ))
+              LIST="$(python -m studio.director "$INSTRUCTION" --hook "${HOOK:-auto}" --count "$N" -o scenes/generated/ai.json)"
             elif [ "$SCENE" = "all" ]; then LIST="$(ls scenes/*.json)"
             else LIST="$SCENE"; fi
           else
-            LIST="$(git diff --name-only --diff-filter=AM "$BEFORE" HEAD -- 'scenes/*.json' 2>/dev/null || true)"
-            [ -z "$LIST" ] && LIST="$(git diff --name-only --diff-filter=AM HEAD~1 HEAD -- 'scenes/*.json' 2>/dev/null || true)"
+            CHANGED="$(git diff --name-only --diff-filter=AM "$BEFORE" HEAD -- 'scenes/*.json' 'scripts/*.txt' 2>/dev/null || true)"
+            [ -z "$CHANGED" ] && CHANGED="$(git diff --name-only --diff-filter=AM HEAD~1 HEAD -- 'scenes/*.json' 'scripts/*.txt' 2>/dev/null || true)"
             # first push / new branch: nothing to diff against -> render every scene
-            [ -z "$LIST" ] && LIST="$(ls scenes/*.json)"
+            [ -z "$CHANGED" ] && CHANGED="$(ls scenes/*.json)"
+            for f in $CHANGED; do
+              case "$f" in
+                *.txt) out="scenes/generated/$(basename "$f" .txt).json"; python -m studio.script "$f" -o "$out"; LIST="$LIST $out" ;;
+                *) LIST="$LIST $f" ;;
+              esac
+            done
           fi
           echo "Scenes: $LIST"
           { echo "list<<EOF"; echo "$LIST"; echo "EOF"; } >> "$GITHUB_OUTPUT"
@@ -96,16 +121,18 @@ jobs:
           for f in $LIST; do
             name=$(basename "$f" .json)
             python -m studio.render "$f" -o "out/$name.mp4" --width "$WIDTH" $FLAGS
-            python -m studio.render "$f" --frame 1.5 -o "out/$name.png" --width 540 $FLAGS
+            python -m studio.render "$f" --frame 1.0 -o "out/$name.png" --width 540 $FLAGS
+            [ -f "${f%.json}.post.txt" ] && cp "${f%.json}.post.txt" "out/$name.post.txt"
             echo "- \`$name.mp4\`" >> "$GITHUB_STEP_SUMMARY"
           done
 
       - name: Upload videos
         uses: actions/upload-artifact@v4
         with:
-          name: stickman-videos
+          name: videos
           path: |
             out/*.mp4
             out/*.png
+            out/*.post.txt
             scenes/generated/*.json
           if-no-files-found: error

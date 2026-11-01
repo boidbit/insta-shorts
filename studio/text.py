@@ -13,6 +13,8 @@ MAIN_FONTS = [
     "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
     "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "C:/Windows/Fonts/arialbd.ttf",            # local preview on Windows
+    "C:/Windows/Fonts/segoeuib.ttf",
 ]
 DEVA_FONTS = [
     os.path.join(ROOT, "assets", "fonts", "devanagari.ttf"),
@@ -20,11 +22,14 @@ DEVA_FONTS = [
     "/usr/share/fonts/opentype/noto/NotoSansDevanagari-Bold.ttf",
     "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
     "/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf",
+    "C:/Windows/Fonts/NirmalaB.ttf",
+    "C:/Windows/Fonts/Nirmala.ttf",
 ]
 EMOJI_FONTS = [
     "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
     "/usr/share/fonts/noto/NotoColorEmoji.ttf",
     "/usr/share/fonts/truetype/noto-color-emoji/NotoColorEmoji.ttf",
+    "C:/Windows/Fonts/seguiemj.ttf",
 ]
 
 
@@ -44,14 +49,14 @@ def font(size, kind="main"):
     size = max(8, int(round(size)))
     path = _first(DEVA_FONTS if kind == "deva" else MAIN_FONTS)
     if path is None:
-        return ImageFont.load_default()
+        return ImageFont.load_default(size)
     return ImageFont.truetype(path, size)
 
 
 def is_emoji(ch):
     o = ord(ch)
-    return (o >= 0x1F000 or 0x2600 <= o <= 0x27BF or o in (0x2B50, 0x2B55, 0x2764, 0x203C, 0x2049)
-            )
+    return (o >= 0x1F000 or 0x2600 <= o <= 0x27BF or 0x2300 <= o <= 0x23FF or
+            o in (0x2B50, 0x2B55, 0x2764, 0x203C, 0x2049))
 
 
 def is_deva(ch):
@@ -225,12 +230,15 @@ def _rrect_layer(w, h, radius, fill, outline=None, ow=0, shadow=0):
 
 STYLES = {
     # size, pad_x, pad_y, radius, bg, fg, border, stroke
-    "caption_box": dict(size=64, px=38, py=26, r=16, bg=(255, 255, 255), fg=(14, 14, 14), border=None, ow=0,
-                        stroke=0, shadow=5, max_w=860),
-    "card": dict(size=60, px=44, py=30, r=34, bg=(236, 90, 70), fg=(255, 255, 255), border=(16, 16, 16), ow=6,
-                 stroke=0, shadow=6, max_w=800),
-    "tag": dict(size=40, px=26, py=14, r=22, bg=(255, 255, 255), fg=(14, 14, 14), border=(16, 16, 16), ow=5,
-                stroke=0, shadow=3, max_w=420),
+    "caption_box": dict(size=72, px=40, py=28, r=18, bg=(255, 255, 255), fg=(14, 14, 14), border=None, ow=0,
+                        stroke=0, shadow=6, max_w=960),
+    # the first-second hook: big, yellow, punches in
+    "hook": dict(size=86, px=42, py=28, r=24, bg=(255, 212, 0), fg=(14, 14, 14), border=(16, 16, 16), ow=7,
+                 stroke=0, shadow=8, max_w=980),
+    "card": dict(size=62, px=44, py=30, r=34, bg=(236, 90, 70), fg=(255, 255, 255), border=(16, 16, 16), ow=6,
+                 stroke=0, shadow=6, max_w=860),
+    "tag": dict(size=42, px=20, py=12, r=20, bg=(255, 255, 255), fg=(14, 14, 14), border=(16, 16, 16), ow=5,
+                stroke=0, shadow=3, max_w=320),
     "title": dict(size=104, px=0, py=0, r=0, bg=None, fg=(255, 255, 255), border=None, ow=0, stroke=9,
                   shadow=0, max_w=960),
     "lyric": dict(size=74, px=0, py=0, r=0, bg=None, fg=(255, 255, 255), border=None, ow=0, stroke=5,
@@ -263,7 +271,7 @@ def styled_box(text, style, s, color=None, size=None, max_w=None):
 
 # ---------------------------------------------------------------- speech bubble
 @functools.lru_cache(maxsize=256)
-def bubble_image(text, s, tail_x, size=46, max_w=600, tail_h=58):
+def bubble_image(text, s, tail_x, size=56, max_w=660, tail_h=58):
     """White speech bubble with a tail whose tip is at (tail_x, bottom). tail_x in output px."""
     tb = text_block(text, size * s, max_w * s, fill=(14, 14, 14))
     px, py = int(30 * s), int(20 * s)

@@ -63,7 +63,7 @@ def audio_duration(path):
 
 
 def estimate_duration(text):
-    return max(1.2, len(text) * 0.07 + 0.45)
+    return max(1.2, len(text) * 0.125 + 0.65)    # fitted on edge-tts hi-IN lines
 
 
 def lip_envelope(path, fps):

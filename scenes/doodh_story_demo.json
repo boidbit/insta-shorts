@@ -1,0 +1,61 @@
+{
+  "hook": "Mummy ka ek kaam... aur hum 😭",
+  "meta": { "fps": 30, "line_gap": 0.3 },
+  "transition": "whip",
+  "music": { "type": "beat", "bpm": 100, "volume": 0.2 },
+  "characters": {
+    "M": { "look": "aunty", "slot": "left", "facing": "right", "voice": { "name": "hi-IN-SwaraNeural", "pitch": "-4Hz" } },
+    "R": { "look": "college_boy", "slot": "right", "voice": { "name": "hi-IN-MadhurNeural", "pitch": "+12Hz", "rate": "+6%" } },
+    "D": { "look": "boy", "accessories": ["cap"], "cap_color": "blue", "slot": "right", "voice": { "name": "hi-IN-MadhurNeural", "pitch": "-6Hz" } }
+  },
+  "overlays": [
+    { "text": "Mummy ka ek kaam... aur hum 😭", "style": "hook", "pos": [540, 420], "from": 0.0, "to": 2.0 }
+  ],
+  "scenes": [
+    {
+      "background": { "type": "room" },
+      "cast": ["M", "R"],
+      "timeline": [
+        { "t": 0.0, "sfx": "whoosh", "volume": 0.7, "camera": { "shake": 0.5 } },
+        { "t": 0.0, "who": "all", "action": "idle", "expression": "smile" },
+        { "t": 0.3, "who": "M", "expression": "think", "action": "point", "point": "right",
+          "say": "Beta, jaldi se doodh le aana!", "speak": "बेटा, जल्दी से दूध ले आना!" },
+        { "who": "R", "expression": "grin", "action": "idle", "say": "Haan mummy, bas 2 minute!", "speak": "हाँ मम्मी, बस दो मिनट!" },
+        { "who": "R", "facing": "right", "move": { "x": 1200, "dur": 1.2 }, "hold": 1.0 }
+      ]
+    },
+    {
+      "title": "Raste me... 🚶",
+      "background": { "type": "street" },
+      "cast": ["R", "D"],
+      "characters": { "R": { "x": -140, "facing": "right" }, "D": { "x": 780, "facing": "left" } },
+      "timeline": [
+        { "t": 0.0, "who": "R", "expression": "smile", "move": { "x": 330, "dur": 1.3 } },
+        { "t": 0.0, "who": "D", "action": "wave", "expression": "grin", "prop": "ball" },
+        { "t": 1.4, "who": "D", "action": "idle", "say": "Bhai! Ek match ho jaye?", "speak": "भाई! एक मैच हो जाए?" },
+        { "who": "R", "expression": "sly", "say": "Bas ek over... phir doodh!", "speak": "बस एक ओवर... फिर दूध!" },
+        { "who": "all", "action": "jump", "expression": "laugh", "sfx": "clap", "volume": 0.6, "hold": 1.4 }
+      ]
+    },
+    {
+      "title": "3 ghante baad... ⏰",
+      "background": { "type": "room" },
+      "cast": ["M", "R"],
+      "characters": { "R": { "x": 1200, "facing": "left" } },
+      "timeline": [
+        { "t": 0.0, "who": "M", "action": "idle", "expression": "angry" },
+        { "t": 0.0, "who": "R", "expression": "smile", "move": { "x": 780, "dur": 1.0 } },
+        { "t": 1.1, "who": "M", "action": "point", "point": "right", "expression": "shout", "sfx": "boing", "volume": 0.7,
+          "camera": { "shake": 0.7 }, "say": "Doodh kahan hai?!", "speak": "दूध कहाँ है?!" },
+        { "t": 1.1, "who": "R", "action": "shock", "expression": "shock" },
+        { "who": "R", "action": "shrug", "expression": "grin", "say": "Doodh... par match jeet gaye na!", "speak": "दूध... पर मैच जीत गए ना!" },
+        { "who": "M", "action": "facepalm", "expression": "angry", "sfx": "thud", "volume": 0.6, "hold": 1.8,
+          "overlay": { "text": "Tag karo us dost ko 👇", "style": "card", "pos": [540, 640], "color": [236, 90, 70] } }
+      ]
+    }
+  ],
+  "post": {
+    "caption": "Mummy ka ek kaam aur hamara 'bas 2 minute' 😭😂 Tag karo us dost ko jo match ke bahane le jata hai!",
+    "hashtags": ["#desicomedy", "#mummy", "#relatable", "#indianreels", "#funnyshorts"]
+  }
+}

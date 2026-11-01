@@ -1,7 +1,8 @@
 {
   "name": "dost_types",
-  "about": "Har group ka alag-alag dost: 3 stickmen, har ek ka label + ek line (bubble + Hindi voice). Camera speaker pe zoom karta hai.",
+  "about": "Har group ka alag-alag dost: pehle second me hook, phir 3 log, har ek ka label + ek line (bubble + Hindi voice).",
   "vars": {
+    "hook": "3 dost, 3 drame 😂",
     "caption": "Har group me hota hai ye dost 😂",
     "bg": "kitchen",
     "label_a": "Kanjoos dost",
@@ -19,18 +20,20 @@
   "background": { "type": "{bg}" },
   "music": { "type": "beat", "bpm": 96, "volume": 0.22 },
   "characters": {
-    "A": { "color": "pink",  "slot": "left",   "voice": { "name": "hi-IN-SwaraNeural", "pitch": "+0Hz" } },
-    "B": { "color": "blue",  "slot": "center", "accessories": ["glasses"], "voice": { "name": "hi-IN-MadhurNeural", "pitch": "+22Hz", "rate": "+8%" } },
-    "C": { "color": "green", "slot": "right",  "accessories": ["cap"], "voice": { "name": "hi-IN-MadhurNeural", "pitch": "-6Hz" } }
+    "A": { "look": "college_girl", "slot": "left", "voice": { "name": "hi-IN-SwaraNeural", "pitch": "+0Hz" } },
+    "B": { "look": "boy", "slot": "center", "accessories": ["glasses"], "voice": { "name": "hi-IN-MadhurNeural", "pitch": "+22Hz", "rate": "+8%" } },
+    "C": { "look": "college_boy", "slot": "right", "accessories": ["cap"], "voice": { "name": "hi-IN-MadhurNeural", "pitch": "-6Hz" } }
   },
-  "caption": { "text": "{caption}", "style": "caption_box", "pos": "top" },
+  "caption": { "text": "{caption}", "style": "caption_box", "pos": "top", "from": 2.0 },
   "timeline": [
     { "t": 0.0, "who": "all", "action": "idle", "expression": "smile" },
-    { "t": 0.2, "who": "A", "label": "{label_a}" },
-    { "t": 0.5, "who": "B", "label": "{label_b}" },
-    { "t": 0.8, "who": "C", "label": "{label_c}" },
-    { "t": 1.4, "who": "A", "expression": "smug", "say": "{line_a}", "speak": "{speak_a}" },
-    { "who": "A", "action": "shrug", "t": 3.4 },
+    { "t": 0.0, "sfx": "whoosh", "volume": 0.7, "camera": { "shake": 0.5 },
+      "overlay": { "text": "{hook}", "style": "hook", "pos": [540, 420], "to": 2.0 } },
+    { "t": 0.1, "who": "A", "label": "{label_a}" },
+    { "t": 0.2, "who": "B", "label": "{label_b}" },
+    { "t": 0.3, "who": "C", "label": "{label_c}" },
+    { "t": 0.5, "who": "A", "expression": "smug", "say": "{line_a}", "speak": "{speak_a}" },
+    { "who": "A", "action": "shrug", "t": 2.4 },
     { "who": "B", "expression": "shout", "action": "shock", "sfx": "boing", "volume": 0.6 },
     { "who": "B", "expression": "shout", "say": "{line_b}", "speak": "{speak_b}" },
     { "who": "C", "expression": "sly", "say": "{line_c}", "speak": "{speak_c}" },

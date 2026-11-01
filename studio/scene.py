@@ -3,7 +3,8 @@ import math
 import sys
 
 from . import audio
-from .util import LW, LH, asset_path, clamp, ease_in_out, lerp
+from .characters import resolve_spec
+from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, lerp
 
 SLOTS = {
     1: {"center": 540},
@@ -21,7 +22,7 @@ class Char:
         self.spec = spec
         self.x = x
         self.y = ground_y
-        self.scale = float(spec.get("scale", 1.0))
+        self.scale = float(resolve_spec(spec).get("scale", 1.0))
         self.phase = float(spec.get("phase", index * 0.9))
         self.events = []        # sorted by t
         self.moves = []         # (t0, t1, x0, y0, x1, y1)
@@ -183,12 +184,7 @@ def compile_scene(scene, use_tts=True, fps=None):
             if "zoom" in cam or "focus" in cam:
                 cam_events.append(cam)
 
-    plan.overlays += [dict(o) for o in scene.get("overlays", [])]
-    if "caption" in scene:     # shorthand
-        c = dict(scene["caption"]) if isinstance(scene["caption"], dict) else {"text": scene["caption"]}
-        c.setdefault("style", "caption_box")
-        c.setdefault("pos", "top")
-        plan.overlays.append(c)
+    plan.overlays += static_overlays(scene)
 
     for c in chars.values():
         c.events.sort(key=lambda e: e["t"])
@@ -224,19 +220,66 @@ def compile_scene(scene, use_tts=True, fps=None):
     plan.shakes = shakes
 
     # ---- audio ----
-    plan.music = None
-    m = scene.get("music") or meta.get("music")
-    if m:
-        if isinstance(m, str):
-            m = {"path": m}
-        vol = float(m.get("volume", 0.35))
-        if m.get("type") == "beat":
-            p = audio.beat_path(float(m.get("bpm", 104)), plan.duration, m.get("style", "desi"))
-        else:
-            p = asset_path(m.get("path"))
-        if p:
-            plan.music = dict(path=p, volume=vol, generated=m.get("type") == "beat")
+    plan.music = compile_music(scene.get("music") or meta.get("music"), plan.duration)
     return plan
+
+
+def static_overlays(scene):
+    """The scene's `overlays` list plus the `caption` shorthand."""
+    out = [dict(o) for o in scene.get("overlays", [])]
+    if "caption" in scene:
+        c = dict(scene["caption"]) if isinstance(scene["caption"], dict) else {"text": scene["caption"]}
+        c.setdefault("style", "caption_box")
+        c.setdefault("pos", "top")
+        out.append(c)
+    return out
+
+
+def compile_music(m, duration):
+    if not m:
+        return None
+    if isinstance(m, str):
+        m = {"path": m}
+    vol = float(m.get("volume", 0.35))
+    if m.get("type") == "beat":
+        p = audio.beat_path(float(m.get("bpm", 104)), duration, m.get("style", "desi"))
+    else:
+        p = asset_path(m.get("path"))
+    return dict(path=p, volume=vol, generated=m.get("type") == "beat") if p else None
+
+
+# keys of a multi-scene file that belong to the whole video, not to one scene
+VIDEO_KEYS = ("scenes", "music", "caption", "overlays", "post", "hook", "vars", "name", "about", "transition")
+
+
+def split_scenes(scene):
+    """A multi-scene file ({"scenes": [...]}) -> list of ordinary single-scene dicts.
+
+    Every scene gets the shared `characters` (only those in its `cast`, if given,
+    with its own `characters` entries merged on top), the shared `meta`, and its own
+    background / timeline / overlays / caption. A scene `title` shows as a card for
+    its first 1.4 seconds ("Agle din...").
+    """
+    if not scene.get("scenes"):
+        return [scene]
+    base = {k: v for k, v in scene.items() if k not in VIDEO_KEYS}
+    base_meta = {k: v for k, v in scene.get("meta", {}).items() if k != "duration"}
+    base_meta.setdefault("tail", 0.5)
+    cast_all = scene.get("characters", {})
+    out = []
+    for sc in scene["scenes"]:
+        sub = deep_merge(base, {k: v for k, v in sc.items() if k not in ("cast", "characters", "meta", "title")})
+        sub["meta"] = dict(base_meta, **sc.get("meta", {}))
+        cast = sc.get("cast") or list(cast_all.keys())
+        chars = {n: dict(cast_all.get(n, {})) for n in cast}
+        for n, spec in sc.get("characters", {}).items():
+            chars[n] = dict(chars.get(n, {}), **spec)
+        sub["characters"] = chars
+        if sc.get("title"):
+            sub["overlays"] = list(sub.get("overlays", [])) + [
+                {"text": sc["title"], "style": "card", "pos": "upper", "from": 0.0, "to": 1.4, "color": [40, 40, 48]}]
+        out.append(sub)
+    return out
 
 
 def camera_at(plan, t):

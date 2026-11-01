@@ -1,0 +1,18 @@
+HOOK: Mummy ka ek kaam... aur hum 😭
+CAST: M = mummy, R = college_boy, D = dost cap
+SCENE: room
+M (think, point): Beta, jaldi se doodh le aana! | बेटा, जल्दी से दूध ले आना!
+R (grin): Haan mummy, bas 2 minute! | हाँ मम्मी, बस दो मिनट!
+R -> exit right
+SCENE: street | Raste me... 🚶
+R -> enter left
+D (wave, ball): Bhai! Ek match ho jaye? | भाई! एक मैच हो जाए?
+R (sly): Bas ek over... phir doodh! | बस एक ओवर... फिर दूध!
+ALL -> jump laugh clap
+SCENE: room | 3 ghante baad... ⏰
+M (shout, point, boing, shake): Doodh kahan hai?! | दूध कहाँ है?!
+R (shock, shock): Doodh... par match jeet gaye na! | दूध... पर मैच जीत गए ना!
+M -> facepalm angry thud
+CTA: Tag karo us dost ko 👇
+CAPTION: Mummy ka ek kaam aur hamara 'bas 2 minute' 😭😂
+HASHTAGS: #desicomedy #mummy #relatable #indianreels #funnyshorts
