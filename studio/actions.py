@@ -13,22 +13,23 @@ def _stance(spread=1.0):
 
 
 def idle(t, sp, I, ph, o):
-    w = 2 * pi * 0.7 * sp
+    # standing still: only slow breathing in the arms and a tiny head drift, no body sway
+    w = 2 * pi * 0.35 * sp
     d = _stance()
-    d.update(tilt=1.2 * sin(w * t + ph) * I, head_tilt=2.0 * sin(w * t * 0.5 + ph) * I,
-             la1=-14 + 2 * sin(w * t), ra1=14 - 2 * sin(w * t))
+    d.update(tilt=0.2 * sin(w * t + ph) * I, head_tilt=1.2 * sin(w * 0.6 * t + ph) * I,
+             la1=-14 + 0.8 * sin(w * t + ph), ra1=14 - 0.8 * sin(w * t + ph))
     return d
 
 
 def talk(t, sp, I, ph, o):
-    w = 2 * pi * 1.1 * sp
+    # calm speaking: small head nods and one hand gesturing, the body stays planted
+    w = 2 * pi * 0.9 * sp
     d = _stance()
     d.update(
-        tilt=1.5 * sin(w * 0.5 * t + ph) * I,
-        head_tilt=4.0 * sin(w * t + ph) * I,
-        ra1=38 + 20 * sin(w * t + ph) * I, ra2=70 + 28 * sin(w * t + 1.2 + ph) * I,
-        la1=-16 + 4 * sin(w * 0.5 * t),
-        lift=-3 * abs(sin(w * t + ph)) * I,
+        tilt=0.4 * sin(w * 0.4 * t + ph) * I,
+        head_tilt=2.2 * sin(w * t + ph) * I,
+        ra1=30 + 10 * sin(w * 0.6 * t + ph) * I, ra2=58 + 16 * sin(w * 0.6 * t + 1.2 + ph) * I,
+        la1=-15,
     )
     return d
 
@@ -96,23 +97,31 @@ def point(t, sp, I, ph, o):
     return d
 
 
+def _settle(t, after, rate=0.6, floor=0.25):
+    """1 until `after` seconds, then fades towards `floor`: reactions calm down instead of looping forever."""
+    return 1.0 if t < after else max(floor, 1.0 - (t - after) * rate)
+
+
 def laugh(t, sp, I, ph, o):
     w = 2 * pi * 4.5 * sp
+    k = I * _settle(t, 1.8)
     d = _stance(1.6)
     d.update(la1=-40, la2=48, ra1=40, ra2=-48,
-             tilt=3 * sin(w * 0.5 * t) * I, head_tilt=-11 + 6 * sin(w * t) * I,
-             lift=-9 * abs(sin(w * t)) * I, look_y=-0.5)
+             tilt=3 * sin(w * 0.5 * t) * k, head_tilt=-11 + 6 * sin(w * t) * k,
+             lift=-9 * abs(sin(w * t)) * k, look_y=-0.5)
     return d
 
 
 def shock(t, sp, I, ph, o):
     jump = sin(pi * clamp(t / 0.32)) * 130 * I if t < 0.32 else 0.0
     lean = o.get("lean", -1) * 10 * ease_out(t / 0.25)
-    shake = sin(2 * pi * 14 * t) * 3 * I if t > 0.3 else 0
+    shake = sin(2 * pi * 14 * t) * 3 * I * math.exp(-(t - 0.3) * 4) if t > 0.3 else 0
+    down = ease_out((t - 1.0) / 0.6) if t > 1.0 else 0.0    # arms come down to a stunned pose
     d = _stance(1.6)
-    d.update(lift=-jump, tilt=lean, shift=shake,
-             la1=-120 - 20 * ease_out(t / 0.25), la2=-165,
-             ra1=120 + 20 * ease_out(t / 0.25), ra2=165, head_tilt=-lean * 0.6)
+    d.update(lift=-jump, tilt=lean * (1 - 0.6 * down), shift=shake,
+             la1=(-120 - 20 * ease_out(t / 0.25)) * (1 - down) - 34 * down, la2=-165 * (1 - down) - 18 * down,
+             ra1=(120 + 20 * ease_out(t / 0.25)) * (1 - down) + 34 * down, ra2=165 * (1 - down) + 18 * down,
+             head_tilt=-lean * 0.6 * (1 - 0.6 * down))
     return d
 
 

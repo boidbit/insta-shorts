@@ -223,6 +223,18 @@ def resolve_spec(spec):
     return out
 
 
+def _capsule(p0, p1, r0, r1, n=10):
+    """Outline of a tapered capsule from p0 (radius r0) to p1 (radius r1)."""
+    dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+    th = math.atan2(dy, dx) if (dx or dy) else 0.0
+    pts = []
+    for c, r, a0 in ((p1, r1, th - math.pi / 2), (p0, r0, th + math.pi / 2)):
+        for i in range(n + 1):
+            a = a0 + math.pi * i / n
+            pts.append((c[0] + r * math.cos(a), c[1] + r * math.sin(a)))
+    return pts
+
+
 class Sketch:
     """Collects drawing ops in global logical coordinates."""
 
@@ -246,9 +258,16 @@ class Sketch:
         self.ops.append(dict(t="line", pts=[self.T(p) for p in pts], w=w * self.k, color=color))
 
     def tube(self, pts, w, fill, ow=OUTLINE * 0.8):
-        """A limb / sleeve: thick coloured line with an ink outline."""
+        """A strap / scarf: thick coloured line with an ink outline."""
         self.line(pts, w + 2 * ow, INK)
         self.line(pts, w, fill)
+
+    def limb(self, pts, widths, fill, ow=OUTLINE * 0.8):
+        """A tapering limb / sleeve (one width per point). All the ink goes down before
+        the fill, so the elbow / knee joints show no seams."""
+        for extra, col in ((2 * ow, INK), (0.0, fill)):
+            for i in range(len(pts) - 1):
+                self.poly(_capsule(pts[i], pts[i + 1], (widths[i] + extra) / 2.0, (widths[i + 1] + extra) / 2.0), col)
 
     def dot(self, c, r, fill=INK, outline=None, w=OUTLINE):
         n = 56 if r > 40 else (32 if r > 12 else 20)
@@ -410,12 +429,25 @@ def _draw_outfit(S, o, sk, cols, build):
 def _sleeve(S, outfit, sh, elb, hand, col):
     if outfit in ("vest",):
         return
-    if outfit in ("tshirt", "uniform", "saree"):
-        S.tube([sh, mix(sh, elb, 0.55)], ARM_W + 14, col)
+    if outfit in ("tshirt", "uniform", "saree"):      # short sleeve, a little flared at the opening
+        S.limb([sh, mix(sh, elb, 0.55)], [ARM_W + 14, ARM_W + 16], col)
     elif outfit == "salwar":
-        S.tube([sh, elb, mix(elb, hand, 0.5)], ARM_W + 10, col)
+        S.limb([sh, elb, mix(elb, hand, 0.5)], [ARM_W + 12, ARM_W + 9, ARM_W + 9], col)
     else:   # shirt, kurta, blazer: full sleeves
-        S.tube([sh, elb, mix(elb, hand, 0.82)], ARM_W + 10, col)
+        S.limb([sh, elb, mix(elb, hand, 0.82)], [ARM_W + 10, ARM_W + 7, ARM_W + 6], col)
+
+
+def _hand(S, wrist, fore_angle, side, skin, finger=False):
+    """Mitten hand: palm along the forearm, thumb towards the body (when the arm hangs)."""
+    d = vec(fore_angle, 1.0)
+    n = (-d[1], d[0])
+    s = -1 if side == "L" else 1
+    c = (wrist[0] + d[0] * 11, wrist[1] + d[1] * 11)
+    thumb = (c[0] + s * n[0] * 13 - d[0] * 3, c[1] + s * n[1] * 13 - d[1] * 3)
+    if finger:
+        S.limb([(c[0] + d[0] * 8, c[1] + d[1] * 8), (c[0] + d[0] * 42, c[1] + d[1] * 42)], [11, 8], skin, 3)
+    S.poly(closed_ellipse(c[0], c[1], 13, 17, 24, -fore_angle), skin, INK, 4.5)
+    S.poly(closed_ellipse(thumb[0], thumb[1], 6.5, 11, 16, -fore_angle + s * 40), skin, INK, 4)
 
 
 def _back_hair(S, HH, style, hc):
@@ -521,7 +553,8 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     # ---- legs + feet ----
     if outfit != "saree":
         for hip, knee, foot in ((sk["hipL"], sk["kneeL"], sk["footL"]), (sk["hipR"], sk["kneeR"], sk["footR"])):
-            S.tube([hip, knee, add(foot, (0, -10))], LEG_W + (10 if outfit == "salwar" else 0), cols["pants"])
+            w = LEG_W + (10 if outfit == "salwar" else 0)
+            S.limb([hip, knee, add(foot, (0, -10))], [w + 4, w, w - 5], cols["pants"])
     _draw_feet(S, sk, o.get("shoes", "black"), skin)
 
     # ---- neck + torso ----
@@ -533,17 +566,13 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     # ---- arms ----
     for side, sh, elb, hand, a2 in (("L", sk["shL"], sk["elbL"], sk["handL"], p["la2"]),
                                     ("R", sk["shR"], sk["elbR"], sk["handR"], p["ra2"])):
-        S.tube([sh, elb, hand], ARM_W, skin)
+        S.limb([sh, elb, hand], [ARM_W, ARM_W - 3, ARM_W - 7], skin)
         _sleeve(S, outfit, sh, elb, hand, cols["main"])
-        S.dot(hand, 15, skin, INK, 4.5)
-        if p.get("finger") == side:
-            S.tube([hand, add(hand, vec(a2, 40))], 9, skin, 3)
+        _hand(S, hand, a2, side, skin, finger=p.get("finger") == side)
     if prop:
         side = o.get("prop_hand", "R")
-        if side == "L":
-            _draw_prop(S, prop, sk["handL"], p["la2"], cols["main"])
-        else:
-            _draw_prop(S, prop, sk["handR"], p["ra2"], cols["main"])
+        wrist, fore = (sk["handL"], p["la2"]) if side == "L" else (sk["handR"], p["ra2"])
+        _draw_prop(S, prop, add(wrist, vec(fore, 11)), fore, cols["main"])     # held in the palm
 
     # ---- head ----
     for sgn in (-1, 1):
