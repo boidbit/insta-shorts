@@ -50,6 +50,24 @@ HASHTAGS: #desicomedy #mummy
 
 Command line se: `python -m studio.script scripts/doodh_story.txt -o scenes/doodh.json` phir render.
 
+## Gaana / lyrics (bilkul bina format ke)
+
+Script ka format yaad nahi rakhna? Page ke **"📝 Apni script"** tab me (ya `scripts/x.txt` me) bas lyrics likho, har line ek lyric:
+
+```
+SECONDS: 60
+Raat lambi hai, raasta khamosh
+Chalta hu bina manzil ke
+Chaand bhi saath chal raha hai
+```
+
+Agar text me `CAST:` / `SCENE:` / `A -> ...` / `NAME: ...` wali koi line nahi hai, to ye lyrics mode hai: ek kurta wala akela musafir night road pe chalta hai aur lyrics ek-ek karke aate hain. Kuch aur nahi likhna.
+
+- `SECONDS: 60` = video kitne second ka (nahi likha to har lyric 3.2 sec). Lines jitni zyada, utni lambi; 17 lines = ~60 sec.
+- Optional: `HOOK:`, `CTA:`, `CAPTION:`, `HASHTAGS:`, `MUSIC: beat 76` / `MUSIC: none` / `MUSIC: <apni audio ka path>`.
+- **Awaaz nahi gaati.** Is mode me koi voice hai hi nahi: sirf lyrics + halka beat. Asli gaana: `MUSIC: none` rakho aur gaana Instagram me upar se daalo (copyright wahi sambhalta hai). Lyrics ki timing gaane se match nahi hogi, to `SECONDS` aur lines gaane ke hisaab se adjust karo.
+- Page ka checker ("HOOK/CTA nahi hai") lyrics pe dikkat dikha sakta hai: confirm me "Phir bhi banau" dabao.
+
 ## Characters
 
 Ready looks: `boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, kid, kid_girl, office_guy, office_girl`. Har cheez badal sakte ho:
