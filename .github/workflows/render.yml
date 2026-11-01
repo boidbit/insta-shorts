@@ -16,10 +16,16 @@ on:
         required: false
         default: "1080"
       voice:
-        description: "Generate Hindi voice (edge-tts)?"
+        description: "Generate Hindi voice?"
         type: boolean
         required: false
         default: true
+      tts:
+        description: "Voice engine: auto (Gemini if GEMINI_API_KEY secret is set, else edge-tts) | gemini | edge"
+        type: choice
+        options: [auto, gemini, edge]
+        required: false
+        default: auto
   push:
     paths:
       - "scenes/*.json"
@@ -45,6 +51,9 @@ jobs:
 
       - name: Python packages
         run: pip install -r requirements.txt
+
+      - name: Unit tests
+        run: python -m unittest discover -s tests
 
       - name: Cache generated voice lines
         uses: actions/cache@v4
@@ -89,9 +98,11 @@ jobs:
           LIST: ${{ steps.pick.outputs.list }}
           WIDTH: ${{ inputs.width || '1080' }}
           VOICE: ${{ inputs.voice }}
+          TTS: ${{ inputs.tts || 'auto' }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           mkdir -p out
-          FLAGS=""
+          FLAGS="--tts $TTS"
           [ "$VOICE" = "false" ] && FLAGS="--no-tts"
           for f in $LIST; do
             name=$(basename "$f" .json)

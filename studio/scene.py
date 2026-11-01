@@ -81,7 +81,39 @@ def _norm_who(who, names):
     return list(who)
 
 
-def compile_scene(scene, use_tts=True, fps=None):
+def _gemini_batch(scene, chars, names, cfg, explicit):
+    """Voice for EVERY spoken line of the scene in a single Gemini request.
+
+    Returns {timeline index: wav path}. On failure: raises SystemExit if the user asked for gemini by name,
+    otherwise warns and returns None so the caller falls back to per-line edge-tts.
+    """
+    from . import gemini_tts
+    items, idxs = [], []
+    for i, raw in enumerate(scene.get("timeline", [])):
+        if "say" not in raw or not raw.get("tts", True):
+            continue
+        who = [w for w in _norm_who(raw.get("who"), names) if w in chars]
+        text = str(raw.get("speak", raw["say"])).strip()
+        if not who or not text:
+            continue
+        v = dict(chars[who[0]].voice)
+        v.update(raw.get("voice", {}) if isinstance(raw.get("voice"), dict) else {})
+        items.append(dict(text=text, voice=gemini_tts.voice_for(v), pitch=v.get("pitch"), rate=v.get("rate")))
+        idxs.append(i)
+    if not items:
+        return {}
+    try:
+        paths = gemini_tts.synth_script(items, model=cfg.get("model", gemini_tts.DEFAULT_MODEL),
+                                        style=cfg.get("style", gemini_tts.DEFAULT_STYLE))
+    except Exception as e:
+        if explicit:
+            raise SystemExit("[tts] Gemini failed: %s" % e)
+        print("  [tts] Gemini failed (%s) -> falling back to edge-tts" % str(e)[:160], file=sys.stderr)
+        return None
+    return dict(zip(idxs, paths))
+
+
+def compile_scene(scene, use_tts=True, fps=None, tts_provider=None):
     plan = Plan()
     meta = scene.get("meta", {})
     plan.fps = int(fps or meta.get("fps", 30))
@@ -115,7 +147,15 @@ def compile_scene(scene, use_tts=True, fps=None):
     warned = [False]
     plan_end = 0.0
 
-    for raw in scene.get("timeline", []):
+    batch, per_line_edge = {}, use_tts
+    if use_tts:
+        provider, explicit = audio.resolve_provider(tts_provider, meta.get("tts"))
+        if provider == "gemini":
+            batch = _gemini_batch(scene, chars, names, meta.get("tts") or {}, explicit)
+            per_line_edge = batch is None          # None = Gemini failed in auto mode -> edge-tts per line
+            batch = batch or {}
+
+    for ti, raw in enumerate(scene.get("timeline", [])):
         ev = dict(raw)
         t = float(ev["t"]) if "t" in ev and ev["t"] is not None else cursor
         plan_end = max(plan_end, t)
@@ -149,7 +189,10 @@ def compile_scene(scene, use_tts=True, fps=None):
             v = dict(c.voice)
             v.update(ev.get("voice", {}) if isinstance(ev.get("voice"), dict) else {})
             path, dur = None, None
-            if use_tts and ev.get("tts", True):
+            if ti in batch:
+                path = batch[ti]
+                dur = audio.audio_duration(path)
+            elif per_line_edge and ev.get("tts", True):
                 path = audio.synth_tts(speak, v.get("name"), v.get("rate", "+0%"), v.get("pitch", "+0Hz"))
                 if path:
                     dur = audio.audio_duration(path)

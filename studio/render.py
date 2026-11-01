@@ -25,9 +25,9 @@ POS = {"top": (540, 330), "center": (540, 960), "lower": (540, 1450), "bottom": 
 
 
 class Renderer:
-    def __init__(self, scene, width=1080, use_tts=True, fps=None):
+    def __init__(self, scene, width=1080, use_tts=True, fps=None, tts_provider=None):
         self.scene = scene
-        self.plan = compile_scene(scene, use_tts=use_tts, fps=fps)
+        self.plan = compile_scene(scene, use_tts=use_tts, fps=fps, tts_provider=tts_provider)
         self.W = int(width) - int(width) % 2
         self.H = int(round(self.W * LH / LW))
         self.H -= self.H % 2
@@ -285,12 +285,15 @@ def main(argv=None):
     ap.add_argument("--width", type=int, default=1080, help="output width in px (height is 16:9 portrait)")
     ap.add_argument("--fps", type=int, default=None)
     ap.add_argument("--no-tts", action="store_true", help="skip speech synthesis (estimated timing, silent voice)")
+    ap.add_argument("--tts", choices=["auto", "gemini", "edge"], default=None,
+                    help="voice engine: gemini = whole script in ONE Gemini request then split per line "
+                         "(needs GEMINI_API_KEY); edge = edge-tts per line; auto (default) = gemini if key is set")
     ap.add_argument("--frame", type=float, default=None, help="render one PNG frame at this time (seconds)")
     args = ap.parse_args(argv)
 
     scene = load_scene(args.scene)
     name = os.path.splitext(os.path.basename(args.scene))[0]
-    r = Renderer(scene, args.width, use_tts=not args.no_tts, fps=args.fps)
+    r = Renderer(scene, args.width, use_tts=not args.no_tts, fps=args.fps, tts_provider=args.tts)
     if args.frame is not None:
         out = args.out or os.path.join("out", name + ".png")
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)

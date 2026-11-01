@@ -40,6 +40,24 @@ Bubble me dikhne wala text Roman Hinglish me hota hai (`say`), lekin TTS ko **De
 
 Voices: `hi-IN-MadhurNeural` (male), `hi-IN-SwaraNeural` (female). Har character ko alag `pitch`/`rate` do (`"voice": {"name": "...", "pitch": "+20Hz", "rate": "+8%"}`) to alag-alag awaaz lagti hai. Mooh ka khulna-band hona awaaz ki loudness se sync hota hai.
 
+### Gemini voice (realistic) - poori script ek hi request me
+
+Free Gemini key ka quota kam hota hai, isliye **ek scene ki saari lines ek hi API request me** bheji jaati hain, ek lambi audio aati hai, aur use lines ke beech ke pause pe kaat kar har line ka alag clip banta hai (lip-sync/timing waise hi chalte hain).
+
+```bash
+export GEMINI_API_KEY=...            # https://aistudio.google.com/apikey  (GitHub: Settings -> Secrets -> GEMINI_API_KEY)
+python -m studio.render scenes/dost_types_demo.json -o out/x.mp4 --tts gemini
+```
+
+- `--tts auto` (default): key set hai to Gemini, warna edge-tts. Auto me Gemini fail ho (quota/network) to edge-tts pe girta hai; `--tts gemini` me fail hone pe render ruk jata hai (awaaz chupke se nahi badalti).
+- Result `.cache/tts/gemini_*` me save hota hai: dobara render / preview frame / GitHub Action re-run = **0 extra requests** (jab tak script same hai). Script ka ek akshar badla to nayi request lagegi.
+- Gemini ek request me max **2 awaazein** deta hai. Do se zyada characters ho to wo in 2 awaazon ko share karte hain; `pitch`/`rate` (ffmpeg se) unhe alag banate hain.
+- Voice chunna ho: `"voice": {"gemini": "Kore"}` (female: Kore, Leda, Aoede...; male: Puck, Charon, Fenrir...). Na do to Swara -> Kore, baaki -> Puck.
+- Style badalna ho: scene `meta.tts` me `{"model": "...", "style": "..."}`.
+- Split pause pe tika hai: Gemini se lines ke beech ~1s ka pause maanga jaata hai. Agar ek line ke andar lamba pause aa gaya to split galat ho sakta hai; render log me har line ka `start-end` aur text print hota hai, wahan check kar lo. Same script dobara bhejna hai to `.cache/tts/gemini_*` delete karo.
+
+Tests: `python -m unittest discover -s tests` (network/key nahi chahiye).
+
 ## GitHub Actions
 
 1. Repo GitHub pe push karo.
@@ -47,6 +65,7 @@ Voices: `hi-IN-MadhurNeural` (male), `hi-IN-SwaraNeural` (female). Har character
    - `scene`: koi bhi `scenes/*.json` (ya `all`)
    - `width`: 1080 (full) ya 720 (fast)
    - `voice`: Hindi voice on/off
+   - `tts`: `auto` / `gemini` / `edge` (Gemini ke liye secret `GEMINI_API_KEY`)
 3. Run ke baad **Artifacts → stickman-videos** me `.mp4` aur preview `.png` milti hai.
 4. `scenes/*.json` push karne par bhi apne aap render hota hai.
 
