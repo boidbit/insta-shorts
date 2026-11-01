@@ -27,11 +27,10 @@ Script format (one thing per line):
 - `wait 1.5` (or `...`) pauses.
 """
 import argparse
-import json
 import os
 import re
 
-from . import actions, audio
+from . import actions, audio, director
 from .characters import ACCESSORIES, EXPRESSIONS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE, SKIN_TONES
 from .scene import SLOTS
 
@@ -313,10 +312,7 @@ def main(argv=None):
     for w in warnings:
         print("  [script] " + w)
     out = args.out or os.path.splitext(args.script)[0] + ".json"
-    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
-    with open(out, "w", encoding="utf-8") as f:
-        json.dump(scene, f, ensure_ascii=False, indent=2)
-    print(out)
+    print(director.save(scene, out))     # + .post.txt (Instagram caption + hashtags)
 
 
 if __name__ == "__main__":

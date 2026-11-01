@@ -1,4 +1,5 @@
 name: Render video
+run-name: ${{ inputs.request_id && format('web-{0}', inputs.request_id) || format('Render video ({0})', github.event_name) }}
 
 on:
   workflow_dispatch:
@@ -20,6 +21,15 @@ on:
         description: "Or a script file, e.g. scripts/doodh_story.txt (no AI needed)"
         required: false
         default: ""
+      script_text:
+        description: "Or the script itself (used by the web page)"
+        required: false
+        default: ""
+      ai_polish:
+        description: "Script: let the AI add Devanagari + acting (needs an AI key)"
+        type: boolean
+        required: false
+        default: false
       scene:
         description: "Or a scene file, e.g. scenes/doodh_story_demo.json (or 'all')"
         required: false
@@ -33,10 +43,17 @@ on:
         type: boolean
         required: false
         default: true
+      request_id:
+        description: "Set by the web page to find this run (leave empty)"
+        required: false
+        default: ""
   push:
     paths:
       - "scenes/*.json"
       - "scripts/*.txt"
+
+permissions:
+  contents: write     # publish each finished reel as a GitHub release
 
 jobs:
   render:
@@ -70,7 +87,7 @@ jobs:
           key: tts-${{ github.run_id }}
           restore-keys: tts-
 
-      - name: Decide what to render
+      - name: Write the story
         id: pick
         env:
           EVENT: ${{ github.event_name }}
@@ -78,18 +95,32 @@ jobs:
           HOOK: ${{ inputs.hook }}
           COUNT: ${{ inputs.count }}
           SCRIPT: ${{ inputs.script }}
+          SCRIPT_TEXT: ${{ inputs.script_text }}
+          AI_POLISH: ${{ inputs.ai_polish }}
           SCENE: ${{ inputs.scene }}
           BEFORE: ${{ github.event.before }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           mkdir -p scenes/generated
           LIST=""
+          HAVE_AI=""
+          [ -n "$ANTHROPIC_API_KEY$GEMINI_API_KEY$GOOGLE_API_KEY" ] && HAVE_AI=1
           if [ "$EVENT" = "workflow_dispatch" ]; then
-            if [ -n "$SCRIPT" ]; then
+            if [ -n "$SCRIPT_TEXT" ]; then
+              printf '%s\n' "$SCRIPT_TEXT" > scenes/generated/web_script.txt
+              if [ "$AI_POLISH" = "true" ] && [ -n "$HAVE_AI" ]; then
+                LIST="$(python -m studio.director "$SCRIPT_TEXT" --hook "${HOOK:-auto}" -o scenes/generated/web.json)"
+              else
+                python -m studio.script scenes/generated/web_script.txt -o scenes/generated/web.json
+                LIST="scenes/generated/web.json"
+              fi
+            elif [ -n "$SCRIPT" ]; then
               python -m studio.script "$SCRIPT" -o scenes/generated/script.json
               LIST="scenes/generated/script.json"
             elif [ -n "$INSTRUCTION" ] || [ "${COUNT:-1}" != "1" ]; then
+              [ -z "$HAVE_AI" ] && { echo "::error::No AI key secret (GEMINI_API_KEY / ANTHROPIC_API_KEY)"; exit 1; }
               N=$(( ${COUNT:-1} > 5 ? 5 : ${COUNT:-1} ))
               LIST="$(python -m studio.director "$INSTRUCTION" --hook "${HOOK:-auto}" --count "$N" -o scenes/generated/ai.json)"
             elif [ "$SCENE" = "all" ]; then LIST="$(ls scenes/*.json)"
@@ -136,3 +167,18 @@ jobs:
             out/*.post.txt
             scenes/generated/*.json
           if-no-files-found: error
+
+      - name: Publish as release (the web page plays it from here)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LIST: ${{ steps.pick.outputs.list }}
+          TAG: reel-${{ inputs.request_id || github.run_id }}
+        run: |
+          shopt -s nullglob
+          files=(out/*.mp4 out/*.png out/*.post.txt)
+          first=$(echo $LIST | awk '{print $1}')
+          TITLE="$(python -c 'import sys; from studio.util import load_scene; s = load_scene(sys.argv[1]); print(s.get("hook") or s.get("vars", {}).get("hook") or "Reel")' "$first")"
+          cat out/*.post.txt > notes.md 2>/dev/null || true
+          [ -s notes.md ] || echo "$TITLE" > notes.md
+          gh release create "$TAG" "${files[@]}" --title "$TITLE" --notes-file notes.md --target "$GITHUB_SHA" --latest=false
+          echo "Release: $TAG" >> "$GITHUB_STEP_SUMMARY"

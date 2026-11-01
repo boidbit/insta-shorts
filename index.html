@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desi Toons Studio</title>
+<meta name="description" content="Idea ya script do, GitHub pe Hindi cartoon reel banti hai.">
+<style>
+  :root {
+    --bg: #f6f1e7; --card: #ffffff; --ink: #1d1a17; --muted: #6b645b; --line: #e3dccf;
+    --accent: #ffd400; --accent-ink: #1d1a17; --brand: #e4572e; --ok: #2f9e44; --err: #c92a2a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #17140f; --card: #221e18; --ink: #f3ede3; --muted: #a79f93; --line: #3a342b; }
+  }
+  :root[data-theme="dark"] { --bg: #17140f; --card: #221e18; --ink: #f3ede3; --muted: #a79f93; --line: #3a342b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 60px; }
+  header { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+  h1 { margin: 0; font-size: 28px; }
+  h2 { font-size: 18px; margin: 0 0 10px; }
+  .sub { margin: 4px 0 20px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: 1fr 330px; gap: 20px; align-items: start; }
+  @media (max-width: 840px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 20px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tab { border: 1px solid var(--line); background: transparent; color: var(--ink); padding: 8px 14px;
+         border-radius: 999px; cursor: pointer; font: inherit; }
+  .tab[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  textarea { width: 100%; min-height: 260px; resize: vertical; border: 1px solid var(--line); border-radius: 10px;
+             padding: 12px; font: 15px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+             background: var(--bg); color: var(--ink); }
+  .hint { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+  label { font-size: 14px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  select, input[type=password], input[type=text], input[type=number] {
+    font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); min-width: 0; }
+  .go { margin-top: 16px; width: 100%; padding: 14px; font-family: inherit; font-size: 20px; font-weight: 700;
+        background: var(--accent); color: var(--accent-ink); border: 2px solid var(--ink); border-radius: 12px;
+        cursor: pointer; box-shadow: 0 4px 0 var(--ink); }
+  .go:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .go:disabled { opacity: .6; cursor: wait; }
+  .small { padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
+           color: var(--ink); font: inherit; cursor: pointer; }
+  .bar { height: 10px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 10px 0; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--brand); transition: width .4s; }
+  video { width: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: 12px; display: block; }
+  .placeholder { aspect-ratio: 9 / 16; border: 2px dashed var(--line); border-radius: 12px; display: grid;
+                 place-items: center; color: var(--muted); text-align: center; padding: 20px; }
+  .err { color: var(--err); white-space: pre-wrap; }
+  .ok { color: var(--ok); }
+  ol.steps { margin: 6px 0 0; padding-left: 20px; font-size: 14px; color: var(--muted); }
+  ol.steps li.done { color: var(--ok); }
+  ol.steps li.now { color: var(--ink); font-weight: 600; }
+  .post { min-height: 110px; font-family: inherit; }
+  .btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .btns a, .btns button { flex: 1; text-align: center; padding: 10px; border-radius: 10px; border: 1px solid var(--line);
+                          background: var(--card); color: var(--ink); text-decoration: none; font: inherit; cursor: pointer; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+  .reel { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); cursor: pointer;
+          text-align: left; padding: 0; font: inherit; color: var(--ink); }
+  .reel img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; display: block; background: var(--line); }
+  .reel span { display: block; padding: 6px 8px; font-size: 13px; line-height: 1.3; }
+  details.setup summary { cursor: pointer; font-weight: 600; }
+  .setup ol { padding-left: 20px; margin: 8px 0; font-size: 14px; }
+  code { background: var(--bg); padding: 1px 5px; border-radius: 5px; }
+  a { color: var(--brand); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🎬 Desi Toons Studio</h1>
+    <span id="who" class="hint"></span>
+  </header>
+  <p class="sub">Idea ya script likho → "Banao" dabao → GitHub pe Hindi cartoon reel banti hai (1080×1920, awaaz ke saath).</p>
+
+  <details class="card setup" id="setup">
+    <summary>⚙️ GitHub connection (ek baar)</summary>
+    <ol>
+      <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Naya fine-grained token banao</a>:
+        Repository access → <b>Only select repositories</b> → <code id="repoName">insta-shorts</code>.</li>
+      <li>Permissions → Repository → <b>Actions: Read and write</b>, <b>Contents: Read-only</b>. Generate karke copy karo.</li>
+      <li>Neeche paste karke "Save" dabao. Token sirf <b>isi browser</b> me save hota hai, repo me kabhi nahi jata.</li>
+    </ol>
+    <div class="row">
+      <label>Token <input type="password" id="token" size="34" autocomplete="off" placeholder="github_pat_…"></label>
+      <label>Branch <input type="text" id="ref" size="18"></label>
+      <button class="small" id="save">Save</button>
+      <button class="small" id="forget">Token hatao</button>
+    </div>
+    <p class="hint" id="connMsg"></p>
+  </details>
+
+  <div class="grid">
+    <section class="card">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" data-mode="idea" aria-selected="true">💡 Idea do (AI)</button>
+        <button class="tab" role="tab" data-mode="script" aria-selected="false">📝 Apni script</button>
+      </div>
+      <textarea id="text" spellcheck="false"></textarea>
+      <p class="hint" id="hint"></p>
+      <div class="row">
+        <label id="hookWrap">Hook
+          <select id="hook">
+            <option value="auto">Auto (AI chune)</option>
+            <option value="pattern_interrupt">Ruko! (pattern interrupt)</option>
+            <option value="pov">POV</option>
+            <option value="relatable">Agar tum bhi...</option>
+            <option value="curiosity">Curiosity gap</option>
+            <option value="list">3 types ke...</option>
+            <option value="question">Sawal / poll</option>
+            <option value="cold_open">Cold open</option>
+            <option value="expectation">Expectation vs reality</option>
+          </select>
+        </label>
+        <label id="countWrap">Kitni videos <input type="number" id="count" min="1" max="5" value="1" style="width:64px"></label>
+        <label>Quality
+          <select id="width"><option value="1080">1080p (HD)</option><option value="720">720p (jaldi)</option></select>
+        </label>
+        <label><input type="checkbox" id="voice" checked> Hindi awaaz</label>
+        <label id="aiWrap" class="hidden"><input type="checkbox" id="aiPolish"> AI se sudharo (Devanagari + acting)</label>
+      </div>
+      <button class="go" id="go">Banao 🎬</button>
+      <p class="hint">GitHub pe ek video banne me ~4-6 minute lagte hain. Page band kar ke wapas aao to bhi progress yahin milegi.</p>
+    </section>
+
+    <aside class="card">
+      <div id="status" class="hidden">
+        <strong id="stage">…</strong>
+        <div class="bar"><i id="barFill"></i></div>
+        <ol class="steps" id="steps"></ol>
+        <div id="errBox" class="err"></div>
+        <a id="runLink" class="hint hidden" target="_blank" rel="noopener">GitHub pe run dekho ↗</a>
+      </div>
+      <div class="placeholder" id="ph">Yahan aapki reel aayegi 📱</div>
+      <div id="result" class="hidden">
+        <div id="videos"></div>
+        <details open>
+          <summary>Instagram caption + hashtags</summary>
+          <textarea class="post" id="post"></textarea>
+          <div class="btns"><button id="copy">📋 Caption copy</button></div>
+        </details>
+      </div>
+    </aside>
+  </div>
+
+  <section class="card">
+    <h2>📼 Pichli reels</h2>
+    <div class="gallery" id="gallery"><p class="hint">Load ho raha hai…</p></div>
+  </section>
+</main>
+
+<script>
+// ---------------------------------------------------------------- config
+// owner/repo come from the Pages address (<owner>.github.io/<repo>/); branch is saved per browser.
+const DEFAULTS = { owner: "boidbit", repo: "insta-shorts", ref: "desi-toons-studio", workflow: "render.yml" };
+const CONFIG = (() => {
+  const c = { ...DEFAULTS };
+  const m = location.hostname.match(/^([\w-]+)\.github\.io$/);
+  const seg = location.pathname.split("/").filter(Boolean)[0];
+  if (m) { c.owner = m[1]; if (seg && !seg.includes(".")) c.repo = seg; }
+  return c;
+})();
+const store = {
+  get(k, d = "") { try { return localStorage.getItem("dts_" + k) ?? d; } catch { return d; } },
+  set(k, v) { try { v ? localStorage.setItem("dts_" + k, v) : localStorage.removeItem("dts_" + k); } catch {} },
+};
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, kids = []) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+const REPO = () => `/repos/${CONFIG.owner}/${CONFIG.repo}`;
+
+const EXAMPLE_SCRIPT = `HOOK: Dadi ko mila naya smartphone 😂
+CAST: D = dadi, P = beta
+SCENE: room
+D (think, phone): Beta, ye WhatsApp me photo kaise bhejte hain? | बेटा, ये व्हाट्सऐप में फ़ोटो कैसे भेजते हैं?
+P (smile, point): Dadi, bas ye button dabao! | दादी, बस ये बटन दबाओ!
+D (shock, boing, shake): Arre! Ye to video call lag gaya! | अरे! ये तो वीडियो कॉल लग गया!
+P -> facepalm
+CTA: Apni dadi ko tag karo 👇
+CAPTION: Har ghar ki dadi aur naya phone 😂📱
+HASHTAGS: #dadi #desicomedy #relatable`;
+const HINTS = {
+  idea: "Bas idea likho, jaise: \"mummy ne doodh mangaya aur beta cricket khelne chala gaya\". Khali chhodo to AI khud topic chunega. (Repo me GEMINI_API_KEY ya ANTHROPIC_API_KEY secret chahiye.)",
+  script: "HOOK: …, CAST: M = mummy, R = beta …, SCENE: room | street | kitchen | school | night_road, phir lines: " +
+          "M (angry, point): Roman line | देवनागरी line.  R -> enter left / exit right / dance.  CTA: …  CAPTION: …  HASHTAGS: …",
+};
+const STEP_NAMES = {
+  "System packages (ffmpeg, fonts, emoji)": "Machine taiyar", "Python packages": "Tools install", "Tests": "Check",
+  "Write the story": "Kahani likhna", "Render": "Video banana", "Upload videos": "Upload",
+  "Publish as release (the web page plays it from here)": "Publish",
+};
+const drafts = { idea: "", script: EXAMPLE_SCRIPT };
+let mode = "idea", timer = null;
+
+// ---------------------------------------------------------------- GitHub API
+async function gh(path, opts = {}) {
+  const token = store.get("token");
+  const headers = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", ...(opts.headers || {}) };
+  if (token) headers.Authorization = "Bearer " + token;
+  const r = await fetch("https://api.github.com" + path, { ...opts, headers });
+  if (r.status === 204) return null;
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const e = new Error(j.message || ("GitHub error " + r.status));
+    e.status = r.status;
+    throw e;
+  }
+  return j;
+}
+
+async function checkConnection() {
+  const token = store.get("token");
+  $("ref").value = store.get("ref", CONFIG.ref);
+  $("repoName").textContent = CONFIG.owner + "/" + CONFIG.repo;
+  if (!token) {
+    $("setup").open = true;
+    $("who").textContent = "⚠ GitHub se connect nahi";
+    $("connMsg").textContent = "Video banane ke liye token chahiye (pichli reels bina token ke bhi dikhti hain).";
+    return false;
+  }
+  try {
+    const [user, repo] = await Promise.all([gh("/user"), gh(REPO())]);
+    $("who").textContent = "✅ " + user.login + " · " + CONFIG.owner + "/" + CONFIG.repo;
+    $("connMsg").className = "hint ok";
+    $("connMsg").textContent = "Connected. Branch: " + store.get("ref", CONFIG.ref);
+    if (repo.permissions && repo.permissions.push === false) {
+      $("connMsg").className = "hint err";
+      $("connMsg").textContent = "Token me is repo pe likhne ki permission nahi (Actions: Read and write chahiye).";
+    }
+    return true;
+  } catch (e) {
+    $("setup").open = true;
+    $("who").textContent = "⚠ Token kaam nahi kar raha";
+    $("connMsg").className = "hint err";
+    $("connMsg").textContent = "GitHub ne mana kiya: " + e.message;
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------- make a reel
+function setMode(m) {
+  drafts[mode] = $("text").value;
+  mode = m;
+  document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.mode === m)));
+  $("text").value = drafts[m];
+  $("text").placeholder = m === "idea" ? "Idea yahan likho… (khali = AI khud soche)" : "Script yahan likho…";
+  $("hint").textContent = HINTS[m];
+  $("countWrap").classList.toggle("hidden", m !== "idea");
+  $("aiWrap").classList.toggle("hidden", m !== "script");
+}
+document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
+
+function showStatus(stage, frac) {
+  $("status").classList.remove("hidden");
+  $("stage").textContent = stage;
+  $("barFill").style.width = Math.max(3, Math.round(frac * 100)) + "%";
+}
+
+async function make() {
+  if (!(await checkConnection())) return;
+  const text = $("text").value.trim();
+  if (mode === "script" && !text) { showStatus("Script khali hai 🙂", 0); return; }
+  const rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const inputs = {
+    hook: $("hook").value, width: $("width").value, voice: String($("voice").checked), request_id: rid,
+  };
+  if (mode === "idea") {
+    inputs.instruction = text;
+    inputs.count = String(Math.min(5, Math.max(1, +$("count").value || 1)));
+  } else {
+    inputs.script_text = text;
+    inputs.ai_polish = String($("aiPolish").checked);
+  }
+  $("go").disabled = true;
+  $("errBox").textContent = ""; $("steps").replaceChildren(); $("runLink").classList.add("hidden");
+  showStatus("GitHub ko bhej raha hoon…", 0.02);
+  try {
+    await gh(`${REPO()}/actions/workflows/${CONFIG.workflow}/dispatches`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ref: store.get("ref", CONFIG.ref), inputs }),
+    });
+    store.set("pending", JSON.stringify({ rid, at: Date.now() }));
+    follow(rid, Date.now());
+  } catch (e) {
+    $("go").disabled = false;
+    showStatus("Shuru nahi ho paya", 0);
+    $("errBox").textContent = e.message + (e.status === 422 ? "\n(Branch ka naam sahi hai? Us branch pe naya render.yml hona chahiye.)" : "");
+  }
+}
+
+function follow(rid, startedAt) {
+  clearTimeout(timer);
+  $("go").disabled = true;
+  let runId = null;
+  const tick = async () => {
+    try {
+      if (!runId) {
+        const runs = await gh(`${REPO()}/actions/workflows/${CONFIG.workflow}/runs?event=workflow_dispatch&per_page=20`);
+        const run = runs.workflow_runs.find((r) => r.display_title === "web-" + rid);
+        if (!run) {
+          if (Date.now() - startedAt > 3 * 60 * 1000) throw new Error("Run nahi mila. Actions tab me dekho.");
+          showStatus("Line me hai…", 0.03);
+          timer = setTimeout(tick, 4000);
+          return;
+        }
+        runId = run.id;
+        $("runLink").href = run.html_url;
+        $("runLink").classList.remove("hidden");
+      }
+      const [run, jobs] = await Promise.all([gh(`${REPO()}/actions/runs/${runId}`), gh(`${REPO()}/actions/runs/${runId}/jobs`)]);
+      const steps = (jobs.jobs[0] && jobs.jobs[0].steps || []).filter((s) => STEP_NAMES[s.name]);
+      const done = steps.filter((s) => s.status === "completed").length;
+      const now = steps.find((s) => s.status === "in_progress");
+      $("steps").replaceChildren(...steps.map((s) => el("li", {
+        className: s.status === "completed" ? "done" : (s === now ? "now" : ""),
+        textContent: (s.status === "completed" ? (s.conclusion === "success" ? "✓ " : "✗ ") : "") + STEP_NAMES[s.name],
+      })));
+      if (run.status !== "completed") {
+        showStatus((now ? STEP_NAMES[now.name] : "Shuru ho raha hai") + "…", steps.length ? (done + 0.5) / steps.length : 0.05);
+        timer = setTimeout(tick, 6000);
+        return;
+      }
+      store.set("pending", "");
+      $("go").disabled = false;
+      if (run.conclusion !== "success") {
+        showStatus("Gadbad ho gayi ❌", 1);
+        $("errBox").textContent = "Run fail hua (" + run.conclusion + "). Upar wale link se log dekho.";
+        return;
+      }
+      showStatus("Ho gaya ✅", 1);
+      const rel = await gh(`${REPO()}/releases/tags/reel-${rid}`);
+      showRelease(rel);
+      loadGallery();
+    } catch (e) {
+      $("go").disabled = false;
+      $("errBox").textContent = e.message;
+    }
+  };
+  tick();
+}
+
+function showRelease(rel) {
+  const assets = rel.assets || [];
+  const pngs = Object.fromEntries(assets.filter((a) => a.name.endsWith(".png")).map((a) => [a.name.replace(/\.png$/, ""), a]));
+  const vids = assets.filter((a) => a.name.endsWith(".mp4"));
+  $("ph").classList.add("hidden");
+  $("result").classList.remove("hidden");
+  $("videos").replaceChildren(...vids.map((a) => {
+    const base = a.name.replace(/\.mp4$/, "");
+    const v = el("video", { controls: true, playsInline: true, preload: "metadata", src: a.browser_download_url });
+    if (pngs[base]) v.poster = pngs[base].browser_download_url;
+    const dl = el("a", { href: a.browser_download_url, textContent: "⬇️ " + a.name + " download" });
+    return el("div", { style: "margin-bottom:14px" }, [v, el("div", { className: "btns" }, [dl])]);
+  }));
+  $("post").value = (rel.body || "").trim();
+}
+
+// ---------------------------------------------------------------- gallery
+async function loadGallery() {
+  try {
+    const rels = (await gh(`${REPO()}/releases?per_page=30`)).filter((r) => r.tag_name.startsWith("reel-"));
+    if (!rels.length) { $("gallery").replaceChildren(el("p", { className: "hint", textContent: "Abhi koi reel nahi." })); return; }
+    $("gallery").replaceChildren(...rels.slice(0, 18).map((r) => {
+      const png = (r.assets || []).find((a) => a.name.endsWith(".png"));
+      const img = el("img", { alt: "", loading: "lazy" });
+      if (png) img.src = png.browser_download_url;
+      const date = new Date(r.created_at).toLocaleDateString("hi-IN", { day: "numeric", month: "short" });
+      const card = el("button", { className: "reel", title: r.name }, [img, el("span", { textContent: (r.name || r.tag_name) + " · " + date })]);
+      card.addEventListener("click", () => { showRelease(r); $("result").scrollIntoView({ behavior: "smooth" }); });
+      return card;
+    }));
+  } catch (e) {
+    $("gallery").replaceChildren(el("p", { className: "hint", textContent: "Gallery load nahi hui: " + e.message }));
+  }
+}
+
+// ---------------------------------------------------------------- wiring
+$("save").addEventListener("click", async () => {
+  const t = $("token").value.trim();
+  if (t) store.set("token", t);
+  store.set("ref", $("ref").value.trim() || CONFIG.ref);
+  $("token").value = "";
+  if (await checkConnection()) $("setup").open = false;
+});
+$("forget").addEventListener("click", () => { store.set("token", ""); checkConnection(); });
+$("go").addEventListener("click", make);
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("post").value); $("copy").textContent = "✅ Copy ho gaya"; }
+  catch { $("post").select(); }
+  setTimeout(() => ($("copy").textContent = "📋 Caption copy"), 1500);
+});
+
+setMode("idea");
+checkConnection();
+loadGallery();
+try {
+  const p = JSON.parse(store.get("pending") || "null");
+  if (p && Date.now() - p.at < 60 * 60 * 1000 && store.get("token")) follow(p.rid, p.at);
+} catch {}
+</script>
+</body>
+</html>

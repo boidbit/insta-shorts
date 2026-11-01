@@ -106,7 +106,17 @@ python -m unittest discover -s tests                                            
 
 **Actions → Render video → Run workflow**: `instruction` (AI idea) + `hook` + `count`, ya `script` (scripts/*.txt), ya `scene`. Artifacts → `videos` me `.mp4`, preview `.png` aur `.post.txt` (caption + hashtags). `scenes/*.json` ya `scripts/*.txt` push karne par bhi apne aap render hota hai. AI ke liye secret `GEMINI_API_KEY` ya `ANTHROPIC_API_KEY` (Settings → Secrets → Actions).
 
-## Webpage ko internet pe daalna
+## GitHub Pages wala page (render GitHub pe)
+
+`index.html` (repo root) GitHub Pages pe chalta hai: https://boidbit.github.io/insta-shorts/
+
+1. Page pe "⚙️ GitHub connection" kholo → fine-grained token banao (sirf is repo ke liye, **Actions: Read and write**, **Contents: Read-only**) → paste → Save. Token sirf aapke browser me rehta hai.
+2. Idea likho (AI) ya script paste karo → **Banao**. Page `render.yml` workflow chalata hai aur har step ki progress dikhata hai (~4-6 min).
+3. Video GitHub **Release** (`reel-…`) me publish hoti hai; page wahi chalata hai, download + caption copy deta hai. "Pichli reels" me sab purani videos.
+
+Branch: page us branch pe workflow chalata hai jo settings me likha hai (default `desi-toons-studio`). Repo public hai to releases (videos) bhi public dikhte hain.
+
+## Webpage ko apne server pe daalna
 
 Repo me `Dockerfile` hai. Hugging Face Space (Docker, free CPU) ya Render/Railway pe deploy karo, Space settings me secret `GEMINI_API_KEY` aur `STUDIO_PASSWORD` daalo (password ke bina koi bhi aapke page se video bana sakta hai). Free CPU pe 20s ki 720p video ~1-2 min me banti hai.
 
