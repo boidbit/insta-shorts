@@ -1,0 +1,28 @@
+{
+  "name": "song_reel",
+  "about": "Aesthetic song reel: night road, ek reusable musafir character chalta hai, lyric lines fade in. music.path me apna gaana do.",
+  "vars": {
+    "bg": "night_road",
+    "l1": "Raat lambi hai, raasta khamosh",
+    "l2": "Chalta hu bina manzil ke",
+    "l3": "Chaand bhi saath chal raha hai",
+    "l4": "Awara hu, par akela nahi"
+  },
+  "meta": { "duration": 12, "fade_in": 0.6, "fade_out": 0.8 },
+  "background": { "type": "{bg}", "scroll": 220 },
+  "music": { "type": "beat", "bpm": 76, "style": "soft", "volume": 0.55 },
+  "characters": {
+    "M": { "color": "teal", "slot": "center", "accessories": ["cap", "beard"], "cap_color": "black", "facing": "right", "y": 1690 }
+  },
+  "overlays": [
+    { "text": "{l1}", "style": "lyric", "pos": [540, 610], "from": 0.8, "to": 3.6 },
+    { "text": "{l2}", "style": "lyric", "pos": [540, 610], "from": 3.6, "to": 6.4 },
+    { "text": "{l3}", "style": "lyric", "pos": [540, 610], "from": 6.4, "to": 9.2 },
+    { "text": "{l4}", "style": "lyric", "pos": [540, 610], "from": 9.2, "to": 11.6 }
+  ],
+  "timeline": [
+    { "t": 0.0, "who": "M", "action": "walk", "hands": "pockets", "expression": "relaxed", "speed": 0.9, "look": "right" },
+    { "t": 6.0, "who": "M", "expression": "smile" },
+    { "t": 9.2, "who": "M", "expression": "smug" }
+  ]
+}

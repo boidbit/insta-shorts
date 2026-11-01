@@ -1,0 +1,109 @@
+name: Render stickman video
+
+on:
+  workflow_dispatch:
+    inputs:
+      scene:
+        description: "Scene file to render, e.g. scenes/tag_karo_demo.json (ignored if 'instruction' is filled)"
+        required: false
+        default: "scenes/tag_karo_demo.json"
+      instruction:
+        description: "AI director: plain-language idea (needs ANTHROPIC_API_KEY secret). Leave empty to render the scene file."
+        required: false
+        default: ""
+      width:
+        description: "Output width in px (1080 = full HD reel, 720 = faster)"
+        required: false
+        default: "1080"
+      voice:
+        description: "Generate Hindi voice (edge-tts)?"
+        type: boolean
+        required: false
+        default: true
+  push:
+    paths:
+      - "scenes/*.json"
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: System packages (ffmpeg, fonts, emoji)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-color-emoji fonts-liberation libraqm0
+
+      - name: Python packages
+        run: pip install -r requirements.txt
+
+      - name: Cache generated voice lines
+        uses: actions/cache@v4
+        with:
+          path: .cache/tts
+          key: tts-${{ github.run_id }}
+          restore-keys: tts-
+
+      - name: AI director (optional)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.instruction != '' }}
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          INSTRUCTION: ${{ inputs.instruction }}
+        run: |
+          mkdir -p scenes/generated
+          python -m studio.director "$INSTRUCTION" -o scenes/generated/directed.json
+          cat scenes/generated/directed.json
+
+      - name: Decide which scenes to render
+        id: pick
+        env:
+          EVENT: ${{ github.event_name }}
+          INSTRUCTION: ${{ inputs.instruction }}
+          SCENE: ${{ inputs.scene }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ -n "$INSTRUCTION" ]; then LIST="scenes/generated/directed.json"
+            elif [ "$SCENE" = "all" ]; then LIST="$(ls scenes/*.json)"
+            else LIST="$SCENE"; fi
+          else
+            LIST="$(git diff --name-only --diff-filter=AM "$BEFORE" HEAD -- 'scenes/*.json' 2>/dev/null || true)"
+            [ -z "$LIST" ] && LIST="$(git diff --name-only --diff-filter=AM HEAD~1 HEAD -- 'scenes/*.json' 2>/dev/null || true)"
+          fi
+          echo "Scenes: $LIST"
+          { echo "list<<EOF"; echo "$LIST"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+
+      - name: Render
+        env:
+          LIST: ${{ steps.pick.outputs.list }}
+          WIDTH: ${{ inputs.width || '1080' }}
+          VOICE: ${{ inputs.voice }}
+        run: |
+          mkdir -p out
+          FLAGS=""
+          [ "$VOICE" = "false" ] && FLAGS="--no-tts"
+          for f in $LIST; do
+            name=$(basename "$f" .json)
+            python -m studio.render "$f" -o "out/$name.mp4" --width "$WIDTH" $FLAGS
+            python -m studio.render "$f" --frame 1.5 -o "out/$name.png" --width 540 $FLAGS
+            echo "- \`$name.mp4\`" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Upload videos
+        uses: actions/upload-artifact@v4
+        with:
+          name: stickman-videos
+          path: |
+            out/*.mp4
+            out/*.png
+            scenes/generated/*.json
+          if-no-files-found: error

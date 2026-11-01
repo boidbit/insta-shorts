@@ -1,0 +1,30 @@
+{
+  "name": "tag_karo",
+  "about": "Loop meme: top caption, 3 stickmen dancing in the kitchen. Change vars.caption (and optionally background/colors).",
+  "vars": {
+    "caption": "Aapke group me bhi aisa dost hai? Tag karo! 😂",
+    "bg": "kitchen"
+  },
+  "meta": { "duration": 8, "fps": 30 },
+  "background": { "type": "{bg}" },
+  "music": { "type": "beat", "bpm": 108, "volume": 0.5 },
+  "characters": {
+    "A": { "color": "pink",  "slot": "left" },
+    "B": { "color": "blue",  "slot": "center", "accessories": ["glasses"], "prop": "spoon" },
+    "C": { "color": "green", "slot": "right" }
+  },
+  "caption": { "text": "{caption}", "style": "caption_box", "pos": "top" },
+  "timeline": [
+    { "t": 0.0, "sfx": "pop", "volume": 0.6 },
+    { "t": 0.0, "who": "A", "action": "dance", "style": "pump",  "expression": "smug" },
+    { "t": 0.0, "who": "B", "action": "dance", "style": "swing", "expression": "shout" },
+    { "t": 0.0, "who": "C", "action": "dance", "style": "cheer", "expression": "sly" },
+    { "t": 2.7, "who": "B", "expression": "laugh" },
+    { "t": 3.2, "who": "C", "expression": "grin" },
+    { "t": 4.0, "who": "A", "action": "dance", "style": "swing", "expression": "smile" },
+    { "t": 4.0, "who": "B", "action": "dance", "style": "pump",  "expression": "shout" },
+    { "t": 4.0, "who": "C", "action": "dance", "style": "swing", "expression": "sly" },
+    { "t": 6.2, "who": "A", "expression": "smug" },
+    { "t": 6.2, "who": "C", "action": "dance", "style": "cheer", "expression": "grin" }
+  ]
+}
