@@ -2,7 +2,7 @@
 import math
 import sys
 
-from . import audio
+from . import audio, gemini_tts
 from .characters import resolve_spec
 from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, lerp
 
@@ -82,7 +82,59 @@ def _norm_who(who, names):
     return list(who)
 
 
-def compile_scene(scene, use_tts=True, fps=None):
+def collect_lines(scene):
+    """Every line of one scene that needs a voice, in speaking order, for the Gemini batch."""
+    cdefs = scene.get("characters", {})
+    names = list(cdefs.keys())
+    out = []
+    for ti, raw in enumerate(scene.get("timeline", [])):
+        if "say" not in raw or not raw.get("tts", True):
+            continue
+        who = [w for w in _norm_who(raw.get("who"), names) if w in cdefs]
+        text = str(raw.get("speak", raw["say"])).strip()
+        if not who or not text:
+            continue
+        v = cdefs[who[0]].get("voice", {})
+        v = dict(v) if isinstance(v, dict) else {"name": v}
+        v.update(raw.get("voice", {}) if isinstance(raw.get("voice"), dict) else {})
+        out.append(dict(ti=ti, text=text, voice=gemini_tts.voice_for(v), pitch=v.get("pitch"), rate=v.get("rate")))
+    return out
+
+
+def prepare_voice(scenes, use_tts=True, tts_provider=None):
+    """Voice for a whole VIDEO (all its scenes) with ONE Gemini request.
+
+    Returns one dict per scene: {"paths": {timeline index: wav}, "edge": bool}. `edge` means
+    "synthesize the lines one by one with edge-tts" (provider is edge, or Gemini failed in auto mode).
+    A failure with an explicitly requested gemini provider raises SystemExit instead.
+    """
+    silent = [{"paths": {}, "edge": False} for _ in scenes]
+    if not use_tts or not scenes:
+        return silent
+    cfg = (scenes[0].get("meta") or {}).get("tts") or {}
+    provider, explicit = audio.resolve_provider(tts_provider, cfg)
+    if provider != "gemini":
+        return [{"paths": {}, "edge": True} for _ in scenes]
+    per_scene = [collect_lines(sc) for sc in scenes]
+    flat = [it for lines in per_scene for it in lines]
+    if not flat:
+        return silent
+    try:
+        paths = gemini_tts.synth_script(flat, model=cfg.get("model", gemini_tts.DEFAULT_MODEL),
+                                        style=cfg.get("style", gemini_tts.DEFAULT_STYLE))
+    except Exception as e:
+        if explicit:
+            raise SystemExit("[tts] Gemini failed: %s" % e)
+        print("  [tts] Gemini failed (%s) -> falling back to edge-tts" % str(e)[:160], file=sys.stderr)
+        return [{"paths": {}, "edge": True} for _ in scenes]
+    out, k = [], 0
+    for lines in per_scene:
+        out.append({"paths": {it["ti"]: paths[k + j] for j, it in enumerate(lines)}, "edge": False})
+        k += len(lines)
+    return out
+
+
+def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan = Plan()
     meta = scene.get("meta", {})
     plan.fps = int(fps or meta.get("fps", 30))
@@ -116,7 +168,12 @@ def compile_scene(scene, use_tts=True, fps=None):
     warned = [False]
     plan_end = 0.0
 
-    for raw in scene.get("timeline", []):
+    # voice: precomputed for the whole video by prepare_voice(); a lone scene prepares its own
+    if voice is None:
+        voice = prepare_voice([scene], use_tts, tts_provider)[0]
+    batch, per_line_edge = voice["paths"], voice["edge"]
+
+    for ti, raw in enumerate(scene.get("timeline", [])):
         ev = dict(raw)
         t = float(ev["t"]) if "t" in ev and ev["t"] is not None else cursor
         plan_end = max(plan_end, t)
@@ -150,7 +207,10 @@ def compile_scene(scene, use_tts=True, fps=None):
             v = dict(c.voice)
             v.update(ev.get("voice", {}) if isinstance(ev.get("voice"), dict) else {})
             path, dur = None, None
-            if use_tts and ev.get("tts", True):
+            if ti in batch:
+                path = batch[ti]
+                dur = audio.audio_duration(path)
+            elif per_line_edge and ev.get("tts", True):
                 path = audio.synth_tts(speak, v.get("name"), v.get("rate", "+0%"), v.get("pitch", "+0Hz"))
                 if path:
                     dur = audio.audio_duration(path)

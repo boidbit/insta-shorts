@@ -40,10 +40,16 @@ on:
         required: false
         default: "1080"
       voice:
-        description: "Generate Hindi voice (edge-tts)?"
+        description: "Generate Hindi voice?"
         type: boolean
         required: false
         default: true
+      tts:
+        description: "Voice engine: auto (Gemini if GEMINI_API_KEY secret is set, else edge-tts) | gemini | edge"
+        type: choice
+        options: [auto, gemini, edge]
+        required: false
+        default: auto
       request_id:
         description: "Set by the web page to find this run (leave empty)"
         required: false
@@ -178,9 +184,10 @@ jobs:
           LIST: ${{ steps.pick.outputs.list }}
           WIDTH: ${{ inputs.width || '1080' }}
           VOICE: ${{ inputs.voice }}
+          TTS: ${{ inputs.tts || 'auto' }}      # GEMINI_API_KEY comes from the workflow-level env
         run: |
           mkdir -p out
-          FLAGS=""
+          FLAGS="--tts $TTS"
           [ "$VOICE" = "false" ] && FLAGS="--no-tts"
           for f in $LIST; do
             name=$(basename "$f" .json)

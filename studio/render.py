@@ -20,7 +20,7 @@ from PIL import Image
 from . import actions, audio
 from .backgrounds import Background
 from .characters import build_character, render_ops
-from .scene import camera_at, compile_music, compile_scene, split_scenes, static_overlays
+from .scene import camera_at, compile_music, compile_scene, prepare_voice, split_scenes, static_overlays
 from .text import bubble_image, styled_box
 from .util import LH, LW, clamp, ease_in_out, ease_out, ease_out_back, load_scene
 
@@ -190,9 +190,9 @@ class Output:
 class Renderer(Output):
     """One scene (one background)."""
 
-    def __init__(self, scene, width=1080, use_tts=True, fps=None):
+    def __init__(self, scene, width=1080, use_tts=True, fps=None, tts_provider=None, voice=None):
         self.scene = scene
-        self.plan = compile_scene(scene, use_tts=use_tts, fps=fps)
+        self.plan = compile_scene(scene, use_tts=use_tts, fps=fps, tts_provider=tts_provider, voice=voice)
         self.W, self.H = frame_size(width)
         self.s = self.W / float(LW)
         self.bg = Background(self.plan.background, self.W, self.H)
@@ -314,10 +314,12 @@ class Renderer(Output):
 class Sequence(Output):
     """Several scenes back to back + whole-video music and overlays."""
 
-    def __init__(self, scene, width=1080, use_tts=True, fps=None):
+    def __init__(self, scene, width=1080, use_tts=True, fps=None, tts_provider=None):
         meta = scene.get("meta", {})
         fps = int(fps or meta.get("fps", 30))
-        self.parts = [Renderer(sub, width, use_tts, fps) for sub in split_scenes(scene)]
+        subs = split_scenes(scene)
+        voices = prepare_voice(subs, use_tts, tts_provider)      # one Gemini request for ALL scenes
+        self.parts = [Renderer(sub, width, use_tts, fps, tts_provider, v) for sub, v in zip(subs, voices)]
         self.W, self.H = self.parts[0].W, self.parts[0].H
         self.s = self.W / float(LW)
         self.fps = fps
@@ -373,10 +375,10 @@ class Sequence(Output):
         return img
 
 
-def make_video(scene, width=1080, use_tts=True, fps=None):
+def make_video(scene, width=1080, use_tts=True, fps=None, tts_provider=None):
     if scene.get("scenes"):
-        return Sequence(scene, width, use_tts, fps)
-    return Renderer(scene, width, use_tts, fps)
+        return Sequence(scene, width, use_tts, fps, tts_provider)
+    return Renderer(scene, width, use_tts, fps, tts_provider)
 
 
 def main(argv=None):
@@ -386,12 +388,15 @@ def main(argv=None):
     ap.add_argument("--width", type=int, default=1080, help="output width in px (height is 16:9 portrait)")
     ap.add_argument("--fps", type=int, default=None)
     ap.add_argument("--no-tts", action="store_true", help="skip speech synthesis (estimated timing, silent voice)")
+    ap.add_argument("--tts", choices=["auto", "gemini", "edge"], default=None,
+                    help="voice engine: gemini = the WHOLE video's script in ONE Gemini request, then split per line "
+                         "(needs GEMINI_API_KEY); edge = edge-tts per line; auto (default) = gemini if a key is set")
     ap.add_argument("--frame", type=float, default=None, help="render one PNG frame at this time (seconds)")
     args = ap.parse_args(argv)
 
     scene = load_scene(args.scene)
     name = os.path.splitext(os.path.basename(args.scene))[0]
-    r = make_video(scene, args.width, use_tts=not args.no_tts, fps=args.fps)
+    r = make_video(scene, args.width, use_tts=not args.no_tts, fps=args.fps, tts_provider=args.tts)
     if args.frame is not None:
         out = args.out or os.path.join("out", name + ".png")
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
