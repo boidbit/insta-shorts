@@ -78,6 +78,8 @@ jobs:
           else
             LIST="$(git diff --name-only --diff-filter=AM "$BEFORE" HEAD -- 'scenes/*.json' 2>/dev/null || true)"
             [ -z "$LIST" ] && LIST="$(git diff --name-only --diff-filter=AM HEAD~1 HEAD -- 'scenes/*.json' 2>/dev/null || true)"
+            # first push / new branch: nothing to diff against -> render every scene
+            [ -z "$LIST" ] && LIST="$(ls scenes/*.json)"
           fi
           echo "Scenes: $LIST"
           { echo "list<<EOF"; echo "$LIST"; echo "EOF"; } >> "$GITHUB_OUTPUT"
