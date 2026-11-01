@@ -47,6 +47,13 @@
            color: var(--ink); font: inherit; cursor: pointer; }
   .small.wide { width: 100%; margin-top: 10px; padding: 11px; }
   .small:disabled { opacity: .6; cursor: wait; }
+  .lint { margin: 10px 0 0; padding: 10px 12px 10px 30px; border-radius: 10px; font-size: 14px;
+          border: 1px solid var(--line); background: var(--bg); }
+  .lint.bad { border-color: var(--err); }
+  .lint li { margin: 2px 0; }
+  .lint.good { list-style: none; padding-left: 12px; color: var(--ok); }
+  .linkbtn { background: none; border: 0; padding: 0; margin-top: 8px; color: var(--brand); cursor: pointer;
+             font: inherit; font-size: 14px; text-align: left; text-decoration: underline; }
   .banner { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--accent); color: var(--accent-ink);
             font-size: 14px; }
   .bar { height: 10px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 10px 0; }
@@ -107,7 +114,10 @@
         <button class="tab" role="tab" data-mode="script" aria-selected="false">📝 Apni script</button>
       </div>
       <textarea id="text" spellcheck="false"></textarea>
+      <ul class="lint hidden" id="lint" aria-live="polite"></ul>
       <p class="hint" id="hint"></p>
+      <button class="linkbtn" id="copyPrompt">🤖 ChatGPT / Claude / Gemini app se script likhwani hai? Unke liye poora prompt copy karo</button>
+      <p class="hint hidden" id="promptNote">Prompt copy ho gaya. Us AI me paste karo (aakhri line me apna idea likho) → jo script mile wo "📝 Apni script" tab me paste karo → upar wala checker dekho → Approve.</p>
       <div class="row">
         <label id="hookWrap">Hook
           <select id="hook">
@@ -159,6 +169,8 @@
   </section>
 </main>
 
+<!-- words the script format understands: same as studio/script.py vocab() (a test keeps them equal) -->
+<script type="application/json" id="vocab">{"places":["kitchen","night_road","plain","room","school","street"],"looks":["aunty","boy","college_boy","college_girl","dada","dadi","girl","kid","kid_girl","office_girl","office_guy","uncle"],"roles":["aunty","bachcha","behen","beta","beti","bhai","boss","brother","chacha","chachi","dad","dada","dadi","didi","dost","father","friend","maa","mom","mother","mummy","nana","nani","padosan","padosi","papa","sister","student","teacher","uncle"],"extras":["aadmi","aurat","bald","balding","beard","bindi","black","blazer","blue","braid","brown","bun","cap","chubby","cream","curly","dark","denim","earrings","fair","female","glasses","gold","green","grey","henna","khaki","kurta","ladka","ladki","long","magenta","male","man","maroon","moustache","mustard","navy","normal","olive","orange","pink","ponytail","purple","red","saffron","salwar","saree","shirt","short","side_part","sky","slim","spiky","teal","tilak","tshirt","tuft","turban","uniform","vest","wheatish","white","woman","yellow"],"expressions":["angry","cry","dead","grin","laugh","love","neutral","sad","shock","shout","sleepy","sly","smile","smug","surprised","think","wink"],"actions":["clap","cry","dance","dance2","dance3","disco","facepalm","fall","idle","jump","laugh","none","point","shock","shrug","sleep","stand","sway","talk","walk","wave"],"props":["ball","cup","mic","phone","spoon","stick"],"sfx":["beep","boing","clap","ding","laugh_track","pop","thud","whoosh"],"moves":["center","cheer","disco","down","drop","enter","exit","left","noprop","pump","right","shake","swing","up","up_left","up_right","walk"]}</script>
 <script>
 // ---------------------------------------------------------------- config
 // owner/repo come from the Pages address (<owner>.github.io/<repo>/); branch is saved per browser.
@@ -246,6 +258,99 @@ async function checkConnection() {
   }
 }
 
+// ---------------------------------------------------------------- script checker (mirrors studio/script.py)
+const V = JSON.parse($("vocab").textContent);
+const SET = Object.fromEntries(Object.entries(V).map(([k, v]) => [k, new Set(v)]));
+const HEADERS = new Set(["HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION"]);
+const words = (s) => s.toLowerCase().split(/[\s,|]+/).map((w) => w.replace(/^[\[\](){}'"]+|[\[\](){}'"]+$/g, "")).filter(Boolean);
+const short = (s) => (s.length > 45 ? s.slice(0, 45) + "…" : s);
+
+function checkActing(tokens) {
+  const unknown = [], acts = [], exprs = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const w = tokens[i], nxt = tokens[i + 1];
+    if ((w === "enter" || w === "exit") && (nxt === "left" || nxt === "right")) { i++; continue; }
+    if (w === "walk" && ["left", "center", "right"].includes(nxt)) { i++; continue; }
+    if (w === "point") { acts.push(w); if (["left", "right", "up", "down", "up_left", "up_right"].includes(nxt)) i++; continue; }
+    // laugh / shock / cry are also expressions, clap is also a sound: after an action they mean those
+    if (SET.actions.has(w) && !(acts.length && (SET.expressions.has(w) || SET.sfx.has(w)))) {
+      acts.push(w);
+      if (w === "dance" && ["pump", "swing", "cheer", "disco"].includes(nxt)) i++;
+      continue;
+    }
+    if (SET.expressions.has(w)) { exprs.push(w); continue; }
+    if (SET.props.has(w) || SET.sfx.has(w) || SET.moves.has(w)) continue;
+    unknown.push(w);
+  }
+  return { unknown, lost: [...acts.slice(0, -1), ...exprs.slice(0, -1)] };
+}
+
+function lintScript(text) {
+  const out = [], cast = new Set(), used = [];
+  let hook = false, cta = false, declared = false;
+  const acting = (s, line) => {
+    const { unknown, lost } = checkActing(words(s));
+    if (unknown.length) out.push(`"${short(line)}": ${unknown.join(", ")} samajh nahi aaye`);
+    if (lost.length) out.push(`"${short(line)}": ek line me ek hi action + ek hi expression; ${lost.join(", ")} ignore honge`);
+  };
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("//")) continue;
+    let m = line.match(/^([A-Za-z_]+)\s*:\s*(.*)$/);
+    if (m && HEADERS.has(m[1].toUpperCase())) {
+      const key = m[1].toUpperCase(), val = m[2].trim();
+      if (key === "HOOK") hook = !!val;
+      if (key === "CTA") cta = !!val;
+      if (key === "SCENE") {
+        const bg = val.split("|")[0].trim().toLowerCase().replace(/ /g, "_");
+        if (bg && !SET.places.has(bg)) out.push(`SCENE "${bg}": ye jagah nahi hai (${V.places.join(", ")})`);
+      }
+      if (key === "CAST") {
+        declared = true;
+        for (const part of val.split(/,\s*(?=[A-Za-z_]\w*\s*=)/)) {
+          const i = part.indexOf("=");
+          if (i < 0) continue;
+          const name = part.slice(0, i).trim();
+          cast.add(name);
+          const bad = words(part.slice(i + 1)).filter((w) => !SET.looks.has(w) && !SET.roles.has(w) && !SET.extras.has(w));
+          if (bad.length) out.push(`CAST ${name}: ${bad.join(", ")} samajh nahi aaye`);
+        }
+      }
+      continue;
+    }
+    if ((m = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/))) { declared = true; cast.add(m[1]); continue; }
+    if (/^(wait\s*[\d.]+|\.\.\.+)$/i.test(line)) continue;
+    if ((m = line.match(/^([A-Za-z_]\w*)\s*->\s*(.+)$/))) { used.push(m[1]); acting(m[2], line); continue; }
+    if ((m = line.match(/^([A-Za-z_]\w*)\s*(?:\(([^)]*)\))?\s*:\s*(.+)$/))) {
+      used.push(m[1]);
+      const br = m[2] || "";
+      if (/[?!]/.test(br) || words(br).length > 5) out.push(`"${short(line)}": brackets me dialogue hai; brackets me sirf acting words (shock, point…)`);
+      else acting(br, line);
+      const speak = m[3].split("|")[1] || "";
+      if (!/[ऀ-ॿ]/.test(speak)) out.push(`"${short(line)}": "|" ke baad Devanagari nahi hai (awaaz galat padhegi)`);
+      continue;
+    }
+    out.push(`"${short(line)}": ye line samajh nahi aayi`);
+  }
+  if (!hook) out.push("HOOK: line nahi hai");
+  if (!cta) out.push("CTA: line nahi hai");
+  if (declared) for (const n of new Set(used)) if (n.toUpperCase() !== "ALL" && !cast.has(n)) out.push(`${n} CAST me nahi hai`);
+  return out;
+}
+
+function showLint() {
+  const box = $("lint");
+  if (mode !== "script" || !$("text").value.trim()) { box.classList.add("hidden"); return []; }
+  const w = lintScript($("text").value);
+  box.classList.remove("hidden");
+  box.className = "lint " + (w.length ? "bad" : "good");
+  box.replaceChildren(...(w.length ? w.map((x) => el("li", { textContent: x }))
+                                   : [el("li", { textContent: "✅ Script ka format sahi hai" })]));
+  return w;
+}
+let lintTimer = null;
+$("text").addEventListener("input", () => { clearTimeout(lintTimer); lintTimer = setTimeout(showLint, 300); });
+
 // ---------------------------------------------------------------- make a reel
 function setMode(m) {
   drafts[mode] = $("text").value;
@@ -262,6 +367,7 @@ function setMode(m) {
     ? "AI ko script likhne me ~1 minute lagta hai. Video tabhi banegi jab aap script approve karoge."
     : "GitHub pe video banne me ~4-6 minute lagte hain. Page band kar ke wapas aao to bhi progress yahin milegi.";
   if (m !== "script") $("draftNote").classList.add("hidden");
+  showLint();
 }
 
 function setBusy(b) {
@@ -283,6 +389,10 @@ async function start(stage) {
   if (busy || !(await checkConnection())) return;
   const text = $("text").value.trim();
   if (stage === "video" && !text) { showStatus("Script khali hai 🙂", 0); return; }
+  if (stage === "video") {
+    const w = showLint();
+    if (w.length && !confirm("Script me " + w.length + " dikkat(ein) hain (neeche list dekho).\n\nPhir bhi video banau?")) return;
+  }
   const rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const inputs = { stage, hook: $("hook").value, request_id: rid };
   if (stage === "script") {
@@ -421,6 +531,18 @@ $("save").addEventListener("click", async () => {
 $("forget").addEventListener("click", () => { store.set("token", ""); checkConnection(); });
 $("go").addEventListener("click", () => start(mode === "idea" ? "script" : "video"));
 $("polish").addEventListener("click", () => start("script"));
+$("copyPrompt").addEventListener("click", async () => {
+  try {
+    const rules = await (await fetch("SCRIPT_PROMPT.md", { cache: "no-store" })).text();
+    const idea = mode === "idea" ? $("text").value.trim() : drafts.idea.trim();
+    await navigator.clipboard.writeText(rules.trim() + "\n\n# My idea\n" + (idea || "<yahan apna idea likho>") + "\n");
+    $("promptNote").classList.remove("hidden");
+  } catch (e) {
+    $("promptNote").classList.remove("hidden");
+    $("promptNote").textContent = "Copy nahi ho paya (" + e.message + "). Prompt yahan hai: " +
+      new URL("SCRIPT_PROMPT.md", location.href).href;
+  }
+});
 $("copy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText($("post").value); $("copy").textContent = "✅ Copy ho gaya"; }
   catch { $("post").select(); }

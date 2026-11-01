@@ -49,14 +49,33 @@ ROLE_LOOKS = {
 }
 FEMALE_LOOKS = {"girl", "college_girl", "aunty", "dadi", "kid_girl", "office_girl"}
 PITCHES = ["+0Hz", "+14Hz", "-8Hz", "+24Hz", "-14Hz"]
+BUILDS = ("slim", "normal", "chubby")
+GENDER_WORDS = ("female", "woman", "ladki", "aurat", "male", "man", "ladka", "aadmi")
+MOVE_WORDS = ("enter", "exit", "walk", "left", "right", "center", "up", "down", "up_left", "up_right",
+              "pump", "swing", "cheer", "disco", "shake", "drop", "noprop")
+
+
+def vocab():
+    """Every word the script format understands (the web page keeps a copy for its checker)."""
+    return {
+        "places": sorted(BACKGROUNDS),
+        "looks": sorted(LOOKS), "roles": sorted(ROLE_LOOKS),
+        "extras": sorted(set(ACCESSORIES) | set(HAIR_STYLES) | set(OUTFITS) | set(SKIN_TONES) | set(BUILDS)
+                         | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS)),
+        "expressions": sorted(EXPRESSIONS), "actions": sorted(actions.ACTIONS),
+        "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS),
+    }
 
 
 def _words(s):
-    return [w for w in re.split(r"[\s,]+", s.strip().lower()) if w]
+    """'shock | point, [tshirt]' -> ['shock', 'point', 'tshirt']"""
+    words = (w.strip("[](){}'\"") for w in re.split(r"[\s,|]+", s.strip().lower()))
+    return [w for w in words if w]
 
 
-def cast_spec(words, index):
-    """'aunty chubby glasses maroon female' -> character spec (with a voice)."""
+def cast_spec(words, index, unknown=None):
+    """'aunty chubby glasses maroon female' -> character spec (with a voice).
+    Words that mean nothing here are added to `unknown`."""
     spec, acc = {}, []
     female = None
     for w in words:
@@ -82,6 +101,8 @@ def cast_spec(words, index):
             spec["color"] = w
         elif w in HAIR_COLORS and "hair_color" not in spec:
             spec["hair_color"] = w
+        elif unknown is not None and w not in LOOKS and w not in ROLE_LOOKS and w not in PALETTE:
+            unknown.append(w)
     spec.setdefault("look", "college_girl" if female else "boy")
     if acc:
         spec["accessories"] = sorted(set(LOOKS[spec["look"]].get("accessories", [])) | set(acc))
@@ -98,8 +119,10 @@ def cast_spec(words, index):
 
 
 def _stage(tokens, ev, scene_cast, who):
-    """Apply bracket / arrow words to an event dict. Returns the move request, if any."""
+    """Apply bracket / arrow words to an event dict.
+    Returns (move request or None, unknown words, words that were overridden)."""
     move = None
+    unknown, acts, exprs = [], [], []
     i = 0
     while i < len(tokens):
         w = tokens[i]
@@ -112,16 +135,21 @@ def _stage(tokens, ev, scene_cast, who):
             i += 1
         elif w == "point":
             ev["action"] = "point"
+            acts.append(w)
             if nxt in DIRECTIONS:
                 ev["point"] = nxt
                 i += 1
-        elif w in actions.ACTIONS:
+        # laugh / shock / cry are also expressions and clap is also a sound: once the line has
+        # an action, such a word becomes the face (or the sound) instead
+        elif w in actions.ACTIONS and not (acts and (w in EXPRESSIONS or w in SFX)):
             ev["action"] = w
+            acts.append(w)
             if w == "dance" and nxt in ("pump", "swing", "cheer", "disco"):
                 ev["style"] = nxt
                 i += 1
         elif w in EXPRESSIONS:
             ev["expression"] = w
+            exprs.append(w)
         elif w in PROPS or w in ("drop", "noprop"):
             ev["prop"] = "" if w in ("drop", "noprop") else w
         elif w in SFX:
@@ -131,10 +159,13 @@ def _stage(tokens, ev, scene_cast, who):
             ev["camera"] = {"shake": 0.6}
         elif w in ("left", "right") and "facing" not in ev:
             ev["facing"] = w
+        else:
+            unknown.append(w)
         i += 1
     if ev.get("action") == "point" and "point" not in ev and who in scene_cast:
         ev["point"] = "right" if scene_cast.index(who) < len(scene_cast) / 2.0 else "left"
-    return move
+    lost = acts[:-1] + exprs[:-1]       # only the last action / expression of a line is used
+    return move, unknown, lost
 
 
 def _slot_x(cast, name):
@@ -159,8 +190,13 @@ def parse_script(text):
 
     def add_cast(name, words):
         if name not in cast:
-            cast[name] = cast_spec(words, len(cast))
+            unknown = []
+            cast[name] = cast_spec(words, len(cast), unknown)
+            if unknown:
+                warnings.append("CAST %s: %s samajh nahi aaye. Sirf look/role + extras likho, "
+                                "jaise 'A = college_girl earrings saree'" % (name, ", ".join(repr(u) for u in unknown)))
 
+    declared = False
     for raw in text.splitlines():
         line = raw.strip()
         if not line or line.startswith("//"):
@@ -169,7 +205,9 @@ def parse_script(text):
         if m and m.group(1).upper() in HEADERS:
             key, val = m.group(1).upper(), m.group(2).strip()
             if key == "CAST":
-                for part in val.split(","):
+                declared = True
+                # split before every "NAME =", so commas inside a character's words don't break it
+                for part in re.split(r",\s*(?=[A-Za-z_]\w*\s*=)", val):
                     if "=" in part:
                         n, w = part.split("=", 1)
                         add_cast(n.strip(), _words(w))
@@ -185,6 +223,7 @@ def parse_script(text):
             continue
         m = re.match(r"^([A-Za-z_][\w]*)\s*=\s*(.+)$", line)
         if m:
+            declared = True
             add_cast(m.group(1), _words(m.group(2)))
             continue
         if cur is None:
@@ -195,12 +234,17 @@ def parse_script(text):
             continue
         m = re.match(r"^([A-Za-z_][\w]*)\s*->\s*(.+)$", line)
         if m:
-            cur["lines"].append(("do", m.group(1), _words(m.group(2))))
+            cur["lines"].append(("do", m.group(1), _words(m.group(2)), line))
             continue
         m = re.match(r"^([A-Za-z_][\w]*)\s*(?:\(([^)]*)\))?\s*:\s*(.+)$", line)
         if m:
             say, _, speak = m.group(3).partition("|")
-            cur["lines"].append(("say", m.group(1), _words(m.group(2) or ""), say.strip(), speak.strip()))
+            bracket = m.group(2) or ""
+            if re.search(r"[?!]", bracket) or len(_words(bracket)) > 5:
+                warnings.append("line %r: brackets me dialogue likha hai. Brackets me sirf acting words aate hain, "
+                                "jaise (shock, point); dialogue ':' ke baad likho" % line[:50])
+                bracket = ""
+            cur["lines"].append(("say", m.group(1), _words(bracket), say.strip(), speak.strip(), line))
             continue
         warnings.append("line not understood: %r" % line[:60])
 
@@ -215,6 +259,8 @@ def parse_script(text):
             if ln[0] in ("do", "say") and ln[1].upper() != "ALL" and ln[1] not in order:
                 order.append(ln[1])
         for name in order:
+            if declared and name not in cast:
+                warnings.append("%s CAST me nahi hai: CAST line me '%s = <role/look>' jodo" % (name, name))
             add_cast(name, [])
         chars = {}
         for name in order:
@@ -233,7 +279,13 @@ def parse_script(text):
             ev = {"who": who}
             if first:
                 ev["t"] = 0.3 if si == 0 else 0.2
-            move = _stage(ln[2], ev, order, who)
+            move, unknown, lost = _stage(ln[2], ev, order, who)
+            if unknown:
+                warnings.append("line %r: %s samajh nahi aaye (acting words ki list dekho)"
+                                % (ln[-1][:50], ", ".join(repr(u) for u in unknown)))
+            if lost:
+                warnings.append("line %r: ek line me ek hi action aur ek hi expression chalta hai; %s ignore hue"
+                                % (ln[-1][:50], ", ".join(repr(u) for u in lost)))
             if move and who != "all":
                 x, _slot = _slot_x(order, who)
                 kind, side = move

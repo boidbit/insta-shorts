@@ -7,6 +7,7 @@ import io
 import json
 import os
 import random
+import re
 import tempfile
 import unittest
 import urllib.error
@@ -62,6 +63,33 @@ class ScriptTests(unittest.TestCase):
         self.assertEqual(scene["characters"]["M"]["voice"]["name"], "hi-IN-SwaraNeural")
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(director.problems(scene, os.path.join(d, "x.json")), [])
+
+    def test_wrong_format_is_caught(self):
+        bad = ("HOOK: Test\n"
+               "CAST: A = college_boy poor [tshirt], B = college_girl rich [pink, saree, earrings]\n"
+               "A (Aalu khareedne aaye ho?): Aalu khareedne aaye ho? | आलू खरीदने आए हो?\n"
+               "A -> point | shock\n"
+               "B -> wink | smile\n"
+               "C (smile): Main kaun? | मैं कौन?\n"
+               "CTA: Tag karo\n")
+        scene, warnings = script.parse_script(bad)
+        text = "\n".join(warnings)
+        self.assertIn("'poor'", text)
+        self.assertIn("'rich'", text)
+        self.assertIn("brackets me dialogue", text)
+        self.assertIn("'wink'", text)                      # two expressions on one line
+        self.assertNotIn("'point'", text)                  # point + shock = action + face, fine
+        self.assertIn("C CAST me nahi hai", text)
+        self.assertEqual(scene["characters"]["A"]["outfit"], "tshirt")
+        self.assertEqual(scene["characters"]["B"]["outfit"], "saree")
+        self.assertIn("earrings", scene["characters"]["B"]["accessories"])
+
+    def test_page_checker_uses_the_same_words(self):
+        with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as f:
+            page = f.read()
+        m = re.search(r'<script type="application/json" id="vocab">(.*?)</script>', page, re.S)
+        self.assertEqual(json.loads(m.group(1)), script.vocab(),
+                         "index.html vocab is stale: paste json.dumps(studio.script.vocab()) into it")
 
     def test_roman_only_line_warns(self):
         scene, warnings = script.parse_script("HOOK: Test\nA (smile): Bhai chai pila de\n")

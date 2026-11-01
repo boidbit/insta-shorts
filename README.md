@@ -115,6 +115,8 @@ python -m unittest discover -s tests                                            
 3. Script **Apni script** tab me aa jati hai: padho, jo badalna ho badlo → **✅ Approve: Video banao 🎬** (`stage=video`, ~4-6 min). Apni likhi script bhi seedha yahin se approve kar sakte ho, ya "AI se sudharo" se pehle AI ka version dekh sakte ho.
 4. Video GitHub **Release** (`reel-…`) me publish hoti hai; page wahi chalata hai, download + caption copy deta hai. Approve hua draft apne aap hat jata hai. "Pichli reels" me sab purani videos.
 
+**Doosre AI (ChatGPT, Claude, Gemini app) se script:** koi code nahi chahiye, script sirf simple text hai. Page pe "🤖 … prompt copy karo" dabao → us AI me paste karo (aakhri line me apna idea) → jo script mile wo "📝 Apni script" me paste karo. Page turant check karta hai (brackets me dialogue, anjaan shabd, Devanagari missing, CAST me naam nahi…) aur galti ho to Approve se pehle batata hai. Prompt file: `SCRIPT_PROMPT.md`.
+
 **AI key kahan daalni hai:** repo → Settings → Secrets and variables → Actions → **Repository secrets** → New repository secret → Name `GEMINI_API_KEY` (ya `ANTHROPIC_API_KEY`). `GOOGLE_API_KEY`, `GEMINI_KEY`, `AI_API_KEY` naam bhi chalte hain. *Environment* (`github-pages`), Codespaces ya Dependabot secrets workflow ko nahi dikhte.
 
 Branch: page us branch pe workflow chalata hai jo settings me likha hai (default `desi-toons-studio`). Repo public hai to releases (videos) bhi public dikhte hain.
