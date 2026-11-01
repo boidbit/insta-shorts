@@ -233,9 +233,10 @@ class Renderer(Output):
             moving = any(t0 <= t < t1 for (t0, t1, *_r) in c.moves)
             if moving and action in ("idle", "none", "stand"):
                 action, a_t0 = "walk", 0.0
-            opts = dict(st["opts"], _x=x)
+            opts = dict(st["opts"], _x=x, _bpm=plan.bpm)
             pose = actions.pose_for(action, t - a_t0 if action != "walk" else t, st["speed"], st["intensity"],
                                     c.phase, opts)
+            singing = action in actions.SING_ACTIONS and not st["talking"]
             look = st["look"]
             if isinstance(look, str) and look in plan.chars:
                 ox, _oy = plan.chars[look].pos_at(t)
@@ -249,11 +250,14 @@ class Renderer(Output):
             mouth_open = 0.0
             if st["talking"]:
                 mouth_open = self._lip_open(st["talking"], t)
+            elif singing:                       # sings along to the music: believable mouth movement
+                mouth_open = self._lip_open({}, t)
             blink = ((t + c.phase * 1.7) % 3.6) < 0.12
             spec = dict(c.spec)
             spec["facing"] = st["facing"]
+            prop = st["prop"] or ("mic" if singing else None)
             ops, an = build_character(spec, pose, st["expression"], mouth_open, t, x, y, c.scale,
-                                      blink=blink, prop=st["prop"], talking=bool(st["talking"]),
+                                      blink=blink, prop=prop, talking=bool(st["talking"]) or singing,
                                       tear_phase=(t * 1.1) % 1.0)
             r = render_ops(ops, s, self.W, self.H)
             if r:

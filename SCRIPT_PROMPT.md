@@ -21,11 +21,14 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5
 - Places: kitchen, room, street, school, night_road, plain.
 - Acting words, inside ( ) on a spoken line or after -> on an action line:
   - ONE action: talk, point (or "point left" / "point right" / "point up"), laugh, shock, jump, wave, clap, cry, fall, facepalm, shrug, sway, dance, sleep
+    desi dance pack: naagin (shaadi naagin dance), bhangra, aeroplane (uncle's arms-out dance), thumka, dance_walk (dancing while walking, e.g. on the street), kamar_dard (dances like a hero, then the back gives way: a fail), sing (mic singer: a mic appears in the hand and the mouth sings)
   - ONE expression: neutral, smile, smug, sly, shock, shout, laugh, grin, cry, angry, surprised, think, wink, dead, love, sleepy, sad
   - optional prop: phone, cup, spoon, mic, ball, stick
   - optional sound: pop, boing, whoosh, ding, thud, clap, beep, laugh_track
   - optional: shake (camera shake for a comedy hit)
 - Moves: `NAME -> enter left`, `NAME -> exit right`, `NAME -> walk center`, `ALL -> dance laugh`. `wait 1` pauses.
+- A line with only a dance (`A -> naagin sly`) is shown for ~1.6 s; the dance keeps going in the background while others talk, until that character gets another action.
+- Optional `MUSIC: beat 110` sets the beat (the dances move on it). For a real song write `MUSIC: none`: the song is added later inside Instagram (no copyright trouble). The voice cannot really sing: for singing jokes use `sing` + a short line, or a "besura" reaction from the others.
 
 ## Wrong vs right
 

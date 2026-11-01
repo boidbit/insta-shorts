@@ -308,6 +308,8 @@ def parse_script(text):
                 others = [o for o in order if o != who]
                 if len(order) == 2 and others:
                     ev.setdefault("look", others[0])
+            elif ev.get("action") in actions.DANCES:
+                ev.setdefault("hold", 2.0 if ev["action"] in ("kamar_dard", "fail") else 1.6)
             elif "action" not in ev and "move" not in ev and "expression" not in ev:
                 ev.setdefault("hold", 0.6)
             tl.append(ev)

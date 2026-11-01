@@ -62,6 +62,8 @@ Ready looks: `boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, ki
 - `outfit`: tshirt, shirt, kurta, salwar (dupatta ke saath), saree, uniform, blazer, vest · `color` / `accent` (dupatta, blouse, tie) / `pants` / `shoes` (black, white, chappal)
 - `build`: slim, normal, chubby · `scale` (bachche ~0.72) · `accessories`: glasses, cap, turban, moustache, beard, bindi, tilak, earrings
 - 17 expressions, 17 actions (walk, talk, dance, point, laugh, shock, jump, wave, clap, cry, fall, facepalm, shrug, sway, sleep...)
+- **Desi dance pack** (music ki beat pe chalta hai, `MUSIC: beat 110`): `naagin` (haath maathe pe phan), `bhangra`, `aeroplane` (uncle special), `thumka`, `dance_walk` (chalte-chalte dance, `night_road` pe best), `kamar_dard` (hero dance… phir kamar jawab de deti hai), `sing` (mic apne aap haath me, mooh gaata hai). Example: `scripts/shaadi_dance.txt`.
+- Asli gaana: video `MUSIC: none` se banao aur gaana Instagram ke andar "Add audio" se lagao (copyright safe, trending audio ki reach). Hindi voice gaa nahi sakti; gaane ke jokes ke liye `sing` + ek line + baaki logon ka "besura" reaction.
 
 ## Ek video me kai jagah (multi-scene)
 

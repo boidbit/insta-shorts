@@ -220,8 +220,14 @@ def compile_scene(scene, use_tts=True, fps=None):
     plan.shakes = shakes
 
     # ---- audio ----
-    plan.music = compile_music(scene.get("music") or meta.get("music"), plan.duration)
+    m = scene.get("music") or meta.get("music")
+    plan.music = compile_music(m, plan.duration)
+    plan.bpm = float(meta.get("bpm") or music_bpm(m) or 96)     # dances move on this beat
     return plan
+
+
+def music_bpm(m):
+    return m.get("bpm", 104) if isinstance(m, dict) and m.get("type") == "beat" else None
 
 
 def static_overlays(scene):
@@ -265,6 +271,8 @@ def split_scenes(scene):
     base = {k: v for k, v in scene.items() if k not in VIDEO_KEYS}
     base_meta = {k: v for k, v in scene.get("meta", {}).items() if k != "duration"}
     base_meta.setdefault("tail", 0.5)
+    if music_bpm(scene.get("music")) and "bpm" not in base_meta:     # scenes dance to the shared music
+        base_meta["bpm"] = music_bpm(scene.get("music"))
     cast_all = scene.get("characters", {})
     out = []
     for sc in scene["scenes"]:

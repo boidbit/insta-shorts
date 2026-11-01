@@ -44,6 +44,25 @@ class SceneTests(unittest.TestCase):
                 self.assertTrue(render_ops(ops, 0.2, 216, 384))
                 self.assertLess(an["head_top"][1], an["feet"][1])
 
+    def test_every_action_draws_and_dances_follow_the_beat(self):
+        from studio import actions
+        self.assertTrue(actions.DANCES <= set(actions.ACTIONS))
+        for name in actions.ACTIONS:
+            for t in (0.0, 0.7, 2.5):
+                with self.subTest(action=name, t=t):
+                    pose = actions.pose_for(name, t, 1, 1, 0, {"_bpm": 110})
+                    ops, _ = build_character({"look": "uncle"}, pose, "smile", 0.4, t, 540, 1700, prop="mic")
+                    self.assertTrue(render_ops(ops, 0.2, 216, 384))
+        slow = actions.pose_for("bhangra", 0.25, 1, 1, 0, {"_bpm": 60})
+        fast = actions.pose_for("bhangra", 0.25, 1, 1, 0, {"_bpm": 120})
+        self.assertNotEqual(round(slow["ra1"], 3), round(fast["ra1"], 3))
+
+    def test_dance_line_is_held_long_enough_to_see(self):
+        scene, warnings = script.parse_script("HOOK: x\nCAST: A = aunty\nA -> naagin sly\nCTA: y\n")
+        self.assertEqual(warnings, [])
+        ev = scene["scenes"][0]["timeline"][2]
+        self.assertEqual((ev["action"], ev["expression"], ev["hold"]), ("naagin", "sly", 1.6))
+
     def test_multi_scene_timing(self):
         video = make_video(load_scene(os.path.join(ROOT, "scenes", "doodh_story_demo.json")), 216, use_tts=False)
         self.assertEqual(len(video.parts), 3)

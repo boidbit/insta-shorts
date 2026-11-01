@@ -49,6 +49,7 @@ Use `hi-IN-SwaraNeural` for women/girls and `hi-IN-MadhurNeural` for men/boys; g
 
 - `who`: "A" | ["A","B"] | "all"
 - `action`: idle, talk, dance (style: pump|swing|cheer|disco), point (point: left|right|up|down|up_left|up_right), laugh, shock, jump, wave, clap, cry, fall (dir: 1|-1), walk (hands: "pockets"), facepalm, shrug, sway, sleep. Optional `speed`, `intensity`.
+  Desi dance pack (moves on the music's bpm): naagin, bhangra, aeroplane, thumka, dance_walk (dance while walking; combine with `move`), kamar_dard (hero dance, then the back gives way), sing (mic appears, mouth sings along). Give a dance a `hold` of ~1.5 s so it is seen.
 - `expression`: neutral, smile, smug, sly, shock, shout, laugh, grin, cry, angry, surprised, think, wink, dead, love, sleepy, sad
 - `prop`: spoon, phone, mic, cup, ball, stick (or "" to drop it). `label`: small name tag above the head ("" hides it). `look`: another character name | left | right. `facing`: left | right | front.
 - `say`: the text in the speech bubble (Hinglish in Roman letters, short: max ~45 characters).

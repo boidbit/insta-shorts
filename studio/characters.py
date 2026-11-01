@@ -113,6 +113,7 @@ DEFAULT_POSE = dict(
     tilt=0.0, lift=0.0, shift=0.0,
     head_tilt=0.0, look_x=0.0, look_y=0.0,
     finger=None,      # "L" / "R": draw a pointing finger on that hand
+    arms_front=False,  # draw the arms over the head (hand on the forehead)
 )
 
 # name -> (eyes, mouth, brows)
@@ -563,16 +564,20 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     if hair == "braid" and not covered:
         _braid(S, HH, hcol, cols["accent"])
 
-    # ---- arms ----
-    for side, sh, elb, hand, a2 in (("L", sk["shL"], sk["elbL"], sk["handL"], p["la2"]),
-                                    ("R", sk["shR"], sk["elbR"], sk["handR"], p["ra2"])):
-        S.limb([sh, elb, hand], [ARM_W, ARM_W - 3, ARM_W - 7], skin)
-        _sleeve(S, outfit, sh, elb, hand, cols["main"])
-        _hand(S, hand, a2, side, skin, finger=p.get("finger") == side)
-    if prop:
-        side = o.get("prop_hand", "R")
-        wrist, fore = (sk["handL"], p["la2"]) if side == "L" else (sk["handR"], p["ra2"])
-        _draw_prop(S, prop, add(wrist, vec(fore, 11)), fore, cols["main"])     # held in the palm
+    # ---- arms (normally behind the head; a pose can bring them in front, e.g. the naagin hood) ----
+    def draw_arms():
+        for side, sh, elb, hand, a2 in (("L", sk["shL"], sk["elbL"], sk["handL"], p["la2"]),
+                                        ("R", sk["shR"], sk["elbR"], sk["handR"], p["ra2"])):
+            S.limb([sh, elb, hand], [ARM_W, ARM_W - 3, ARM_W - 7], skin)
+            _sleeve(S, outfit, sh, elb, hand, cols["main"])
+            _hand(S, hand, a2, side, skin, finger=p.get("finger") == side)
+        if prop:
+            side = o.get("prop_hand", "R")
+            wrist, fore = (sk["handL"], p["la2"]) if side == "L" else (sk["handR"], p["ra2"])
+            _draw_prop(S, prop, add(wrist, vec(fore, 11)), fore, cols["main"])     # held in the palm
+
+    if not p.get("arms_front"):
+        draw_arms()
 
     # ---- head ----
     for sgn in (-1, 1):
@@ -736,6 +741,9 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
             hpoly(closed_ellipse(fdx, -38, 7, 7, 14), (200, 30, 50), None)
         elif a == "tilak":
             hpoly([(fdx - 5, -60), (fdx + 5, -60), (fdx + 3, -20), (fdx - 3, -20)], (220, 70, 40), None)
+
+    if p.get("arms_front"):
+        draw_arms()
 
     top_extra = {"spiky": 34, "curly": 26, "bun": 48, "ponytail": 8}.get(hair, 8)
     if "turban" in acc:

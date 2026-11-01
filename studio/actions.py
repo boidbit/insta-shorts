@@ -34,9 +34,14 @@ def talk(t, sp, I, ph, o):
     return d
 
 
+def _beat(o, sp):
+    """Beats per second: the music's tempo (the renderer passes it as _bpm) times the event speed."""
+    return o.get("_bpm", 90) / 60.0 * sp
+
+
 def dance(t, sp, I, ph, o):
     style = o.get("style", "pump")
-    w = 2 * pi * 1.5 * sp
+    w = 2 * pi * _beat(o, sp)
     c = sin(w * t + ph)
     side = sin(w * 0.5 * t + ph)
     spread = 22 + 8 * c * I
@@ -214,12 +219,96 @@ def sleep(t, sp, I, ph, o):
     return d
 
 
+# ------------------------------------------------------------------ desi dance pack
+def naagin(t, sp, I, ph, o):
+    # shaadi wala naagin: one hand a hood over the head, the other the tail at the waist, body slithering low
+    w = 2 * pi * _beat(o, sp) * 0.5
+    s = sin(w * t + ph)
+    return dict(ll1=-26, ll2=14, rl1=26, rl2=-14,              # knees bent: the body sits lower
+                tilt=9 * s * I, shift=14 * sin(w * t + ph + 0.8) * I, head_tilt=-12 * s * I,
+                ra1=168 - 6 * s, ra2=-130 + 8 * s, arms_front=True,    # hand on the forehead = the hood
+                la1=-35, la2=55 + 15 * s, look_x=0.4 * s)
+
+
+def bhangra(t, sp, I, ph, o):
+    # one arm up and one out, swapping every beat, a hop with the knee kicking out, shoulders up
+    b = _beat(o, sp) * t + ph / pi
+    k = 0.5 + 0.5 * cos(pi * b)            # 1: right arm up, 0: left arm up
+    hop = abs(sin(pi * b))
+    return dict(ra1=95 + 55 * k, ra2=120 + 55 * k, la1=-95 - 55 * (1 - k), la2=-120 - 55 * (1 - k),
+                rl1=9 + 50 * k * hop * I, rl2=3 - 10 * k * hop, ll1=-9 - 50 * (1 - k) * hop * I,
+                ll2=-3 + 10 * (1 - k) * hop, lift=-14 * hop * I, tilt=4 * (2 * k - 1) * I,
+                head_tilt=-5 * (2 * k - 1), look_y=-0.3)
+
+
+def aeroplane(t, sp, I, ph, o):
+    # uncle special: arms out like wings, banking left and right across the floor
+    w = 2 * pi * _beat(o, sp) * 0.25
+    s = sin(w * t + ph)
+    step = abs(sin(pi * _beat(o, sp) * t + ph))
+    d = _stance(1.3)
+    d.update(la1=-92 - 4 * s, la2=-92 - 4 * s, ra1=92 - 4 * s, ra2=92 - 4 * s,
+             tilt=14 * s * I, shift=20 * s * I, head_tilt=-6 * s, lift=-5 * step * I, look_y=-0.4)
+    return d
+
+
+def thumka(t, sp, I, ph, o):
+    # hip pops to the side on every beat, one hand on the hip, the other twirling up high
+    b = _beat(o, sp) * t + ph / pi
+    hip = sin(pi * b)
+    d = _stance()
+    d.update(shift=18 * hip * I, tilt=-6 * hip * I, head_tilt=8 * hip,
+             la1=-35, la2=45, ra1=155, ra2=178 + 25 * sin(2 * pi * b),
+             rl1=9 + 10 * max(0.0, hip), ll1=-9 + 10 * min(0.0, hip))
+    return d
+
+
+def dance_walk(t, sp, I, ph, o):
+    # strutting down the road: a step on every beat, grooving arms, a bounce on each step
+    bps = _beat(o, sp)
+    d = walk(t, bps / 2.0 / 1.25, I, ph, {})          # walk() does one step per half cycle
+    p = sin(2 * pi * bps * t + ph)
+    d.update(la1=-35 - 25 * p, la2=-120 - 30 * p, ra1=35 - 25 * p, ra2=120 - 30 * p,
+             lift=d["lift"] - 8 * abs(sin(pi * bps * t)) * I, head_tilt=4 * sin(2 * pi * bps * t))
+    return d
+
+
+def kamar_dard(t, sp, I, ph, o):
+    # starts dancing like a hero... then the back gives way: bent over, hand on the back, trembling
+    if t < 0.8:
+        return dance(t, sp, I, ph, dict(o, style="pump"))
+    e = ease_out((t - 0.8) / 0.35)
+    shake = 2.5 * sin(2 * pi * 9 * t) * math.exp(-(t - 0.8) * 1.5) * I
+    return dict(ll1=-16, ll2=10, rl1=16, rl2=-10,          # knees buckle
+                tilt=-10 * e, shift=shake, head_tilt=14 * e, look_y=0.7 * e,
+                ra1=20 + 30 * e, ra2=-10 - 40 * e,          # hand on the lower back
+                la1=-20 - 10 * e, la2=-5 + 20 * e)          # other hand on the knee
+
+
+def sing(t, sp, I, ph, o):
+    # mic singer: mic at the mouth, the other arm reaching out with feeling, slow sway
+    w = 2 * pi * _beat(o, sp) * 0.25
+    s = sin(w * t + ph)
+    d = _stance()
+    d.update(ra1=55, ra2=-145 + 4 * s, la1=-100 - 25 * s * I, la2=-140 - 15 * s * I,
+             tilt=3 * s * I, head_tilt=-6 + 5 * s * I, look_y=-0.3, arms_front=True)    # mic in front of the face
+    return d
+
+
+SING_ACTIONS = {"sing", "gaana"}
+# moves worth watching for a while: a script line with only one of these holds the cursor ~1.6 s
+DANCES = {"dance", "dance2", "dance3", "disco", "sway", "naagin", "nagin", "bhangra", "aeroplane", "airplane",
+          "thumka", "dance_walk", "kamar_dard", "fail"} | SING_ACTIONS
+
 ACTIONS = {
     "idle": idle, "none": idle, "stand": idle,
     "talk": talk, "dance": dance, "dance2": dance2, "dance3": dance3, "disco": disco,
     "point": point, "laugh": laugh, "shock": shock, "jump": jump, "wave": wave, "clap": clap,
     "cry": cry, "fall": fall, "walk": walk, "facepalm": facepalm, "shrug": shrug, "sway": sway,
     "sleep": sleep,
+    "naagin": naagin, "nagin": naagin, "bhangra": bhangra, "aeroplane": aeroplane, "airplane": aeroplane,
+    "thumka": thumka, "dance_walk": dance_walk, "kamar_dard": kamar_dard, "fail": kamar_dard,
+    "sing": sing, "gaana": sing,
 }
 
 
