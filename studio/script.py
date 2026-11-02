@@ -23,8 +23,13 @@ Script format (one thing per line):
   Words in brackets can be expressions, actions, props, point directions, sfx, "shake".
 - `NAME -> ...` is an action without speech: enter/exit left|right, walk left|center|right,
   any action / expression.  `ALL -> ...` does it for everybody in the scene.
-- `SCENE: background | title` starts a new place (kitchen, room, street, school, night_road, plain).
+- `SCENE: background | title` starts a new place (kitchen, room, street, school, market, office, bus_stop, night_road,
+  plain), or your own picture: `SCENE: gali` uses assets/backgrounds/gali.png (.jpg/.webp), or a path `SCENE: assets/backgrounds/gali.jpg`.
 - `wait 1.5` (or `...`) pauses.
+- Camera (optional, the camera already cuts in on every speaker by itself): `wide`, `medium`, `close`,
+  `two_shot` in the brackets of a line, e.g. `A (shock, close): ...` or `A -> shock close`.
+- Depth: `near` (step towards the camera, bigger), `far` (step back, smaller), `mid` (back to normal),
+  e.g. `B -> near smug`.
 
 Just lyrics (no format at all): if the text has no CAST/SCENE line, no `A = ...`, no `A -> ...` and no
 `NAME: ...` speaker line, every line is a lyric shown on screen while one singer walks down a night road:
@@ -40,14 +45,20 @@ import argparse
 import os
 import re
 
-from . import actions, audio
+from . import actions, audio, objects
 from .characters import ACCESSORIES, EXPRESSIONS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE, SKIN_TONES
-from .scene import SLOTS
+from .util import asset_path
+from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS, chat_length
 
 HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION")
-BACKGROUNDS = ("kitchen", "room", "street", "school", "night_road", "plain")
-PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick")
+BACKGROUNDS = ("kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road", "plain")
+PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick", "bag")
 SFX = ("pop", "boing", "whoosh", "ding", "thud", "clap", "beep", "laugh_track")
+NARRATION_NAMES = ("narrator", "vo", "narration", "voiceover", "voice_over")   # a voice with no body
+NARRATOR_SPEC = {"hidden": True, "voice": {"name": "hi-IN-MadhurNeural", "pitch": "-12Hz", "rate": "-4%",
+                                           "gemini": "Charon"}}
+SHOTS = tuple(SHOT_ZOOM) + tuple(SHOT_ALIASES)       # camera: wide, medium, close, two_shot (+ spellings)
+DEPTH_WORDS = tuple(DEPTHS)                         # near / mid / far: step towards or away from the camera
 DIRECTIONS = ("left", "right", "up", "down", "up_left", "up_right")
 ROLE_LOOKS = {
     "mummy": "aunty", "mom": "aunty", "maa": "aunty", "mother": "aunty", "chachi": "aunty", "padosan": "aunty",
@@ -74,6 +85,9 @@ def vocab():
                          | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS)),
         "expressions": sorted(EXPRESSIONS), "actions": sorted(actions.ACTIONS),
         "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS),
+        "shots": sorted(SHOTS), "depth": sorted(DEPTH_WORDS),
+        "objects": sorted(set(objects.OBJECTS) | set(objects.ALIASES)),
+        "object_words": ["center", "enter", "exit", "front", "go", "left", "right", "to"],
     }
 
 
@@ -167,6 +181,10 @@ def _stage(tokens, ev, scene_cast, who):
             ev["volume"] = 0.6
         elif w == "shake":
             ev["camera"] = {"shake": 0.6}
+        elif w in SHOTS:
+            ev["shot"] = SHOT_ALIASES.get(w, w)
+        elif w in DEPTH_WORDS:
+            ev["depth"] = w
         elif w in ("left", "right") and "facing" not in ev:
             ev["facing"] = w
         else:
@@ -260,6 +278,65 @@ def parse_lyrics(meta, lyrics):
     return scene, warnings
 
 
+IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp")
+
+
+def resolve_background(raw):
+    """`street` / `gali` (= assets/backgrounds/gali.png) / `assets/backgrounds/x.jpg` -> (background dict, warning)."""
+    name = raw.strip()
+    low = name.lower().replace(" ", "_")
+    if low in BACKGROUNDS:
+        return {"type": low}, None
+    is_path = name.lower().endswith(IMAGE_EXT)
+    stems = [name, name.replace(" ", "_"), low]
+    tries = [name] if is_path else [os.path.join("assets", "backgrounds", st + ext) for st in dict.fromkeys(stems)
+                                    for ext in IMAGE_EXT]
+    for t in tries:
+        if os.path.isfile(asset_path(t)):
+            return {"type": "image", "path": t.replace(os.sep, "/")}, None
+    if is_path:
+        return {"type": "room"}, "SCENE %r: ye image nahi mili (file assets/backgrounds/ me daalo) -> using room" % name
+    return {"type": "room"}, "unknown place %r -> using room" % low
+
+
+def parse_obj(rest):
+    """`truck enter left to right` -> ({"kind": "truck", "enter": "left", "at": "right"}, [problems])."""
+    raw = rest.split()
+    spec, bad = {}, []
+    if not raw:
+        return None, ["OBJ: ke baad object ka naam likho (%s)" % ", ".join(sorted(objects.OBJECTS))]
+    kind = objects.resolve_kind(raw[0])
+    if not kind:
+        return None, ["OBJ %r: ye object nahi hai (%s, ya apni .png)" % (raw[0], ", ".join(sorted(objects.OBJECTS)))]
+    spec["kind"] = kind if kind in objects.OBJECTS else raw[0]
+    i = 1
+    while i < len(raw):
+        w = raw[i].lower()
+        nxt = raw[i + 1].lower() if i + 1 < len(raw) else None
+        if w in ("enter", "exit", "go") and nxt in ("left", "right", "center"):
+            spec[w] = nxt
+            i += 1
+        elif w == "to" and nxt in ("left", "right", "center"):
+            spec["at"] = nxt
+            i += 1
+        elif w in ("left", "right", "center"):
+            spec["at"] = w
+        elif w == "front":
+            spec["front"] = True
+        elif w in ("big", "small"):
+            spec["scale"] = 1.35 if w == "big" else 0.7
+        elif w in PALETTE:
+            spec["color"] = w
+        else:
+            bad.append(w)
+        i += 1
+    if spec.get("enter") == "center" or spec.get("exit") == "center":
+        return None, ["OBJ %s: enter/exit sirf left ya right se hota hai" % raw[0]]
+    if spec.get("go") and not spec.get("at"):
+        spec["at"] = spec["go"]
+    return spec, ["OBJ %s: %s samajh nahi aaye" % (raw[0], ", ".join(repr(b) for b in bad))] if bad else []
+
+
 def parse_script(text):
     """Return (scene dict, warnings)."""
     lyr = _split_lyrics(text)
@@ -272,7 +349,8 @@ def parse_script(text):
     cur = None
 
     def new_scene(bg="room", title=None):
-        sc = {"background": {"type": bg}, "lines": [], "title": title}
+        sc = {"background": bg if isinstance(bg, dict) else {"type": bg}, "lines": [], "title": title, "chat": [],
+              "chat_title": ""}
         scenes.append(sc)
         return sc
 
@@ -301,10 +379,9 @@ def parse_script(text):
                         add_cast(n.strip(), _words(w))
             elif key == "SCENE":
                 bg, _, title = val.partition("|")
-                bg = bg.strip().lower().replace(" ", "_") or "room"
-                if bg not in BACKGROUNDS:
-                    warnings.append("unknown place %r -> using room" % bg)
-                    bg = "room"
+                bg, warn = resolve_background(bg.strip() or "room")
+                if warn:
+                    warnings.append(warn)
                 cur = new_scene(bg, title.strip() or None)
             else:
                 meta[key] = val
@@ -316,6 +393,23 @@ def parse_script(text):
             continue
         if cur is None:
             cur = new_scene()
+        m = re.match(r"^CHAT\s*(left|right)?\s*:\s*(.*)$", line, re.I)
+        if m:
+            side, text = (m.group(1) or "").lower(), m.group(2).partition("|")[0].strip()
+            if not side:
+                cur["chat_title"] = text
+            elif text:
+                cur["chat"].append({"side": side, "text": text})
+            else:
+                warnings.append("CHAT %s: message khali hai" % side)
+            continue
+        m = re.match(r"^OBJ\s*:\s*(.*)$", line, re.I)
+        if m:
+            spec, probs = parse_obj(m.group(1))
+            warnings += probs
+            if spec:
+                cur["lines"].append(("obj", spec))
+            continue
         m = re.match(r"^(?:wait\s*([\d.]+)|\.\.\.+)$", line, re.I)
         if m:
             cur["lines"].append(("wait", float(m.group(1) or 1.0)))
@@ -332,7 +426,8 @@ def parse_script(text):
                 warnings.append("line %r: brackets me dialogue likha hai. Brackets me sirf acting words aate hain, "
                                 "jaise (shock, point); dialogue ':' ke baad likho" % line[:50])
                 bracket = ""
-            cur["lines"].append(("say", m.group(1), _words(bracket), say.strip(), speak.strip(), line))
+            who_ = "NARRATOR" if m.group(1).lower() in NARRATION_NAMES else m.group(1)
+            cur["lines"].append(("say", who_, _words(bracket), say.strip(), speak.strip(), line))
             continue
         warnings.append("line not understood: %r" % line[:60])
 
@@ -344,8 +439,9 @@ def parse_script(text):
     for si, sc in enumerate(scenes):
         order = []
         for ln in sc["lines"]:
-            if ln[0] in ("do", "say") and ln[1].upper() != "ALL" and ln[1] not in order:
+            if ln[0] in ("do", "say") and ln[1].upper() not in ("ALL", "NARRATOR") and ln[1] not in order:
                 order.append(ln[1])
+        narrated = any(ln[0] == "say" and ln[1] == "NARRATOR" for ln in sc["lines"])
         for name in order:
             if declared and name not in cast:
                 warnings.append("%s CAST me nahi hai: CAST line me '%s = <role/look>' jodo" % (name, name))
@@ -362,6 +458,13 @@ def parse_script(text):
         for ln in sc["lines"]:
             if ln[0] == "wait":
                 tl.append({"wait": ln[1]})
+                continue
+            if ln[0] == "obj":
+                oev = {"obj": ln[1]}
+                if first:
+                    oev["t"] = 0.1
+                    first = False
+                tl.append(oev)
                 continue
             who = "all" if ln[1].upper() == "ALL" else ln[1]
             ev = {"who": who}
@@ -394,7 +497,11 @@ def parse_script(text):
                 if not ln[4] and not re.search(r"[ऀ-ॿ]", ln[3]):
                     warnings.append("no Devanagari for %r: the voice will read Roman letters" % ln[3][:30])
                 others = [o for o in order if o != who]
-                if len(order) == 2 and others:
+                if who == "NARRATOR":
+                    ev["bubble"], ev["subtitle"] = False, True
+                    for key in ("action", "expression", "prop", "move", "camera", "sfx", "volume", "facing", "look"):
+                        ev.pop(key, None)                       # a voice has no body to act with
+                elif len(order) == 2 and others:
                     ev.setdefault("look", others[0])
             elif ev.get("action") in actions.DANCES:
                 ev.setdefault("hold", 2.0 if ev["action"] in ("kamar_dard", "fail") else 1.6)
@@ -402,12 +509,21 @@ def parse_script(text):
                 ev.setdefault("hold", 0.6)
             tl.append(ev)
             first = False
+        if sc["chat"]:                              # the chat plays by itself: the CTA waits for its end
+            tl.append({"wait": round(chat_length(len(sc["chat"])), 2)})
         last = {"hold": 1.0}
         if si == len(scenes) - 1 and meta.get("CTA"):
             last = {"hold": 2.0, "sfx": "pop", "volume": 0.5,
-                    "overlay": {"text": meta["CTA"], "style": "card", "pos": [540, 640], "color": [236, 90, 70]}}
+                    "overlay": {"text": meta["CTA"], "style": "card",
+                                "pos": [540, 1250 if sc["chat"] else 640], "color": [236, 90, 70]}}
         tl.append(last)
-        item = {"background": sc["background"], "cast": order, "characters": chars, "timeline": tl}
+        item = {"background": sc["background"], "cast": order + (["NARRATOR"] if narrated else []),
+                "characters": chars, "timeline": tl}
+        if narrated:
+            item["characters"]["NARRATOR"] = {}
+            cast.setdefault("NARRATOR", dict(NARRATOR_SPEC))
+        if sc["chat"]:
+            item["chat"] = {"title": sc["chat_title"], "messages": [dict(m_) for m_ in sc["chat"]]}
         if sc["title"]:
             item["title"] = sc["title"]
         out_scenes.append(item)
@@ -436,7 +552,7 @@ def parse_script(text):
     }
     if music:
         scene["music"] = music
-    if len(cast) > 3:
+    if len([n for n in cast if n != "NARRATOR"]) > 3:
         warnings.append("more than 3 characters: the screen gets crowded")
     est = sum(audio.estimate_duration(ln[3]) + 0.3 for sc in scenes for ln in sc["lines"] if ln[0] == "say")
     if est > 28:

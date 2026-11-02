@@ -65,7 +65,7 @@ HAIR_COLORS = {
 HAIR_STYLES = ("short", "side_part", "spiky", "curly", "balding", "bald", "long", "braid", "bun", "ponytail")
 OUTFITS = ("tshirt", "shirt", "kurta", "salwar", "saree", "uniform", "blazer", "vest")
 BUILDS = {"slim": (0.9, 0.0), "normal": (1.0, 6.0), "chubby": (1.2, 44.0)}
-ACCESSORIES = ("glasses", "cap", "turban", "moustache", "beard", "bindi", "tilak", "earrings", "tuft")
+ACCESSORIES = ("glasses", "sunglasses", "cap", "turban", "moustache", "beard", "bindi", "tilak", "earrings", "tuft")
 
 # Ready-made Indian looks. Anything in the character spec overrides these.
 LOOKS = {
@@ -322,6 +322,12 @@ def _draw_prop(S, prop, hand, fore_angle, color_hint):
         S.dot(pt(30, 0), 32, (232, 120, 60), INK, 5)
     elif prop == "stick":
         S.line([pt(-30, 0), pt(150, 0)], 10, (150, 104, 70))
+    elif prop == "bag":                       # a black garbage bag hanging from the hand
+        top = (hand[0], hand[1] + 6)
+        S.poly([(top[0] - 14, top[1]), (top[0], top[1] - 18), (top[0] + 14, top[1])], (28, 28, 34), INK, 5)
+        S.poly([(top[0] + 30 * math.cos(a), top[1] + 46 + 52 * math.sin(a))
+                for a in [i * math.pi / 12 for i in range(24)]], (36, 36, 44), INK, 6)
+        S.line([(top[0] - 14, top[1] + 30), (top[0] - 4, top[1] + 62)], 4, (74, 74, 84))
 
 
 def _eye_center(sgn, face_dx, ey=-4.0, ex=34.0):
@@ -717,6 +723,14 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
                 cx, cy = _eye_center(sgn, fdx)
                 ring = closed_ellipse(cx, cy, 30, 27, 28)
                 hline(ring + [ring[0]], 5)
+            hline([(-5 + fdx, -6), (5 + fdx, -6)], 5)
+            hline([(-62 + fdx, -8), (-96, -14)], 5)
+            hline([(62 + fdx, -8), (96, -14)], 5)
+        elif a == "sunglasses":
+            for sgn in (-1, 1):
+                cx, cy = _eye_center(sgn, fdx)
+                hpoly(closed_ellipse(cx, cy, 34, 24, 28), (22, 22, 28), INK, 5)
+                hline([(cx - 18, cy - 10), (cx - 6, cy - 14)], 4, (150, 150, 170))     # glint
             hline([(-5 + fdx, -6), (5 + fdx, -6)], 5)
             hline([(-62 + fdx, -8), (-96, -14)], 5)
             hline([(62 + fdx, -8), (96, -14)], 5)

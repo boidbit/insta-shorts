@@ -58,11 +58,13 @@ Use `hi-IN-SwaraNeural` for women/girls and `hi-IN-MadhurNeural` for men/boys; g
 - `move`: { "x": 800, "dur": 1.0 } walks the character there (walk animation is automatic). Walk in from off-screen by starting at x -140 / 1200.
 - `hold`: seconds to keep the cursor still after this event (use it on the last event of each scene). `{ "wait": 1.0 }` just advances the cursor.
 - `sfx`: pop | boing | whoosh | ding | thud | clap | beep | laugh_track (+ `volume` 0..1)
+- `obj`: set object event, e.g. `{ "t": 1.0, "obj": { "kind": "truck", "enter": "left", "at": "right" } }` (kinds: truck, auto, car, scooter, cow, dustbin, bags, table; keys: at/enter/exit/go = left|center|right, color, scale, front, dur). New props/looks: prop `bag`, accessory `sunglasses`, action `salute`.
 - `camera`: { "shake": 0.6 } (comedy hit) or { "zoom": 1.2, "focus": "A", "dur": 0.4 } (use zoom rarely)
+  Scenes with no `zoom`/`focus` camera event get an automatic camera (cut-ins on the speaker, tight punch line); put `"shot": "close"|"wide"|"medium"|"two_shot"` on a `say` event to choose a shot yourself. `"depth": "near"|"far"|"mid"` on an event makes that character step towards / away from the camera.
 - `overlay`: an overlay object shown from this event's time
 
 Overlay styles: hook (big yellow, punches in), caption_box, card (colored, use "color": [r,g,b]), tag, title, lyric, subtitle. `pos`: top | upper | center | lower | bottom | [x, y].
-Backgrounds: kitchen, room, street, school, night_road (scrolls, good for walking/song), plain, or {"type": "image", "path": "assets/backgrounds/x.png"}.
+Backgrounds: kitchen, room, street, school, market, office, bus_stop, night_road (scrolls, good for walking/song), plain, or {"type": "image", "path": "assets/backgrounds/x.png"}.
 
 # Rules
 
@@ -76,3 +78,7 @@ Backgrounds: kitchen, room, street, school, night_road (scrolls, good for walkin
 8. If the user gives a SCRIPT (dialogue lines), keep their lines and their order exactly; only add Devanagari, staging, expressions, sfx and the hook.
 9. Always fill `post.caption` (1-2 lines, emoji ok) and 4-8 `post.hashtags`.
 10. Output JSON only.
+
+Voice-over and chat:
+- A character with `"hidden": true` is only a voice (no body, no slot): give it `"voice"` and use `say` events with `"bubble": false, "subtitle": true`.
+- A scene can carry `"chat": {"title": "Mummy", "messages": [{"side": "left", "text": "..."}, {"side": "right", "text": "..."}]}` (a phone chat, no characters: `"cast": []`); messages appear every 1.5 s with a pop sound.

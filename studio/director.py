@@ -29,7 +29,7 @@ from .util import ROOT, load_scene
 DEFAULT_MODEL = "claude-sonnet-5-5"
 # tried in order: a retired model (404) or one that stays busy (503/429) hands over to the next
 GEMINI_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.0-flash"]
-BACKGROUNDS = {"kitchen", "room", "street", "school", "night_road", "plain", "image"}
+BACKGROUNDS = {"kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road", "plain", "image"}
 MAX_SECONDS = 30.0
 _sleep = time.sleep     # tests replace it
 

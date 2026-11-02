@@ -17,11 +17,11 @@ import time
 
 from PIL import Image
 
-from . import actions, audio
+from . import actions, audio, objects
 from .backgrounds import Background
 from .characters import build_character, render_ops
 from .scene import camera_at, compile_music, compile_scene, prepare_voice, split_scenes, static_overlays
-from .text import bubble_image, styled_box
+from .text import bubble_image, chat_image, styled_box
 from .util import LH, LW, clamp, ease_in_out, ease_out, ease_out_back, load_scene
 
 POS = {"top": (540, 330), "center": (540, 960), "lower": (540, 1450), "bottom": (540, 1560),
@@ -49,6 +49,12 @@ class OverlayLayer:
                                           o.get("color"), o.get("size"), o.get("max_w"))
         return self._cache[key]
 
+    def _chat(self, o, shown):
+        key = (id(o), shown)
+        if key not in self._cache:
+            self._cache[key] = chat_image(o["chat"], shown, self.s)
+        return self._cache[key]
+
     def draw(self, img, overlays, t):
         for o in overlays:
             t0 = float(o.get("from", 0.0))
@@ -56,7 +62,13 @@ class OverlayLayer:
             t1 = float(t1) if t1 is not None else (t0 + float(o["dur"]) if "dur" in o else 1e9)
             if not (t0 <= t < t1):
                 continue
-            im = self._image(o)
+            if o.get("chat"):                       # phone chat: shows the messages whose time has come
+                shown = sum(1 for m in o["chat"].get("messages", []) if float(m.get("t", 0.0)) <= t)
+                if not shown:
+                    continue
+                im = self._chat(o, shown)
+            else:
+                im = self._image(o)
             pos = o.get("pos", "top")
             px, py = POS[pos] if isinstance(pos, str) else pos
             default_anim = {"lyric": "fade", "subtitle": "fade", "hook": "punch"}.get(o.get("style"), "pop")
@@ -76,7 +88,10 @@ class OverlayLayer:
                 al = clamp(lt / 0.2)
             if t1 < 1e8:
                 al *= clamp((t1 - t) / 0.2)
-            paste_rgba(img, im, px * self.s, py * self.s, sc, al)
+            if o.get("chat"):                       # anchored at the top, so the panel only grows downwards
+                paste_rgba(img, im, px * self.s, py * self.s, sc, al, anchor=(im.width / 2.0, 0.0))
+            else:
+                paste_rgba(img, im, px * self.s, py * self.s, sc, al)
 
 
 def paste_rgba(img, rgba, cx, cy, scale=1.0, alpha=1.0, anchor=None):
@@ -218,17 +233,42 @@ class Renderer(Output):
         a = abs(math.sin(t * 9.1)) * (0.55 + 0.45 * abs(math.sin(t * 3.7 + 1.3)))
         return clamp(a * 1.25 - 0.1)
 
+    def _draw_objects(self, img, t, front):
+        """Set objects (vehicles, bins, bags...): `front` ones over the characters, the rest behind them."""
+        s = self.s
+        for o in self.plan.objects.values():
+            if o.front != front or not o.visible(t):
+                continue
+            im, (ax, ay), wheels = objects.sprite(o.kind, s * o.scale, o.color)
+            x = o.x_at(t)
+            moving = o.moving(t)
+            bob = math.sin(t * 17.0) * 3.0 * s if (moving and o.kind in objects.VEHICLES) else 0.0
+            flip = o.flip_at(t)
+            if flip:
+                im = im.transpose(Image.FLIP_LEFT_RIGHT)
+                ax = im.width - ax
+            age = t - o.t_in
+            alpha = clamp(age / 0.18) if not o.moves or o.moves[0][0] > o.t_in + 0.01 else 1.0
+            cx, cy = x * s, o.y * s + bob
+            paste_rgba(img, im, cx, cy, 1.0, alpha, anchor=(ax, ay))
+            for (wx, wy, r) in wheels:
+                wim = objects.wheel_image(r, -(x * s) / max(r, 1.0) * 57.2958)
+                wxx = (im.width - wx) if flip else wx
+                paste_rgba(img, wim, cx + (wxx - ax), cy + (wy - ay), 1.0, alpha)
+
     # ------------------------------------------------------------ one frame
     def frame(self, t):
         plan, s = self.plan, self.s
         img = self.bg.frame(t).convert("RGB")
-        order = sorted(plan.chars.values(), key=lambda c: (c.pos_at(t)[1], c.pos_at(t)[0]))
+        self._draw_objects(img, t, False)
+        order = sorted((c for c in plan.chars.values() if not c.spec.get("hidden")),
+                       key=lambda c: (c.draw_pos(t)[1], c.draw_pos(t)[0]))
         anchors = {}
         states = {}
         for c in order:
             st = c.state_at(t)
             states[c.name] = st
-            x, y = c.pos_at(t)
+            x, y = c.draw_pos(t)
             action, a_t0 = st["action"], st["action_t0"]
             moving = any(t0 <= t < t1 for (t0, t1, *_r) in c.moves)
             if moving and action in ("idle", "none", "stand"):
@@ -256,7 +296,7 @@ class Renderer(Output):
             spec = dict(c.spec)
             spec["facing"] = st["facing"]
             prop = st["prop"] or ("mic" if singing else None)
-            ops, an = build_character(spec, pose, st["expression"], mouth_open, t, x, y, c.scale,
+            ops, an = build_character(spec, pose, st["expression"], mouth_open, t, x, y, c.draw_scale(t),
                                       blink=blink, prop=prop, talking=bool(st["talking"]) or singing,
                                       tear_phase=(t * 1.1) % 1.0)
             r = render_ops(ops, s, self.W, self.H)
@@ -264,6 +304,19 @@ class Renderer(Output):
                 layer, (ox, oy) = r
                 img.paste(layer, (ox, oy), layer)
             anchors[c.name] = an
+
+        self._draw_objects(img, t, True)
+
+        # camera first, so the speech bubbles can be kept inside the visible part of the frame
+        z, cx, cy, dx, dy = camera_at(plan, t)
+        if dx or dy:
+            z = max(z, 1.05)
+        vw, vh = self.W / max(z, 1.0), self.H / max(z, 1.0)
+        vl = clamp((cx + dx) * s - vw / 2, 0, self.W - vw)
+        vt = clamp((cy + dy) * s - vh / 2, 0, self.H - vh)
+        zb = max(1.0, z * 0.8)          # a bubble never grows more than ~1.25x on screen when the camera zooms
+        sb = s / zb
+        mar = 22 * s / max(z, 1.0)      # margin to the edge of the visible part (pre-zoom pixels)
 
         # labels + bubbles
         for c in order:
@@ -280,23 +333,19 @@ class Renderer(Output):
             sp = st["talking"]
             if sp and sp.get("bubble", True):
                 lt = t - sp["start"]
-                im0, _ = bubble_image(sp["text"], s, 0)
-                left = clamp(hx * s - im0.width * 0.35, 24 * s, self.W - im0.width - 24 * s)
-                im, (tipx, tipy) = bubble_image(sp["text"], s, int(hx * s - left))
+                im0, _ = bubble_image(sp["text"], sb, 0)
+                left = clamp(hx * s - im0.width * 0.35, max(24 * s, vl + mar), min(self.W - im0.width - 24 * s,
+                                                                                     vl + vw - im0.width - mar))
+                im, (tipx, tipy) = bubble_image(sp["text"], sb, int(hx * s - left))
                 tx, ty = left + tipx, top * s - 12 * s
                 sc = 0.55 + 0.45 * ease_out_back(lt / 0.22)
                 paste_rgba(img, im, tx, ty, sc, 1.0, anchor=(tipx, tipy))
+                if z > 1.001 and ty - tipy < vt + mar:          # bubble would be cut off at the top: tilt the camera up
+                    vt = clamp(ty - tipy - mar, 0, self.H - vh)
 
-        # camera
-        z, cx, cy, dx, dy = camera_at(plan, t)
-        if dx or dy:
-            z = max(z, 1.05)
+        # camera crop
         if z > 1.001:
-            vw, vh = self.W / z, self.H / z
-            ccx, ccy = (cx + dx) * s, (cy + dy) * s
-            l = clamp(ccx - vw / 2, 0, self.W - vw)
-            tp = clamp(ccy - vh / 2, 0, self.H - vh)
-            img = img.resize((self.W, self.H), Image.BILINEAR, box=(l, tp, l + vw, tp + vh))
+            img = img.resize((self.W, self.H), Image.BILINEAR, box=(vl, vt, vl + vw, vt + vh))
 
         self.overlay_layer.draw(img, plan.overlays, t)    # captions stay screen-fixed (not zoomed)
 

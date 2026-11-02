@@ -269,6 +269,55 @@ def styled_box(text, style, s, color=None, size=None, max_w=None):
     return box
 
 
+# ---------------------------------------------------------------- chat screen
+CHAT_LEFT = (250, 250, 250, 255)
+CHAT_RIGHT = (214, 240, 200, 255)
+
+
+def chat_image(chat, shown, s, max_h=1180):
+    """A phone-style chat panel with the first `shown` messages ({"side": "left"|"right", "text": ...}).
+    Only the newest messages that fit are kept (the older ones scroll away). RGBA at output scale s."""
+    size = 46 * s
+    msgs = list(chat.get("messages", []))[:max(0, shown)]
+    bubbles = []
+    for m in msgs:
+        tb = text_block(str(m.get("text", "")), size, 560 * s, fill=(20, 20, 20), align="left")
+        bubbles.append((m.get("side", "left"), tb, tb.width + int(46 * s), tb.height + int(26 * s)))
+    pad, gap, head_h = int(26 * s), int(16 * s), int(124 * s)
+    keep, total = [], 0
+    for b in reversed(bubbles):
+        if keep and total + b[3] + gap > int(max_h * s) - head_h - 2 * pad:
+            break
+        keep.append(b)
+        total += b[3] + gap
+    keep.reverse()
+    W = int(900 * s)
+    H = head_h + 2 * pad + total + int(8 * s)
+    panel, pp = _rrect_layer(W, H, int(38 * s), (236, 229, 221, 255), (16, 16, 16), 5 * s, 0)
+    canvas = panel.copy()
+    d = ImageDraw.Draw(canvas)
+    teal = (52, 132, 120, 255)
+    head, _hp = _rrect_layer(W, head_h, int(38 * s), teal, (16, 16, 16), 5 * s, 0)
+    canvas.alpha_composite(head, (pp - _hp, pp - _hp))
+    d.rectangle([pp + 3, pp + head_h // 2, pp + W - 3, pp + head_h - 1], fill=teal)
+    d.line([pp + 3, pp + head_h, pp + W - 3, pp + head_h], fill=(16, 16, 16, 255), width=max(2, int(4 * s)))
+    r = int(38 * s)                                           # avatar: a white disc with a head and shoulders
+    cx, cy = pp + int(34 * s) + r, pp + head_h // 2
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(255, 255, 255, 255), outline=(16, 16, 16, 255), width=max(2, int(3 * s)))
+    d.ellipse([cx - r * 0.3, cy - r * 0.55, cx + r * 0.3, cy + r * 0.05], fill=teal)
+    d.pieslice([cx - r * 0.62, cy - r * 0.05, cx + r * 0.62, cy + r * 1.2], 180, 360, fill=teal)
+    title = text_block(str(chat.get("title", "")), 50 * s, 600 * s, fill=(255, 255, 255), align="left")
+    canvas.alpha_composite(title, (cx + r + int(24 * s), pp + (head_h - title.height) // 2))
+    y = pp + head_h + pad
+    for side, tb, bw, bh in keep:
+        x = pp + pad if side == "left" else pp + W - pad - bw
+        layer, lp = _rrect_layer(bw, bh, int(26 * s), CHAT_LEFT if side == "left" else CHAT_RIGHT, (16, 16, 16), 3 * s, 0)
+        canvas.alpha_composite(layer, (x - lp, y - lp))
+        canvas.alpha_composite(tb, (x + int(23 * s), y + int(11 * s)))
+        y += bh + gap
+    return canvas
+
+
 # ---------------------------------------------------------------- speech bubble
 @functools.lru_cache(maxsize=256)
 def bubble_image(text, s, tail_x, size=56, max_w=660, tail_h=58):
