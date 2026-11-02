@@ -705,7 +705,8 @@ def parse_script(text):
             if ln[0] == "say":
                 ev["say"], ev["speak"] = ln[3], ln[4] or ln[3]
                 if not ln[4] and not re.search(r"[ऀ-ॿ]", ln[3]):
-                    warnings.append("no Devanagari for %r: the voice will read Roman letters" % ln[3][:30])
+                    warnings.append("no Devanagari for %r: made by the AI when the video is made (GEMINI_API_KEY), "
+                                    "else the voice reads Roman letters" % ln[3][:30])
                 others = [o for o in order if o != who]
                 if who == "NARRATOR":
                     ev["bubble"], ev["subtitle"] = False, True
@@ -780,9 +781,15 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Plain-text script -> scene.json (no AI)")
     ap.add_argument("script")
     ap.add_argument("-o", "--out", default=None)
+    ap.add_argument("--no-hindi", action="store_true",
+                    help="do not ask the AI for Devanagari of Roman-only lines (the voice reads them as they are)")
     args = ap.parse_args(argv)
     with open(args.script, encoding="utf-8") as f:
         scene, warnings = parse_script(f.read())
+    if not args.no_hindi:
+        from .hindi import fill_hindi
+        if fill_hindi(scene):
+            warnings = [w for w in warnings if not w.startswith("no Devanagari")]
     for w in warnings:
         print("  [script] " + w)
     from .director import save
