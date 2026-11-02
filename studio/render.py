@@ -222,13 +222,13 @@ class Renderer(Output):
     def frame(self, t):
         plan, s = self.plan, self.s
         img = self.bg.frame(t).convert("RGB")
-        order = sorted(plan.chars.values(), key=lambda c: (c.pos_at(t)[1], c.pos_at(t)[0]))
+        order = sorted(plan.chars.values(), key=lambda c: (c.draw_pos(t)[1], c.draw_pos(t)[0]))
         anchors = {}
         states = {}
         for c in order:
             st = c.state_at(t)
             states[c.name] = st
-            x, y = c.pos_at(t)
+            x, y = c.draw_pos(t)
             action, a_t0 = st["action"], st["action_t0"]
             moving = any(t0 <= t < t1 for (t0, t1, *_r) in c.moves)
             if moving and action in ("idle", "none", "stand"):
@@ -256,7 +256,7 @@ class Renderer(Output):
             spec = dict(c.spec)
             spec["facing"] = st["facing"]
             prop = st["prop"] or ("mic" if singing else None)
-            ops, an = build_character(spec, pose, st["expression"], mouth_open, t, x, y, c.scale,
+            ops, an = build_character(spec, pose, st["expression"], mouth_open, t, x, y, c.draw_scale(t),
                                       blink=blink, prop=prop, talking=bool(st["talking"]) or singing,
                                       tear_phase=(t * 1.1) % 1.0)
             r = render_ops(ops, s, self.W, self.H)

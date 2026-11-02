@@ -59,6 +59,7 @@ Use `hi-IN-SwaraNeural` for women/girls and `hi-IN-MadhurNeural` for men/boys; g
 - `hold`: seconds to keep the cursor still after this event (use it on the last event of each scene). `{ "wait": 1.0 }` just advances the cursor.
 - `sfx`: pop | boing | whoosh | ding | thud | clap | beep | laugh_track (+ `volume` 0..1)
 - `camera`: { "shake": 0.6 } (comedy hit) or { "zoom": 1.2, "focus": "A", "dur": 0.4 } (use zoom rarely)
+  Scenes with no `zoom`/`focus` camera event get an automatic camera (cut-ins on the speaker, tight punch line); put `"shot": "close"|"wide"|"medium"|"two_shot"` on a `say` event to choose a shot yourself. `"depth": "near"|"far"|"mid"` on an event makes that character step towards / away from the camera.
 - `overlay`: an overlay object shown from this event's time
 
 Overlay styles: hook (big yellow, punches in), caption_box, card (colored, use "color": [r,g,b]), tag, title, lyric, subtitle. `pos`: top | upper | center | lower | bottom | [x, y].

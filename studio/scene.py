@@ -12,6 +12,9 @@ SLOTS = {
     3: {"left": 190, "center": 540, "right": 890},
 }
 GROUND_Y = 1700
+SHOT_ZOOM = {"wide": 1.0, "medium": 1.3, "close": 1.7, "two_shot": 1.3}
+SHOT_ALIASES = {"closeup": "close", "close_up": "close", "twoshot": "two_shot", "2shot": "two_shot"}
+DEPTHS = {"near": (1.3, 110.0), "mid": (1.0, 0.0), "far": (0.75, -150.0)}   # (size multiplier, feet offset in px)
 CHAR_ATTRS = ("action", "expression", "prop", "label", "look", "facing", "style", "point", "dir",
               "lean", "speed", "intensity", "hands", "tint")
 
@@ -27,6 +30,7 @@ class Char:
         self.events = []        # sorted by t
         self.moves = []         # (t0, t1, x0, y0, x1, y1)
         self.speech = []        # dicts
+        self.depth = []         # (t, k0, dy0, k1, dy1): step towards / away from the camera
         v = spec.get("voice", {})
         self.voice = v if isinstance(v, dict) else {"name": v}
 
@@ -38,6 +42,23 @@ class Char:
             e = ease_in_out((t - t0) / max(1e-6, t1 - t0))
             x, y = lerp(x0, x1, e), lerp(y0, y1, e)
         return x, y
+
+    def depth_at(self, t):
+        """(size multiplier, feet offset) - 1.0 / 0 on the normal ground line."""
+        k, dy = 1.0, 0.0
+        for (t0, k0, dy0, k1, dy1) in self.depth:
+            if t < t0:
+                break
+            e = ease_in_out((t - t0) / 0.5)
+            k, dy = lerp(k0, k1, e), lerp(dy0, dy1, e)
+        return k, dy
+
+    def draw_pos(self, t):
+        x, y = self.pos_at(t)
+        return x, y + self.depth_at(t)[1]
+
+    def draw_scale(self, t):
+        return self.scale * self.depth_at(t)[0]
 
     def state_at(self, t):
         st = dict(action="idle", action_t0=0.0, expression=self.spec.get("expression", "neutral"),
@@ -137,18 +158,54 @@ def prepare_voice(scenes, use_tts=True, tts_provider=None):
 SHOT_SIZES = (1.25, 1.5, 1.3, 1.6)       # zoom per spoken line, cycled, so neighbouring lines are different shots
 
 
-def auto_camera(plan, cam_events, shakes):
+def shot_camera(name, t, chars, who, speaker=None, dur=0.16):
+    """Camera event for a shot word (wide / medium / close / two_shot) on the given character(s)."""
+    name = SHOT_ALIASES.get(name, name)
+    ev = dict(t=t, zoom=SHOT_ZOOM[name], dur=dur)
+    if name == "wide":
+        return ev
+    names = [w for w in (who or []) if w in chars]
+    if name == "two_shot" or len(names) > 1:
+        sp = speaker if speaker in chars else (names[0] if names else None)
+        others = [n for n in chars if n != sp and chars[n].spec.get("hidden") is not True]
+        if sp and others:                           # the speaker and whoever stands closest to them
+            sx = chars[sp].draw_pos(t)[0]
+            near = min(others, key=lambda n_: abs(chars[n_].draw_pos(t)[0] - sx))
+            pts = [chars[sp].draw_pos(t), chars[near].draw_pos(t)]
+        else:
+            pts = [chars[n].draw_pos(t) for n in names]
+        if pts:
+            ev["focus"] = [sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts) - 560]
+            return ev
+    focus = names[0] if names else speaker
+    if focus in chars:
+        ev["focus"] = focus
+    return ev
+
+
+def auto_camera(plan, chars, cam_events, shakes):
     """Rule-based direction for scenes that have no camera moves of their own.
 
     Every spoken line gets a quick cut-in on its speaker (size cycles through SHOT_SIZES) followed by a slow
     push-in while the line is spoken; the last line (the punch line) is the tightest shot and ends with a shake;
-    after it the camera pulls back to a wide shot for the reaction.
+    after it the camera pulls back to a wide shot for the reaction. A shot word on the line (close, wide, ...)
+    replaces the automatic size of that line.
     """
     speech = sorted((sp for sp in plan.speech if sp.get("who")), key=lambda sp: sp["start"])
     n = len(speech)
     for i, sp in enumerate(speech):
         t0 = sp["start"]
         d = max(0.6, sp["end"] - t0)
+        shot = SHOT_ALIASES.get(sp.get("shot"), sp.get("shot"))
+        if shot in SHOT_ZOOM:
+            cut = shot_camera(shot, max(0.0, t0 - 0.05), chars, [sp["who"]], sp["who"])
+            cam_events.append(cut)
+            size = cut["zoom"]
+            if size > 1.0 and d > 1.0:
+                cam_events.append(dict(cut, t=t0 + 0.2, zoom=round(size + 0.1, 2), dur=max(0.4, d - 0.2)))
+            if i == n - 1 and n > 1:
+                shakes.append((max(0.0, sp["end"] - 0.15), 0.5, 0.45))
+            continue
         if i == 0:                                  # first line: ease in from the wide establishing shot
             cam_events.append(dict(t=t0, zoom=1.2, focus=sp["who"], dur=min(0.6, d)))
             size = 1.2
@@ -193,6 +250,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.sfx = []
     plan.overlays = []
     cam_events = []
+    shot_events = []        # camera moves from shot words on action lines (do not switch the auto camera off)
     shakes = []
     plan.speech = []
     warned = [False]
@@ -224,6 +282,10 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 e["expression"] = ev["emotion"]
             if len(e) > 1:
                 c.events.append(e)
+            if ev.get("depth") in DEPTHS:
+                k0, dy0 = c.depth_at(t)
+                k1, dy1 = DEPTHS[ev["depth"]]
+                c.depth.append((t, k0, dy0, k1, dy1))
             if "move" in ev:
                 m = ev["move"]
                 x0, y0 = c.pos_at(t)
@@ -249,7 +311,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                     warned[0] = True
             if dur is None:
                 dur = float(ev.get("duration", audio.estimate_duration(speak)))
-            sp = dict(who=c.name, text=text, start=t, end=t + dur + 0.12, audio=path, bubble=ev.get("bubble", True))
+            sp = dict(who=c.name, text=text, start=t, end=t + dur + 0.12, audio=path, bubble=ev.get("bubble", True),
+                      shot=ev.get("shot"))
             c.speech.append(sp)
             plan.speech.append(sp)
             cursor = max(cursor, t + dur + gap)
@@ -266,6 +329,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             o = dict(ev["overlay"])
             o.setdefault("from", t)
             plan.overlays.append(o)
+        if "shot" in ev and "say" not in ev and SHOT_ALIASES.get(ev["shot"], ev["shot"]) in SHOT_ZOOM:
+            shot_events.append(shot_camera(ev["shot"], t, chars, who, dur=0.3))
         if "camera" in ev:
             cam = dict(ev["camera"])
             cam["t"] = t
@@ -290,15 +355,16 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
 
     # ---- camera segments ----
     if meta.get("auto_camera", True) and not cam_events:
-        auto_camera(plan, cam_events, shakes)
+        auto_camera(plan, chars, cam_events, shakes)
+    cam_events += shot_events
     segs = []
     z, cx, cy = 1.0, LW / 2.0, LH / 2.0
     for cam in sorted(cam_events, key=lambda c_: c_["t"]):
         tz = float(cam.get("zoom", z))
         f = cam.get("focus")
         if isinstance(f, str) and f in chars:
-            fx, fy = chars[f].pos_at(cam["t"])
-            tc = (fx, fy - 560)
+            fx, fy = chars[f].draw_pos(cam["t"])
+            tc = (fx, fy - 560 * chars[f].depth_at(cam["t"])[0])
         elif isinstance(f, (list, tuple)):
             tc = (float(f[0]), float(f[1]))
         elif tz == 1.0:

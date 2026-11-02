@@ -52,3 +52,49 @@ class AutoCameraTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ShotAndDepthTests(unittest.TestCase):
+    def test_script_words_become_shots_and_depth(self):
+        from studio.script import parse_script, vocab
+        sc, warns = parse_script("CAST: A = dost, B = aunty\nSCENE: street\nHOOK: x\n"
+                                 "A (laugh, wide): ek | एक\nB -> near smug\nB (angry, close): do | दो\n"
+                                 "A -> shock two_shot\nA (cry, closeup): teen | तीन\nB -> far\nCTA: y\n")
+        self.assertEqual(warns, [])
+        tl = sc["scenes"][0]["timeline"]
+        self.assertEqual([e.get("shot") for e in tl if "say" in e], ["wide", "close", "close"])   # closeup -> close
+        self.assertIn("depth", [k for e in tl for k in e])
+        v = vocab()
+        self.assertIn("two_shot", v["shots"])
+        self.assertEqual(v["depth"], ["far", "mid", "near"])
+
+    def test_depth_moves_the_character_towards_the_camera_smoothly(self):
+        s = scene()
+        s["timeline"] = [{"t": 0.0, "who": "A", "say": "ek", "duration": 1.0},
+                         {"t": 2.0, "who": "B", "depth": "near", "action": "idle", "hold": 1.0},
+                         {"t": 4.0, "who": "B", "depth": "far", "action": "idle", "hold": 1.0}]
+        p = compile_scene(s, use_tts=False)
+        b = p.chars["B"]
+        self.assertEqual(b.depth_at(1.9), (1.0, 0.0))
+        k_mid, dy_mid = b.depth_at(2.25)
+        self.assertTrue(1.0 < k_mid < 1.3 and 0 < dy_mid < 110)             # in between: eased, not a jump
+        self.assertEqual(b.depth_at(3.0), (1.3, 110.0))
+        self.assertEqual(b.depth_at(5.0), (0.75, -150.0))
+        self.assertGreater(b.draw_pos(3.0)[1], p.chars["A"].draw_pos(3.0)[1])   # feet lower = in front
+
+    def test_shot_word_overrides_the_automatic_size_and_two_shot_frames_both(self):
+        s = scene()
+        s["timeline"] = [{"t": 0.0, "who": "A", "say": "ek", "duration": 2.0, "shot": "wide"},
+                         {"who": "B", "say": "do", "duration": 2.0, "shot": "two_shot"},
+                         {"who": "A", "say": "teen", "duration": 2.0}]
+        p = compile_scene(s, use_tts=False)
+        self.assertEqual(p.cam_segments[0][3], 1.0)                          # first line forced wide
+        two = [sg for sg in p.cam_segments if sg[3] == 1.3][0]
+        a_x, b_x = p.chars["A"].draw_pos(0)[0], p.chars["B"].draw_pos(0)[0]
+        self.assertAlmostEqual(two[5][0], (a_x + b_x) / 2, delta=1)           # centred between the two
+
+    def test_frames_render_with_depth(self):
+        s = scene()
+        s["timeline"].insert(1, {"t": 1.0, "who": "B", "depth": "near", "action": "idle"})
+        v = make_video(s, 216, use_tts=False)
+        self.assertEqual(v.frame(3.0).size, (216, 384))

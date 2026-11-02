@@ -25,6 +25,10 @@ Script format (one thing per line):
   any action / expression.  `ALL -> ...` does it for everybody in the scene.
 - `SCENE: background | title` starts a new place (kitchen, room, street, school, night_road, plain).
 - `wait 1.5` (or `...`) pauses.
+- Camera (optional, the camera already cuts in on every speaker by itself): `wide`, `medium`, `close`,
+  `two_shot` in the brackets of a line, e.g. `A (shock, close): ...` or `A -> shock close`.
+- Depth: `near` (step towards the camera, bigger), `far` (step back, smaller), `mid` (back to normal),
+  e.g. `B -> near smug`.
 
 Just lyrics (no format at all): if the text has no CAST/SCENE line, no `A = ...`, no `A -> ...` and no
 `NAME: ...` speaker line, every line is a lyric shown on screen while one singer walks down a night road:
@@ -42,12 +46,14 @@ import re
 
 from . import actions, audio
 from .characters import ACCESSORIES, EXPRESSIONS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE, SKIN_TONES
-from .scene import SLOTS
+from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS
 
 HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION")
 BACKGROUNDS = ("kitchen", "room", "street", "school", "night_road", "plain")
 PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick")
 SFX = ("pop", "boing", "whoosh", "ding", "thud", "clap", "beep", "laugh_track")
+SHOTS = tuple(SHOT_ZOOM) + tuple(SHOT_ALIASES)       # camera: wide, medium, close, two_shot (+ spellings)
+DEPTH_WORDS = tuple(DEPTHS)                         # near / mid / far: step towards or away from the camera
 DIRECTIONS = ("left", "right", "up", "down", "up_left", "up_right")
 ROLE_LOOKS = {
     "mummy": "aunty", "mom": "aunty", "maa": "aunty", "mother": "aunty", "chachi": "aunty", "padosan": "aunty",
@@ -74,6 +80,7 @@ def vocab():
                          | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS)),
         "expressions": sorted(EXPRESSIONS), "actions": sorted(actions.ACTIONS),
         "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS),
+        "shots": sorted(SHOTS), "depth": sorted(DEPTH_WORDS),
     }
 
 
@@ -167,6 +174,10 @@ def _stage(tokens, ev, scene_cast, who):
             ev["volume"] = 0.6
         elif w == "shake":
             ev["camera"] = {"shake": 0.6}
+        elif w in SHOTS:
+            ev["shot"] = SHOT_ALIASES.get(w, w)
+        elif w in DEPTH_WORDS:
+            ev["depth"] = w
         elif w in ("left", "right") and "facing" not in ev:
             ev["facing"] = w
         else:

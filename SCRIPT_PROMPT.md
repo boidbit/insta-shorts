@@ -26,6 +26,8 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5
   - optional prop: phone, cup, spoon, mic, ball, stick
   - optional sound: pop, boing, whoosh, ding, thud, clap, beep, laugh_track
   - optional: shake (camera shake for a comedy hit)
+  - optional camera: wide, medium, close, two_shot (the camera already cuts in on every speaker by itself, so use this only for a special moment, e.g. `A (shock, close): ...` on the punch line or `ALL -> wide` for the reaction)
+  - optional depth: near (the character steps towards the camera and gets bigger), far (steps back, smaller), mid (back to normal), e.g. `B -> near smug`. Use `near`/`far` for a boss or a big entrance; do not combine `near` with `close` on the same line.
 - Moves: `NAME -> enter left`, `NAME -> exit right`, `NAME -> walk center`, `ALL -> dance laugh`. `wait 1` pauses.
 - A line with only a dance (`A -> naagin sly`) is shown for ~1.6 s; the dance keeps going in the background while others talk, until that character gets another action.
 - Optional `MUSIC: beat 110` sets the beat (the dances move on it). For a real song write `MUSIC: none`: the song is added later inside Instagram (no copyright trouble). The voice cannot really sing: for singing jokes use `sing` + a short line, or a "besura" reaction from the others.
