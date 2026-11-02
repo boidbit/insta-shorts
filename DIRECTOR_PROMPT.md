@@ -79,6 +79,5 @@ Backgrounds: kitchen, room, street, school, market, office, bus_stop, night_road
 9. Always fill `post.caption` (1-2 lines, emoji ok) and 4-8 `post.hashtags`.
 10. Output JSON only.
 
-Voice-over and chat:
+Voice-over:
 - A character with `"hidden": true` is only a voice (no body, no slot): give it `"voice"` and use `say` events with `"bubble": false, "subtitle": true`.
-- A scene can carry `"chat": {"title": "Mummy", "messages": [{"side": "left", "text": "..."}, {"side": "right", "text": "..."}]}` (a phone chat, no characters: `"cast": []`); messages appear every 1.5 s with a pop sound.

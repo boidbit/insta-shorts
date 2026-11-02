@@ -76,16 +76,27 @@ Agar text me `CAST:` / `SCENE:` / `A -> ...` / `NAME: ...` wali koi line nahi ha
 - **Apni image se background:** 9:16 (1080x1920) image `assets/backgrounds/gali.png` me daalo, phir script me `SCENE: gali | title` (ya poora path `SCENE: assets/backgrounds/gali.jpg`). Character neeche ki taraf (zameen/sadak ~ neeche ke 35%) khade hote hain, to image me wahan khaali jagah rakho. Image main bana nahi sakta: kisi AI image tool se banwao ya free-licence image lo (flat cartoon style character ke saath mel khaati hai).
 - **Naye props/looks:** prop `bag`, accessory `sunglasses`, action `salute`.
 - **Voice-over:** `NARRATOR: Ek din ki baat hai | एक दिन की बात है`. Koi character nahi dikhta, bas awaaz aur neeche subtitle. CAST me likhna nahi padta.
-- **Chat scene (WhatsApp jaisa):**
-  ```
-  SCENE: plain | Message 📱
-  CHAT: Mummy ❤️
-  CHAT left: Beta khana kha liya?
-  CHAT right: Haan mummy 😅
-  ```
-  Har ~1.5 sec me ek message aata hai (pop awaaz ke saath). CTA chat ke baad aata hai.
 - **"Expectation vs Reality" / comparison:** do `SCENE:` likho, title card me `Expectation 😎` aur `Reality 😭`, beech me `TRANSITION: whip`. Alag split-screen abhi nahi hai.
 - **Camera se baat karna (monologue):** ek hi character, ek ke baad ek lines. Auto camera use alag-alag close shots me kaat deta hai.
+
+## Chat video (alag, chhota format)
+
+Texting wale jokes ke liye. Story format se bilkul alag hai: koi character, voice ya CAST nahi. "Apni script" box me (ya `scripts/x.txt` me) bas ye likho:
+
+```
+HOOK: Mummy ka message 📱
+CHAT: Mummy ❤️
+< Beta khana kha liya?
+> Haan mummy 😅
+< Jhooth mat bol, ghar aa!
+> Abhi aaya, 5 minute!
+CTA: Tag karo 👇
+```
+
+- `<` = samne wala (left; message se pehle ~1 sec "typing..." ke teen dot aate hain, aur aane ki `ding` awaaz), `>` = aap (right, `pop` awaaz).
+- Optional: `HOOK:`, `CTA:`, `CAPTION:`, `HASHTAGS:`, `MUSIC: beat 90`. 12 se zyada messages ho to purane upar se nikal jaate hain.
+- Chat ko story ke andar mat milao: story script me `<` / `>` / `CHAT` lines ek warning ke saath ignore hoti hain.
+- Awaaz nahi hoti, to Gemini ka quota kharch nahi hota.
 
 ## Characters
 

@@ -49,10 +49,10 @@ class OverlayLayer:
                                           o.get("color"), o.get("size"), o.get("max_w"))
         return self._cache[key]
 
-    def _chat(self, o, shown):
-        key = (id(o), shown)
+    def _chat(self, o, shown, typing=None):
+        key = (id(o), shown, typing)
         if key not in self._cache:
-            self._cache[key] = chat_image(o["chat"], shown, self.s)
+            self._cache[key] = chat_image(o["chat"], shown, self.s, typing=typing)
         return self._cache[key]
 
     def draw(self, img, overlays, t):
@@ -63,10 +63,14 @@ class OverlayLayer:
             if not (t0 <= t < t1):
                 continue
             if o.get("chat"):                       # phone chat: shows the messages whose time has come
-                shown = sum(1 for m in o["chat"].get("messages", []) if float(m.get("t", 0.0)) <= t)
-                if not shown:
+                msgs = o["chat"].get("messages", [])
+                shown = sum(1 for m in msgs if float(m.get("t", 0.0)) <= t)
+                nxt = msgs[shown] if shown < len(msgs) else None
+                typing = (int(t * 3.5) % 3) if (nxt and nxt.get("side") == "left"
+                                                and t >= float(nxt.get("t", 0.0)) - 0.9) else None
+                if not shown and typing is None:
                     continue
-                im = self._chat(o, shown)
+                im = self._chat(o, shown, typing)
             else:
                 im = self._image(o)
             pos = o.get("pos", "top")

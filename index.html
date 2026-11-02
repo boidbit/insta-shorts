@@ -285,7 +285,34 @@ function checkActing(tokens) {
   return { unknown, lost: [...acts.slice(0, -1), ...exprs.slice(0, -1)] };
 }
 
+function isChatText(text) {          // a chat = only < / > lines (plus HOOK/CTA/CAPTION/HASHTAGS/MUSIC/CHAT:)
+  let msgs = 0;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("//")) continue;
+    if (/^(HOOK|CTA|CAPTION|HASHTAGS|MUSIC|SECONDS|CHAT)\s*:/i.test(line)) continue;
+    if (/^([<>]|CHAT\s+(left|right)\s*:)/i.test(line)) { msgs++; continue; }
+    return false;
+  }
+  return msgs > 0;
+}
+
+function lintChat(text) {
+  const out = [];
+  let n = 0;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    const m = line.match(/^([<>])\s*(.*)$/) || line.match(/^CHAT\s+(left|right)\s*:\s*(.*)$/i);
+    if (!m) continue;
+    n++;
+    if (!m[2].trim()) out.push(`"${short(line)}": message khali hai`);
+  }
+  if (n > 12) out.push(`${n} messages bahut zyada hain: purane messages upar se nikal jaayenge`);
+  return out;
+}
+
 function lintScript(text) {
+  if (isChatText(text)) return lintChat(text);          // chat: its own tiny format, no CAST / HOOK / CTA needed
   const out = [], cast = new Set(), used = [];
   let hook = false, cta = false, declared = false;
   const acting = (s, line) => {
@@ -327,12 +354,7 @@ function lintScript(text) {
       }
       continue;
     }
-    if (/^CHAT\b/i.test(line)) {          // phone-chat scene: CHAT: contact / CHAT left|right: message
-      const cm = line.match(/^CHAT\s*(left|right)?\s*:\s*(.*)$/i);
-      if (!cm) out.push(`"${short(line)}": CHAT left: ya CHAT right: likho`);
-      else if (cm[1] && !cm[2].trim()) out.push(`"${short(line)}": message khali hai`);
-      continue;
-    }
+    if (/^(CHAT\b|[<>])/i.test(line)) { out.push(`"${short(line)}": chat alag format hai, story script me nahi chalta (chat ke liye alag text likho)`); continue; }
     if ((m = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/))) { declared = true; cast.add(m[1]); continue; }
     if (/^(wait\s*[\d.]+|\.\.\.+)$/i.test(line)) continue;
     if ((m = line.match(/^([A-Za-z_]\w*)\s*->\s*(.+)$/))) { used.push(m[1]); acting(m[2], line); continue; }

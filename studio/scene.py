@@ -56,13 +56,15 @@ class SceneObj:
         return t >= self.t_in and (self.t_out is None or t < self.t_out)
 
 
-CHAT_START, CHAT_GAP, CHAT_HOLD = 0.6, 1.5, 1.4
+CHAT_START, CHAT_GAP, CHAT_HOLD, TYPING = 0.6, 1.5, 1.4, 0.9
 
 
 def chat_length(n_messages, chat=None):
     """Seconds a chat scene with n messages lasts (so a CTA can wait for the end)."""
     chat = chat or {}
-    return (float(chat.get("start", CHAT_START)) + n_messages * float(chat.get("gap", CHAT_GAP))
+    msgs = chat.get("messages", [])
+    typing = sum(TYPING for m in msgs if m.get("side") == "left") if msgs else 0.0
+    return (float(chat.get("start", CHAT_START)) + n_messages * float(chat.get("gap", CHAT_GAP)) + typing
             + float(chat.get("hold", CHAT_HOLD)))
 
 
@@ -72,10 +74,13 @@ def compile_chat(plan, chat):
     gap = float(chat.get("gap", CHAT_GAP))
     t = float(chat.get("start", CHAT_START))
     for m in msgs:
+        if m.get("side") == "left" and "t" not in m:
+            t += TYPING                              # the other person "types" before their message arrives
         m.setdefault("t", round(t, 2))
-        plan.sfx.append(dict(t=float(m["t"]), path=audio.sfx_path("pop"), volume=0.6))
+        plan.sfx.append(dict(t=float(m["t"]), path=audio.sfx_path("ding" if m.get("side") == "left" else "pop"),
+                             volume=0.45 if m.get("side") == "left" else 0.6))
         t = float(m["t"]) + gap
-    plan.overlays.insert(0, {"chat": chat, "from": 0.0, "pos": [540, 330], "anim": "none"})   # behind hook / CTA
+    plan.overlays.insert(0, {"chat": chat, "from": 0.0, "pos": [540, 400], "anim": "none"})   # behind hook / CTA
     return t + float(chat.get("hold", CHAT_HOLD))
 
 

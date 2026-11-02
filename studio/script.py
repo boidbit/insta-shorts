@@ -31,6 +31,17 @@ Script format (one thing per line):
 - Depth: `near` (step towards the camera, bigger), `far` (step back, smaller), `mid` (back to normal),
   e.g. `B -> near smug`.
 
+Just a chat (a separate, tiny format - not part of the story format):
+
+    CHAT: Mummy ❤️
+    < Beta khana kha liya?
+    > Haan mummy 😅
+    < Jhooth mat bol, ghar aa!
+    CTA: Tag karo 👇
+
+`<` = the other person (left, with a "typing..." moment first), `>` = you (right). Optional: HOOK, CTA, CAPTION,
+HASHTAGS, MUSIC. No characters, no voice.
+
 Just lyrics (no format at all): if the text has no CAST/SCENE line, no `A = ...`, no `A -> ...` and no
 `NAME: ...` speaker line, every line is a lyric shown on screen while one singer walks down a night road:
 
@@ -337,8 +348,71 @@ def parse_obj(rest):
     return spec, ["OBJ %s: %s samajh nahi aaye" % (raw[0], ", ".join(repr(b) for b in bad))] if bad else []
 
 
+CHAT_META = ("HOOK", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "CHAT", "SECONDS")
+
+
+def _split_chat(text):
+    """(meta, title, messages) if `text` is a chat (lines starting with < or >), else None."""
+    meta, msgs, title = {}, [], ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("//"):
+            continue
+        m = re.match(r"^([A-Za-z_]+)\s*:\s*(.*)$", line)
+        if m and m.group(1).upper() in CHAT_META:
+            if m.group(1).upper() == "CHAT":
+                title = m.group(2).strip()
+            else:
+                meta[m.group(1).upper()] = m.group(2).strip()
+            continue
+        m = re.match(r"^([<>])\s*(.*)$", line) or re.match(r"^CHAT\s+(left|right)\s*:\s*(.*)$", line, re.I)
+        if not m:
+            return None                     # a story script (or lyrics) with a stray line: not a chat
+        side = "left" if m.group(1) in ("<", "left") or m.group(1).lower() == "left" else "right"
+        msgs.append({"side": side, "text": m.group(2).partition("|")[0].strip()})
+    return (meta, title, msgs) if msgs else None
+
+
+def parse_chat(meta, title, msgs):
+    """Just a phone chat (no characters, no voice): `< other person` / `> me`, optional HOOK / CTA / CAPTION."""
+    warnings = []
+    kept = []
+    for m in msgs:
+        if m["text"]:
+            kept.append(m)
+        else:
+            warnings.append("chat: khali message chhod diya")
+    if len(kept) > 12:
+        warnings.append("chat bahut lambi hai (%d messages): purane messages upar se nikal jaayenge" % len(kept))
+    chat = {"title": title or "Chat", "messages": kept}
+    length = chat_length(len(kept), chat)
+    hook = meta.get("HOOK", "")
+    overlays = [{"text": hook, "style": "hook", "pos": [540, 190], "from": 0.0, "to": 2.2}] if hook else []
+    timeline = [{"wait": round(length, 2)}]
+    if meta.get("CTA"):
+        timeline.append({"hold": 2.0, "sfx": "pop", "volume": 0.5,
+                         "overlay": {"text": meta["CTA"], "style": "card", "pos": [540, 1350], "color": [236, 90, 70]}})
+    mv = meta.get("MUSIC", "").strip()
+    music = None
+    if mv.lower().startswith("beat"):
+        bpm = re.findall(r"\d+", mv)
+        music = {"type": "beat", "bpm": int(bpm[0]) if bpm else 90, "style": "soft", "volume": 0.3}
+    elif mv and mv.lower() != "none":
+        music = {"path": mv, "volume": 0.4}
+    scene = {"hook": hook, "meta": {"fps": 30, "tail": 0.6}, "background": {"type": "plain"}, "characters": {},
+             "overlays": overlays, "timeline": timeline, "chat": chat,
+             "post": {"caption": meta.get("CAPTION") or hook or (kept[0]["text"] if kept else ""),
+                      "hashtags": meta.get("HASHTAGS", "#chat #funny #relatable").split()}}
+    if music:
+        scene["music"] = music
+    return scene, warnings
+
+
 def parse_script(text):
     """Return (scene dict, warnings)."""
+    cht = _split_chat(text)
+    if cht:
+        return parse_chat(*cht)
     lyr = _split_lyrics(text)
     if lyr:
         return parse_lyrics(*lyr)
@@ -349,8 +423,7 @@ def parse_script(text):
     cur = None
 
     def new_scene(bg="room", title=None):
-        sc = {"background": bg if isinstance(bg, dict) else {"type": bg}, "lines": [], "title": title, "chat": [],
-              "chat_title": ""}
+        sc = {"background": bg if isinstance(bg, dict) else {"type": bg}, "lines": [], "title": title}
         scenes.append(sc)
         return sc
 
@@ -393,15 +466,9 @@ def parse_script(text):
             continue
         if cur is None:
             cur = new_scene()
-        m = re.match(r"^CHAT\s*(left|right)?\s*:\s*(.*)$", line, re.I)
-        if m:
-            side, text = (m.group(1) or "").lower(), m.group(2).partition("|")[0].strip()
-            if not side:
-                cur["chat_title"] = text
-            elif text:
-                cur["chat"].append({"side": side, "text": text})
-            else:
-                warnings.append("CHAT %s: message khali hai" % side)
+        if re.match(r"^(CHAT\b|[<>]\s*\S)", line, re.I):
+            warnings.append("chat alag format hai, story script me nahi chalta (chat ke liye alag text likho: "
+                            "'< samne wala' / '> aap'): %r" % line[:40])
             continue
         m = re.match(r"^OBJ\s*:\s*(.*)$", line, re.I)
         if m:
@@ -509,21 +576,18 @@ def parse_script(text):
                 ev.setdefault("hold", 0.6)
             tl.append(ev)
             first = False
-        if sc["chat"]:                              # the chat plays by itself: the CTA waits for its end
-            tl.append({"wait": round(chat_length(len(sc["chat"])), 2)})
         last = {"hold": 1.0}
         if si == len(scenes) - 1 and meta.get("CTA"):
             last = {"hold": 2.0, "sfx": "pop", "volume": 0.5,
                     "overlay": {"text": meta["CTA"], "style": "card",
-                                "pos": [540, 1250 if sc["chat"] else 640], "color": [236, 90, 70]}}
+                                "pos": [540, 640], "color": [236, 90, 70]}}
         tl.append(last)
         item = {"background": sc["background"], "cast": order + (["NARRATOR"] if narrated else []),
                 "characters": chars, "timeline": tl}
         if narrated:
             item["characters"]["NARRATOR"] = {}
             cast.setdefault("NARRATOR", dict(NARRATOR_SPEC))
-        if sc["chat"]:
-            item["chat"] = {"title": sc["chat_title"], "messages": [dict(m_) for m_ in sc["chat"]]}
+
         if sc["title"]:
             item["title"] = sc["title"]
         out_scenes.append(item)
