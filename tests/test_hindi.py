@@ -86,7 +86,7 @@ class Hindi(unittest.TestCase):
         from studio.director import GeminiLLM, GEMINI_MODELS
         llm = hindi.quick(GeminiLLM(key="x"))
         self.assertEqual(llm.TRIES, 1)
-        self.assertLessEqual(llm.timeout, 40)
+        self.assertLessEqual(llm.timeout, 60)
         self.assertIn("lite", llm.models[0])
         self.assertEqual(sorted(llm.models), sorted(GEMINI_MODELS))       # every model still gets one chance
         self.assertEqual(GeminiLLM(key="x").TRIES, 3)                       # the script writer keeps its retries
@@ -97,3 +97,37 @@ class Hindi(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RetiredModels(unittest.TestCase):
+    """Google retires Gemini models (404) and names the new one in the error: follow it."""
+
+    def test_successor_from_the_error(self):
+        from studio.director import successor
+        msg = ('{"error": {"code": 404, "message": "This model models/gemini-2.0-flash is no longer available. '
+               'Please update your code to use models/gemini-3.8-flash for the latest features."}}')
+        self.assertEqual(successor(msg), "gemini-3.8-flash")
+        self.assertIsNone(successor('{"error": {"code": 404, "message": "not found"}}'))
+
+    def test_404_follows_the_named_model(self):
+        import io
+        import urllib.error
+        from studio import director
+        tried = []
+
+        def fake_urlopen(req, timeout=0):
+            model = req.full_url.split("/models/")[1].split(":")[0]
+            tried.append(model)
+            if model != "gemini-3.8-flash":
+                body = ('{"error": {"message": "models/%s is no longer available. Please update your code to use '
+                        'models/gemini-3.8-flash."}}' % model).encode()
+                raise urllib.error.HTTPError(req.full_url, 404, "nf", {}, io.BytesIO(body))
+            out = {"candidates": [{"content": {"parts": [{"text": json.dumps(["नमस्ते"], ensure_ascii=False)}]}}]}
+            return mock.MagicMock(__enter__=lambda s: io.BytesIO(json.dumps(out).encode()),
+                                  __exit__=lambda *a: False)
+
+        llm = director.GeminiLLM(key="x", model="gemini-2.0-flash")
+        with mock.patch.object(director.urllib.request, "urlopen", fake_urlopen):
+            self.assertEqual(llm("s", [{"role": "user", "content": "x"}]), '["नमस्ते"]')
+        self.assertEqual(tried, ["gemini-2.0-flash", "gemini-3.8-flash"])
+        self.assertEqual(llm.models[0], "gemini-3.8-flash")          # remembered for the next call

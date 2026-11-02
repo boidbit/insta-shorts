@@ -52,9 +52,9 @@ def _clean(text):
 
 def quick(llm):
     """A helper must never hold the video up: one try per model, a short timeout, the light (fast, rarely busy) model
-    first. A retired model (404) is skipped at once. Worst case ~2 minutes, then the lines stay Roman."""
+    first. A retired model (404) is skipped at once. Worst case ~3 minutes, then the lines stay Roman."""
     if hasattr(llm, "models"):
-        llm.TRIES, llm.timeout, llm.temperature = 1, 30, 0.2
+        llm.TRIES, llm.timeout, llm.temperature = 1, 45, 0.2
         llm.models = sorted(llm.models, key=lambda m: 0 if "lite" in m else 1)
     return llm
 
