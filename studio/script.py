@@ -510,8 +510,34 @@ def parse_chat(meta, title, msgs):
     return scene, warnings
 
 
+HEADER_WORDS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "OBJ", "NARRATOR")
+
+
+def unflatten(text):
+    """A script whose line breaks were lost (GitHub's one-line "Run workflow" box, some phone apps): put every
+    HOOK: / CAST: / SCENE: / CUT / CTA: ... and every "A (shock): ..." / "B -> ..." line back on its own line.
+    Returns (text, True if it had to be split)."""
+    if text.count("\n") >= 3 or not re.search(r"\b(HOOK|CAST|SCENE)\s*:", text):
+        return text, False
+    t = re.sub(r"\s+(?=(?:%s)\s*:)" % "|".join(HEADER_WORDS), "\n", text.strip())
+    t = re.sub(r"\s+(?=(?:CUT|SHOT)\b(?:\s+(?:%s|reverse|over|[A-Z]\w*))*\s+[A-Z]\w*\s*[(:\-])"
+               % "|".join(FRAMINGS), "\n", t)
+    names = []
+    m = re.search(r"^CAST\s*:\s*(.*)$", t, re.M)
+    if m:
+        names = re.findall(r"([A-Za-z_]\w*)\s*=", m.group(1))
+    for n in sorted(set(names) | {"ALL"}, key=len, reverse=True):
+        t = re.sub(r"(?<!^)[ \t]+(?=%s\s*(?:\([^)]*\))?\s*(?::|->))" % re.escape(n), "\n", t, flags=re.M)
+    t = re.sub(r"[ \t]+((?:CUT|SHOT)\b[^\n]*?)[ \t]*$", r"\n\1", t, flags=re.M)     # a CUT at the end of a line
+    return (t, True) if t.count("\n") > text.strip().count("\n") else (text, False)
+
+
 def parse_script(text):
     """Return (scene dict, warnings)."""
+    text, flat = unflatten(text)
+    if flat:
+        scene, warns = parse_script(text)
+        return scene, ["script ek hi line me aaya tha (line break kho gaye); lines apne aap alag ki"] + warns
     cht = _split_chat(text)
     if cht:
         return parse_chat(*cht)

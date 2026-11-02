@@ -442,6 +442,10 @@ function lintScript(text) {
 
 function showLint() {
   const box = $("lint");
+  if (mode === "script") {
+    const fixed = unflatten($("text").value);
+    if (fixed !== $("text").value) $("text").value = fixed;      // line breaks were lost: put them back
+  }
   if (mode !== "script" || !$("text").value.trim()) { box.classList.add("hidden"); return []; }
   const w = lintScript($("text").value);
   box.classList.remove("hidden");
@@ -583,6 +587,22 @@ function buildScript(text, b) {
     "HASHTAGS: " + (meta.HASHTAGS || "#desicomedy #hindicomedy #relatable #funny"),
   ];
   return { script: [...head, ...body, ...tail].join("\n") + "\n", problems };
+}
+// A script whose line breaks were lost (pasted from GitHub's one-line box / some apps) -> its lines back.
+// Mirrors unflatten() in studio/script.py.
+function unflatten(text) {
+  if ((text.match(/\n/g) || []).length >= 3 || !/\b(HOOK|CAST|SCENE)\s*:/.test(text)) return text;
+  const heads = "HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|OBJ|NARRATOR";
+  let t = text.trim().replace(new RegExp(`\\s+(?=(?:${heads})\\s*:)`, "g"), "\n");
+  t = t.replace(new RegExp(`\\s+(?=(?:CUT|SHOT)\\b(?:\\s+(?:${V.framings.join("|")}|reverse|over|[A-Z]\\w*))*\\s+[A-Z]\\w*\\s*[(:\\-])`, "g"), "\n");
+  const cast = (t.match(/^CAST\s*:\s*(.*)$/m) || [, ""])[1];
+  const names = [...new Set([...cast.matchAll(/([A-Za-z_]\w*)\s*=/g)].map((m) => m[1]).concat("ALL"))]
+    .sort((a, b) => b.length - a.length);
+  for (const n of names) {
+    t = t.split("\n").map((line) => line.replace(new RegExp(`(?<=\\S)[ \\t]+(?=${n}\\s*(?:\\([^)]*\\))?\\s*(?::|->))`, "g"), "\n")).join("\n");
+  }
+  t = t.replace(/[ \t]+((?:CUT|SHOT)\b[^\n]*?)[ \t]*$/gm, "\n$1");
+  return t;
 }
 // ---------------------------------------------------------------- builder end
 
