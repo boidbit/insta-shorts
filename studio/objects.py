@@ -6,6 +6,10 @@
     OBJ: truck exit right          drives away
     OBJ: assets/objects/x.png right   your own transparent PNG
 
+Vehicles a character can ride (see rides.py) are drawn in parts: "back" = what is behind the rider (the inside of
+a cab, seats), "front" = what is in front of the rider (the body with the windows cut out, pillars, roof).
+"all" is the whole vehicle in one go (what you see when nobody rides it).
+
 Everything is drawn in logical 1080x1920 units with the ground-contact point of the object at (0, 0).
 """
 import math
@@ -57,9 +61,14 @@ class Pen:
 
 # ---------------------------------------------------------------- the drawings
 # each returns (pen, wheels) where wheels = [(x, y, radius)] drawn separately so they can spin
-def _truck(s, c):
+def _truck(s, c, part="all"):
     p = Pen(s, 640, 330)
     body, dark = c, shade(c, 0.78)
+    win = [(118, -244), (118, -170), (246, -170), (196, -244)]
+    if part == "back":                                                              # inside the cab, behind the driver
+        p.poly(win, (62, 80, 96), None)
+        p.rect(104, -170, 124, -90, (44, 58, 70), None)                             # seat back
+        return p, []
     p.rrect(-305, -85, 305, -62, 8, (70, 72, 80))                                   # chassis
     p.rrect(-312, -258, 96, -80, 16, body)                                          # waste box
     for x in range(-270, 80, 52):
@@ -67,8 +76,8 @@ def _truck(s, c):
     p.poly([(-318, -258), (-318, -236), (-250, -214), (-250, -258)], dark)          # loading hopper lip
     p.rect(-312, -140, -262, -82, (44, 46, 52))                                     # hopper opening
     p.poly([(98, -80), (98, -252), (192, -252), (262, -184), (306, -172), (306, -80)], shade(c, 1.12))   # cab
-    p.poly([(118, -236), (118, -176), (246, -176), (190, -236)], (170, 214, 238))   # window
-    p.line([(160, -168), (160, -84)], INK, 4)
+    p.poly(win, (170, 214, 238) if part == "all" else (205, 232, 246, 46))          # window (see-through when ridden)
+    p.line([(160, -166), (160, -84)], INK, 4)
     p.rect(292, -128, 310, -104, (255, 232, 140), INK, 4)                           # headlight
     p.rect(296, -92, 316, -70, (96, 98, 106))                                       # bumper
     p.circle(150, -270, 13, (255, 176, 40), INK, 4)                                 # beacon
@@ -78,25 +87,41 @@ def _truck(s, c):
     return p, [(-190, -52, 52), (-60, -52, 52), (212, -52, 52)]
 
 
-def _auto(s, c):
-    p = Pen(s, 330, 270)
-    p.poly([(-148, -104), (-140, -226), (84, -226), (124, -160), (156, -104)], (36, 38, 46))     # canopy
-    p.line([(-120, -226), (-124, -104)], INK, 7)                                                 # rear pillar
-    p.line([(70, -226), (88, -104)], INK, 7)                                                     # front pillar
-    p.rrect(-150, -138, 156, -58, 14, c)                                                          # body
-    p.rrect(-128, -184, 50, -138, 10, (150, 110, 80))                                             # passenger seat
-    p.poly([(124, -160), (156, -104), (116, -104)], (170, 214, 238), INK, 4)                     # windscreen
-    p.poly([(124, -92), (170, -92), (180, -64), (116, -58)], shade(c, 0.85))                      # front mudguard
-    p.circle(168, -114, 11, (255, 232, 140), INK, 4)
-    return p, [(-92, -34, 34), (-18, -34, 34), (136, -34, 34)]
+def _auto(s, c, part="all"):
+    p = Pen(s, 380, 330)
+    glass = (170, 214, 238) if part == "all" else (205, 232, 246, 46)
+    if part in ("all", "back"):                                                     # seats, behind the riders
+        p.rrect(-146, -176, -34, -124, 10, (150, 110, 80))                          # rear bench
+        p.rrect(30, -166, 112, -124, 10, (128, 90, 66))                             # driver seat
+    if part == "back":
+        return p, []
+    p.rrect(-158, -128, 160, -62, 14, c)                                            # body
+    p.line([(-146, -276), (-146, -128)], INK, 10)                                   # rear pillar
+    p.line([(28, -276), (28, -128)], INK, 10)                                       # middle pillar
+    p.poly([(118, -276), (150, -128), (118, -128)], glass)                          # windscreen
+    p.line([(118, -276), (150, -128)], INK, 10)                                     # front pillar
+    p.rrect(-170, -304, 128, -274, 10, (36, 38, 46))                                # roof
+    p.poly([(120, -304), (178, -282), (120, -274)], (36, 38, 46))                   # roof peak over the windscreen
+    p.poly([(126, -100), (176, -100), (188, -66), (122, -60)], shade(c, 0.85))      # front mudguard
+    p.circle(174, -114, 11, (255, 232, 140), INK, 4)
+    return p, [(-95, -36, 36), (136, -36, 36)]
 
 
-def _car(s, c):
-    p = Pen(s, 520, 250)
+def _car(s, c, part="all"):
+    p = Pen(s, 520, 280)
+    glass = (170, 214, 238) if part == "all" else (205, 232, 246, 46)
+    rear = [(-98, -122), (-62, -198), (-6, -198), (-6, -122)]
+    front = [(14, -122), (14, -198), (90, -198), (130, -122)]
+    if part == "back":                                                              # the inside, behind the people
+        for w in (rear, front):
+            p.poly(w, (70, 82, 98), None)
+        p.rect(-40, -190, -22, -122, (52, 62, 76), None)                            # seat backs
+        p.rect(40, -190, 58, -122, (52, 62, 76), None)
+        return p, []
     p.rrect(-235, -118, 235, -44, 22, c)
-    p.poly([(-120, -116), (-70, -192), (96, -192), (150, -116)], shade(c, 1.1))
-    p.poly([(-96, -122), (-58, -178), (-4, -178), (-4, -122)], (170, 214, 238), INK, 4)
-    p.poly([(14, -122), (14, -178), (86, -178), (126, -122)], (170, 214, 238), INK, 4)
+    p.poly([(-120, -116), (-72, -212), (102, -212), (152, -116)], shade(c, 1.1))     # cabin
+    for w in (rear, front):
+        p.poly(w, glass)
     p.rect(214, -102, 236, -78, (255, 232, 140), INK, 4)
     p.rect(-236, -104, -222, -80, (220, 70, 70), INK, 3)
     return p, [(-142, -40, 40), (142, -40, 40)]
@@ -106,10 +131,41 @@ def _scooter(s, c):
     p = Pen(s, 300, 250)
     p.poly([(-110, -70), (-84, -160), (-30, -160), (-4, -92), (60, -92), (90, -150), (104, -150), (96, -60)], c)
     p.rrect(-84, -176, 4, -150, 8, (60, 52, 50))                                                           # seat
-    p.line([(90, -148), (100, -232)], INK, 9)                                                               # fork
-    p.line([(70, -234), (132, -234)], INK, 9)                                                               # handlebar
-    p.circle(104, -222, 11, (255, 232, 140), INK, 4)
+    p.line([(86, -148), (76, -232)], INK, 9)                                                                # fork
+    p.line([(46, -234), (108, -234)], INK, 9)                                                               # handlebar
+    p.circle(88, -218, 11, (255, 232, 140), INK, 4)
     return p, [(-96, -38, 38), (100, -38, 38)]
+
+
+def _bike(s, c, part="all"):
+    """A motorbike, facing right."""
+    p = Pen(s, 340, 270)
+    p.line([(-112, -46), (-12, -74)], (60, 62, 70), 12)                              # swing arm
+    p.rrect(-48, -128, 60, -50, 14, (90, 94, 104))                                   # engine block
+    p.rect(-30, -112, 40, -96, (150, 154, 164), None)
+    p.poly([(-36, -152), (62, -160), (100, -142), (84, -120), (-36, -120)], c)       # tank
+    p.rrect(-140, -142, -34, -120, 9, (44, 40, 44))                                  # seat
+    p.line([(100, -140), (126, -48)], (150, 152, 160) if False else (160, 162, 170), 10)   # front fork
+    p.line([(94, -152), (86, -200), (112, -206)], INK, 8)                            # handlebar
+    p.circle(128, -150, 17, (255, 232, 140), INK, 4)                                 # headlight
+    p.line([(-12, -60), (-128, -72)], (130, 132, 140), 9)                            # exhaust
+    p.rect(26, -66, 50, -58, (60, 60, 66), None)                                     # foot peg
+    return p, [(-112, -46, 46), (118, -46, 46)]
+
+
+def _cycle(s, c, part="all"):
+    """A bicycle, facing right. The crank and pedals are drawn per frame (they turn)."""
+    p = Pen(s, 340, 260)
+    fr = (60, 62, 70)
+    bb, seat, head, rear, front = (0, -58), (-8, -178), (84, -168), (-108, -60), (112, -60)
+    for a, b in ((bb, seat), (seat, head), (bb, head), (bb, rear), (seat, rear)):
+        p.line([a, b], c, 9)
+    p.line([head, front], fr, 8)                                                     # fork
+    p.line([head, (80, -206)], fr, 8)                                                # stem
+    p.line([(68, -208), (100, -206)], INK, 8)                                        # handlebar
+    p.rrect(-34, -194, 22, -178, 7, (44, 40, 44))                                    # saddle
+    p.circle(bb[0], bb[1], 12, (150, 152, 160), INK, 4)
+    return p, [(rear[0], rear[1], 60), (front[0], front[1], 60)]
 
 
 def _cow(s, c):
@@ -164,14 +220,17 @@ OBJECTS = {            # kind: (drawer, default colour, default scale, spins its
     "auto": (_auto, (240, 196, 60), 1.0),
     "car": (_car, PALETTE["red"], 1.0),
     "scooter": (_scooter, PALETTE["blue"], 1.0),
+    "bike": (_bike, PALETTE["red"], 1.0),
+    "cycle": (_cycle, (60, 140, 200), 1.0),
     "cow": (_cow, (156, 110, 76), 1.0),
     "dustbin": (_dustbin, (70, 130, 170), 1.0),
     "bags": (_bags, (38, 38, 46), 1.0),
     "table": (_table, (160, 112, 76), 1.0),
 }
 ALIASES = {"garbage_truck": "truck", "kachra_gaadi": "truck", "gaadi": "truck", "rickshaw": "auto", "gai": "cow",
-           "bike": "scooter", "dustbin": "dustbin", "bin": "dustbin", "thaila": "bags", "kachra": "bags"}
-VEHICLES = ("truck", "auto", "car", "scooter")
+           "motorcycle": "bike", "bullet": "bike", "bicycle": "cycle", "dustbin": "dustbin", "bin": "dustbin", "thaila": "bags", "kachra": "bags"}
+VEHICLES = ("truck", "auto", "car", "scooter", "bike", "cycle")
+SPLIT = ("truck", "auto", "car")               # drawn in two parts so a driver can show through the windows
 
 
 def resolve_kind(word):
@@ -183,22 +242,30 @@ def resolve_kind(word):
 _cache = {}
 
 
-def sprite(kind, s, color=None):
-    """(RGBA image, (anchor x, anchor y), wheels [(x, y, r)] in image px) at render scale s."""
-    key = (kind, round(s, 4), tuple(color) if color else None)
+def sprite(kind, s, color=None, part="all"):
+    """(RGBA image or None, (anchor x, anchor y), wheels [(x, y, r)] in image px) at render scale s.
+    part = "all" | "back" | "front" (only the SPLIT vehicles have two parts; the others are all "back")."""
+    key = (kind, round(s, 4), tuple(color) if color else None, part)
     if key in _cache:
         return _cache[key]
     if kind in OBJECTS:
         drawer, col, _ = OBJECTS[kind]
-        pen, wheels = drawer(s, tuple(color) if color else col)
-        im = pen.image()
-        k = s
-        out = (im, (pen.ox * k, pen.oy * k), [((x + pen.ox) * k, (y + pen.oy) * k, r * k) for x, y, r in wheels])
+        split = kind in SPLIT
+        if not split and part == "front":
+            pen, wheels = drawer(s, tuple(color) if color else col)
+            out = (None, (pen.ox * s, pen.oy * s), [])
+        else:
+            pen, wheels = drawer(s, tuple(color) if color else col, part) if split else drawer(s, tuple(color) if color else col)
+            im = pen.image()
+            out = (im, (pen.ox * s, pen.oy * s), [((x + pen.ox) * s, (y + pen.oy) * s, r * s) for x, y, r in wheels])
     else:                                                      # your own PNG: 320 logical px tall, feet at the bottom
-        src = Image.open(asset_path(kind)).convert("RGBA")
-        h = max(8, int(320 * s))
-        im = src.resize((max(1, int(src.width * h / src.height)), h), Image.LANCZOS)
-        out = (im, (im.width / 2.0, float(im.height)), [])
+        if part == "front":
+            out = (None, (0.0, 0.0), [])
+        else:
+            src = Image.open(asset_path(kind)).convert("RGBA")
+            h = max(8, int(320 * s))
+            im = src.resize((max(1, int(src.width * h / src.height)), h), Image.LANCZOS)
+            out = (im, (im.width / 2.0, float(im.height)), [])
     _cache[key] = out
     return out
 

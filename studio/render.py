@@ -17,7 +17,7 @@ import time
 
 from PIL import Image
 
-from . import actions, audio, objects
+from . import actions, audio, objects, rides
 from .backgrounds import Background
 from .characters import build_character, render_ops
 from .scene import camera_at, compile_music, compile_scene, prepare_voice, split_scenes, static_overlays
@@ -237,28 +237,61 @@ class Renderer(Output):
         a = abs(math.sin(t * 9.1)) * (0.55 + 0.45 * abs(math.sin(t * 3.7 + 1.3)))
         return clamp(a * 1.25 - 0.1)
 
-    def _draw_objects(self, img, t, front):
-        """Set objects (vehicles, bins, bags...): `front` ones over the characters, the rest behind them."""
+    def _front_rider(self, c, t):
+        rf = c.ride_frame(t)
+        return bool(rf and rf["inside"] and rf["obj"].front)
+
+    def _riders_of(self, o, t):
+        return [rf for rf in (c.ride_frame(t) for c in self.plan.chars.values()) if rf and rf["obj"] is o and rf["inside"]]
+
+    def _paste_object(self, img, o, t, part="all"):
+        """One vehicle / object. part: "all", or "back" / "front" for a split vehicle with a rider in it."""
         s = self.s
-        for o in self.plan.objects.values():
-            if o.front != front or not o.visible(t):
-                continue
-            im, (ax, ay), wheels = objects.sprite(o.kind, s * o.scale, o.color)
-            x = o.x_at(t)
-            moving = o.moving(t)
-            bob = math.sin(t * 17.0) * 3.0 * s if (moving and o.kind in objects.VEHICLES) else 0.0
-            flip = o.flip_at(t)
+        im, (ax, ay), wheels = objects.sprite(o.kind, s * o.scale, o.color, part)
+        x = o.x_at(t)
+        flip = o.flip_at(t)
+        age = t - o.t_in
+        alpha = clamp(age / 0.18) if not o.moves or o.moves[0][0] > o.t_in + 0.01 else 1.0
+        cx, cy = x * s, (o.y + o.bob_at(t)) * s
+        if im is not None:
             if flip:
                 im = im.transpose(Image.FLIP_LEFT_RIGHT)
                 ax = im.width - ax
-            age = t - o.t_in
-            alpha = clamp(age / 0.18) if not o.moves or o.moves[0][0] > o.t_in + 0.01 else 1.0
-            cx, cy = x * s, o.y * s + bob
             paste_rgba(img, im, cx, cy, 1.0, alpha, anchor=(ax, ay))
-            for (wx, wy, r) in wheels:
-                wim = objects.wheel_image(r, -(x * s) / max(r, 1.0) * 57.2958)
-                wxx = (im.width - wx) if flip else wx
-                paste_rgba(img, wim, cx + (wxx - ax), cy + (wy - ay), 1.0, alpha)
+        for (wx, wy, r) in wheels:
+            wim = objects.wheel_image(r, -(x * s) / max(r, 1.0) * 57.2958)
+            wxx = ((im.width if im is not None else 0) - wx) if flip else wx
+            paste_rgba(img, wim, cx + (wxx - ax), cy + (wy - ay), 1.0, alpha)
+
+    def _draw_crank(self, img, o, t):
+        """The pedals of a bicycle turn with the wheels."""
+        from PIL import ImageDraw
+        s, sgn = self.s, (-1.0 if o.flip_at(t) else 1.0)
+        a = rides.crank_angle(o, t)
+        bx = o.x_at(t) + sgn * rides.CRANK["bb"][0] * o.scale
+        by = o.y + o.bob_at(t) + rides.CRANK["bb"][1] * o.scale
+        d = ImageDraw.Draw(img)
+        for ang, col in ((a + math.pi, (70, 72, 80)), (a, (40, 40, 46))):
+            px = bx + sgn * math.cos(ang) * rides.CRANK["length"] * o.scale
+            py = by + math.sin(ang) * rides.CRANK["length"] * o.scale
+            d.line([(bx * s, by * s), (px * s, py * s)], fill=(26, 26, 30), width=max(2, int(7 * s * o.scale)))
+            w, h = 22 * s * o.scale, 7 * s * o.scale
+            d.rectangle([px * s - w, py * s - h, px * s + w, py * s + h], fill=col, outline=(26, 26, 30))
+
+    def _draw_objects(self, img, t, front):
+        """Set objects (vehicles, bins, bags...): `front` ones over the characters, the rest behind them.
+        (A `front` vehicle with somebody in it is drawn later, together with its riders.)"""
+        for o in self.plan.objects.values():
+            if not o.visible(t):
+                continue
+            riders = self._riders_of(o, t)
+            if o.front and riders:                  # drawn together with its riders, over everybody
+                continue
+            if o.front != front:
+                continue
+            self._paste_object(img, o, t, "back" if (riders and o.kind in objects.SPLIT) else "all")
+            if o.kind == "cycle":
+                self._draw_crank(img, o, t)
 
     # ------------------------------------------------------------ one frame
     def frame(self, t):
@@ -269,7 +302,7 @@ class Renderer(Output):
                        key=lambda c: (c.draw_pos(t)[1], c.draw_pos(t)[0]))
         anchors = {}
         states = {}
-        for c in order:
+        def draw_char(c):
             st = c.state_at(t)
             states[c.name] = st
             x, y = c.draw_pos(t)
@@ -280,6 +313,9 @@ class Renderer(Output):
             opts = dict(st["opts"], _x=x, _bpm=plan.bpm)
             pose = actions.pose_for(action, t - a_t0 if action != "walk" else t, st["speed"], st["intensity"],
                                     c.phase, opts)
+            rf = c.ride_frame(t)
+            if rf:                                  # on a vehicle: the seat decides the pose
+                pose = dict(rf["pose"])
             singing = action in actions.SING_ACTIONS and not st["talking"]
             look = st["look"]
             if isinstance(look, str) and look in plan.chars:
@@ -308,8 +344,23 @@ class Renderer(Output):
                 layer, (ox, oy) = r
                 img.paste(layer, (ox, oy), layer)
             anchors[c.name] = an
+            if rf and rf["inside"] and rf["obj"].kind in objects.SPLIT:      # the body in front of the driver
+                self._paste_object(img, rf["obj"], t, "front")
 
+        # everybody except the riders of a vehicle that is in front; then front objects; then those vehicles with their riders
+        in_front = [c for c in order if self._front_rider(c, t)]
+        for c in order:
+            if c not in in_front:
+                draw_char(c)
         self._draw_objects(img, t, True)
+        for o in plan.objects.values():
+            riders = [c for c in in_front if c.ride_frame(t)["obj"] is o]
+            if riders and o.visible(t):
+                self._paste_object(img, o, t, "back" if o.kind in objects.SPLIT else "all")
+                if o.kind == "cycle":
+                    self._draw_crank(img, o, t)
+                for c in riders:
+                    draw_char(c)
 
         # camera first, so the speech bubbles can be kept inside the visible part of the frame
         z, cx, cy, dx, dy = camera_at(plan, t)

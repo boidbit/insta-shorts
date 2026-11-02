@@ -74,6 +74,14 @@ Agar text me `CAST:` / `SCENE:` / `A -> ...` / `NAME: ...` wali koi line nahi ha
 - **Depth:** `B -> near` (character camera ki taraf aata hai, bada), `far` (peeche, chhota), `mid` (normal). `near` ke saath `close` mat milao: shot bahut tight ho jaata hai.
 - **Objects:** `OBJ: truck enter left to right` (gaadi aati hai aur right pe ruk jaati hai), `OBJ: dustbin left`, `OBJ: truck exit right`. Objects: truck (kachra gaadi), auto, car, scooter, cow, dustbin, bags, table; rang (`OBJ: car red ...`), `front` (characters ke aage), `big`/`small`. Apni PNG: `OBJ: assets/objects/x.png right`. Gaadi ke aane tak kahani ruki rehti hai. Jahan character khade hain wahan gaadi mat roko (wo chhup jaati hai), ya `front` lagao.
 - **Apni image se background:** 9:16 (1080x1920) image `assets/backgrounds/gali.png` me daalo, phir script me `SCENE: gali | title` (ya poora path `SCENE: assets/backgrounds/gali.jpg`). Character neeche ki taraf (zameen/sadak ~ neeche ke 35%) khade hote hain, to image me wahan khaali jagah rakho. Image main bana nahi sakta: kisi AI image tool se banwao ya free-licence image lo (flat cartoon style character ke saath mel khaati hai).
+- **Gaadi chalana / chadhna-utarna (rides):** `A -> ride bike` (bike, scooter, cycle, auto, car, truck; `B -> ride auto back` = doosri seat) character gaadi par hop karke baithta hai, `A -> getoff` (ya `getoff left|right`) se utarta hai. Gaadi chalane ke liye `OBJ: bike go right` (ya `enter left to center`), rider saath chalta hai; cycle me pedal ghoomte hain, mudne par rider mirror hota hai. Cycle/bike/scooter/auto me poora rider dikhta hai, car/truck me khidki me sirf sar dikhta hai (truck ka design wahi hai, khidki thodi badi). Rider ke haath handle tak pahunchne ke liye thode lambe hote hain. Jis gaadi par koi baitha ho wo badi dikhti hai aur sabke aage aati hai (peeche khade characters uske peeche rehte hain). Example:
+  ```
+  A -> ride truck enter left to center     (gaadi bahar se aati hai, A pehle se andar)
+  A (smug, close): Le aaya sarkari gaadi! | ले आया सरकारी गाड़ी!
+  A -> getoff                                (utarta hai)
+  OBJ: truck exit right                      (khaali gaadi chali jaati hai)
+  ```
+  Pehle se khade vehicle par chadhna ho to `OBJ: bike left`, phir `A -> ride bike` (hop karke baithta hai).
 - **Naye props/looks:** prop `bag`, accessory `sunglasses`, action `salute`.
 - **Voice-over:** `NARRATOR: Ek din ki baat hai | एक दिन की बात है`. Koi character nahi dikhta, bas awaaz aur neeche subtitle. CAST me likhna nahi padta.
 - **"Expectation vs Reality" / comparison:** do `SCENE:` likho, title card me `Expectation 😎` aur `Reality 😭`, beech me `TRANSITION: whip`. Alag split-screen abhi nahi hai.

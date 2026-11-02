@@ -28,6 +28,9 @@ Script format (one thing per line):
 - `wait 1.5` (or `...`) pauses.
 - Camera (optional, the camera already cuts in on every speaker by itself): `wide`, `medium`, `close`,
   `two_shot` in the brackets of a line, e.g. `A (shock, close): ...` or `A -> shock close`.
+- Vehicles: `A -> ride bike` (also truck, car, auto, scooter, cycle; `ride auto back` = the second seat) hops A on,
+  `A -> getoff` (or `getoff left|right`) hops off. `A -> ride truck enter left to center` = the vehicle drives in
+  from the left with A already inside. The vehicle is made bigger while somebody rides it.
 - Depth: `near` (step towards the camera, bigger), `far` (step back, smaller), `mid` (back to normal),
   e.g. `B -> near smug`.
 
@@ -56,7 +59,7 @@ import argparse
 import os
 import re
 
-from . import actions, audio, objects
+from . import actions, audio, objects, rides
 from .characters import ACCESSORIES, EXPRESSIONS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE, SKIN_TONES
 from .util import asset_path
 from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS, chat_length
@@ -68,6 +71,7 @@ SFX = ("pop", "boing", "whoosh", "ding", "thud", "clap", "beep", "laugh_track")
 NARRATION_NAMES = ("narrator", "vo", "narration", "voiceover", "voice_over")   # a voice with no body
 NARRATOR_SPEC = {"hidden": True, "voice": {"name": "hi-IN-MadhurNeural", "pitch": "-12Hz", "rate": "-4%",
                                            "gemini": "Charon"}}
+GETOFF_WORDS = ("getoff", "utar", "dismount")
 SHOTS = tuple(SHOT_ZOOM) + tuple(SHOT_ALIASES)       # camera: wide, medium, close, two_shot (+ spellings)
 DEPTH_WORDS = tuple(DEPTHS)                         # near / mid / far: step towards or away from the camera
 DIRECTIONS = ("left", "right", "up", "down", "up_left", "up_right")
@@ -99,6 +103,7 @@ def vocab():
         "shots": sorted(SHOTS), "depth": sorted(DEPTH_WORDS),
         "objects": sorted(set(objects.OBJECTS) | set(objects.ALIASES)),
         "object_words": ["center", "enter", "exit", "front", "go", "left", "right", "to"],
+        "rides": sorted(rides.RIDES), "ride_words": sorted(("ride", "back", "driver") + GETOFF_WORDS),
     }
 
 
@@ -162,7 +167,35 @@ def _stage(tokens, ev, scene_cast, who):
     while i < len(tokens):
         w = tokens[i]
         nxt = tokens[i + 1] if i + 1 < len(tokens) else None
-        if w in ("enter", "exit") and nxt in ("left", "right"):
+        if w == "ride":
+            kind = objects.resolve_kind(nxt) if nxt else None
+            if kind and rides.rideable(kind):
+                spec = {"kind": kind}
+                i += 1
+                while i + 1 < len(tokens):                  # back | driver | enter left|right | to left|center|right
+                    t1, t2 = tokens[i + 1], tokens[i + 2] if i + 2 < len(tokens) else None
+                    if t1 in ("back", "driver"):
+                        spec["seat"] = t1
+                        i += 1
+                    elif t1 == "enter" and t2 in ("left", "right"):
+                        spec["enter"] = t2
+                        i += 2
+                    elif t1 == "to" and t2 in ("left", "center", "right"):
+                        spec["at"] = t2
+                        i += 2
+                    else:
+                        break
+                ev["ride"] = spec
+            else:
+                unknown.append("ride %s (%s)" % (nxt or "?", ", ".join(sorted(rides.RIDES))))
+                i += 1 if nxt else 0
+        elif w in GETOFF_WORDS:
+            spec = {}
+            if nxt in ("left", "right"):
+                spec["side"] = nxt
+                i += 1
+            ev["getoff"] = spec
+        elif w in ("enter", "exit") and nxt in ("left", "right"):
             move = (w, nxt)
             i += 1
         elif w == "walk" and nxt in ("left", "center", "right"):
