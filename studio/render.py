@@ -15,12 +15,12 @@ import subprocess
 import sys
 import time
 
-from PIL import Image
+from PIL import Image, ImageOps
 
 from . import actions, audio, objects, rides
 from .backgrounds import Background
 from .characters import build_character, render_ops
-from .scene import camera_at, compile_music, compile_scene, prepare_voice, split_scenes, static_overlays
+from .scene import GROUND_Y, camera_at, compile_music, compile_scene, prepare_voice, split_scenes, static_overlays
 from .text import bubble_image, chat_image, styled_box
 from .util import LH, LW, clamp, ease_in_out, ease_out, ease_out_back, load_scene
 
@@ -214,7 +214,8 @@ class Renderer(Output):
         self.plan = compile_scene(scene, use_tts=use_tts, fps=fps, tts_provider=tts_provider, voice=voice)
         self.W, self.H = frame_size(width)
         self.s = self.W / float(LW)
-        self.bg = Background(self.plan.background, self.W, self.H)
+        ang = self.plan.angle
+        self.bg = Background(self.plan.background, int(self.W * ang["zoom"] + 0.5), int(self.H * ang["zoom"] + 0.5))
         self.overlay_layer = OverlayLayer(self.s)
         self._lip = {}
         self._label_cache = {}
@@ -236,6 +237,21 @@ class Renderer(Output):
         # no audio: believable fake syllables
         a = abs(math.sin(t * 9.1)) * (0.55 + 0.45 * abs(math.sin(t * 3.7 + 1.3)))
         return clamp(a * 1.25 - 0.1)
+
+    def _background(self, t):
+        """The place, seen from this shot's angle: drawn bigger (crisp, not blown up), the part around angle x, with the
+        ground line where the people stand kept in place; mirrored for a reverse shot."""
+        img = self.bg.frame(t).convert("RGB")
+        ang = self.plan.angle
+        z = ang["zoom"]
+        if z > 1.001:
+            s = self.s * z
+            left = clamp(ang["x"] * s - self.W / 2.0, 0, img.width - self.W)
+            top = clamp(GROUND_Y * (s - self.s), 0, img.height - self.H)
+            img = img.crop((int(left), int(top), int(left) + self.W, int(top) + self.H))
+        if ang["mirror"]:
+            img = ImageOps.mirror(img)
+        return img
 
     def _front_rider(self, c, t):
         rf = c.ride_frame(t)
@@ -296,7 +312,7 @@ class Renderer(Output):
     # ------------------------------------------------------------ one frame
     def frame(self, t):
         plan, s = self.plan, self.s
-        img = self.bg.frame(t).convert("RGB")
+        img = self._background(t)
         self._draw_objects(img, t, False)
         order = sorted((c for c in plan.chars.values() if not c.spec.get("hidden")),
                        key=lambda c: (c.draw_pos(t)[1], c.draw_pos(t)[0]))

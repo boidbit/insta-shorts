@@ -78,7 +78,9 @@ NARRATION_NAMES = ("narrator", "vo", "narration", "voiceover", "voice_over")   #
 NARRATOR_SPEC = {"hidden": True, "voice": {"name": "hi-IN-MadhurNeural", "pitch": "-12Hz", "rate": "-4%",
                                            "gemini": "Charon"}}
 GETOFF_WORDS = ("getoff", "utar", "dismount")
-FRAMINGS = ("wide", "medium", "inside")
+FRAMINGS = ("wide", "medium", "inside", "ots")
+ANGLE_WORDS = ("reverse",)
+OTS_WORDS = ("over", "shoulder", "over_shoulder")
 SHOTS = tuple(SHOT_ZOOM) + tuple(SHOT_ALIASES)       # camera: wide, medium, close, two_shot (+ spellings)
 DEPTH_WORDS = tuple(DEPTHS)                         # near / mid / far: step towards or away from the camera
 DIRECTIONS = ("left", "right", "up", "down", "up_left", "up_right")
@@ -111,7 +113,7 @@ def vocab():
         "objects": sorted(set(objects.OBJECTS) | set(objects.ALIASES)),
         "object_words": ["center", "enter", "exit", "front", "go", "left", "right", "to"],
         "rides": sorted(rides.RIDES), "ride_words": sorted(("ride", "back", "driver") + GETOFF_WORDS),
-        "framings": sorted(FRAMINGS),
+        "framings": sorted(FRAMINGS), "angle_words": sorted(ANGLE_WORDS + OTS_WORDS),
     }
 
 
@@ -204,6 +206,21 @@ def vary_cast(cast):
                 color = spec["color"] = free[0]
         colors.append(color)
     return cast
+
+
+def ots_back(sc, before, order, cast):
+    """Whose back is in front of the camera in an over-the-shoulder shot: the name after `CUT ots`, else the one
+    who is spoken to (the second character of the shot), else whoever spoke last before this shot."""
+    if sc.get("back"):
+        return sc["back"] if sc["back"] in cast or sc["back"] in order else None
+    if len(order) >= 2:
+        return order[1]
+    for prev in reversed(before):
+        for ln in reversed(prev["lines"]):
+            if ln[0] in ("say", "do") and ln[1] not in order and ln[1].upper() not in ("ALL", "NARRATOR"):
+                return ln[1]
+    others = [n for n in cast if n not in order and n != "NARRATOR" and not cast[n].get("hidden")]
+    return others[0] if others else None
 
 
 def _stage(tokens, ev, scene_cast, who):
@@ -557,14 +574,30 @@ def parse_script(text):
             warnings.append("chat alag format hai, story script me nahi chalta (chat ke liye alag text likho: "
                             "'< samne wala' / '> aap'): %r" % line[:40])
             continue
-        m = re.match(r"^(?:CUT|SHOT)\b\s*:?\s*(\w*)\s*$", line, re.I)
+        m = re.match(r"^(?:CUT|SHOT)\b\s*:?\s*([\w\s,]*)$", line, re.I)
         if m:                                       # a new shot in the same place: a hard cut, its own set of characters
-            frame = m.group(1).lower()
-            if frame and frame not in FRAMINGS:
-                warnings.append("CUT %r: framing wide / medium / inside likho" % frame)
-                frame = ""
+            frame, reverse, back = "", False, None
+            for w in re.split(r"[\s,]+", m.group(1).strip()):
+                lw = w.lower()
+                if not w:
+                    continue
+                if lw in FRAMINGS and not frame:
+                    frame = lw
+                elif lw in OTS_WORDS and not frame:
+                    frame = "ots"
+                elif lw in ANGLE_WORDS:
+                    reverse = True
+                elif w in cast or (frame == "ots" and re.match(r"^[A-Z]\w*$", w) and back is None):
+                    back = w
+                else:
+                    warnings.append("CUT %r: framing wide / medium / inside / ots (+ reverse) likho" % w)
+            shot_no = cur.get("shot", 0) + 1
             cur = new_scene(dict(cur["background"]), None)
-            cur["cut_in"], cur["framing"] = True, frame or None
+            cur["cut_in"], cur["framing"], cur["shot"] = True, frame or None, shot_no
+            if reverse:
+                cur["reverse"] = True
+            if frame == "ots":
+                cur["back"] = back
             continue
         m = re.match(r"^OBJ\s*:\s*(.*)$", line, re.I)
         if m:
@@ -609,11 +642,25 @@ def parse_script(text):
             if declared and name not in cast:
                 warnings.append("%s CAST me nahi hai: CAST line me '%s = <role/look>' jodo" % (name, name))
             add_cast(name, [])
+        back = None
+        if sc.get("framing") == "ots":
+            back = ots_back(sc, scenes[:si], order, cast)
+            if back is None:
+                warnings.append("CUT ots: peeche se kaun dikhe? 'CUT ots B' likho (shot me ek aur character chahiye)")
+                sc["framing"] = None
         chars = {}
-        for name in order:
-            x, slot = _slot_x(order, name)
-            facing = "front" if len(order) != 2 else ("right" if slot == "left" else "left")
+        fronts = [n for n in order if n != back]
+        for name in fronts:
+            x, slot = _slot_x(fronts, name)
+            facing = "front" if len(fronts) != 2 else ("right" if slot == "left" else "left")
             chars[name] = {"slot": slot, "facing": facing}
+        if back:                                    # over the shoulder: back's back big in the near corner
+            side = "left" if sc.get("shot", 0) % 2 == 0 else "right"
+            chars[back] = {"slot": side, "view": "back"}
+            for name in fronts:
+                chars[name]["facing"] = side        # the speaker talks to the one in front of the camera
+            if back not in order:
+                order.append(back)
         tl = [{"t": 0.0, "who": "all", "action": "idle", "expression": "smile"}]
         if si == 0:
             tl.append({"t": 0.0, "sfx": "whoosh", "volume": 0.7, "camera": {"shake": 0.5}})
@@ -690,6 +737,10 @@ def parse_script(text):
             item["framing"] = sc["framing"]
         if sc.get("cut_in"):
             item["cut_in"] = True
+        if sc.get("shot"):
+            item["angle"] = sc["shot"]
+        if sc.get("reverse"):
+            item["reverse"] = True
         out_scenes.append(item)
 
     vary_cast(cast)

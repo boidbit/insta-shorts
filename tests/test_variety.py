@@ -7,7 +7,24 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from studio.characters import LOOKS, assign_faces, build_character      # noqa: E402
 from studio.script import parse_script                     # noqa: E402
-from studio.scene import split_scenes                      # noqa: E402
+from studio.scene import ANGLES, compile_scene, shot_angle, split_scenes      # noqa: E402
+from studio.render import Renderer                         # noqa: E402
+from studio.script import vocab                            # noqa: E402
+
+OTS = """HOOK: h
+CAST: A = college_boy, B = college_girl
+SCENE: room
+A (angry): Premium mera? | प्रीमियम मेरा?
+CUT
+B (smug): Haan | हाँ
+CUT ots
+A (angry): Kyun? | क्यों?
+CUT ots A
+B (sly): Bas | बस
+CUT reverse
+A (shock): Kya | क्या
+CTA: c
+"""
 
 
 def cast_of(cast_line):
@@ -106,6 +123,98 @@ class FaceVariety(unittest.TestCase):
                     ops, anchors = build_character(spec, {}, "neutral", 0.0, 0.0, 540, 1500)
                     self.assertTrue(ops)
                     self.assertLess(anchors["head_top"][1], anchors["mouth"][1])
+
+
+
+class Angles(unittest.TestCase):
+    def test_each_cut_gets_a_new_angle(self):
+        scene, warn = parse_script(OTS)
+        self.assertEqual(warn, [])
+        subs = split_scenes(scene)
+        angles = [shot_angle(sub, None) for sub in subs]
+        self.assertEqual(angles[0], dict(zoom=1.0, x=540.0, mirror=False))      # the first shot shows the whole place
+        for a, b in zip(angles, angles[1:]):
+            self.assertNotEqual(a, b)
+
+    def test_reverse_mirrors(self):
+        scene, _ = parse_script(OTS)
+        last = split_scenes(scene)[-1]
+        self.assertTrue(last.get("reverse"))
+        self.assertTrue(shot_angle(last, None)["mirror"])
+
+    def test_wide_and_inside_show_the_whole_place(self):
+        self.assertEqual(shot_angle({"angle": 2}, "wide")["zoom"], 1.0)
+        self.assertEqual(shot_angle({"angle": 1, "reverse": True}, "inside"), dict(zoom=1.0, x=540.0, mirror=True))
+
+    def test_angles_cycle_after_the_list(self):
+        self.assertEqual(shot_angle({"angle": len(ANGLES)}, None), shot_angle({"angle": 1}, None))
+
+    def test_photo_is_not_mirrored_unless_asked(self):
+        bg = {"type": "image", "path": "x.png"}
+        self.assertFalse(shot_angle({"angle": 1, "background": bg}, None)["mirror"])
+        self.assertTrue(shot_angle({"angle": 1, "background": bg, "reverse": True}, None)["mirror"])
+
+    def test_json_cuts_get_angles_too(self):
+        scene = {"characters": {"A": {}}, "scenes": [
+            {"background": {"type": "room"}, "timeline": []},
+            {"background": {"type": "room"}, "cut_in": True, "timeline": []},
+            {"background": {"type": "street"}, "timeline": []}]}
+        subs = split_scenes(scene)
+        self.assertEqual([s_.get("angle") for s_ in subs], [None, 1, None])
+
+    def test_angled_background_is_crisp_and_differs(self):
+        base = {"characters": {}, "background": {"type": "room"}, "meta": {"duration": 1.0}, "timeline": []}
+        a = Renderer(dict(base), width=270, use_tts=False).frame(0.5)
+        b = Renderer(dict(base, angle=1), width=270, use_tts=False).frame(0.5)
+        self.assertEqual(a.size, b.size)
+        self.assertNotEqual(a.tobytes(), b.tobytes())
+
+
+class OverTheShoulder(unittest.TestCase):
+    def setUp(self):
+        self.scene, self.warn = parse_script(OTS)
+        self.subs = split_scenes(self.scene)
+
+    def test_listener_is_seen_from_behind(self):
+        ots = self.subs[2]                           # CUT ots with only A speaking: B (spoke before) is the back
+        self.assertEqual(ots["framing"], "ots")
+        self.assertEqual(ots["characters"]["B"]["view"], "back")
+        self.assertNotEqual(ots["characters"]["A"].get("view"), "back")
+
+    def test_named_back(self):
+        self.assertEqual(self.subs[3]["characters"]["A"]["view"], "back")
+        self.assertNotEqual(self.subs[2]["characters"]["B"]["slot"], self.subs[3]["characters"]["A"]["slot"])
+
+    def test_back_is_big_and_near(self):
+        plan = compile_scene(self.subs[2], use_tts=False)
+        back, front = plan.chars["B"], plan.chars["A"]
+        self.assertGreater(back.scale, front.scale * 1.8)
+        self.assertGreater(back.y, 1920)                 # feet below the frame: only head and shoulders show
+        self.assertLess(abs(back.x - 540), abs(front.x - 540) + 400)
+        self.assertNotEqual(back.x > 540, front.x > 540)  # opposite halves
+
+    def test_no_one_to_show_from_behind(self):
+        _, warn = parse_script("HOOK: h\nCAST: A = boy\nSCENE: room\nCUT ots\nA: hi | हाय\nCTA: c\n")
+        self.assertTrue(any("ots" in w for w in warn))
+
+    def test_back_view_has_no_face(self):
+        front, _ = build_character({"look": "boy"}, {}, "neutral", 0.0, 0.0, 540, 1700)
+        back, an = build_character({"look": "boy", "view": "back"}, {}, "neutral", 0.0, 0.0, 540, 1700)
+        self.assertLess(len(back), len(front))
+        self.assertIn("head_top", an)
+        for hair in ("short", "long", "braid", "bun", "ponytail", "curly", "spiky", "balding", "bald"):
+            for acc in ([], ["cap"], ["turban"], ["earrings"]):
+                build_character({"look": "girl", "hair": hair, "view": "back", "accessories": acc,
+                                 "outfit": "saree"}, {}, "neutral", 0.0, 0.0, 540, 1700)
+
+    def test_renders(self):
+        img = Renderer(self.subs[2], width=270, use_tts=False).frame(0.5)
+        self.assertEqual(img.size[0], 270)
+
+    def test_page_knows_the_words(self):
+        v = vocab()
+        self.assertIn("ots", v["framings"])
+        self.assertIn("reverse", v["angle_words"])
 
 
 if __name__ == "__main__":

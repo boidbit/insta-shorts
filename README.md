@@ -128,6 +128,8 @@ S (shock): Yeh kya hai?? | ...
 ```
 
 - `CUT wide` / `CUT inside` / `CUT medium` (default). `SCENE: jagah | title | wide` se bhi framing de sakte ho. Gaadi wala shot apne aap wide hota hai.
+- **Har CUT ek naya angle:** ek jagah ke andar har CUT par background alag hissa dikhata hai (paas se, ek side se, ya ulti taraf se = mirror), jaise camera ghooma ho. `CUT reverse` = jagah ko doosri taraf se dikhao.
+- **`CUT ots` (over the shoulder):** sunne wale ki peeth (sir + kandhe) bade size me aage kone me, bolne wala camera ki taraf. Peeche kaun dikhe: `CUT ots B`; na likho to shot ka doosra character, ya pichhle shot me jo bola tha. Do `CUT ots` aage-peeche = face-off (side apne aap badalti hai).
 - **Ek hi scale:** gaadi hamesha insaan ke anupaat me hoti hai (truck insaan se ~2 guna ooncha, car/auto lagbhag insaan jitni), aur rider khade character jitna hi bada hota hai. Wide shot me log chhote hote hain taaki poori gaadi frame me aaye; bade chehre ke liye `CUT inside` ya `CUT medium`.
 - Shot ek doosre ka state yaad nahi rakhte: jis shot me ladka gaadi me dikhna hai usme `L -> ride truck` dobara likho.
 - Auto camera sirf `medium` shots me zoom karta hai (wide aur inside "composed" shots hain).

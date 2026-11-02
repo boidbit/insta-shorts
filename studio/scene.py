@@ -14,6 +14,55 @@ SLOTS = {
 GROUND_Y = 1700
 SHOT_ZOOM = {"wide": 1.0, "medium": 1.3, "close": 1.7, "two_shot": 1.3}
 SHOT_ALIASES = {"closeup": "close", "close_up": "close", "twoshot": "two_shot", "2shot": "two_shot"}
+# Camera angle of a shot (CUT): the background is seen closer (a longer lens), from a side, or from the other side
+# (mirrored = the reverse shot). (zoom, centre x in logical px, mirror). Shot 0 of a place shows it all.
+ANGLES = [(1.0, 540.0, False), (1.25, 400.0, True), (1.25, 680.0, False), (1.4, 540.0, True)]
+
+
+def shot_angle(scene, framing):
+    """The background angle of a shot: {"zoom", "x", "mirror"}. scene["angle"] is a shot number (the script counts the
+    CUTs in one place) or a dict; scene["reverse"] = true asks for the view from the other side."""
+    a = scene.get("angle", 0)
+    if isinstance(a, dict):
+        out = dict(zoom=float(a.get("zoom", 1.0)), x=float(a.get("x", 540.0)), mirror=bool(a.get("mirror", False)))
+    else:
+        k = int(a or 0)
+        z, x, m = ANGLES[k if k < len(ANGLES) else 1 + (k - 1) % (len(ANGLES) - 1)]
+        out = dict(zoom=z, x=x, mirror=m)
+    if framing == "wide":                       # a wide shot shows the whole place
+        out.update(zoom=1.0, x=540.0)
+    if framing == "inside":
+        out = dict(zoom=1.0, x=540.0, mirror=False)
+    if scene.get("reverse"):
+        out["mirror"] = True
+    if (scene.get("background") or {}).get("type") == "image" and not scene.get("reverse"):
+        out["mirror"] = False                   # a photo may have writing on it: mirror only when asked
+    out["zoom"] = clamp(out["zoom"], 1.0, 1.6)
+    return out
+
+
+OTS_BACK = dict(k=2.3, drop=1200.0, left=150.0, right=930.0)      # the near shoulder: big, cut off by the frame
+
+
+def place_over_shoulder(chars):
+    """Over-the-shoulder shot: whoever is seen from behind stands big in a near corner (only head and shoulders in
+    the frame); the others face them from the other half, a step further away."""
+    backs = [c for c in chars.values() if c.spec.get("view") == "back"]
+    if not backs:
+        return
+    side = backs[0].spec.get("slot") if backs[0].spec.get("slot") in ("left", "right") else "left"
+    for c in backs:
+        c.x, c.y = OTS_BACK[side], GROUND_Y + OTS_BACK["drop"]
+        c.scale *= OTS_BACK["k"]
+    fronts = [c for c in chars.values() if c.spec.get("view") != "back" and not c.spec.get("hidden")]
+    xs = {1: [720.0], 2: [580.0, 870.0]}.get(len(fronts), [480.0, 700.0, 920.0])
+    if side == "right":
+        xs = [1080.0 - x for x in reversed(xs)]
+    for c, x in zip(fronts, xs):
+        c.x, c.y = x, GROUND_Y + 90.0          # a step closer than in a medium shot
+        c.scale *= 1.12
+
+
 DEPTHS = {"near": (1.3, 110.0), "mid": (1.0, 0.0), "far": (0.75, -150.0)}   # (size multiplier, feet offset in px)
 CHAR_ATTRS = ("action", "expression", "prop", "label", "look", "facing", "style", "point", "dir",
               "lean", "speed", "intensity", "hands", "tint")
@@ -453,13 +502,14 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             if k_ in objects.PERSON_R:
                 kinds_.add(k_)
     framing = scene.get("framing") or meta.get("framing")
-    if framing not in ("wide", "medium", "inside"):
+    if framing not in ("wide", "medium", "inside", "ots"):
         framing = "wide" if any(k_ in objects.VEHICLES for k_ in kinds_) else "medium"
     world = 1.0
     if framing == "wide" and kinds_:
         widest = max(objects.SPRITE_LEN[k_] / objects.PERSON_R[k_] for k_ in kinds_) * objects.REF_SCALE
         world = clamp(900.0 / widest, 0.22, 1.0)
     plan.framing, plan.world = framing, world
+    plan.angle = shot_angle(scene, framing)
     plan.cut_in = bool(scene.get("cut_in"))
 
     # ---- characters ----
@@ -478,6 +528,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         y = spec.get("y", GROUND_Y)
         chars[name] = Char(name, spec, float(x), float(y), i)
         chars[name].scale *= world
+    if framing == "ots":
+        place_over_shoulder(chars)
     plan.chars = chars
 
     # ---- timeline ----
@@ -695,7 +747,9 @@ def split_scenes(scene):
         base_meta["bpm"] = music_bpm(scene.get("music"))
     cast_all = scene.get("characters", {})
     out = []
+    shot_no = 0
     for sc in scene["scenes"]:
+        shot_no = shot_no + 1 if sc.get("cut_in") else 0           # CUTs in one place: each a new camera angle
         sub = deep_merge(base, {k: v for k, v in sc.items() if k not in ("cast", "characters", "meta", "title")})
         sub["meta"] = dict(base_meta, **sc.get("meta", {}))
         cast = sc.get("cast", []) if sc.get("chat") else (sc.get("cast") or list(cast_all.keys()))
@@ -703,6 +757,8 @@ def split_scenes(scene):
         for n, spec in sc.get("characters", {}).items():
             chars[n] = dict(chars.get(n, {}), **spec)
         sub["characters"] = chars
+        if shot_no and "angle" not in sub:
+            sub["angle"] = shot_no
         if sc.get("title"):
             sub["overlays"] = list(sub.get("overlays", [])) + [
                 {"text": sc["title"], "style": "card", "pos": "upper", "from": 0.0, "to": 1.4, "color": [40, 40, 48]}]
