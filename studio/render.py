@@ -251,7 +251,7 @@ class Renderer(Output):
         x = o.x_at(t)
         flip = o.flip_at(t)
         age = t - o.t_in
-        alpha = clamp(age / 0.18) if not o.moves or o.moves[0][0] > o.t_in + 0.01 else 1.0
+        alpha = 1.0 if o.no_fade else (clamp(age / 0.18) if not o.moves or o.moves[0][0] > o.t_in + 0.01 else 1.0)
         cx, cy = x * s, (o.y + o.bob_at(t)) * s
         if im is not None:
             if flip:
@@ -452,7 +452,9 @@ class Sequence(Output):
         part, lt = self.parts[i], t - self.offsets[i]
         img = part.frame(lt)
         D = 0.28
-        if i > 0 and lt < D and self.transition == "whip":
+        cut_in = bool(part.plan.cut_in)                                     # a CUT shot: no whip / fade into it
+        cut_out = i + 1 < len(self.parts) and bool(self.parts[i + 1].plan.cut_in)
+        if i > 0 and lt < D and self.transition == "whip" and not cut_in:
             prev = self.parts[i - 1]
             old = prev.frame(prev.duration - 1.0 / self.fps)
             e = ease_in_out(lt / D)
@@ -462,9 +464,9 @@ class Sequence(Output):
             img = canvas
         elif self.transition == "fade":
             f = 1.0
-            if i > 0 and lt < D / 2:
+            if i > 0 and lt < D / 2 and not cut_in:
                 f = lt / (D / 2)
-            if i + 1 < len(self.parts) and part.duration - lt < D / 2:
+            if i + 1 < len(self.parts) and part.duration - lt < D / 2 and not cut_out:
                 f = min(f, (part.duration - lt) / (D / 2))
             if f < 0.999:
                 img = Image.blend(Image.new("RGB", img.size, (0, 0, 0)), img, clamp(f))

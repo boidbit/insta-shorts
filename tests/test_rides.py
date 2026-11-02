@@ -69,7 +69,9 @@ class CompileTests(unittest.TestCase):
         p = compile_scene(scene({"t": 0.4, "who": "A", "ride": {"kind": "bike"}},
                                 {"t": 3.0, "obj": {"kind": "bike", "go": "right"}}), use_tts=False)
         bike = p.objects["bike"]
-        self.assertEqual(bike.scale, rides.RIDE_SCALE["bike"])
+        self.assertAlmostEqual(bike.scale, objects.REF_SCALE * p.world / objects.PERSON_R["bike"], places=6)
+        a_ = p.chars["A"]                                              # the rider is as big as somebody standing
+        self.assertAlmostEqual(a_.ride_frame(2.0)["scale"], a_.scale, delta=0.08)
         a = p.chars["A"]
         x0 = a.draw_pos(2.0)[0]
         self.assertAlmostEqual(x0, bike.x_at(2.0) + rides.RIDES["bike"]["driver"]["hip"][0] * bike.scale, delta=1.0)

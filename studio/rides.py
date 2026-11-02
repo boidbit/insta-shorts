@@ -11,12 +11,13 @@ the hands are on the handlebar and the feet on the pedals / pegs.
 """
 import math
 
+from . import objects
 from .characters import DEFAULT_POSE, LA, SH, TH, UA, skeleton
 from .util import clamp, ease_in_out, lerp
 
 RIDE_HOP = 0.6                                  # seconds a hop onto / off a vehicle takes
 SHOULDER = {"L": (-56.0, -268.0), "R": (56.0, -268.0)}
-ARM_K = 1.35                                    # riders' arms are this much longer, so they reach the handlebar
+ARM_K = 1.5                                     # riders' arms are this much longer, so they reach the handlebar
 HIP = {"L": (-32.0, 0.0), "R": (32.0, 0.0)}
 
 # seat = hip position, rider size r, hands [near, far] (or None = rest on the lap), feet [near, far] or "pedals"
@@ -29,13 +30,16 @@ RIDES = {
              "back": dict(hip=(-90, -134), r=0.24, hands=[(-62, -160), (-66, -156)], feet=[(-40, -70), (-50, -68)])},
     "car": {"driver": dict(hip=(66, -80), r=0.2, hands=[(108, -96), (102, -94)], feet=[(96, -52), (88, -50)]),
             "back": dict(hip=(-52, -80), r=0.2, hands=None, feet=[(-18, -52), (-26, -50)])},
-    "truck": {"driver": dict(hip=(204, -96), r=0.24, hands=[(246, -110), (240, -108)], feet=[(240, -64), (232, -62)]),
-              "back": dict(hip=(146, -96), r=0.24, hands=None, feet=[(182, -64), (174, -62)])},
+    "truck": {"driver": dict(hip=(206, -124), r=0.21, hands=[(246, -128), (240, -126)], feet=[(240, -78), (232, -76)]),
+              "back": dict(hip=(148, -124), r=0.21, hands=None, feet=[(184, -78), (176, -76)])},
 }
-# how big a vehicle is when somebody rides it (so the rider is not tiny next to a standing character)
-RIDE_SCALE = {"bike": 1.8, "scooter": 1.8, "cycle": 1.8, "auto": 1.6, "car": 1.5, "truck": 1.3}
 HALF_LENGTH = {"bike": 170, "scooter": 150, "cycle": 170, "auto": 190, "car": 260, "truck": 320}
 CRANK = dict(bb=(0, -58), length=40)
+
+
+for _kind, _seats in RIDES.items():                 # one scale for the world: a rider is as big as somebody standing
+    for _seat in _seats.values():
+        _seat["r"] = objects.PERSON_R[_kind]
 
 
 def rideable(kind):

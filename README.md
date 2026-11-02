@@ -74,7 +74,7 @@ Agar text me `CAST:` / `SCENE:` / `A -> ...` / `NAME: ...` wali koi line nahi ha
 - **Depth:** `B -> near` (character camera ki taraf aata hai, bada), `far` (peeche, chhota), `mid` (normal). `near` ke saath `close` mat milao: shot bahut tight ho jaata hai.
 - **Objects:** `OBJ: truck enter left to right` (gaadi aati hai aur right pe ruk jaati hai), `OBJ: dustbin left`, `OBJ: truck exit right`. Objects: truck (kachra gaadi), auto, car, scooter, cow, dustbin, bags, table; rang (`OBJ: car red ...`), `front` (characters ke aage), `big`/`small`. Apni PNG: `OBJ: assets/objects/x.png right`. Gaadi ke aane tak kahani ruki rehti hai. Jahan character khade hain wahan gaadi mat roko (wo chhup jaati hai), ya `front` lagao.
 - **Apni image se background:** 9:16 (1080x1920) image `assets/backgrounds/gali.png` me daalo, phir script me `SCENE: gali | title` (ya poora path `SCENE: assets/backgrounds/gali.jpg`). Character neeche ki taraf (zameen/sadak ~ neeche ke 35%) khade hote hain, to image me wahan khaali jagah rakho. Image main bana nahi sakta: kisi AI image tool se banwao ya free-licence image lo (flat cartoon style character ke saath mel khaati hai).
-- **Gaadi chalana / chadhna-utarna (rides):** `A -> ride bike` (bike, scooter, cycle, auto, car, truck; `B -> ride auto back` = doosri seat) character gaadi par hop karke baithta hai, `A -> getoff` (ya `getoff left|right`) se utarta hai. Gaadi chalane ke liye `OBJ: bike go right` (ya `enter left to center`), rider saath chalta hai; cycle me pedal ghoomte hain, mudne par rider mirror hota hai. Cycle/bike/scooter/auto me poora rider dikhta hai, car/truck me khidki me sirf sar dikhta hai (truck ka design wahi hai, khidki thodi badi). Rider ke haath handle tak pahunchne ke liye thode lambe hote hain. Jis gaadi par koi baitha ho wo badi dikhti hai aur sabke aage aati hai (peeche khade characters uske peeche rehte hain). Example:
+- **Gaadi chalana / chadhna-utarna (rides):** `A -> ride bike` (bike, scooter, cycle, auto, car, truck; `B -> ride auto back` = doosri seat) character gaadi par hop karke baithta hai, `A -> getoff` (ya `getoff left|right`) se utarta hai. Gaadi chalane ke liye `OBJ: bike go right` (ya `enter left to center`), rider saath chalta hai; cycle me pedal ghoomte hain, mudne par rider mirror hota hai. Cycle/bike/scooter/auto me poora rider dikhta hai, car/truck me khidki me sirf sar dikhta hai (truck ka design wahi hai, khidki thodi badi). Rider ke haath handle tak pahunchne ke liye thode lambe hote hain. Jis gaadi par koi baitha ho wo sabke aage aati hai. Gaadi ka size character se hi nikalta hai (ek scale), isliye truck jaisi badi gaadi ke saath wala shot `CUT wide` hota hai (log chhote) ya `CUT inside` (cab bada). Example:
   ```
   A -> ride truck enter left to center     (gaadi bahar se aati hai, A pehle se andar)
   A (smug, close): Le aaya sarkari gaadi! | ले आया सरकारी गाड़ी!
@@ -105,6 +105,32 @@ CTA: Tag karo 👇
 - Optional: `HOOK:`, `CTA:`, `CAPTION:`, `HASHTAGS:`, `MUSIC: beat 90`. 12 se zyada messages ho to purane upar se nikal jaate hain.
 - Chat ko story ke andar mat milao: story script me `<` / `>` / `CHAT` lines ek warning ke saath ignore hoti hain.
 - Awaaz nahi hoti, to Gemini ka quota kharch nahi hota.
+
+## Shots (CUT): sab ek hi frame me nahi
+
+Ek film ki tarah likho: jab camera kisi aur par jaaye to `CUT` likho. Har shot me **sirf wahi characters** dikhte hain jo us shot me bolte ya kuch karte hain, aur cut seedha hota hai (fade/whip nahi).
+
+```
+SCENE: street
+S (angry): Sun ladke! Sarkari gaadi se aana! | ...      <- baap pehle bolta hai (baap + beti ek frame me)
+B (shock): Papa!? | ...
+CUT
+L (grin): Ji sasur ji! | ...                              <- ab sirf ladka
+L -> exit left
+CUT wide
+S (smug): Dekhte hain... | ...                            <- wide: sab chhote, poori gaadi dikhti hai
+L -> ride truck enter left to center
+CUT inside
+L -> ride truck                                           <- gaadi ke andar: driver bada, cab ke saath
+L (smug): Le aaya sarkari gaadi! | ...
+CUT
+S (shock): Yeh kya hai?? | ...
+```
+
+- `CUT wide` / `CUT inside` / `CUT medium` (default). `SCENE: jagah | title | wide` se bhi framing de sakte ho. Gaadi wala shot apne aap wide hota hai.
+- **Ek hi scale:** gaadi hamesha insaan ke anupaat me hoti hai (truck insaan se ~2 guna ooncha, car/auto lagbhag insaan jitni), aur rider khade character jitna hi bada hota hai. Wide shot me log chhote hote hain taaki poori gaadi frame me aaye; bade chehre ke liye `CUT inside` ya `CUT medium`.
+- Shot ek doosre ka state yaad nahi rakhte: jis shot me ladka gaadi me dikhna hai usme `L -> ride truck` dobara likho.
+- Auto camera sirf `medium` shots me zoom karta hai (wide aur inside "composed" shots hain).
 
 ## Characters
 

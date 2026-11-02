@@ -21,6 +21,15 @@ from .characters import PALETTE, shade
 from .util import asset_path
 
 PAD = 30
+# One scale for the whole world. A standing character is ~800 units tall (at character scale 1); PERSON_R[kind] is how
+# big that person is relative to the object's sprite, from real sizes (truck ~6.8 x 3.1 m, auto 2.7 x 1.75, car
+# 4.2 x 1.5, bike 2.1 x 1.2, cow 2 x 1.45, person 1.7 m...). An object is drawn at (character scale / PERSON_R), so
+# a vehicle is always in proportion to the people next to it, and a rider is as big as somebody standing.
+PERSON_R = {"truck": 0.21, "auto": 0.34, "car": 0.27, "bike": 0.35, "scooter": 0.36, "cycle": 0.39,
+            "cow": 0.44, "dustbin": 0.43, "bags": 0.62, "table": 0.50}
+SPRITE_LEN = {"truck": 640, "auto": 380, "car": 520, "bike": 340, "scooter": 300, "cycle": 340,
+              "cow": 430, "dustbin": 170, "bags": 280, "table": 380}
+REF_SCALE = 0.95                                 # a typical character's scale
 SPOTS = {"left": 270.0, "center": 540.0, "right": 810.0}      # where an object rests (x of its middle)
 OFFSCREEN = {"left": -480.0, "right": 1560.0}
 GREEN = (64, 150, 92)
@@ -88,38 +97,39 @@ def _truck(s, c, part="all"):
 
 
 def _auto(s, c, part="all"):
-    p = Pen(s, 380, 330)
+    p = Pen(s, 380, 400)
     glass = (170, 214, 238) if part == "all" else (205, 232, 246, 46)
     if part in ("all", "back"):                                                     # seats, behind the riders
         p.rrect(-146, -176, -34, -124, 10, (150, 110, 80))                          # rear bench
         p.rrect(30, -166, 112, -124, 10, (128, 90, 66))                             # driver seat
+        p.line([(96, -236), (126, -246)], INK, 9)                                   # steering handle
     if part == "back":
         return p, []
     p.rrect(-158, -128, 160, -62, 14, c)                                            # body
-    p.line([(-146, -276), (-146, -128)], INK, 10)                                   # rear pillar
-    p.line([(28, -276), (28, -128)], INK, 10)                                       # middle pillar
-    p.poly([(118, -276), (150, -128), (118, -128)], glass)                          # windscreen
-    p.line([(118, -276), (150, -128)], INK, 10)                                     # front pillar
-    p.rrect(-170, -304, 128, -274, 10, (36, 38, 46))                                # roof
-    p.poly([(120, -304), (178, -282), (120, -274)], (36, 38, 46))                   # roof peak over the windscreen
+    p.line([(-146, -354), (-146, -128)], INK, 10)                                   # rear pillar
+    p.line([(28, -354), (28, -128)], INK, 10)                                       # middle pillar
+    p.poly([(118, -354), (150, -128), (118, -128)], glass)                          # windscreen
+    p.line([(118, -354), (150, -128)], INK, 10)                                     # front pillar
+    p.rrect(-170, -384, 128, -352, 10, (36, 38, 46))                                # roof
+    p.poly([(120, -384), (178, -362), (120, -352)], (36, 38, 46))                   # roof peak over the windscreen
     p.poly([(126, -100), (176, -100), (188, -66), (122, -60)], shade(c, 0.85))      # front mudguard
     p.circle(174, -114, 11, (255, 232, 140), INK, 4)
     return p, [(-95, -36, 36), (136, -36, 36)]
 
 
 def _car(s, c, part="all"):
-    p = Pen(s, 520, 280)
+    p = Pen(s, 520, 290)
     glass = (170, 214, 238) if part == "all" else (205, 232, 246, 46)
-    rear = [(-98, -122), (-62, -198), (-6, -198), (-6, -122)]
-    front = [(14, -122), (14, -198), (90, -198), (130, -122)]
+    rear = [(-100, -122), (-64, -232), (-6, -232), (-6, -122)]
+    front = [(14, -122), (14, -232), (92, -232), (132, -122)]
     if part == "back":                                                              # the inside, behind the people
         for w in (rear, front):
             p.poly(w, (70, 82, 98), None)
-        p.rect(-40, -190, -22, -122, (52, 62, 76), None)                            # seat backs
-        p.rect(40, -190, 58, -122, (52, 62, 76), None)
+        p.rect(-40, -226, -22, -122, (52, 62, 76), None)                            # seat backs
+        p.rect(40, -226, 58, -122, (52, 62, 76), None)
         return p, []
-    p.rrect(-235, -118, 235, -44, 22, c)
-    p.poly([(-120, -116), (-72, -212), (102, -212), (152, -116)], shade(c, 1.1))     # cabin
+    p.rrect(-235, -118, 235, -24, 22, c)
+    p.poly([(-122, -116), (-74, -250), (104, -250), (154, -116)], shade(c, 1.1))     # cabin
     for w in (rear, front):
         p.poly(w, glass)
     p.rect(214, -102, 236, -78, (255, 232, 140), INK, 4)

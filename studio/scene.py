@@ -29,6 +29,7 @@ class SceneObj:
     def __init__(self, kind, color, scale, y, front, t_in, x):
         self.kind, self.color, self.scale, self.y, self.front, self.t_in = kind, color, scale, y, front, t_in
         self.t_out = None
+        self.no_fade = t_in < 0.35                      # created at the very start of a shot: it is just there
         self.x0 = x
         self.rest = x
         self.moves = []             # (t0, t1, x0, x1)
@@ -103,7 +104,7 @@ def compile_ride(plan, c, spec, t):
         if side in objects.OFFSCREEN:
             drive = compile_obj(plan, {"kind": kind, "enter": side, "at": spec.get("at") or "center"}, t, plan.warnings)
         else:
-            compile_obj(plan, {"kind": kind, "at": float(c.pos_at(t)[0])}, t, plan.warnings)
+            compile_obj(plan, {"kind": kind, "at": spec.get("at") or float(c.pos_at(t)[0])}, t, plan.warnings)
         instant = True
     seat = spec.get("seat", "driver")
     taken = {r["seat"] for o_ in plan.world_chars for r in o_.rides
@@ -111,6 +112,13 @@ def compile_ride(plan, c, spec, t):
     if seat in taken and seat != "back" and "back" in rides.RIDES[kind]:
         seat = "back"
     plan.objects[kind].front = True                           # a vehicle with riders is the star: in front of everybody
+    if plan.framing == "inside":                             # the shot is the cab: the driver sits in the middle of the frame
+        o_ = plan.objects[kind]
+        o_.x0 = o_.rest = 540.0 - rides.seat_for(kind, seat)["hip"][0] * o_.scale
+        o_.moves = []
+        o_.flips = [(o_.t_in, False)]
+    if instant:
+        plan.objects[kind].no_fade = True
     c.rides.append({"t0": t, "obj": kind, "seat": seat, "t_off": None, "land_x": None, "land_y": None,
                     "instant": instant})
     return drive if drive else (0.1 if instant else rides.RIDE_HOP + 0.1)
@@ -151,10 +159,8 @@ def compile_obj(plan, spec, t, warnings=None):
     if o is None:
         rest = spot if spot is not None else objects.SPOTS["center"]
         color = color_of(spec["color"]) if spec.get("color") else None
-        base = objects.OBJECTS[kind][2] if kind in objects.OBJECTS else 1.0
-        if kind in getattr(plan, "ridden", ()):
-            base = rides.RIDE_SCALE.get(kind, base)
-        o = SceneObj(kind, color, float(spec.get("scale", base)), float(spec.get("y", OBJ_Y.get(kind, 1680.0))),
+        base = (objects.REF_SCALE * plan.world / objects.PERSON_R[kind]) if kind in objects.PERSON_R else plan.world
+        o = SceneObj(kind, color, base * float(spec.get("scale", 1.0)), float(spec.get("y", OBJ_Y.get(kind, 1680.0))),
                      bool(spec.get("front")), t, rest)
         plan.objects[kind] = o
         side = spec.get("enter")
@@ -436,6 +442,26 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.fade_out = float(meta.get("fade_out", 0.0))
     plan.background = scene.get("background", {"type": "plain"})
 
+    # ---- one scale for the whole shot ----
+    # framing: "wide" = everybody small enough that the vehicles fit in the frame in proportion; "inside" = people big
+    # and the vehicle drawn huge around its driver; "medium" = people big (default when there is no vehicle).
+    kinds_ = set()
+    for raw_ in scene.get("timeline", []):
+        for key_ in ("obj", "ride"):
+            d_ = raw_.get(key_)
+            k_ = objects.resolve_kind(d_.get("kind", "")) if isinstance(d_, dict) else None
+            if k_ in objects.PERSON_R:
+                kinds_.add(k_)
+    framing = scene.get("framing") or meta.get("framing")
+    if framing not in ("wide", "medium", "inside"):
+        framing = "wide" if any(k_ in objects.VEHICLES for k_ in kinds_) else "medium"
+    world = 1.0
+    if framing == "wide" and kinds_:
+        widest = max(objects.SPRITE_LEN[k_] / objects.PERSON_R[k_] for k_ in kinds_) * objects.REF_SCALE
+        world = clamp(900.0 / widest, 0.22, 1.0)
+    plan.framing, plan.world = framing, world
+    plan.cut_in = bool(scene.get("cut_in"))
+
     # ---- characters ----
     cdefs = scene.get("characters", {})
     names = list(cdefs.keys())
@@ -451,6 +477,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         x = spec.get("x", slots.get(slot, 540))
         y = spec.get("y", GROUND_Y)
         chars[name] = Char(name, spec, float(x), float(y), i)
+        chars[name].scale *= world
     plan.chars = chars
 
     # ---- timeline ----
@@ -463,12 +490,6 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     for c_ in chars.values():
         c_.world = plan.objects
     plan.world_chars = list(chars.values())
-    plan.ridden = set()                                       # kinds somebody rides: drawn bigger, so the rider is not tiny
-    for raw_ in scene.get("timeline", []):
-        rd_ = raw_.get("ride")
-        k_ = objects.resolve_kind(rd_.get("kind", "")) if isinstance(rd_, dict) else None
-        if k_ and rides.rideable(k_):
-            plan.ridden.add(k_)
     cam_events = []
     shot_events = []        # camera moves from shot words on action lines (do not switch the auto camera off)
     shakes = []
@@ -595,7 +616,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.n_frames = int(round(plan.duration * plan.fps))
 
     # ---- camera segments ----
-    if meta.get("auto_camera", True) and not cam_events:
+    if meta.get("auto_camera", True) and not cam_events and plan.framing == "medium":     # wide / inside are composed shots
         auto_camera(plan, chars, cam_events, shakes)
     cam_events += shot_events
     segs = []

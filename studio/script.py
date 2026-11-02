@@ -26,6 +26,11 @@ Script format (one thing per line):
 - `SCENE: background | title` starts a new place (kitchen, room, street, school, market, office, bus_stop, night_road,
   plain), or your own picture: `SCENE: gali` uses assets/backgrounds/gali.png (.jpg/.webp), or a path `SCENE: assets/backgrounds/gali.jpg`.
 - `wait 1.5` (or `...`) pauses.
+- Shots: `CUT` starts a new shot in the same place (a hard cut) and shows only the characters who speak or act in it;
+  `CUT wide` = everybody small so a whole vehicle fits, `CUT inside` = the inside of a vehicle (the driver big, in
+  the middle), `CUT medium` (default) = people big. `SCENE: place | title | wide` sets the framing of a scene too.
+  A shot with a vehicle is "wide" by itself. One scale for the whole world: a vehicle is always in proportion to the
+  people next to it, a rider is as big as somebody standing.
 - Camera (optional, the camera already cuts in on every speaker by itself): `wide`, `medium`, `close`,
   `two_shot` in the brackets of a line, e.g. `A (shock, close): ...` or `A -> shock close`.
 - Vehicles: `A -> ride bike` (also truck, car, auto, scooter, cycle; `ride auto back` = the second seat) hops A on,
@@ -72,6 +77,7 @@ NARRATION_NAMES = ("narrator", "vo", "narration", "voiceover", "voice_over")   #
 NARRATOR_SPEC = {"hidden": True, "voice": {"name": "hi-IN-MadhurNeural", "pitch": "-12Hz", "rate": "-4%",
                                            "gemini": "Charon"}}
 GETOFF_WORDS = ("getoff", "utar", "dismount")
+FRAMINGS = ("wide", "medium", "inside")
 SHOTS = tuple(SHOT_ZOOM) + tuple(SHOT_ALIASES)       # camera: wide, medium, close, two_shot (+ spellings)
 DEPTH_WORDS = tuple(DEPTHS)                         # near / mid / far: step towards or away from the camera
 DIRECTIONS = ("left", "right", "up", "down", "up_left", "up_right")
@@ -104,6 +110,7 @@ def vocab():
         "objects": sorted(set(objects.OBJECTS) | set(objects.ALIASES)),
         "object_words": ["center", "enter", "exit", "front", "go", "left", "right", "to"],
         "rides": sorted(rides.RIDES), "ride_words": sorted(("ride", "back", "driver") + GETOFF_WORDS),
+        "framings": sorted(FRAMINGS),
     }
 
 
@@ -484,11 +491,17 @@ def parse_script(text):
                         n, w = part.split("=", 1)
                         add_cast(n.strip(), _words(w))
             elif key == "SCENE":
-                bg, _, title = val.partition("|")
+                bg, _, rest = val.partition("|")
+                title, _, frame = rest.partition("|")
                 bg, warn = resolve_background(bg.strip() or "room")
                 if warn:
                     warnings.append(warn)
+                frame = frame.strip().lower()
+                if frame and frame not in FRAMINGS:
+                    warnings.append("SCENE framing %r: wide / medium / inside" % frame)
+                    frame = ""
                 cur = new_scene(bg, title.strip() or None)
+                cur["framing"] = frame or None
             else:
                 meta[key] = val
             continue
@@ -502,6 +515,15 @@ def parse_script(text):
         if re.match(r"^(CHAT\b|[<>]\s*\S)", line, re.I):
             warnings.append("chat alag format hai, story script me nahi chalta (chat ke liye alag text likho: "
                             "'< samne wala' / '> aap'): %r" % line[:40])
+            continue
+        m = re.match(r"^(?:CUT|SHOT)\b\s*:?\s*(\w*)\s*$", line, re.I)
+        if m:                                       # a new shot in the same place: a hard cut, its own set of characters
+            frame = m.group(1).lower()
+            if frame and frame not in FRAMINGS:
+                warnings.append("CUT %r: framing wide / medium / inside likho" % frame)
+                frame = ""
+            cur = new_scene(dict(cur["background"]), None)
+            cur["cut_in"], cur["framing"] = True, frame or None
             continue
         m = re.match(r"^OBJ\s*:\s*(.*)$", line, re.I)
         if m:
@@ -623,6 +645,10 @@ def parse_script(text):
 
         if sc["title"]:
             item["title"] = sc["title"]
+        if sc.get("framing"):
+            item["framing"] = sc["framing"]
+        if sc.get("cut_in"):
+            item["cut_in"] = True
         out_scenes.append(item)
 
     hook = meta.get("HOOK") or ""
