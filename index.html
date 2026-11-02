@@ -325,11 +325,17 @@ function lintScript(text) {
       }
       continue;
     }
+    if (/^CHAT\b/i.test(line)) {          // phone-chat scene: CHAT: contact / CHAT left|right: message
+      const cm = line.match(/^CHAT\s*(left|right)?\s*:\s*(.*)$/i);
+      if (!cm) out.push(`"${short(line)}": CHAT left: ya CHAT right: likho`);
+      else if (cm[1] && !cm[2].trim()) out.push(`"${short(line)}": message khali hai`);
+      continue;
+    }
     if ((m = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/))) { declared = true; cast.add(m[1]); continue; }
     if (/^(wait\s*[\d.]+|\.\.\.+)$/i.test(line)) continue;
     if ((m = line.match(/^([A-Za-z_]\w*)\s*->\s*(.+)$/))) { used.push(m[1]); acting(m[2], line); continue; }
     if ((m = line.match(/^([A-Za-z_]\w*)\s*(?:\(([^)]*)\))?\s*:\s*(.+)$/))) {
-      used.push(m[1]);
+      if (!/^(narrator|vo|narration|voiceover|voice_over)$/i.test(m[1])) used.push(m[1]);   // a narrator needs no CAST entry
       const br = m[2] || "";
       if (/[?!]/.test(br) || words(br).length > 5) out.push(`"${short(line)}": brackets me dialogue hai; brackets me sirf acting words (shock, point…)`);
       else acting(br, line);

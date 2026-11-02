@@ -18,7 +18,7 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5
 - Roles: mummy, papa, dadi, dada, nani, nana, chacha, chachi, dost, bhai, behen, beta, beti, didi, teacher, boss, bachcha, padosi, padosan.
   Looks: boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, kid, kid_girl, office_guy, office_girl.
 - Extras after the role/look (optional, plain words, no brackets): glasses, sunglasses, cap, turban, moustache, beard, bindi, tilak, earrings, chubby, slim, kurta, saree, salwar, shirt, tshirt, uniform, blazer, vest, and colors (red, blue, green, pink, maroon, navy, mustard, saffron, yellow, purple, white, black, grey).
-- Places: kitchen, room, street, school, night_road, plain.
+- Places: kitchen, room, street, school, market, office, bus_stop, night_road, plain. (street and bus_stop have drifting clouds, birds and small passing vehicles by themselves.)
 - Acting words, inside ( ) on a spoken line or after -> on an action line:
   - ONE action: talk, point (or "point left" / "point right" / "point up"), laugh, shock, jump, wave, salute, clap, cry, fall, facepalm, shrug, sway, dance, sleep
     desi dance pack: naagin (shaadi naagin dance), bhangra, aeroplane (uncle's arms-out dance), thumka, dance_walk (dancing while walking, e.g. on the street), kamar_dard (dances like a hero, then the back gives way: a fail), sing (mic singer: a mic appears in the hand and the mouth sings)
@@ -28,6 +28,8 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5
   - optional: shake (camera shake for a comedy hit)
   - optional camera: wide, medium, close, two_shot (the camera already cuts in on every speaker by itself, so use this only for a special moment, e.g. `A (shock, close): ...` on the punch line or `ALL -> wide` for the reaction)
   - optional depth: near (the character steps towards the camera and gets bigger), far (steps back, smaller), mid (back to normal), e.g. `B -> near smug`. Use `near`/`far` for a boss or a big entrance; do not combine `near` with `close` on the same line.
+- Voice-over: `NARRATOR: <Hinglish> | <Devanagari>` is a voice with no body (nobody is drawn; the words show as a subtitle). Use it for a story told over the action; do not list it in CAST. It does not count as a character.
+- Chat scene (a phone chat, no characters, good for texting jokes): `SCENE: plain | Message 📱`, then `CHAT: <contact name>` and lines `CHAT left: <message>` / `CHAT right: <message>` (left = the other person, right = the one holding the phone). 3-7 short messages; the chat plays by itself (about 1.5 s per message), so put the CTA after it and put any reaction in a following scene.
 - Set objects (a line of their own, optional, only when the story needs the object): `OBJ: <object> [enter left|right] [exit left|right] [go left|center|right] [left|center|right] [to left|center|right] [front] [big|small] [color]`
   Objects: truck (garbage truck, also kachra_gaadi), auto, car, scooter, cow, dustbin, bags, table. Examples: `OBJ: truck enter left to right` (drives in and parks at the right), `OBJ: dustbin left`, `OBJ: truck exit right`. The story waits while a vehicle drives. Park it where nobody stands, or add `front`, otherwise the characters hide it.
 - Moves: `NAME -> enter left`, `NAME -> exit right`, `NAME -> walk center`, `ALL -> dance laugh`. `wait 1` pauses.

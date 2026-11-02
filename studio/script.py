@@ -46,12 +46,15 @@ import re
 
 from . import actions, audio, objects
 from .characters import ACCESSORIES, EXPRESSIONS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE, SKIN_TONES
-from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS
+from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS, chat_length
 
 HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION")
 BACKGROUNDS = ("kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road", "plain")
 PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick", "bag")
 SFX = ("pop", "boing", "whoosh", "ding", "thud", "clap", "beep", "laugh_track")
+NARRATION_NAMES = ("narrator", "vo", "narration", "voiceover", "voice_over")   # a voice with no body
+NARRATOR_SPEC = {"hidden": True, "voice": {"name": "hi-IN-MadhurNeural", "pitch": "-12Hz", "rate": "-4%",
+                                           "gemini": "Charon"}}
 SHOTS = tuple(SHOT_ZOOM) + tuple(SHOT_ALIASES)       # camera: wide, medium, close, two_shot (+ spellings)
 DEPTH_WORDS = tuple(DEPTHS)                         # near / mid / far: step towards or away from the camera
 DIRECTIONS = ("left", "right", "up", "down", "up_left", "up_right")
@@ -323,7 +326,7 @@ def parse_script(text):
     cur = None
 
     def new_scene(bg="room", title=None):
-        sc = {"background": {"type": bg}, "lines": [], "title": title}
+        sc = {"background": {"type": bg}, "lines": [], "title": title, "chat": [], "chat_title": ""}
         scenes.append(sc)
         return sc
 
@@ -367,6 +370,16 @@ def parse_script(text):
             continue
         if cur is None:
             cur = new_scene()
+        m = re.match(r"^CHAT\s*(left|right)?\s*:\s*(.*)$", line, re.I)
+        if m:
+            side, text = (m.group(1) or "").lower(), m.group(2).partition("|")[0].strip()
+            if not side:
+                cur["chat_title"] = text
+            elif text:
+                cur["chat"].append({"side": side, "text": text})
+            else:
+                warnings.append("CHAT %s: message khali hai" % side)
+            continue
         m = re.match(r"^OBJ\s*:\s*(.*)$", line, re.I)
         if m:
             spec, probs = parse_obj(m.group(1))
@@ -390,7 +403,8 @@ def parse_script(text):
                 warnings.append("line %r: brackets me dialogue likha hai. Brackets me sirf acting words aate hain, "
                                 "jaise (shock, point); dialogue ':' ke baad likho" % line[:50])
                 bracket = ""
-            cur["lines"].append(("say", m.group(1), _words(bracket), say.strip(), speak.strip(), line))
+            who_ = "NARRATOR" if m.group(1).lower() in NARRATION_NAMES else m.group(1)
+            cur["lines"].append(("say", who_, _words(bracket), say.strip(), speak.strip(), line))
             continue
         warnings.append("line not understood: %r" % line[:60])
 
@@ -402,8 +416,9 @@ def parse_script(text):
     for si, sc in enumerate(scenes):
         order = []
         for ln in sc["lines"]:
-            if ln[0] in ("do", "say") and ln[1].upper() != "ALL" and ln[1] not in order:
+            if ln[0] in ("do", "say") and ln[1].upper() not in ("ALL", "NARRATOR") and ln[1] not in order:
                 order.append(ln[1])
+        narrated = any(ln[0] == "say" and ln[1] == "NARRATOR" for ln in sc["lines"])
         for name in order:
             if declared and name not in cast:
                 warnings.append("%s CAST me nahi hai: CAST line me '%s = <role/look>' jodo" % (name, name))
@@ -459,7 +474,11 @@ def parse_script(text):
                 if not ln[4] and not re.search(r"[ऀ-ॿ]", ln[3]):
                     warnings.append("no Devanagari for %r: the voice will read Roman letters" % ln[3][:30])
                 others = [o for o in order if o != who]
-                if len(order) == 2 and others:
+                if who == "NARRATOR":
+                    ev["bubble"], ev["subtitle"] = False, True
+                    for key in ("action", "expression", "prop", "move", "camera", "sfx", "volume", "facing", "look"):
+                        ev.pop(key, None)                       # a voice has no body to act with
+                elif len(order) == 2 and others:
                     ev.setdefault("look", others[0])
             elif ev.get("action") in actions.DANCES:
                 ev.setdefault("hold", 2.0 if ev["action"] in ("kamar_dard", "fail") else 1.6)
@@ -467,12 +486,21 @@ def parse_script(text):
                 ev.setdefault("hold", 0.6)
             tl.append(ev)
             first = False
+        if sc["chat"]:                              # the chat plays by itself: the CTA waits for its end
+            tl.append({"wait": round(chat_length(len(sc["chat"])), 2)})
         last = {"hold": 1.0}
         if si == len(scenes) - 1 and meta.get("CTA"):
             last = {"hold": 2.0, "sfx": "pop", "volume": 0.5,
-                    "overlay": {"text": meta["CTA"], "style": "card", "pos": [540, 640], "color": [236, 90, 70]}}
+                    "overlay": {"text": meta["CTA"], "style": "card",
+                                "pos": [540, 1250 if sc["chat"] else 640], "color": [236, 90, 70]}}
         tl.append(last)
-        item = {"background": sc["background"], "cast": order, "characters": chars, "timeline": tl}
+        item = {"background": sc["background"], "cast": order + (["NARRATOR"] if narrated else []),
+                "characters": chars, "timeline": tl}
+        if narrated:
+            item["characters"]["NARRATOR"] = {}
+            cast.setdefault("NARRATOR", dict(NARRATOR_SPEC))
+        if sc["chat"]:
+            item["chat"] = {"title": sc["chat_title"], "messages": [dict(m_) for m_ in sc["chat"]]}
         if sc["title"]:
             item["title"] = sc["title"]
         out_scenes.append(item)

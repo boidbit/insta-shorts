@@ -21,7 +21,7 @@ from . import actions, audio, objects
 from .backgrounds import Background
 from .characters import build_character, render_ops
 from .scene import camera_at, compile_music, compile_scene, prepare_voice, split_scenes, static_overlays
-from .text import bubble_image, styled_box
+from .text import bubble_image, chat_image, styled_box
 from .util import LH, LW, clamp, ease_in_out, ease_out, ease_out_back, load_scene
 
 POS = {"top": (540, 330), "center": (540, 960), "lower": (540, 1450), "bottom": (540, 1560),
@@ -49,6 +49,12 @@ class OverlayLayer:
                                           o.get("color"), o.get("size"), o.get("max_w"))
         return self._cache[key]
 
+    def _chat(self, o, shown):
+        key = (id(o), shown)
+        if key not in self._cache:
+            self._cache[key] = chat_image(o["chat"], shown, self.s)
+        return self._cache[key]
+
     def draw(self, img, overlays, t):
         for o in overlays:
             t0 = float(o.get("from", 0.0))
@@ -56,7 +62,13 @@ class OverlayLayer:
             t1 = float(t1) if t1 is not None else (t0 + float(o["dur"]) if "dur" in o else 1e9)
             if not (t0 <= t < t1):
                 continue
-            im = self._image(o)
+            if o.get("chat"):                       # phone chat: shows the messages whose time has come
+                shown = sum(1 for m in o["chat"].get("messages", []) if float(m.get("t", 0.0)) <= t)
+                if not shown:
+                    continue
+                im = self._chat(o, shown)
+            else:
+                im = self._image(o)
             pos = o.get("pos", "top")
             px, py = POS[pos] if isinstance(pos, str) else pos
             default_anim = {"lyric": "fade", "subtitle": "fade", "hook": "punch"}.get(o.get("style"), "pop")
@@ -76,7 +88,10 @@ class OverlayLayer:
                 al = clamp(lt / 0.2)
             if t1 < 1e8:
                 al *= clamp((t1 - t) / 0.2)
-            paste_rgba(img, im, px * self.s, py * self.s, sc, al)
+            if o.get("chat"):                       # anchored at the top, so the panel only grows downwards
+                paste_rgba(img, im, px * self.s, py * self.s, sc, al, anchor=(im.width / 2.0, 0.0))
+            else:
+                paste_rgba(img, im, px * self.s, py * self.s, sc, al)
 
 
 def paste_rgba(img, rgba, cx, cy, scale=1.0, alpha=1.0, anchor=None):
@@ -246,7 +261,8 @@ class Renderer(Output):
         plan, s = self.plan, self.s
         img = self.bg.frame(t).convert("RGB")
         self._draw_objects(img, t, False)
-        order = sorted(plan.chars.values(), key=lambda c: (c.draw_pos(t)[1], c.draw_pos(t)[0]))
+        order = sorted((c for c in plan.chars.values() if not c.spec.get("hidden")),
+                       key=lambda c: (c.draw_pos(t)[1], c.draw_pos(t)[0]))
         anchors = {}
         states = {}
         for c in order:

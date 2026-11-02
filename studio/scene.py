@@ -56,6 +56,29 @@ class SceneObj:
         return t >= self.t_in and (self.t_out is None or t < self.t_out)
 
 
+CHAT_START, CHAT_GAP, CHAT_HOLD = 0.6, 1.5, 1.4
+
+
+def chat_length(n_messages, chat=None):
+    """Seconds a chat scene with n messages lasts (so a CTA can wait for the end)."""
+    chat = chat or {}
+    return (float(chat.get("start", CHAT_START)) + n_messages * float(chat.get("gap", CHAT_GAP))
+            + float(chat.get("hold", CHAT_HOLD)))
+
+
+def compile_chat(plan, chat):
+    """A phone-chat scene: messages appear one by one (with a pop sound). Returns the time it is all over."""
+    msgs = chat.get("messages", [])
+    gap = float(chat.get("gap", CHAT_GAP))
+    t = float(chat.get("start", CHAT_START))
+    for m in msgs:
+        m.setdefault("t", round(t, 2))
+        plan.sfx.append(dict(t=float(m["t"]), path=audio.sfx_path("pop"), volume=0.6))
+        t = float(m["t"]) + gap
+    plan.overlays.insert(0, {"chat": chat, "from": 0.0, "pos": [540, 330], "anim": "none"})   # behind hook / CTA
+    return t + float(chat.get("hold", CHAT_HOLD))
+
+
 def compile_obj(plan, spec, t, warnings=None):
     """Apply one `obj` timeline event: {"kind", "at", "enter", "exit", "go", "color", "scale", "front", "dur"}."""
     kind = objects.resolve_kind(spec.get("kind", ""))
@@ -272,7 +295,8 @@ def auto_camera(plan, chars, cam_events, shakes):
     after it the camera pulls back to a wide shot for the reaction. A shot word on the line (close, wide, ...)
     replaces the automatic size of that line.
     """
-    speech = sorted((sp for sp in plan.speech if sp.get("who")), key=lambda sp: sp["start"])
+    speech = sorted((sp for sp in plan.speech if sp.get("who") and not chars[sp["who"]].spec.get("hidden")),
+                    key=lambda sp: sp["start"])
     n = len(speech)
     for i, sp in enumerate(speech):
         t0 = sp["start"]
@@ -313,13 +337,15 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     # ---- characters ----
     cdefs = scene.get("characters", {})
     names = list(cdefs.keys())
-    n = len(names)
+    visible = [nm for nm in names if not cdefs[nm].get("hidden")]       # a hidden one is only a voice (narrator)
+    n = len(visible)
     slots = SLOTS.get(n, SLOTS[3])
     auto = ["left", "center", "right"] if n == 3 else (["left", "right"] if n == 2 else ["center"])
     chars = {}
     for i, name in enumerate(names):
         spec = dict(cdefs[name])
-        slot = spec.get("slot") or (auto[i] if i < len(auto) else "center")
+        vi = visible.index(name) if name in visible else 0
+        slot = spec.get("slot") or (auto[vi] if vi < len(auto) else "center")
         x = spec.get("x", slots.get(slot, 540))
         y = spec.get("y", GROUND_Y)
         chars[name] = Char(name, spec, float(x), float(y), i)
@@ -398,6 +424,9 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                       shot=ev.get("shot"))
             c.speech.append(sp)
             plan.speech.append(sp)
+            if ev.get("subtitle"):                  # voice-over: the words are shown at the bottom while spoken
+                plan.overlays.append({"text": text, "style": "subtitle", "pos": "bottom", "from": t,
+                                      "to": t + dur + 0.12})
             cursor = max(cursor, t + dur + gap)
             plan_end = max(plan_end, t + dur + 0.12)
         if "hold" in ev:
@@ -427,6 +456,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 cam_events.append(cam)
 
     plan.overlays += static_overlays(scene)
+    if scene.get("chat"):
+        plan_end = max(plan_end, compile_chat(plan, scene["chat"]))
 
     for c in chars.values():
         c.events.sort(key=lambda e: e["t"])
@@ -523,7 +554,7 @@ def split_scenes(scene):
     for sc in scene["scenes"]:
         sub = deep_merge(base, {k: v for k, v in sc.items() if k not in ("cast", "characters", "meta", "title")})
         sub["meta"] = dict(base_meta, **sc.get("meta", {}))
-        cast = sc.get("cast") or list(cast_all.keys())
+        cast = sc.get("cast", []) if sc.get("chat") else (sc.get("cast") or list(cast_all.keys()))
         chars = {n: dict(cast_all.get(n, {})) for n in cast}
         for n, spec in sc.get("characters", {}).items():
             chars[n] = dict(chars.get(n, {}), **spec)
