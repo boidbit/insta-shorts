@@ -136,10 +136,16 @@ def request_audio(payload, model=DEFAULT_MODEL, key=None, attempts=3, timeout=24
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", "replace")
             if e.code == 429:
-                if re.search(r"PerDay|per day|daily", body, re.I):
-                    raise QuotaExceeded("Gemini free-tier DAILY quota is used up; try again tomorrow "
-                                        "or use another key") from None
-                wait = min(65.0, (_retry_delay(body) or 20.0) + 1.0)
+                delay = _retry_delay(body)
+                if delay is not None and delay <= 120:
+                    # a short wait = a per-minute limit. (The body of such an error often names the daily metric
+                    # too, so the word "PerDay" alone does not mean the day's quota is gone.)
+                    wait = min(65.0, delay + 1.0)
+                elif re.search(r"PerDay|per day|daily", body, re.I):
+                    raise QuotaExceeded("Gemini free quota looks used up for today (no short retry time given); "
+                                        "try again later or use another key") from None
+                else:
+                    wait = 20.0
             elif e.code in (500, 502, 503, 504):
                 wait = 4.0 * (attempt + 1)
             else:
