@@ -82,6 +82,15 @@ class Hindi(unittest.TestCase):
         self.assertEqual(hindi.fill_hindi(scene, llm, log=lambda m: None), 0)
         self.assertEqual(llm.calls, [])
 
+    def test_quick_tries_the_light_model_first_once(self):
+        from studio.director import GeminiLLM, GEMINI_MODELS
+        llm = hindi.quick(GeminiLLM(key="x"))
+        self.assertEqual(llm.TRIES, 1)
+        self.assertLessEqual(llm.timeout, 40)
+        self.assertIn("lite", llm.models[0])
+        self.assertEqual(sorted(llm.models), sorted(GEMINI_MODELS))       # every model still gets one chance
+        self.assertEqual(GeminiLLM(key="x").TRIES, 3)                       # the script writer keeps its retries
+
     def test_parser_says_it_will_be_made(self):
         self.assertTrue(any("Devanagari" in w and "GEMINI" in w for w in self.warn))
 
