@@ -142,6 +142,7 @@ Ready looks: `boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, ki
 
 - `skin`: fair, wheatish, brown, dark · `hair`: short, side_part, spiky, curly, balding, bald, long, braid, bun, ponytail · `hair_color`: black, brown, grey, white, henna
 - `outfit`: tshirt, shirt, kurta, salwar (dupatta ke saath), saree, uniform, blazer, vest · `color` / `accent` (dupatta, blouse, tie) / `pants` / `shoes` (black, white, chappal)
+- **Chehra** (face): `face` oval, round, long, square · `eyes` dot, big, small · `nose` hook, button, long, big · `brows` normal, thick, thin. Script me CAST words: `round_face big_eyes button_nose thick_brows`. Na likho to studio har character ko apna alag chehra deta hai (pehla character classic chehra), aur ek jaise do characters (do `college_boy`) ko alag baal, rang (skin) aur shirt ka colour.
 - `build`: slim, normal, chubby · `scale` (bachche ~0.72) · `accessories`: glasses, cap, turban, moustache, beard, bindi, tilak, earrings
 - 17 expressions, 17 actions (walk, talk, dance, point, laugh, shock, jump, wave, clap, cry, fall, facepalm, shrug, sway, sleep...)
 - **Desi dance pack** (music ki beat pe chalta hai, `MUSIC: beat 110`): `naagin` (haath maathe pe phan), `bhangra`, `aeroplane` (uncle special), `thumka`, `dance_walk` (chalte-chalte dance, `night_road` pe best), `kamar_dard` (hero dance… phir kamar jawab de deti hai), `sing` (mic apne aap haath me, mooh gaata hai). Example: `scripts/shaadi_dance.txt`.

@@ -65,7 +65,8 @@ import os
 import re
 
 from . import actions, audio, objects, rides
-from .characters import ACCESSORIES, EXPRESSIONS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE, SKIN_TONES
+from .characters import (ACCESSORIES, EXPRESSIONS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE,
+                         SKIN_TONES)
 from .util import asset_path
 from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS, chat_length
 
@@ -103,7 +104,7 @@ def vocab():
         "places": sorted(BACKGROUNDS),
         "looks": sorted(LOOKS), "roles": sorted(ROLE_LOOKS),
         "extras": sorted(set(ACCESSORIES) | set(HAIR_STYLES) | set(OUTFITS) | set(SKIN_TONES) | set(BUILDS)
-                         | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS)),
+                         | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS) | set(FACE_WORDS)),
         "expressions": sorted(EXPRESSIONS), "actions": sorted(actions.ACTIONS),
         "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS),
         "shots": sorted(SHOTS), "depth": sorted(DEPTH_WORDS),
@@ -140,6 +141,8 @@ def cast_spec(words, index, unknown=None):
             spec["skin"] = w
         elif w in ("slim", "normal", "chubby"):
             spec["build"] = w
+        elif w in FACE_WORDS:                          # round_face, big_eyes, button_nose, thick_brows...
+            spec[FACE_WORDS[w][0]] = FACE_WORDS[w][1]
         elif w in ("female", "woman", "ladki", "aurat"):
             female = True
         elif w in ("male", "man", "ladka", "aadmi"):
@@ -168,12 +171,14 @@ def cast_spec(words, index, unknown=None):
 MALE_HAIR = ("short", "side_part", "curly", "spiky", "balding")
 FEMALE_HAIR = ("ponytail", "bun", "long", "braid")
 SKIN_ORDER = ("wheatish", "brown", "fair", "dark")
+SHIRT_ORDER = ("blue", "mustard", "red", "teal", "purple", "orange", "green", "maroon")
 
 
 def vary_cast(cast):
     """Characters that share a look (two college_boys...) would be twins. Give each a different hair style and
     skin tone, unless the script chose them. Only what the script left open is changed."""
     seen = {}                                   # look -> [(hair, skin), ...] already on screen
+    colors = []                                 # shirt colours already on screen
     for name, spec in cast.items():
         if spec.get("hidden"):
             continue
@@ -192,6 +197,12 @@ def vary_cast(cast):
                 if "skin" not in spec and options:
                     skin = spec["skin"] = options[(len(taken) - 1) % len(options)]
         taken.append((hair, skin))
+        color = spec.get("color", base.get("color", "blue"))
+        if color in colors and "color" not in spec:          # same shirt as somebody else: pick a free colour
+            free = [c for c in SHIRT_ORDER if c not in colors]
+            if free:
+                color = spec["color"] = free[0]
+        colors.append(color)
     return cast
 
 

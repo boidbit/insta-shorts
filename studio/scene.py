@@ -3,7 +3,7 @@ import math
 import sys
 
 from . import audio, gemini_tts, objects, rides
-from .characters import color_of, resolve_spec
+from .characters import assign_faces, color_of, resolve_spec
 from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, lerp
 
 SLOTS = {
@@ -463,7 +463,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.cut_in = bool(scene.get("cut_in"))
 
     # ---- characters ----
-    cdefs = scene.get("characters", {})
+    cdefs = assign_faces(scene.get("characters", {}))
     names = list(cdefs.keys())
     visible = [nm for nm in names if not cdefs[nm].get("hidden")]       # a hidden one is only a voice (narrator)
     n = len(visible)
@@ -685,6 +685,7 @@ def split_scenes(scene):
     background / timeline / overlays / caption. A scene `title` shows as a card for
     its first 1.4 seconds ("Agle din...").
     """
+    scene = dict(scene, characters=assign_faces(scene.get("characters", {})))   # one face per character, all video
     if not scene.get("scenes"):
         return [scene]
     base = {k: v for k, v in scene.items() if k not in VIDEO_KEYS}

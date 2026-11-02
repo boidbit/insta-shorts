@@ -37,6 +37,8 @@ Single-scene videos put `"background"` and `"timeline"` at the top level instead
   "skin": "fair|wheatish|brown|dark",
   "hair": "short|side_part|spiky|curly|balding|bald|long|braid|bun|ponytail",
   "hair_color": "black|brown|grey|white|henna",
+  "face": "oval|round|long|square", "eyes": "dot|big|small", "nose": "hook|button|long|big",
+  "brows": "normal|thick|thin",   // optional: every character already gets a different face by position
   "outfit": "tshirt|shirt|kurta|salwar|saree|uniform|blazer|vest",
   "color": "<main clothes color>", "accent": "<dupatta / blouse / tie color>", "pants": "<color>",
   "shoes": "black|white|chappal|<color>", "build": "slim|normal|chubby", "scale": 1.0,
