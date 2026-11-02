@@ -19,6 +19,23 @@ Page pe 3 tareeke hain:
 
 "Banao" dabao → progress bar → video, download button, caption copy button.
 
+### 🎭 Builder: jagah aur characters chuno, dialogue saade text me
+
+"Idea do" tab me upar **"Jagah aur characters khud chuno"** kholo:
+
+- **Jagah** (kamra, rasoi, bazaar, office…) aur max 3 **characters**: naam, kaun (papa, mummy, dost… har ek ki chhoti photo), baal, rang, kapde, colour, body, extra (chashma, mooch, topi…). Na chuno to "auto". Ye choice browser me yaad rehti hai.
+- Neeche box me **idea** likho → AI inhi characters aur jagah ke saath script likhta hai.
+- Ya seedha **dialogue** likho, har line `Naam: baat`:
+  ```
+  Papa: Sarkari gaadi se aana!
+  Beta: Ji papa ji!
+  Papa (gussa): Aur time pe aana.
+  ```
+  Button "📝 Script banao (bina AI)" ban jata hai: page khud poori script banata hai (HOOK, CAST, SCENE, shots, CTA, caption) aur "Apni script" tab me dikhata hai → padho → Approve.
+- Emotion: box ke neeche chips (😠 gussa, 😲 hairan, 😏 akad, 😂 hasi…) jis line pe cursor hai usme jud jaate hain. Na do to `?!` = hairan, 😂 = hasi apne aap.
+- Shots: khali line = naya shot. Na do to har baar bolne wala badalne pe CUT, aur do logon ki baat me zyada tar `CUT ots` (face-off).
+- **Devanagari likhne ki zarurat nahi:** video banate waqt workflow saari Roman lines ek hi AI request me Devanagari me badal deta hai (`GEMINI_API_KEY`), taaki Hindi awaaz sahi padhe. Bubble me aapka Roman text hi dikhta hai. Key na ho to awaaz Roman padhegi.
+
 AI key ke saath chalana: `GEMINI_API_KEY=xxxx python -m studio.web` (key: aistudio.google.com → Get API key). Model badalna ho to `GEMINI_MODEL` / `DIRECTOR_MODEL`.
 
 ## Script format (bina AI)

@@ -114,6 +114,10 @@ def vocab():
         "object_words": ["center", "enter", "exit", "front", "go", "left", "right", "to"],
         "rides": sorted(rides.RIDES), "ride_words": sorted(("ride", "back", "driver") + GETOFF_WORDS),
         "framings": sorted(FRAMINGS), "angle_words": sorted(ANGLE_WORDS + OTS_WORDS),
+        # the page's Builder pickers
+        "role_looks": sorted([r, l] for r, l in ROLE_LOOKS.items()), "hair": list(HAIR_STYLES),
+        "skin": list(SKIN_TONES), "outfits": list(OUTFITS), "colors": sorted(PALETTE), "accessories": list(ACCESSORIES),
+        "builds": list(BUILDS),
     }
 
 
