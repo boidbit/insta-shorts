@@ -134,6 +134,36 @@ def prepare_voice(scenes, use_tts=True, tts_provider=None):
     return out
 
 
+SHOT_SIZES = (1.25, 1.5, 1.3, 1.6)       # zoom per spoken line, cycled, so neighbouring lines are different shots
+
+
+def auto_camera(plan, cam_events, shakes):
+    """Rule-based direction for scenes that have no camera moves of their own.
+
+    Every spoken line gets a quick cut-in on its speaker (size cycles through SHOT_SIZES) followed by a slow
+    push-in while the line is spoken; the last line (the punch line) is the tightest shot and ends with a shake;
+    after it the camera pulls back to a wide shot for the reaction.
+    """
+    speech = sorted((sp for sp in plan.speech if sp.get("who")), key=lambda sp: sp["start"])
+    n = len(speech)
+    for i, sp in enumerate(speech):
+        t0 = sp["start"]
+        d = max(0.6, sp["end"] - t0)
+        if i == 0:                                  # first line: ease in from the wide establishing shot
+            cam_events.append(dict(t=t0, zoom=1.2, focus=sp["who"], dur=min(0.6, d)))
+            size = 1.2
+        else:
+            size = 1.7 if (i == n - 1 and n > 2) else SHOT_SIZES[i % len(SHOT_SIZES)]
+            cam_events.append(dict(t=max(0.0, t0 - 0.05), zoom=size, focus=sp["who"], dur=0.16))
+        if d > 1.0:                                 # slow push-in while the line is spoken
+            cam_events.append(dict(t=t0 + 0.65 if i == 0 else t0 + 0.2, zoom=round(size + 0.12, 2),
+                                   focus=sp["who"], dur=max(0.4, d - (0.65 if i == 0 else 0.2))))
+        if i == n - 1 and n > 1:
+            shakes.append((max(0.0, sp["end"] - 0.15), 0.5, 0.45))
+    if speech and plan.duration - speech[-1]["end"] > 0.7:
+        cam_events.append(dict(t=speech[-1]["end"] + 0.2, zoom=1.0, dur=0.5))
+
+
 def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan = Plan()
     meta = scene.get("meta", {})
@@ -259,6 +289,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.n_frames = int(round(plan.duration * plan.fps))
 
     # ---- camera segments ----
+    if meta.get("auto_camera", True) and not cam_events:
+        auto_camera(plan, cam_events, shakes)
     segs = []
     z, cx, cy = 1.0, LW / 2.0, LH / 2.0
     for cam in sorted(cam_events, key=lambda c_: c_["t"]):

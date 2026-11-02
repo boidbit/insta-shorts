@@ -265,6 +265,17 @@ class Renderer(Output):
                 img.paste(layer, (ox, oy), layer)
             anchors[c.name] = an
 
+        # camera first, so the speech bubbles can be kept inside the visible part of the frame
+        z, cx, cy, dx, dy = camera_at(plan, t)
+        if dx or dy:
+            z = max(z, 1.05)
+        vw, vh = self.W / max(z, 1.0), self.H / max(z, 1.0)
+        vl = clamp((cx + dx) * s - vw / 2, 0, self.W - vw)
+        vt = clamp((cy + dy) * s - vh / 2, 0, self.H - vh)
+        zb = max(1.0, z * 0.8)          # a bubble never grows more than ~1.25x on screen when the camera zooms
+        sb = s / zb
+        mar = 22 * s / max(z, 1.0)      # margin to the edge of the visible part (pre-zoom pixels)
+
         # labels + bubbles
         for c in order:
             st, an = states[c.name], anchors[c.name]
@@ -280,23 +291,19 @@ class Renderer(Output):
             sp = st["talking"]
             if sp and sp.get("bubble", True):
                 lt = t - sp["start"]
-                im0, _ = bubble_image(sp["text"], s, 0)
-                left = clamp(hx * s - im0.width * 0.35, 24 * s, self.W - im0.width - 24 * s)
-                im, (tipx, tipy) = bubble_image(sp["text"], s, int(hx * s - left))
+                im0, _ = bubble_image(sp["text"], sb, 0)
+                left = clamp(hx * s - im0.width * 0.35, max(24 * s, vl + mar), min(self.W - im0.width - 24 * s,
+                                                                                     vl + vw - im0.width - mar))
+                im, (tipx, tipy) = bubble_image(sp["text"], sb, int(hx * s - left))
                 tx, ty = left + tipx, top * s - 12 * s
                 sc = 0.55 + 0.45 * ease_out_back(lt / 0.22)
                 paste_rgba(img, im, tx, ty, sc, 1.0, anchor=(tipx, tipy))
+                if z > 1.001 and ty - tipy < vt + mar:          # bubble would be cut off at the top: tilt the camera up
+                    vt = clamp(ty - tipy - mar, 0, self.H - vh)
 
-        # camera
-        z, cx, cy, dx, dy = camera_at(plan, t)
-        if dx or dy:
-            z = max(z, 1.05)
+        # camera crop
         if z > 1.001:
-            vw, vh = self.W / z, self.H / z
-            ccx, ccy = (cx + dx) * s, (cy + dy) * s
-            l = clamp(ccx - vw / 2, 0, self.W - vw)
-            tp = clamp(ccy - vh / 2, 0, self.H - vh)
-            img = img.resize((self.W, self.H), Image.BILINEAR, box=(l, tp, l + vw, tp + vh))
+            img = img.resize((self.W, self.H), Image.BILINEAR, box=(vl, vt, vl + vw, vt + vh))
 
         self.overlay_layer.draw(img, plan.overlays, t)    # captions stay screen-fixed (not zoomed)
 
