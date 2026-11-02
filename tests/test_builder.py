@@ -128,5 +128,42 @@ class Builder(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(ROOT, "assets", "looks", look + ".png")), look)
 
 
+    def test_page_puts_lost_line_breaks_back_like_the_parser(self):
+        from studio.script import unflatten
+        for flat in (FLAT, FLAT.replace("CUT A (smug)", "CUT ots B A (smug)"), FLAT.replace("CUT B", "CUT wide B")):
+            self.assertEqual(run("unflatten(%s)" % json.dumps(flat)), unflatten(flat)[0])
+        self.assertEqual(run('unflatten("A: hi\\nB: ho\\nC: x\\nD: y")'), "A: hi\nB: ho\nC: x\nD: y")
+
+
+FLAT = ("HOOK: Chachi boss ban gayi 😂 CAST: A = chachi, B = office_guy SCENE: office A (angry): Tu late aaya! | "
+        "तू लेट आया! B (shock): Sorry madam! | सॉरी मैडम! CUT A (smug): Accha, apna resign bhej! | अच्छा, अपना रिज़ाइन "
+        "भेज! CUT B (shock): Kyun? Maine kya kiya? | क्यों? मैंने क्या किया? CUT A (laugh): Ab tu mera boss banega! | "
+        "अब तू मेरा बॉस बनेगा! B -> shock boing CTA: Tag karo 😂 CAPTION: Chachi ne system badal diya HASHTAGS: #Desi")
+
+
+class Flattened(unittest.TestCase):
+    """A script pasted into a one-line box (GitHub's "Run workflow" form) loses its line breaks."""
+
+    def test_parser_splits_it_back(self):
+        scene, warns = parse_script(FLAT)
+        self.assertIn("ek hi line", warns[0])
+        self.assertEqual(warns[1:], [w for w in warns[1:] if w.startswith("no Devanagari")])
+        self.assertEqual(len(scene["scenes"]), 4)
+        says = [ev["say"] for sc in scene["scenes"] for ev in sc["timeline"] if "say" in ev]
+        self.assertEqual(says[0], "Tu late aaya!")
+        self.assertEqual(says[-1], "Ab tu mera boss banega!")
+
+    def test_framing_and_ots_words_stay_on_the_cut(self):
+        from studio.script import unflatten
+        t, _ = unflatten(FLAT.replace("CUT A (smug)", "CUT ots B A (smug)").replace("CUT B (shock)", "CUT wide B (shock)"))
+        self.assertIn("\nCUT ots B\nA (smug)", t)
+        self.assertIn("\nCUT wide\nB (shock)", t)
+
+    def test_normal_scripts_untouched(self):
+        from studio.script import unflatten
+        text = "HOOK: h\nCAST: A = boy\nSCENE: room\nA: hi | हाय\nCTA: c\n"
+        self.assertEqual(unflatten(text), (text, False))
+
+
 if __name__ == "__main__":
     unittest.main()
