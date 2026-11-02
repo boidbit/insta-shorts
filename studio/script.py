@@ -23,7 +23,8 @@ Script format (one thing per line):
   Words in brackets can be expressions, actions, props, point directions, sfx, "shake".
 - `NAME -> ...` is an action without speech: enter/exit left|right, walk left|center|right,
   any action / expression.  `ALL -> ...` does it for everybody in the scene.
-- `SCENE: background | title` starts a new place (kitchen, room, street, school, night_road, plain).
+- `SCENE: background | title` starts a new place (kitchen, room, street, school, market, office, bus_stop, night_road,
+  plain), or your own picture: `SCENE: gali` uses assets/backgrounds/gali.png (.jpg/.webp), or a path `SCENE: assets/backgrounds/gali.jpg`.
 - `wait 1.5` (or `...`) pauses.
 - Camera (optional, the camera already cuts in on every speaker by itself): `wide`, `medium`, `close`,
   `two_shot` in the brackets of a line, e.g. `A (shock, close): ...` or `A -> shock close`.
@@ -46,6 +47,7 @@ import re
 
 from . import actions, audio, objects
 from .characters import ACCESSORIES, EXPRESSIONS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE, SKIN_TONES
+from .util import asset_path
 from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS, chat_length
 
 HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION")
@@ -276,6 +278,27 @@ def parse_lyrics(meta, lyrics):
     return scene, warnings
 
 
+IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp")
+
+
+def resolve_background(raw):
+    """`street` / `gali` (= assets/backgrounds/gali.png) / `assets/backgrounds/x.jpg` -> (background dict, warning)."""
+    name = raw.strip()
+    low = name.lower().replace(" ", "_")
+    if low in BACKGROUNDS:
+        return {"type": low}, None
+    is_path = name.lower().endswith(IMAGE_EXT)
+    stems = [name, name.replace(" ", "_"), low]
+    tries = [name] if is_path else [os.path.join("assets", "backgrounds", st + ext) for st in dict.fromkeys(stems)
+                                    for ext in IMAGE_EXT]
+    for t in tries:
+        if os.path.isfile(asset_path(t)):
+            return {"type": "image", "path": t.replace(os.sep, "/")}, None
+    if is_path:
+        return {"type": "room"}, "SCENE %r: ye image nahi mili (file assets/backgrounds/ me daalo) -> using room" % name
+    return {"type": "room"}, "unknown place %r -> using room" % low
+
+
 def parse_obj(rest):
     """`truck enter left to right` -> ({"kind": "truck", "enter": "left", "at": "right"}, [problems])."""
     raw = rest.split()
@@ -326,7 +349,8 @@ def parse_script(text):
     cur = None
 
     def new_scene(bg="room", title=None):
-        sc = {"background": {"type": bg}, "lines": [], "title": title, "chat": [], "chat_title": ""}
+        sc = {"background": bg if isinstance(bg, dict) else {"type": bg}, "lines": [], "title": title, "chat": [],
+              "chat_title": ""}
         scenes.append(sc)
         return sc
 
@@ -355,10 +379,9 @@ def parse_script(text):
                         add_cast(n.strip(), _words(w))
             elif key == "SCENE":
                 bg, _, title = val.partition("|")
-                bg = bg.strip().lower().replace(" ", "_") or "room"
-                if bg not in BACKGROUNDS:
-                    warnings.append("unknown place %r -> using room" % bg)
-                    bg = "room"
+                bg, warn = resolve_background(bg.strip() or "room")
+                if warn:
+                    warnings.append(warn)
                 cur = new_scene(bg, title.strip() or None)
             else:
                 meta[key] = val
@@ -529,7 +552,7 @@ def parse_script(text):
     }
     if music:
         scene["music"] = music
-    if len(cast) > 3:
+    if len([n for n in cast if n != "NARRATOR"]) > 3:
         warnings.append("more than 3 characters: the screen gets crowded")
     est = sum(audio.estimate_duration(ln[3]) + 0.3 for sc in scenes for ln in sc["lines"] if ln[0] == "say")
     if est > 28:

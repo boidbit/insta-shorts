@@ -310,7 +310,9 @@ function lintScript(text) {
       }
       if (key === "SCENE") {
         const bg = val.split("|")[0].trim().toLowerCase().replace(/ /g, "_");
-        if (bg && !SET.places.has(bg)) out.push(`SCENE "${bg}": ye jagah nahi hai (${V.places.join(", ")})`);
+        const rawBg = val.split("|")[0].trim();
+        if (/\.(png|jpe?g|webp)$/i.test(rawBg)) { /* your own picture: the renderer checks that the file exists */ }
+        else if (bg && !SET.places.has(bg)) out.push(`SCENE "${bg}": ye jagah nahi hai (${V.places.join(", ")}; ya assets/backgrounds/ ki apni image ka path likho)`);
       }
       if (key === "CAST") {
         declared = true;
