@@ -189,6 +189,13 @@ def walk(t, sp, I, ph, o):
     return d
 
 
+def salute(t, sp, I, ph, o):
+    e = ease_out(t / 0.22)
+    d = _stance()
+    d.update(ra1=14 + 112 * e, ra2=8 + 214 * e, tilt=-1.5 * e, head_tilt=-2 * e)
+    return d
+
+
 def facepalm(t, sp, I, ph, o):
     e = ease_out(t / 0.3)
     d = _stance()
@@ -303,7 +310,7 @@ DANCES = {"dance", "dance2", "dance3", "disco", "sway", "naagin", "nagin", "bhan
 ACTIONS = {
     "idle": idle, "none": idle, "stand": idle,
     "talk": talk, "dance": dance, "dance2": dance2, "dance3": dance3, "disco": disco,
-    "point": point, "laugh": laugh, "shock": shock, "jump": jump, "wave": wave, "clap": clap,
+    "point": point, "laugh": laugh, "shock": shock, "jump": jump, "wave": wave, "salute": salute, "clap": clap,
     "cry": cry, "fall": fall, "walk": walk, "facepalm": facepalm, "shrug": shrug, "sway": sway,
     "sleep": sleep,
     "naagin": naagin, "nagin": naagin, "bhangra": bhangra, "aeroplane": aeroplane, "airplane": aeroplane,

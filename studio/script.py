@@ -44,13 +44,13 @@ import argparse
 import os
 import re
 
-from . import actions, audio
+from . import actions, audio, objects
 from .characters import ACCESSORIES, EXPRESSIONS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE, SKIN_TONES
 from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS
 
 HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION")
 BACKGROUNDS = ("kitchen", "room", "street", "school", "night_road", "plain")
-PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick")
+PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick", "bag")
 SFX = ("pop", "boing", "whoosh", "ding", "thud", "clap", "beep", "laugh_track")
 SHOTS = tuple(SHOT_ZOOM) + tuple(SHOT_ALIASES)       # camera: wide, medium, close, two_shot (+ spellings)
 DEPTH_WORDS = tuple(DEPTHS)                         # near / mid / far: step towards or away from the camera
@@ -81,6 +81,8 @@ def vocab():
         "expressions": sorted(EXPRESSIONS), "actions": sorted(actions.ACTIONS),
         "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS),
         "shots": sorted(SHOTS), "depth": sorted(DEPTH_WORDS),
+        "objects": sorted(set(objects.OBJECTS) | set(objects.ALIASES)),
+        "object_words": ["center", "enter", "exit", "front", "go", "left", "right", "to"],
     }
 
 
@@ -271,6 +273,44 @@ def parse_lyrics(meta, lyrics):
     return scene, warnings
 
 
+def parse_obj(rest):
+    """`truck enter left to right` -> ({"kind": "truck", "enter": "left", "at": "right"}, [problems])."""
+    raw = rest.split()
+    spec, bad = {}, []
+    if not raw:
+        return None, ["OBJ: ke baad object ka naam likho (%s)" % ", ".join(sorted(objects.OBJECTS))]
+    kind = objects.resolve_kind(raw[0])
+    if not kind:
+        return None, ["OBJ %r: ye object nahi hai (%s, ya apni .png)" % (raw[0], ", ".join(sorted(objects.OBJECTS)))]
+    spec["kind"] = kind if kind in objects.OBJECTS else raw[0]
+    i = 1
+    while i < len(raw):
+        w = raw[i].lower()
+        nxt = raw[i + 1].lower() if i + 1 < len(raw) else None
+        if w in ("enter", "exit", "go") and nxt in ("left", "right", "center"):
+            spec[w] = nxt
+            i += 1
+        elif w == "to" and nxt in ("left", "right", "center"):
+            spec["at"] = nxt
+            i += 1
+        elif w in ("left", "right", "center"):
+            spec["at"] = w
+        elif w == "front":
+            spec["front"] = True
+        elif w in ("big", "small"):
+            spec["scale"] = 1.35 if w == "big" else 0.7
+        elif w in PALETTE:
+            spec["color"] = w
+        else:
+            bad.append(w)
+        i += 1
+    if spec.get("enter") == "center" or spec.get("exit") == "center":
+        return None, ["OBJ %s: enter/exit sirf left ya right se hota hai" % raw[0]]
+    if spec.get("go") and not spec.get("at"):
+        spec["at"] = spec["go"]
+    return spec, ["OBJ %s: %s samajh nahi aaye" % (raw[0], ", ".join(repr(b) for b in bad))] if bad else []
+
+
 def parse_script(text):
     """Return (scene dict, warnings)."""
     lyr = _split_lyrics(text)
@@ -327,6 +367,13 @@ def parse_script(text):
             continue
         if cur is None:
             cur = new_scene()
+        m = re.match(r"^OBJ\s*:\s*(.*)$", line, re.I)
+        if m:
+            spec, probs = parse_obj(m.group(1))
+            warnings += probs
+            if spec:
+                cur["lines"].append(("obj", spec))
+            continue
         m = re.match(r"^(?:wait\s*([\d.]+)|\.\.\.+)$", line, re.I)
         if m:
             cur["lines"].append(("wait", float(m.group(1) or 1.0)))
@@ -373,6 +420,13 @@ def parse_script(text):
         for ln in sc["lines"]:
             if ln[0] == "wait":
                 tl.append({"wait": ln[1]})
+                continue
+            if ln[0] == "obj":
+                oev = {"obj": ln[1]}
+                if first:
+                    oev["t"] = 0.1
+                    first = False
+                tl.append(oev)
                 continue
             who = "all" if ln[1].upper() == "ALL" else ln[1]
             ev = {"who": who}

@@ -170,7 +170,7 @@
 </main>
 
 <!-- words the script format understands: same as studio/script.py vocab() (a test keeps them equal) -->
-<script type="application/json" id="vocab">{"places":["kitchen","night_road","plain","room","school","street"],"looks":["aunty","boy","college_boy","college_girl","dada","dadi","girl","kid","kid_girl","office_girl","office_guy","uncle"],"roles":["aunty","bachcha","behen","beta","beti","bhai","boss","brother","chacha","chachi","dad","dada","dadi","didi","dost","father","friend","maa","mom","mother","mummy","nana","nani","padosan","padosi","papa","sister","student","teacher","uncle"],"extras":["aadmi","aurat","bald","balding","beard","bindi","black","blazer","blue","braid","brown","bun","cap","chubby","cream","curly","dark","denim","earrings","fair","female","glasses","gold","green","grey","henna","khaki","kurta","ladka","ladki","long","magenta","male","man","maroon","moustache","mustard","navy","normal","olive","orange","pink","ponytail","purple","red","saffron","salwar","saree","shirt","short","side_part","sky","slim","spiky","teal","tilak","tshirt","tuft","turban","uniform","vest","wheatish","white","woman","yellow"],"expressions":["angry","cry","dead","grin","laugh","love","neutral","sad","shock","shout","sleepy","sly","smile","smug","surprised","think","wink"],"actions":["aeroplane","airplane","bhangra","clap","cry","dance","dance2","dance3","dance_walk","disco","facepalm","fail","fall","gaana","idle","jump","kamar_dard","laugh","naagin","nagin","none","point","shock","shrug","sing","sleep","stand","sway","talk","thumka","walk","wave"],"props":["ball","cup","mic","phone","spoon","stick"],"sfx":["beep","boing","clap","ding","laugh_track","pop","thud","whoosh"],"moves":["center","cheer","disco","down","drop","enter","exit","left","noprop","pump","right","shake","swing","up","up_left","up_right","walk"],"shots":["2shot","close","close_up","closeup","medium","two_shot","twoshot","wide"],"depth":["far","mid","near"]}</script>
+<script type="application/json" id="vocab">{"places":["kitchen","night_road","plain","room","school","street"],"looks":["aunty","boy","college_boy","college_girl","dada","dadi","girl","kid","kid_girl","office_girl","office_guy","uncle"],"roles":["aunty","bachcha","behen","beta","beti","bhai","boss","brother","chacha","chachi","dad","dada","dadi","didi","dost","father","friend","maa","mom","mother","mummy","nana","nani","padosan","padosi","papa","sister","student","teacher","uncle"],"extras":["aadmi","aurat","bald","balding","beard","bindi","black","blazer","blue","braid","brown","bun","cap","chubby","cream","curly","dark","denim","earrings","fair","female","glasses","gold","green","grey","henna","khaki","kurta","ladka","ladki","long","magenta","male","man","maroon","moustache","mustard","navy","normal","olive","orange","pink","ponytail","purple","red","saffron","salwar","saree","shirt","short","side_part","sky","slim","spiky","sunglasses","teal","tilak","tshirt","tuft","turban","uniform","vest","wheatish","white","woman","yellow"],"expressions":["angry","cry","dead","grin","laugh","love","neutral","sad","shock","shout","sleepy","sly","smile","smug","surprised","think","wink"],"actions":["aeroplane","airplane","bhangra","clap","cry","dance","dance2","dance3","dance_walk","disco","facepalm","fail","fall","gaana","idle","jump","kamar_dard","laugh","naagin","nagin","none","point","salute","shock","shrug","sing","sleep","stand","sway","talk","thumka","walk","wave"],"props":["bag","ball","cup","mic","phone","spoon","stick"],"sfx":["beep","boing","clap","ding","laugh_track","pop","thud","whoosh"],"moves":["center","cheer","disco","down","drop","enter","exit","left","noprop","pump","right","shake","swing","up","up_left","up_right","walk"],"shots":["2shot","close","close_up","closeup","medium","two_shot","twoshot","wide"],"depth":["far","mid","near"],"objects":["auto","bags","bike","bin","car","cow","dustbin","gaadi","gai","garbage_truck","kachra","kachra_gaadi","rickshaw","scooter","table","thaila","truck"],"object_words":["center","enter","exit","front","go","left","right","to"]}</script>
 <script>
 // ---------------------------------------------------------------- config
 // owner/repo come from the Pages address (<owner>.github.io/<repo>/); branch is saved per browser.
@@ -261,7 +261,7 @@ async function checkConnection() {
 // ---------------------------------------------------------------- script checker (mirrors studio/script.py)
 const V = JSON.parse($("vocab").textContent);
 const SET = Object.fromEntries(Object.entries(V).map(([k, v]) => [k, new Set(v)]));
-const HEADERS = new Set(["HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION"]);
+const HEADERS = new Set(["HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "OBJ"]);
 const words = (s) => s.toLowerCase().split(/[\s,|]+/).map((w) => w.replace(/^[\[\](){}'"]+|[\[\](){}'"]+$/g, "")).filter(Boolean);
 const short = (s) => (s.length > 45 ? s.slice(0, 45) + "…" : s);
 
@@ -301,6 +301,13 @@ function lintScript(text) {
       const key = m[1].toUpperCase(), val = m[2].trim();
       if (key === "HOOK") hook = !!val;
       if (key === "CTA") cta = !!val;
+      if (key === "OBJ") {
+        const first = val.split(/\s+/)[0] || "";
+        if (!first) out.push("OBJ: ke baad object ka naam likho");
+        else if (!SET.objects.has(first.toLowerCase()) && !/\.(png|webp)$/i.test(first)) out.push(`OBJ "${first}": ye object nahi hai (${V.objects.join(", ")})`);
+        else if (words(val).slice(1).some((w) => !SET.object_words.has(w) && !SET.extras.has(w) && !["big", "small", "red", "blue", "green", "yellow", "orange", "pink", "purple", "teal", "white", "black", "brown"].includes(w))) out.push(`OBJ "${short(val)}": kuch shabd samajh nahi aaye (enter/exit/go left|right, to ..., front, rang)`);
+        continue;
+      }
       if (key === "SCENE") {
         const bg = val.split("|")[0].trim().toLowerCase().replace(/ /g, "_");
         if (bg && !SET.places.has(bg)) out.push(`SCENE "${bg}": ye jagah nahi hai (${V.places.join(", ")})`);

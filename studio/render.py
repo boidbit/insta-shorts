@@ -17,7 +17,7 @@ import time
 
 from PIL import Image
 
-from . import actions, audio
+from . import actions, audio, objects
 from .backgrounds import Background
 from .characters import build_character, render_ops
 from .scene import camera_at, compile_music, compile_scene, prepare_voice, split_scenes, static_overlays
@@ -218,10 +218,34 @@ class Renderer(Output):
         a = abs(math.sin(t * 9.1)) * (0.55 + 0.45 * abs(math.sin(t * 3.7 + 1.3)))
         return clamp(a * 1.25 - 0.1)
 
+    def _draw_objects(self, img, t, front):
+        """Set objects (vehicles, bins, bags...): `front` ones over the characters, the rest behind them."""
+        s = self.s
+        for o in self.plan.objects.values():
+            if o.front != front or not o.visible(t):
+                continue
+            im, (ax, ay), wheels = objects.sprite(o.kind, s * o.scale, o.color)
+            x = o.x_at(t)
+            moving = o.moving(t)
+            bob = math.sin(t * 17.0) * 3.0 * s if (moving and o.kind in objects.VEHICLES) else 0.0
+            flip = o.flip_at(t)
+            if flip:
+                im = im.transpose(Image.FLIP_LEFT_RIGHT)
+                ax = im.width - ax
+            age = t - o.t_in
+            alpha = clamp(age / 0.18) if not o.moves or o.moves[0][0] > o.t_in + 0.01 else 1.0
+            cx, cy = x * s, o.y * s + bob
+            paste_rgba(img, im, cx, cy, 1.0, alpha, anchor=(ax, ay))
+            for (wx, wy, r) in wheels:
+                wim = objects.wheel_image(r, -(x * s) / max(r, 1.0) * 57.2958)
+                wxx = (im.width - wx) if flip else wx
+                paste_rgba(img, wim, cx + (wxx - ax), cy + (wy - ay), 1.0, alpha)
+
     # ------------------------------------------------------------ one frame
     def frame(self, t):
         plan, s = self.plan, self.s
         img = self.bg.frame(t).convert("RGB")
+        self._draw_objects(img, t, False)
         order = sorted(plan.chars.values(), key=lambda c: (c.draw_pos(t)[1], c.draw_pos(t)[0]))
         anchors = {}
         states = {}
@@ -264,6 +288,8 @@ class Renderer(Output):
                 layer, (ox, oy) = r
                 img.paste(layer, (ox, oy), layer)
             anchors[c.name] = an
+
+        self._draw_objects(img, t, True)
 
         # camera first, so the speech bubbles can be kept inside the visible part of the frame
         z, cx, cy, dx, dy = camera_at(plan, t)

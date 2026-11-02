@@ -2,8 +2,8 @@
 import math
 import sys
 
-from . import audio, gemini_tts
-from .characters import resolve_spec
+from . import audio, gemini_tts, objects
+from .characters import color_of, resolve_spec
 from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, lerp
 
 SLOTS = {
@@ -17,6 +17,87 @@ SHOT_ALIASES = {"closeup": "close", "close_up": "close", "twoshot": "two_shot", 
 DEPTHS = {"near": (1.3, 110.0), "mid": (1.0, 0.0), "far": (0.75, -150.0)}   # (size multiplier, feet offset in px)
 CHAR_ATTRS = ("action", "expression", "prop", "label", "look", "facing", "style", "point", "dir",
               "lean", "speed", "intensity", "hands", "tint")
+
+
+OBJ_Y = {"truck": 1640.0, "auto": 1650.0, "car": 1640.0, "scooter": 1660.0, "cow": 1690.0, "dustbin": 1690.0,
+         "bags": 1700.0, "table": 1700.0}
+
+
+class SceneObj:
+    """A set object (vehicle, bin, bags...) that sits in the scene or drives in / out."""
+
+    def __init__(self, kind, color, scale, y, front, t_in, x):
+        self.kind, self.color, self.scale, self.y, self.front, self.t_in = kind, color, scale, y, front, t_in
+        self.t_out = None
+        self.x0 = x
+        self.rest = x
+        self.moves = []             # (t0, t1, x0, x1)
+        self.flips = [(t_in, False)]
+
+    def x_at(self, t):
+        x = self.x0
+        for (t0, t1, xa, xb) in self.moves:
+            if t < t0:
+                break
+            x = lerp(xa, xb, ease_in_out((t - t0) / max(1e-6, t1 - t0)))
+        return x
+
+    def moving(self, t):
+        return any(t0 <= t < t1 for (t0, t1, _a, _b) in self.moves)
+
+    def flip_at(self, t):
+        f = False
+        for (t0, fl) in self.flips:
+            if t >= t0:
+                f = fl
+        return f
+
+    def visible(self, t):
+        return t >= self.t_in and (self.t_out is None or t < self.t_out)
+
+
+def compile_obj(plan, spec, t, warnings=None):
+    """Apply one `obj` timeline event: {"kind", "at", "enter", "exit", "go", "color", "scale", "front", "dur"}."""
+    kind = objects.resolve_kind(spec.get("kind", ""))
+    if not kind:
+        if warnings is not None:
+            warnings.append("unknown object %r" % spec.get("kind"))
+        return 0.0
+    o = plan.objects.get(kind)
+    at = spec.get("at")
+    spot = objects.SPOTS.get(at) if isinstance(at, str) else (float(at) if at is not None else None)
+    dur = float(spec.get("dur", 1.8 if kind in objects.VEHICLES else 1.0))
+    vehicle = kind in objects.VEHICLES
+    if o is None:
+        rest = spot if spot is not None else objects.SPOTS["center"]
+        color = color_of(spec["color"]) if spec.get("color") else None
+        base = objects.OBJECTS[kind][2] if kind in objects.OBJECTS else 1.0
+        o = SceneObj(kind, color, float(spec.get("scale", base)), float(spec.get("y", OBJ_Y.get(kind, 1680.0))),
+                     bool(spec.get("front")), t, rest)
+        plan.objects[kind] = o
+        side = spec.get("enter")
+        if side in objects.OFFSCREEN:
+            o.x0 = objects.OFFSCREEN[side]
+            o.moves.append((t, t + dur, o.x0, rest))
+            o.flips = [(t, side == "right")]
+        o.rest = rest
+        if spec.get("exit") not in objects.OFFSCREEN:
+            return dur if side in objects.OFFSCREEN else 0.0
+    cur = o.x_at(t)
+    if spec.get("go") or (spot is not None and not spec.get("enter") and not spec.get("exit")
+                          and o.t_in < t and abs(spot - cur) > 1):
+        tgt = spot if spot is not None else objects.SPOTS.get(spec.get("go"), cur)
+        o.moves.append((t, t + dur, cur, tgt))
+        o.flips.append((t, tgt < cur))
+        o.rest = tgt
+        return dur if vehicle else dur * 0.6
+    if spec.get("exit") in objects.OFFSCREEN:
+        side = spec["exit"]
+        o.moves.append((t, t + dur, cur, objects.OFFSCREEN[side]))
+        o.flips.append((t, side == "left"))
+        o.t_out = t + dur
+        return dur
+    return 0.0
 
 
 class Char:
@@ -249,6 +330,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     gap = float(meta.get("line_gap", 0.35))
     plan.sfx = []
     plan.overlays = []
+    plan.objects = {}
+    plan.warnings = []
     cam_events = []
     shot_events = []        # camera moves from shot words on action lines (do not switch the auto camera off)
     shakes = []
@@ -329,6 +412,10 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             o = dict(ev["overlay"])
             o.setdefault("from", t)
             plan.overlays.append(o)
+        if "obj" in ev:
+            ev_hold = compile_obj(plan, ev["obj"], t, plan.warnings)
+            plan_end = max(plan_end, t + ev_hold)
+            cursor = max(cursor, t + ev_hold)
         if "shot" in ev and "say" not in ev and SHOT_ALIASES.get(ev["shot"], ev["shot"]) in SHOT_ZOOM:
             shot_events.append(shot_camera(ev["shot"], t, chars, who, dur=0.3))
         if "camera" in ev:
