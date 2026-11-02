@@ -165,6 +165,36 @@ def cast_spec(words, index, unknown=None):
     return spec
 
 
+MALE_HAIR = ("short", "side_part", "curly", "spiky", "balding")
+FEMALE_HAIR = ("ponytail", "bun", "long", "braid")
+SKIN_ORDER = ("wheatish", "brown", "fair", "dark")
+
+
+def vary_cast(cast):
+    """Characters that share a look (two college_boys...) would be twins. Give each a different hair style and
+    skin tone, unless the script chose them. Only what the script left open is changed."""
+    seen = {}                                   # look -> [(hair, skin), ...] already on screen
+    for name, spec in cast.items():
+        if spec.get("hidden"):
+            continue
+        look = spec.get("look", "boy")
+        base = LOOKS.get(look, {})
+        hair, skin = spec.get("hair", base.get("hair")), spec.get("skin", base.get("skin"))
+        taken = seen.setdefault(look, [])
+        if (hair, skin) in taken:
+            female = look in FEMALE_LOOKS or spec.get("voice", {}).get("name", "").startswith("hi-IN-Swara")
+            if "hair" not in spec and hair not in ("bald",):
+                options = [h for h in (FEMALE_HAIR if female else MALE_HAIR) if all(h != t[0] for t in taken)]
+                if options:
+                    hair = spec["hair"] = options[0]
+            if (hair, skin) in taken or "skin" not in spec:
+                options = [k for k in SKIN_ORDER if k != skin and (hair, k) not in taken]
+                if "skin" not in spec and options:
+                    skin = spec["skin"] = options[(len(taken) - 1) % len(options)]
+        taken.append((hair, skin))
+    return cast
+
+
 def _stage(tokens, ev, scene_cast, who):
     """Apply bracket / arrow words to an event dict.
     Returns (move request or None, unknown words, words that were overridden)."""
@@ -651,6 +681,7 @@ def parse_script(text):
             item["cut_in"] = True
         out_scenes.append(item)
 
+    vary_cast(cast)
     hook = meta.get("HOOK") or ""
     if not hook:
         warnings.append("no HOOK: line - the first second has no hook text")
