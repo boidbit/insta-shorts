@@ -170,6 +170,23 @@ Poora example: `scenes/doodh_story_demo.json`. Poora schema: `DIRECTOR_PROMPT.md
 
 `pattern_interrupt` (Ruko!), `pov`, `relatable` (Agar tum bhi...), `curiosity` (end tak dekho), `list` (3 types ke...), `question` (kaun sahi?), `cold_open` (jhagde ke beech se), `expectation` (expectation vs reality). AI ko style do ya `auto`. Director check karta hai ki hook t=0 pe screen pe hai aur pehle second me kuch ho raha hai, warna khud sudharwata hai.
 
+## Tone: light, dark, satire, absurd (AI writer ke liye)
+
+Page ke "Idea do (AI)" tab me **Tone** dropdown hai (ya idea me ek line `TONE: dark` likho, ya command line me `--tone dark`):
+
+| Tone | Matlab |
+|---|---|
+| `auto` (default) | Idea dekh kar AI khud chunta hai (aur dark/ajeeb idea ko "light" nahi banata). Bina idea ke random mix. |
+| `light` | Family/relatable, halka-phulka. |
+| `dark` 💀 | Halat grim (maut, qarz, system, kismat), andaaz deadpan. Darkness implied: cut, awaaz, `dead` expression; kuch graphic nahi. |
+| `satire` | Aisi ajeeb cheez jo sab pehchaante hain (daftar, bill, rules), kaalpanik log aur sansthan. |
+| `absurd` | Ek namumkin cheez sach hai aur sab use normal maante hain. |
+| `twist` | Meetha shuru, aakhir me tez twist. |
+
+- Har tone ke saath AI ko ek chhota example (exact format me) milta hai, jisse style samajh aati hai.
+- Length: default 4-7 lines / 12-25 sec; jis kahani ko setup chahiye (dark twist, satire, gaadi) wo 10 lines / 40 sec tak ja sakti hai.
+- **Teen cheezein kabhi nahi:** kisi group (dharm, jaati, kshetra, gender, shareer, disability) ya asli, naam wale insaan ko nishana banane wala mazaak; sexual content; khud ko ya doosron ko nuksaan pahunchane ya jurm sikhane wali baat. Baaki sab (maut, qarz, bhrasht daftar, bhoot, kismat) allowed hai. Ye seema isliye bhi hai ki Instagram aise content ki reach daba deta hai, aur Gemini/Claude jaise AI use khud refuse karte hain.
+
 ## Templates (`templates/`)
 
 `tag_karo`, `dost_types`, `dialogue`, `kaun_sahi`, `song_reel`: chhoti scene file se `{ "extends": "dost_types", "vars": { "hook": "...", "line_a": "..." } }`.

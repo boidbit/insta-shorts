@@ -678,8 +678,8 @@ def parse_script(text):
     if len([n for n in cast if n != "NARRATOR"]) > 3:
         warnings.append("more than 3 characters: the screen gets crowded")
     est = sum(audio.estimate_duration(ln[3]) + 0.3 for sc in scenes for ln in sc["lines"] if ln[0] == "say")
-    if est > 28:
-        warnings.append("script is long (~%.0fs of talking): reels work best under 25s" % est)
+    if est > 45:
+        warnings.append("script is long (~%.0fs of talking): most reels work best under 30s" % est)
     return scene, warnings
 
 

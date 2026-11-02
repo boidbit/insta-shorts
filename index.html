@@ -132,6 +132,16 @@
             <option value="expectation">Expectation vs reality</option>
           </select>
         </label>
+        <label id="toneWrap">Tone
+          <select id="tone">
+            <option value="auto">Auto (idea ke hisaab se)</option>
+            <option value="light">Light (family, relatable)</option>
+            <option value="dark">Dark comedy 💀</option>
+            <option value="satire">Satire (system par vyang)</option>
+            <option value="absurd">Absurd / ajeeb</option>
+            <option value="twist">Meetha shuru, tez twist</option>
+          </select>
+        </label>
         <label class="videoOpt">Quality
           <select id="width"><option value="1080">1080p (HD)</option><option value="720">720p (jaldi)</option></select>
         </label>
@@ -417,6 +427,7 @@ function setMode(m) {
   $("go").textContent = m === "idea" ? "Script likho ✍️" : "✅ Approve: Video banao 🎬";
   $("polish").classList.toggle("hidden", m !== "script");
   $("hookWrap").classList.toggle("hidden", m !== "idea");
+  $("toneWrap").classList.toggle("hidden", m !== "idea");
   document.querySelectorAll(".videoOpt").forEach((x) => x.classList.toggle("hidden", m !== "script"));
   $("timeHint").textContent = m === "idea"
     ? "AI ko script likhne me ~1 minute lagta hai. Video tabhi banegi jab aap script approve karoge."
@@ -449,7 +460,7 @@ async function start(stage) {
     if (w.length && !confirm("Script me " + w.length + " dikkat(ein) hain (neeche list dekho).\n\nPhir bhi video banau?")) return;
   }
   const rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const inputs = { stage, hook: $("hook").value, request_id: rid };
+  const inputs = { stage, hook: $("hook").value, tone: $("tone").value, request_id: rid };
   if (stage === "script") {
     if (mode === "idea") inputs.instruction = text; else inputs.script_text = text;
   } else {

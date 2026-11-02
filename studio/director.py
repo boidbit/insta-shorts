@@ -4,6 +4,7 @@
     python -m studio.director "3 dost, ek ko chai pe bill dena hai" -o scenes/generated/chai.json
     python -m studio.director --hook pov "mummy ne doodh mangaya"
     python -m studio.director --count 3            # no idea given: AI picks topics, 3 different hooks
+    python -m studio.director --tone dark "dost jo marne ke baad bhi EMI bhar raha hai"   # light|dark|satire|absurd|twist
     python -m studio.director --script-only "dadi aur naya phone" -o draft.txt    # script for a human to approve
 
 Every result is checked (loads, compiles, known looks/actions/expressions, hook in
@@ -30,7 +31,7 @@ DEFAULT_MODEL = "claude-sonnet-5-5"
 # tried in order: a retired model (404) or one that stays busy (503/429) hands over to the next
 GEMINI_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.0-flash"]
 BACKGROUNDS = {"kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road", "plain", "image"}
-MAX_SECONDS = 30.0
+MAX_SECONDS = 40.0
 _sleep = time.sleep     # tests replace it
 
 
@@ -191,7 +192,7 @@ def problems(scene_dict, tmp_path):
 
     total = sum(p.duration for p in plans)
     if total > MAX_SECONDS:
-        out.append("video too long (%.0fs); keep it between 10 and 25 seconds" % total)
+        out.append("video too long (%.0fs); keep it between 10 and 40 seconds (most between 15 and 30)" % total)
 
     # hook: text + a hook overlay at t=0 + something happening in the first second
     if not scene.get("hook"):
@@ -231,7 +232,7 @@ def script_problems(text, tmp_path):
 def request_text(instruction, topic=None):
     if instruction and instruction.strip():
         return instruction.strip()
-    return ("Koi idea nahi diya. Topic: %s. Is topic pe ek original, relatable desi comedy short khud socho "
+    return ("Koi idea nahi diya. Topic: %s. Is topic pe ek original desi comedy short khud socho, tone ke hisaab se "
             "(purane cliche jokes se bacho)." % topic)
 
 
@@ -255,30 +256,43 @@ def _iterate(llm, system, first_msg, parse, check, json_mode, log, max_tries):
     raise SystemExit("director could not produce a valid result: %s" % last)
 
 
-def _setup(hook_style, llm, tmp_path, rng, log, prompt_file, fmt):
+def _setup(hook_style, llm, tmp_path, rng, log, prompt_file, fmt, tone="auto", idea=""):
     rng = rng or random.Random()
     log = log or (lambda m: print(m, file=sys.stderr))
     with open(os.path.join(ROOT, prompt_file), encoding="utf-8") as f:
         base = f.read()
     key, _hook = hooks.pick(hook_style, rng)
-    log("  [director] hook style: %s" % key)
+    tone_key = hooks.pick_tone(tone, idea, rng)
+    log("  [director] hook style: %s, tone: %s" % (key, tone_key))
     tmp_path = tmp_path or os.path.join(ROOT, ".cache", "_director_check_%d.json" % os.getpid())
     os.makedirs(os.path.dirname(tmp_path), exist_ok=True)
-    return base + "\n\n" + hooks.prompt_block(key, fmt), key, llm or make_llm(), tmp_path, rng, log
+    system = base + "\n\n" + hooks.tone_block(tone_key) + "\n\n" + hooks.prompt_block(key, fmt)
+    return system, key, llm or make_llm(), tmp_path, rng, log
 
 
-def direct(instruction="", hook_style="auto", llm=None, tmp_path=None, max_tries=3, rng=None, log=None):
+def _tone_and_idea(instruction, tone):
+    """A `TONE: dark` line inside the idea works like the tone argument (the argument wins)."""
+    inline, idea = hooks.split_tone(instruction)
+    return (tone if tone in hooks.TONES else (inline or "auto")), idea
+
+
+def direct(instruction="", hook_style="auto", llm=None, tmp_path=None, max_tries=3, rng=None, log=None, tone="auto"):
     """Return a checked scene dict. `llm(system, messages, json_mode) -> text`."""
-    system, key, llm, tmp_path, rng, log = _setup(hook_style, llm, tmp_path, rng, log, "DIRECTOR_PROMPT.md", "json")
+    tone, instruction = _tone_and_idea(instruction, tone)
+    system, key, llm, tmp_path, rng, log = _setup(hook_style, llm, tmp_path, rng, log, "DIRECTOR_PROMPT.md", "json",
+                                                  tone, instruction)
     scene = _iterate(llm, system, request_text(instruction, hooks.random_topic(rng)), extract_json,
                      lambda s: problems(s, tmp_path), True, log, max_tries)
     scene.setdefault("meta", {})["hook_style"] = key
     return scene
 
 
-def write_script(instruction="", hook_style="auto", llm=None, tmp_path=None, max_tries=3, rng=None, log=None):
+def write_script(instruction="", hook_style="auto", llm=None, tmp_path=None, max_tries=3, rng=None, log=None,
+                 tone="auto"):
     """Return a checked plain-text script (for a human to read, edit and approve)."""
-    system, _key, llm, tmp_path, rng, log = _setup(hook_style, llm, tmp_path, rng, log, "SCRIPT_PROMPT.md", "script")
+    tone, instruction = _tone_and_idea(instruction, tone)
+    system, _key, llm, tmp_path, rng, log = _setup(hook_style, llm, tmp_path, rng, log, "SCRIPT_PROMPT.md", "script",
+                                                   tone, instruction)
     return _iterate(llm, system, request_text(instruction, hooks.random_topic(rng)), extract_script,
                     lambda t: script_problems(t, tmp_path), False, log, max_tries)
 
@@ -313,6 +327,8 @@ def main(argv=None):
     ap.add_argument("instruction", nargs="?", default="", help="idea or script; empty = AI picks a topic")
     ap.add_argument("-o", "--out", default=None, help="output file (with --count > 1: _1, _2... are added)")
     ap.add_argument("--hook", default="auto", choices=["auto"] + sorted(hooks.HOOKS))
+    ap.add_argument("--tone", default="auto", choices=["auto"] + sorted(hooks.TONES),
+                    help="light | dark | satire | absurd | twist; auto = the tone that fits the idea (random without one)")
     ap.add_argument("--count", type=int, default=1, help="how many different videos to write")
     ap.add_argument("--script-only", action="store_true", help="write a readable script (.txt) instead of a scene")
     ap.add_argument("--provider", default=None, choices=["anthropic", "gemini"])
@@ -322,7 +338,7 @@ def main(argv=None):
     llm = make_llm(args.provider, args.model)
     rng = random.Random()
     if args.script_only:
-        text = write_script(args.instruction, args.hook, llm, rng=rng)
+        text = write_script(args.instruction, args.hook, llm, rng=rng, tone=args.tone)
         out = args.out or os.path.join(ROOT, "scripts", "generated", slug(args.instruction or "auto") + ".txt")
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
         with open(out, "w", encoding="utf-8") as f:
@@ -336,7 +352,7 @@ def main(argv=None):
         if style == "auto" and args.count > 1:
             style, _h = hooks.pick("auto", rng, avoid=used)
             used.append(style)
-        scene = direct(args.instruction, style, llm, rng=rng)
+        scene = direct(args.instruction, style, llm, rng=rng, tone=args.tone)
         out = base if args.count == 1 else "%s_%d.json" % (os.path.splitext(base)[0], i + 1)
         print(save(scene, out))
 
