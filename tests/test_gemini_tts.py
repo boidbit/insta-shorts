@@ -215,5 +215,127 @@ class MultiSceneTests(GeminiMocked):
         self.assertTrue(all(o["edge"] and not o["paths"] for o in out))
 
 
+class QuotaErrorTests(unittest.TestCase):
+    """A 429 is only "the day's quota is gone" when the server gives no short retry time."""
+
+    def _http_error(self, body):
+        import io
+        import urllib.error
+        return urllib.error.HTTPError("https://x", 429, "Too Many Requests", {}, io.BytesIO(body.encode()))
+
+    def _ok_response(self):
+        import base64
+        import json as _json
+
+        class Resp:
+            def __enter__(self_):
+                return self_
+
+            def __exit__(self_, *a):
+                return False
+
+            def read(self_):
+                pcm = (np.zeros(2400, dtype="<i2")).tobytes()
+                return _json.dumps({"candidates": [{"content": {"parts": [{"inlineData": {
+                    "mimeType": "audio/L16;codec=pcm;rate=24000", "data": base64.b64encode(pcm).decode()}}]}}]}).encode()
+        return Resp()
+
+    def test_a_per_minute_limit_that_also_names_the_daily_metric_is_retried(self):
+        body = ('{"error": {"code": 429, "status": "RESOURCE_EXHAUSTED", "details": [{"violations": ['
+                '{"quotaMetric": "generate_requests_per_model_per_day", "quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"},'
+                '{"quotaId": "GenerateRequestsPerMinutePerProjectPerModel-FreeTier"}]}, {"retryDelay": "23s"}]}}')
+        calls = []
+
+        def fake_urlopen(req, timeout=0):
+            calls.append(1)
+            if len(calls) == 1:
+                raise self._http_error(body)
+            return self._ok_response()
+
+        sleeps = []
+        with mock.patch.object(g.urllib.request, "urlopen", fake_urlopen), mock.patch.object(g.time, "sleep", sleeps.append):
+            x = g.request_audio({"contents": []}, key="k")
+        self.assertEqual(len(calls), 2)                    # it waited and tried again
+        self.assertEqual(sleeps, [24.0])                   # the server said 23 s
+        self.assertEqual(len(x), 2400)
+
+    def test_no_short_retry_time_and_a_daily_metric_means_the_day_is_over(self):
+        body = '{"error": {"code": 429, "message": "You exceeded your current quota", "details": [{"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}}'
+        with mock.patch.object(g.urllib.request, "urlopen", side_effect=self._http_error(body)), \
+                mock.patch.object(g.time, "sleep"):
+            with self.assertRaises(g.QuotaExceeded):
+                g.request_audio({"contents": []}, key="k")
+
+    def test_a_long_retry_time_with_a_daily_metric_is_also_the_day_being_over(self):
+        body = '{"error": {"code": 429, "details": [{"quotaId": "PerDay"}, {"retryDelay": "40000s"}]}}'
+        with mock.patch.object(g.urllib.request, "urlopen", side_effect=self._http_error(body)), \
+                mock.patch.object(g.time, "sleep"):
+            with self.assertRaises(g.QuotaExceeded):
+                g.request_audio({"contents": []}, key="k")
+
+    def test_a_429_with_nothing_to_go_on_is_retried_not_declared_daily(self):
+        calls = []
+
+        def fake_urlopen(req, timeout=0):
+            calls.append(1)
+            if len(calls) < 3:
+                raise self._http_error('{"error": {"code": 429}}')
+            return self._ok_response()
+
+        with mock.patch.object(g.urllib.request, "urlopen", fake_urlopen), mock.patch.object(g.time, "sleep"):
+            self.assertEqual(len(g.request_audio({"contents": []}, key="k")), 2400)
+        self.assertEqual(len(calls), 3)
+
+
+class HardSplitTests(unittest.TestCase):
+    """Eight lines, the first one long with pauses inside it, gaps between lines of only ~0.14 s (a real run looked like this)."""
+
+    TEXTS = ["सुन लड़के! बेटी का हाथ तभी, जब सरकारी गाड़ी से आएगा!", "पापा!?", "जी ससुर जी, ले आऊँगा!", "देखते हैं...",
+             "पापा, आप भी न...", "ले आया सरकारी गाड़ी!", "ये क्या है??", "पापा, ये कचरा गाड़ी है..."]
+    DURS = [5.05, 1.05, 0.95, 0.95, 1.2, 1.6, 0.95, 1.65]
+
+    def make(self, gap, intra):
+        rng = np.random.RandomState(1)
+        out, pos, truth = [np.zeros(int(0.1 * SR))], 0.1, []
+
+        def burst(d):
+            n = int(d * SR)
+            return rng.randn(n) * 0.2 * (0.55 + 0.45 * np.abs(np.sin(np.linspace(0, d * 9, n))))
+
+        for i, d in enumerate(self.DURS):
+            pauses = intra.get(i, [])
+            start, piece = pos, (d - sum(pauses)) / (len(pauses) + 1)
+            for k in range(len(pauses) + 1):
+                out.append(burst(piece))
+                pos += piece
+                if k < len(pauses):
+                    out.append(np.zeros(int(pauses[k] * SR)))
+                    pos += pauses[k]
+            truth.append((start, pos))
+            if i < len(self.DURS) - 1:
+                out.append(np.zeros(int(gap * SR)))
+                pos += gap
+        out.append(np.zeros(int(0.2 * SR)))
+        return np.concatenate(out).astype(np.float32), truth
+
+    def assert_cuts_in_the_real_gaps(self, gap, intra):
+        x, truth = self.make(gap, intra)
+        cuts, method = g.split_audio(x, self.TEXTS)
+        self.assertEqual(len(cuts), 8)
+        for i in range(7):
+            mid = (cuts[i][1] + cuts[i + 1][0]) / 2.0
+            self.assertTrue(truth[i][1] - 0.02 <= mid <= truth[i + 1][0] + 0.02, (method, i + 1, mid, truth[i]))
+        return method
+
+    def test_clear_pauses(self):
+        self.assertEqual(self.assert_cuts_in_the_real_gaps(0.9, {0: [0.15, 0.14]}), "pauses")
+
+    def test_short_pauses(self):
+        self.assertEqual(self.assert_cuts_in_the_real_gaps(0.25, {0: [0.15, 0.14]}), "pauses")
+
+    def test_tiny_pauses_fall_back_but_still_cut_in_the_gaps(self):
+        self.assert_cuts_in_the_real_gaps(0.14, {0: [0.15, 0.14], 4: [0.12], 7: [0.13]})
+
+
 if __name__ == "__main__":
     unittest.main()

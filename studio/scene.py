@@ -2,7 +2,7 @@
 import math
 import sys
 
-from . import audio, gemini_tts, objects
+from . import audio, gemini_tts, objects, rides
 from .characters import color_of, resolve_spec
 from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, lerp
 
@@ -29,6 +29,7 @@ class SceneObj:
     def __init__(self, kind, color, scale, y, front, t_in, x):
         self.kind, self.color, self.scale, self.y, self.front, self.t_in = kind, color, scale, y, front, t_in
         self.t_out = None
+        self.no_fade = t_in < 0.35                      # created at the very start of a shot: it is just there
         self.x0 = x
         self.rest = x
         self.moves = []             # (t0, t1, x0, x1)
@@ -45,6 +46,10 @@ class SceneObj:
     def moving(self, t):
         return any(t0 <= t < t1 for (t0, t1, _a, _b) in self.moves)
 
+    def bob_at(self, t):
+        """A vehicle shakes a little while it drives (logical px); its riders shake with it."""
+        return math.sin(t * 17.0) * 3.0 if (self.kind in objects.VEHICLES and self.moving(t)) else 0.0
+
     def flip_at(self, t):
         f = False
         for (t0, fl) in self.flips:
@@ -56,13 +61,15 @@ class SceneObj:
         return t >= self.t_in and (self.t_out is None or t < self.t_out)
 
 
-CHAT_START, CHAT_GAP, CHAT_HOLD = 0.6, 1.5, 1.4
+CHAT_START, CHAT_GAP, CHAT_HOLD, TYPING = 0.6, 1.5, 1.4, 0.9
 
 
 def chat_length(n_messages, chat=None):
     """Seconds a chat scene with n messages lasts (so a CTA can wait for the end)."""
     chat = chat or {}
-    return (float(chat.get("start", CHAT_START)) + n_messages * float(chat.get("gap", CHAT_GAP))
+    msgs = chat.get("messages", [])
+    typing = sum(TYPING for m in msgs if m.get("side") == "left") if msgs else 0.0
+    return (float(chat.get("start", CHAT_START)) + n_messages * float(chat.get("gap", CHAT_GAP)) + typing
             + float(chat.get("hold", CHAT_HOLD)))
 
 
@@ -72,11 +79,69 @@ def compile_chat(plan, chat):
     gap = float(chat.get("gap", CHAT_GAP))
     t = float(chat.get("start", CHAT_START))
     for m in msgs:
+        if m.get("side") == "left" and "t" not in m:
+            t += TYPING                              # the other person "types" before their message arrives
         m.setdefault("t", round(t, 2))
-        plan.sfx.append(dict(t=float(m["t"]), path=audio.sfx_path("pop"), volume=0.6))
+        plan.sfx.append(dict(t=float(m["t"]), path=audio.sfx_path("ding" if m.get("side") == "left" else "pop"),
+                             volume=0.45 if m.get("side") == "left" else 0.6))
         t = float(m["t"]) + gap
-    plan.overlays.insert(0, {"chat": chat, "from": 0.0, "pos": [540, 330], "anim": "none"})   # behind hook / CTA
+    plan.overlays.insert(0, {"chat": chat, "from": 0.0, "pos": [540, 400], "anim": "none"})   # behind hook / CTA
     return t + float(chat.get("hold", CHAT_HOLD))
+
+
+def compile_ride(plan, c, spec, t):
+    """`A -> ride bike [back]`: A hops on (the vehicle is created beside A if it is not in the scene yet)."""
+    kind = objects.resolve_kind(spec.get("kind", ""))
+    if not kind or not rides.rideable(kind):
+        plan.warnings.append("cannot ride %r" % spec.get("kind"))
+        return 0.0
+    if c.ride_at(t) is not None or any(r["t_off"] is None for r in c.rides):
+        plan.warnings.append("%s is already on a vehicle" % c.name)
+        return 0.0
+    instant, drive = False, 0.0
+    if kind not in plan.objects:                              # created together with its rider: no hop, it drives in with him
+        side = spec.get("enter")
+        if side in objects.OFFSCREEN:
+            drive = compile_obj(plan, {"kind": kind, "enter": side, "at": spec.get("at") or "center"}, t, plan.warnings)
+        else:
+            compile_obj(plan, {"kind": kind, "at": spec.get("at") or float(c.pos_at(t)[0])}, t, plan.warnings)
+        instant = True
+    seat = spec.get("seat", "driver")
+    taken = {r["seat"] for o_ in plan.world_chars for r in o_.rides
+             if r["obj"] == kind and (r["t_off"] is None or r["t_off"] > t)}
+    if seat in taken and seat != "back" and "back" in rides.RIDES[kind]:
+        seat = "back"
+    plan.objects[kind].front = True                           # a vehicle with riders is the star: in front of everybody
+    if plan.framing == "inside":                             # the shot is the cab: the driver sits in the middle of the frame
+        o_ = plan.objects[kind]
+        o_.x0 = o_.rest = 540.0 - rides.seat_for(kind, seat)["hip"][0] * o_.scale
+        o_.moves = []
+        o_.flips = [(o_.t_in, False)]
+    if instant:
+        plan.objects[kind].no_fade = True
+    c.rides.append({"t0": t, "obj": kind, "seat": seat, "t_off": None, "land_x": None, "land_y": None,
+                    "instant": instant})
+    return drive if drive else (0.1 if instant else rides.RIDE_HOP + 0.1)
+
+
+def compile_getoff(plan, c, spec, t):
+    """`A -> getoff [left|right]`: A hops off beside the vehicle (towards the screen centre unless told)."""
+    cur = [r for r in c.rides if r["t_off"] is None and r["t0"] <= t]
+    if not cur:
+        plan.warnings.append("%s is not on a vehicle" % c.name)
+        return 0.0
+    ride = cur[-1]
+    obj = plan.objects.get(ride["obj"])
+    ox = obj.x_at(t) if obj else c.pos_at(t)[0]
+    side = spec.get("side") if isinstance(spec, dict) else None
+    if side not in ("left", "right"):
+        side = "right" if ox < 540 else "left"
+    reach = rides.HALF_LENGTH.get(ride["obj"], 200) * (obj.scale if obj else 1.0) * 0.5 + 170
+    land_x = clamp(ox + (reach if side == "right" else -reach), 150.0, 930.0)
+    k, dy = c.depth_at(t)
+    ride.update(t_off=t, land_x=land_x, land_y=c.y + dy, land_k=k)
+    c.moves.append((t, t + rides.RIDE_HOP, land_x, c.y, land_x, c.y))       # afterwards it stands there
+    return rides.RIDE_HOP + 0.1
 
 
 def compile_obj(plan, spec, t, warnings=None):
@@ -94,8 +159,8 @@ def compile_obj(plan, spec, t, warnings=None):
     if o is None:
         rest = spot if spot is not None else objects.SPOTS["center"]
         color = color_of(spec["color"]) if spec.get("color") else None
-        base = objects.OBJECTS[kind][2] if kind in objects.OBJECTS else 1.0
-        o = SceneObj(kind, color, float(spec.get("scale", base)), float(spec.get("y", OBJ_Y.get(kind, 1680.0))),
+        base = (objects.REF_SCALE * plan.world / objects.PERSON_R[kind]) if kind in objects.PERSON_R else plan.world
+        o = SceneObj(kind, color, base * float(spec.get("scale", 1.0)), float(spec.get("y", OBJ_Y.get(kind, 1680.0))),
                      bool(spec.get("front")), t, rest)
         plan.objects[kind] = o
         side = spec.get("enter")
@@ -135,6 +200,9 @@ class Char:
         self.moves = []         # (t0, t1, x0, y0, x1, y1)
         self.speech = []        # dicts
         self.depth = []         # (t, k0, dy0, k1, dy1): step towards / away from the camera
+        self.rides = []         # {"t0", "obj", "seat", "t_off", "land_x", "land_y"}: sitting on a vehicle
+        self.world = {}         # the scene's objects (set by compile_scene)
+        self._rf = (None, None)
         v = spec.get("voice", {})
         self.voice = v if isinstance(v, dict) else {"name": v}
 
@@ -157,12 +225,52 @@ class Char:
             k, dy = lerp(k0, k1, e), lerp(dy0, dy1, e)
         return k, dy
 
+    def ground_state(self, t):
+        """(x, feet y, size) of the character standing on the ground at time t."""
+        x, y = self.pos_at(t)
+        k, dy = self.depth_at(t)
+        return x, y + dy, self.scale * k
+
+    def ride_at(self, t):
+        """(ride, phase, p) while on a vehicle: phase "on" / "riding" / "off", p = progress of a hop (0..1)."""
+        for r in self.rides:
+            end = None if r["t_off"] is None else r["t_off"] + rides.RIDE_HOP
+            if t < r["t0"] or (end is not None and t >= end):
+                continue
+            if not r.get("instant") and t < r["t0"] + rides.RIDE_HOP:
+                return r, "on", (t - r["t0"]) / rides.RIDE_HOP
+            if r["t_off"] is not None and t >= r["t_off"]:
+                return r, "off", (t - r["t_off"]) / rides.RIDE_HOP
+            return r, "riding", 1.0
+        return None
+
+    def ride_frame(self, t):
+        if not self.rides:
+            return None
+        if self._rf[0] != t:
+            self._rf = (t, rides.frame(self, t))
+        return self._rf[1]
+
     def draw_pos(self, t):
+        rf = self.ride_frame(t)
+        if rf:
+            return rf["x"], rf["y"]
         x, y = self.pos_at(t)
         return x, y + self.depth_at(t)[1]
 
     def draw_scale(self, t):
+        rf = self.ride_frame(t)
+        if rf:
+            return rf["scale"]
         return self.scale * self.depth_at(t)[0]
+
+    def focus_at(self, t):
+        """Where the camera looks when it follows this character (head / chest)."""
+        rf = self.ride_frame(t)
+        if rf:
+            return rf["hip"][0], rf["hip"][1] - 250 * rf["scale"]
+        x, y = self.draw_pos(t)
+        return x, y - 560 * self.depth_at(t)[0]
 
     def state_at(self, t):
         st = dict(action="idle", action_t0=0.0, expression=self.spec.get("expression", "neutral"),
@@ -334,6 +442,26 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.fade_out = float(meta.get("fade_out", 0.0))
     plan.background = scene.get("background", {"type": "plain"})
 
+    # ---- one scale for the whole shot ----
+    # framing: "wide" = everybody small enough that the vehicles fit in the frame in proportion; "inside" = people big
+    # and the vehicle drawn huge around its driver; "medium" = people big (default when there is no vehicle).
+    kinds_ = set()
+    for raw_ in scene.get("timeline", []):
+        for key_ in ("obj", "ride"):
+            d_ = raw_.get(key_)
+            k_ = objects.resolve_kind(d_.get("kind", "")) if isinstance(d_, dict) else None
+            if k_ in objects.PERSON_R:
+                kinds_.add(k_)
+    framing = scene.get("framing") or meta.get("framing")
+    if framing not in ("wide", "medium", "inside"):
+        framing = "wide" if any(k_ in objects.VEHICLES for k_ in kinds_) else "medium"
+    world = 1.0
+    if framing == "wide" and kinds_:
+        widest = max(objects.SPRITE_LEN[k_] / objects.PERSON_R[k_] for k_ in kinds_) * objects.REF_SCALE
+        world = clamp(900.0 / widest, 0.22, 1.0)
+    plan.framing, plan.world = framing, world
+    plan.cut_in = bool(scene.get("cut_in"))
+
     # ---- characters ----
     cdefs = scene.get("characters", {})
     names = list(cdefs.keys())
@@ -349,6 +477,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         x = spec.get("x", slots.get(slot, 540))
         y = spec.get("y", GROUND_Y)
         chars[name] = Char(name, spec, float(x), float(y), i)
+        chars[name].scale *= world
     plan.chars = chars
 
     # ---- timeline ----
@@ -358,6 +487,9 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.overlays = []
     plan.objects = {}
     plan.warnings = []
+    for c_ in chars.values():
+        c_.world = plan.objects
+    plan.world_chars = list(chars.values())
     cam_events = []
     shot_events = []        # camera moves from shot words on action lines (do not switch the auto camera off)
     shakes = []
@@ -441,6 +573,18 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             o = dict(ev["overlay"])
             o.setdefault("from", t)
             plan.overlays.append(o)
+        if ev.get("ride") and who:
+            hold_ = 0.0
+            for w in who:
+                hold_ = max(hold_, compile_ride(plan, chars[w], ev["ride"], t))
+            plan_end = max(plan_end, t + hold_)
+            cursor = max(cursor, t + hold_)
+        if "getoff" in ev and who:
+            hold_ = 0.0
+            for w in who:
+                hold_ = max(hold_, compile_getoff(plan, chars[w], ev["getoff"], t))
+            plan_end = max(plan_end, t + hold_)
+            cursor = max(cursor, t + hold_)
         if "obj" in ev:
             ev_hold = compile_obj(plan, ev["obj"], t, plan.warnings)
             plan_end = max(plan_end, t + ev_hold)
@@ -472,7 +616,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.n_frames = int(round(plan.duration * plan.fps))
 
     # ---- camera segments ----
-    if meta.get("auto_camera", True) and not cam_events:
+    if meta.get("auto_camera", True) and not cam_events and plan.framing == "medium":     # wide / inside are composed shots
         auto_camera(plan, chars, cam_events, shakes)
     cam_events += shot_events
     segs = []
@@ -481,8 +625,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         tz = float(cam.get("zoom", z))
         f = cam.get("focus")
         if isinstance(f, str) and f in chars:
-            fx, fy = chars[f].draw_pos(cam["t"])
-            tc = (fx, fy - 560 * chars[f].depth_at(cam["t"])[0])
+            tc = chars[f].focus_at(cam["t"])
         elif isinstance(f, (list, tuple)):
             tc = (float(f[0]), float(f[1]))
         elif tz == 1.0:

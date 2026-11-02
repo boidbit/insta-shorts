@@ -274,15 +274,24 @@ CHAT_LEFT = (250, 250, 250, 255)
 CHAT_RIGHT = (214, 240, 200, 255)
 
 
-def chat_image(chat, shown, s, max_h=1180):
+def chat_image(chat, shown, s, max_h=1180, typing=None):
     """A phone-style chat panel with the first `shown` messages ({"side": "left"|"right", "text": ...}).
-    Only the newest messages that fit are kept (the older ones scroll away). RGBA at output scale s."""
+    Only the newest messages that fit are kept (the older ones scroll away). `typing` = None, or 0..2 = the other
+    person is typing (three dots, that one lit) below the messages. RGBA at output scale s."""
     size = 46 * s
     msgs = list(chat.get("messages", []))[:max(0, shown)]
     bubbles = []
     for m in msgs:
         tb = text_block(str(m.get("text", "")), size, 560 * s, fill=(20, 20, 20), align="left")
         bubbles.append((m.get("side", "left"), tb, tb.width + int(46 * s), tb.height + int(26 * s)))
+    if typing is not None:                                   # a bubble with three dots; dot `typing` is the dark one
+        dots = Image.new("RGBA", (int(150 * s), int(76 * s)), (0, 0, 0, 0))
+        dd = ImageDraw.Draw(dots)
+        for i in range(3):
+            c = (30, 30, 36, 255) if i == typing else (150, 150, 158, 255)
+            cx_, cy_ = int((38 + i * 37) * s), int(38 * s)
+            dd.ellipse([cx_ - 9 * s, cy_ - 9 * s, cx_ + 9 * s, cy_ + 9 * s], fill=c)
+        bubbles.append(("left", dots, dots.width, dots.height))
     pad, gap, head_h = int(26 * s), int(16 * s), int(124 * s)
     keep, total = [], 0
     for b in reversed(bubbles):

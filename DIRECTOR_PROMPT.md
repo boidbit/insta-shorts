@@ -58,6 +58,8 @@ Use `hi-IN-SwaraNeural` for women/girls and `hi-IN-MadhurNeural` for men/boys; g
 - `move`: { "x": 800, "dur": 1.0 } walks the character there (walk animation is automatic). Walk in from off-screen by starting at x -140 / 1200.
 - `hold`: seconds to keep the cursor still after this event (use it on the last event of each scene). `{ "wait": 1.0 }` just advances the cursor.
 - `sfx`: pop | boing | whoosh | ding | thud | clap | beep | laugh_track (+ `volume` 0..1)
+- `ride` / `getoff`: a character gets on / off a vehicle: `{ "t": 1.0, "who": "A", "ride": { "kind": "bike", "seat": "driver" } }` (kinds: bike, scooter, cycle, auto, car, truck; seats: driver, back) and `{ "t": 6.0, "who": "A", "getoff": { "side": "left" } }`. The vehicle must exist (an `obj` event) or is created beside the character; `obj` events with `go` / `enter` / `exit` make it drive and the rider goes along.
+- Shots: every scene of the `scenes` list is a shot. Put each one in the same place as a hard cut with `"cut_in": true` and give it only the characters that act in it (`cast`); `"framing": "wide" | "medium" | "inside"` (wide = everybody small so a vehicle fits in proportion, inside = the cab / the vehicle interior around the driver). A scene with a vehicle is wide by itself; one scale for the whole world.
 - `obj`: set object event, e.g. `{ "t": 1.0, "obj": { "kind": "truck", "enter": "left", "at": "right" } }` (kinds: truck, auto, car, scooter, cow, dustbin, bags, table; keys: at/enter/exit/go = left|center|right, color, scale, front, dur). New props/looks: prop `bag`, accessory `sunglasses`, action `salute`.
 - `camera`: { "shake": 0.6 } (comedy hit) or { "zoom": 1.2, "focus": "A", "dur": 0.4 } (use zoom rarely)
   Scenes with no `zoom`/`focus` camera event get an automatic camera (cut-ins on the speaker, tight punch line); put `"shot": "close"|"wide"|"medium"|"two_shot"` on a `say` event to choose a shot yourself. `"depth": "near"|"far"|"mid"` on an event makes that character step towards / away from the camera.
@@ -69,9 +71,9 @@ Backgrounds: kitchen, room, street, school, market, office, bus_stop, night_road
 # Rules
 
 1. HOOK FIRST. Second 0 must already be interesting: the hook overlay (style "hook") from t=0 to ~2 s, an sfx at t=0, and the first spoken line or big action by t=0.6. No idle introductions.
-2. Total length 10-25 seconds (one scene: 8-15 s). Each scene ends with `hold` so the reaction is visible.
+2. Total length 10-40 seconds (most 15-30; one scene / shot: 3-15 s). Each scene ends with `hold` so the reaction is visible.
 3. End with the punch line + a call-to-action overlay (e.g. "Tag karo us dost ko 👇", "Comment me batao 👇") in the last 2 seconds.
-4. Humour = desi everyday life (family, friends, college, office, chai, cricket, shaadi, traffic). Keep it light: no insults to religion, caste, region, gender or real people.
+4. Tone and limits: follow the `# Tone for THIS video` section after this prompt (light, dark, satire, absurd or twist) fully; never water a dark or absurd idea down. Dark comedy is welcome (death, debt, ruin, corrupt offices, cruel fate, a character's own folly backfiring): the joke is about the situation, the system or fate, imply the darkness (cut away, a sound, the `dead` expression), nothing graphic. Three lines are never crossed: no joke whose target is a group of people (religion, caste, region, gender, body, disability) or a real, named person; no sexual content; nothing that teaches or encourages hurting yourself or others or committing a crime. Any everyday desi or modern setting is fine (family, office, bank, sarkari daftar, hospital queue, afterlife...). Think of three punch lines first and use the least expected one.
 5. Max 3 characters per video; pick looks that fit the story (mummy -> aunty, papa -> uncle, dadi -> dadi...). In a 2-person scene put them left and right, facing each other.
 6. Use several scenes only when the story moves to another place or time; otherwise one scene.
 7. Every spoken line needs both `say` (Hinglish) and `speak` (Devanagari).
@@ -79,6 +81,5 @@ Backgrounds: kitchen, room, street, school, market, office, bus_stop, night_road
 9. Always fill `post.caption` (1-2 lines, emoji ok) and 4-8 `post.hashtags`.
 10. Output JSON only.
 
-Voice-over and chat:
+Voice-over:
 - A character with `"hidden": true` is only a voice (no body, no slot): give it `"voice"` and use `say` events with `"bubble": false, "subtitle": true`.
-- A scene can carry `"chat": {"title": "Mummy", "messages": [{"side": "left", "text": "..."}, {"side": "right", "text": "..."}]}` (a phone chat, no characters: `"cast": []`); messages appear every 1.5 s with a pop sound.

@@ -74,18 +74,63 @@ Agar text me `CAST:` / `SCENE:` / `A -> ...` / `NAME: ...` wali koi line nahi ha
 - **Depth:** `B -> near` (character camera ki taraf aata hai, bada), `far` (peeche, chhota), `mid` (normal). `near` ke saath `close` mat milao: shot bahut tight ho jaata hai.
 - **Objects:** `OBJ: truck enter left to right` (gaadi aati hai aur right pe ruk jaati hai), `OBJ: dustbin left`, `OBJ: truck exit right`. Objects: truck (kachra gaadi), auto, car, scooter, cow, dustbin, bags, table; rang (`OBJ: car red ...`), `front` (characters ke aage), `big`/`small`. Apni PNG: `OBJ: assets/objects/x.png right`. Gaadi ke aane tak kahani ruki rehti hai. Jahan character khade hain wahan gaadi mat roko (wo chhup jaati hai), ya `front` lagao.
 - **Apni image se background:** 9:16 (1080x1920) image `assets/backgrounds/gali.png` me daalo, phir script me `SCENE: gali | title` (ya poora path `SCENE: assets/backgrounds/gali.jpg`). Character neeche ki taraf (zameen/sadak ~ neeche ke 35%) khade hote hain, to image me wahan khaali jagah rakho. Image main bana nahi sakta: kisi AI image tool se banwao ya free-licence image lo (flat cartoon style character ke saath mel khaati hai).
+- **Gaadi chalana / chadhna-utarna (rides):** `A -> ride bike` (bike, scooter, cycle, auto, car, truck; `B -> ride auto back` = doosri seat) character gaadi par hop karke baithta hai, `A -> getoff` (ya `getoff left|right`) se utarta hai. Gaadi chalane ke liye `OBJ: bike go right` (ya `enter left to center`), rider saath chalta hai; cycle me pedal ghoomte hain, mudne par rider mirror hota hai. Cycle/bike/scooter/auto me poora rider dikhta hai, car/truck me khidki me sirf sar dikhta hai (truck ka design wahi hai, khidki thodi badi). Rider ke haath handle tak pahunchne ke liye thode lambe hote hain. Jis gaadi par koi baitha ho wo sabke aage aati hai. Gaadi ka size character se hi nikalta hai (ek scale), isliye truck jaisi badi gaadi ke saath wala shot `CUT wide` hota hai (log chhote) ya `CUT inside` (cab bada). Example:
+  ```
+  A -> ride truck enter left to center     (gaadi bahar se aati hai, A pehle se andar)
+  A (smug, close): Le aaya sarkari gaadi! | ले आया सरकारी गाड़ी!
+  A -> getoff                                (utarta hai)
+  OBJ: truck exit right                      (khaali gaadi chali jaati hai)
+  ```
+  Pehle se khade vehicle par chadhna ho to `OBJ: bike left`, phir `A -> ride bike` (hop karke baithta hai).
 - **Naye props/looks:** prop `bag`, accessory `sunglasses`, action `salute`.
 - **Voice-over:** `NARRATOR: Ek din ki baat hai | एक दिन की बात है`. Koi character nahi dikhta, bas awaaz aur neeche subtitle. CAST me likhna nahi padta.
-- **Chat scene (WhatsApp jaisa):**
-  ```
-  SCENE: plain | Message 📱
-  CHAT: Mummy ❤️
-  CHAT left: Beta khana kha liya?
-  CHAT right: Haan mummy 😅
-  ```
-  Har ~1.5 sec me ek message aata hai (pop awaaz ke saath). CTA chat ke baad aata hai.
 - **"Expectation vs Reality" / comparison:** do `SCENE:` likho, title card me `Expectation 😎` aur `Reality 😭`, beech me `TRANSITION: whip`. Alag split-screen abhi nahi hai.
 - **Camera se baat karna (monologue):** ek hi character, ek ke baad ek lines. Auto camera use alag-alag close shots me kaat deta hai.
+
+## Chat video (alag, chhota format)
+
+Texting wale jokes ke liye. Story format se bilkul alag hai: koi character, voice ya CAST nahi. "Apni script" box me (ya `scripts/x.txt` me) bas ye likho:
+
+```
+HOOK: Mummy ka message 📱
+CHAT: Mummy ❤️
+< Beta khana kha liya?
+> Haan mummy 😅
+< Jhooth mat bol, ghar aa!
+> Abhi aaya, 5 minute!
+CTA: Tag karo 👇
+```
+
+- `<` = samne wala (left; message se pehle ~1 sec "typing..." ke teen dot aate hain, aur aane ki `ding` awaaz), `>` = aap (right, `pop` awaaz).
+- Optional: `HOOK:`, `CTA:`, `CAPTION:`, `HASHTAGS:`, `MUSIC: beat 90`. 12 se zyada messages ho to purane upar se nikal jaate hain.
+- Chat ko story ke andar mat milao: story script me `<` / `>` / `CHAT` lines ek warning ke saath ignore hoti hain.
+- Awaaz nahi hoti, to Gemini ka quota kharch nahi hota.
+
+## Shots (CUT): sab ek hi frame me nahi
+
+Ek film ki tarah likho: jab camera kisi aur par jaaye to `CUT` likho. Har shot me **sirf wahi characters** dikhte hain jo us shot me bolte ya kuch karte hain, aur cut seedha hota hai (fade/whip nahi).
+
+```
+SCENE: street
+S (angry): Sun ladke! Sarkari gaadi se aana! | ...      <- baap pehle bolta hai (baap + beti ek frame me)
+B (shock): Papa!? | ...
+CUT
+L (grin): Ji sasur ji! | ...                              <- ab sirf ladka
+L -> exit left
+CUT wide
+S (smug): Dekhte hain... | ...                            <- wide: sab chhote, poori gaadi dikhti hai
+L -> ride truck enter left to center
+CUT inside
+L -> ride truck                                           <- gaadi ke andar: driver bada, cab ke saath
+L (smug): Le aaya sarkari gaadi! | ...
+CUT
+S (shock): Yeh kya hai?? | ...
+```
+
+- `CUT wide` / `CUT inside` / `CUT medium` (default). `SCENE: jagah | title | wide` se bhi framing de sakte ho. Gaadi wala shot apne aap wide hota hai.
+- **Ek hi scale:** gaadi hamesha insaan ke anupaat me hoti hai (truck insaan se ~2 guna ooncha, car/auto lagbhag insaan jitni), aur rider khade character jitna hi bada hota hai. Wide shot me log chhote hote hain taaki poori gaadi frame me aaye; bade chehre ke liye `CUT inside` ya `CUT medium`.
+- Shot ek doosre ka state yaad nahi rakhte: jis shot me ladka gaadi me dikhna hai usme `L -> ride truck` dobara likho.
+- Auto camera sirf `medium` shots me zoom karta hai (wide aur inside "composed" shots hain).
 
 ## Characters
 
@@ -124,6 +169,23 @@ Poora example: `scenes/doodh_story_demo.json`. Poora schema: `DIRECTOR_PROMPT.md
 ## Hook styles (pehla second)
 
 `pattern_interrupt` (Ruko!), `pov`, `relatable` (Agar tum bhi...), `curiosity` (end tak dekho), `list` (3 types ke...), `question` (kaun sahi?), `cold_open` (jhagde ke beech se), `expectation` (expectation vs reality). AI ko style do ya `auto`. Director check karta hai ki hook t=0 pe screen pe hai aur pehle second me kuch ho raha hai, warna khud sudharwata hai.
+
+## Tone: light, dark, satire, absurd (AI writer ke liye)
+
+Page ke "Idea do (AI)" tab me **Tone** dropdown hai (ya idea me ek line `TONE: dark` likho, ya command line me `--tone dark`):
+
+| Tone | Matlab |
+|---|---|
+| `auto` (default) | Idea dekh kar AI khud chunta hai (aur dark/ajeeb idea ko "light" nahi banata). Bina idea ke random mix. |
+| `light` | Family/relatable, halka-phulka. |
+| `dark` 💀 | Halat grim (maut, qarz, system, kismat), andaaz deadpan. Darkness implied: cut, awaaz, `dead` expression; kuch graphic nahi. |
+| `satire` | Aisi ajeeb cheez jo sab pehchaante hain (daftar, bill, rules), kaalpanik log aur sansthan. |
+| `absurd` | Ek namumkin cheez sach hai aur sab use normal maante hain. |
+| `twist` | Meetha shuru, aakhir me tez twist. |
+
+- Har tone ke saath AI ko ek chhota example (exact format me) milta hai, jisse style samajh aati hai.
+- Length: default 4-7 lines / 12-25 sec; jis kahani ko setup chahiye (dark twist, satire, gaadi) wo 10 lines / 40 sec tak ja sakti hai.
+- **Teen cheezein kabhi nahi:** kisi group (dharm, jaati, kshetra, gender, shareer, disability) ya asli, naam wale insaan ko nishana banane wala mazaak; sexual content; khud ko ya doosron ko nuksaan pahunchane ya jurm sikhane wali baat. Baaki sab (maut, qarz, bhrasht daftar, bhoot, kismat) allowed hai. Ye seema isliye bhi hai ki Instagram aise content ki reach daba deta hai, aur Gemini/Claude jaise AI use khud refuse karte hain.
 
 ## Templates (`templates/`)
 

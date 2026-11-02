@@ -26,10 +26,29 @@ Script format (one thing per line):
 - `SCENE: background | title` starts a new place (kitchen, room, street, school, market, office, bus_stop, night_road,
   plain), or your own picture: `SCENE: gali` uses assets/backgrounds/gali.png (.jpg/.webp), or a path `SCENE: assets/backgrounds/gali.jpg`.
 - `wait 1.5` (or `...`) pauses.
+- Shots: `CUT` starts a new shot in the same place (a hard cut) and shows only the characters who speak or act in it;
+  `CUT wide` = everybody small so a whole vehicle fits, `CUT inside` = the inside of a vehicle (the driver big, in
+  the middle), `CUT medium` (default) = people big. `SCENE: place | title | wide` sets the framing of a scene too.
+  A shot with a vehicle is "wide" by itself. One scale for the whole world: a vehicle is always in proportion to the
+  people next to it, a rider is as big as somebody standing.
 - Camera (optional, the camera already cuts in on every speaker by itself): `wide`, `medium`, `close`,
   `two_shot` in the brackets of a line, e.g. `A (shock, close): ...` or `A -> shock close`.
+- Vehicles: `A -> ride bike` (also truck, car, auto, scooter, cycle; `ride auto back` = the second seat) hops A on,
+  `A -> getoff` (or `getoff left|right`) hops off. `A -> ride truck enter left to center` = the vehicle drives in
+  from the left with A already inside. The vehicle is made bigger while somebody rides it.
 - Depth: `near` (step towards the camera, bigger), `far` (step back, smaller), `mid` (back to normal),
   e.g. `B -> near smug`.
+
+Just a chat (a separate, tiny format - not part of the story format):
+
+    CHAT: Mummy ❤️
+    < Beta khana kha liya?
+    > Haan mummy 😅
+    < Jhooth mat bol, ghar aa!
+    CTA: Tag karo 👇
+
+`<` = the other person (left, with a "typing..." moment first), `>` = you (right). Optional: HOOK, CTA, CAPTION,
+HASHTAGS, MUSIC. No characters, no voice.
 
 Just lyrics (no format at all): if the text has no CAST/SCENE line, no `A = ...`, no `A -> ...` and no
 `NAME: ...` speaker line, every line is a lyric shown on screen while one singer walks down a night road:
@@ -45,7 +64,7 @@ import argparse
 import os
 import re
 
-from . import actions, audio, objects
+from . import actions, audio, objects, rides
 from .characters import ACCESSORIES, EXPRESSIONS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE, SKIN_TONES
 from .util import asset_path
 from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS, chat_length
@@ -57,6 +76,8 @@ SFX = ("pop", "boing", "whoosh", "ding", "thud", "clap", "beep", "laugh_track")
 NARRATION_NAMES = ("narrator", "vo", "narration", "voiceover", "voice_over")   # a voice with no body
 NARRATOR_SPEC = {"hidden": True, "voice": {"name": "hi-IN-MadhurNeural", "pitch": "-12Hz", "rate": "-4%",
                                            "gemini": "Charon"}}
+GETOFF_WORDS = ("getoff", "utar", "dismount")
+FRAMINGS = ("wide", "medium", "inside")
 SHOTS = tuple(SHOT_ZOOM) + tuple(SHOT_ALIASES)       # camera: wide, medium, close, two_shot (+ spellings)
 DEPTH_WORDS = tuple(DEPTHS)                         # near / mid / far: step towards or away from the camera
 DIRECTIONS = ("left", "right", "up", "down", "up_left", "up_right")
@@ -88,6 +109,8 @@ def vocab():
         "shots": sorted(SHOTS), "depth": sorted(DEPTH_WORDS),
         "objects": sorted(set(objects.OBJECTS) | set(objects.ALIASES)),
         "object_words": ["center", "enter", "exit", "front", "go", "left", "right", "to"],
+        "rides": sorted(rides.RIDES), "ride_words": sorted(("ride", "back", "driver") + GETOFF_WORDS),
+        "framings": sorted(FRAMINGS),
     }
 
 
@@ -151,7 +174,35 @@ def _stage(tokens, ev, scene_cast, who):
     while i < len(tokens):
         w = tokens[i]
         nxt = tokens[i + 1] if i + 1 < len(tokens) else None
-        if w in ("enter", "exit") and nxt in ("left", "right"):
+        if w == "ride":
+            kind = objects.resolve_kind(nxt) if nxt else None
+            if kind and rides.rideable(kind):
+                spec = {"kind": kind}
+                i += 1
+                while i + 1 < len(tokens):                  # back | driver | enter left|right | to left|center|right
+                    t1, t2 = tokens[i + 1], tokens[i + 2] if i + 2 < len(tokens) else None
+                    if t1 in ("back", "driver"):
+                        spec["seat"] = t1
+                        i += 1
+                    elif t1 == "enter" and t2 in ("left", "right"):
+                        spec["enter"] = t2
+                        i += 2
+                    elif t1 == "to" and t2 in ("left", "center", "right"):
+                        spec["at"] = t2
+                        i += 2
+                    else:
+                        break
+                ev["ride"] = spec
+            else:
+                unknown.append("ride %s (%s)" % (nxt or "?", ", ".join(sorted(rides.RIDES))))
+                i += 1 if nxt else 0
+        elif w in GETOFF_WORDS:
+            spec = {}
+            if nxt in ("left", "right"):
+                spec["side"] = nxt
+                i += 1
+            ev["getoff"] = spec
+        elif w in ("enter", "exit") and nxt in ("left", "right"):
             move = (w, nxt)
             i += 1
         elif w == "walk" and nxt in ("left", "center", "right"):
@@ -337,8 +388,71 @@ def parse_obj(rest):
     return spec, ["OBJ %s: %s samajh nahi aaye" % (raw[0], ", ".join(repr(b) for b in bad))] if bad else []
 
 
+CHAT_META = ("HOOK", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "CHAT", "SECONDS")
+
+
+def _split_chat(text):
+    """(meta, title, messages) if `text` is a chat (lines starting with < or >), else None."""
+    meta, msgs, title = {}, [], ""
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("//"):
+            continue
+        m = re.match(r"^([A-Za-z_]+)\s*:\s*(.*)$", line)
+        if m and m.group(1).upper() in CHAT_META:
+            if m.group(1).upper() == "CHAT":
+                title = m.group(2).strip()
+            else:
+                meta[m.group(1).upper()] = m.group(2).strip()
+            continue
+        m = re.match(r"^([<>])\s*(.*)$", line) or re.match(r"^CHAT\s+(left|right)\s*:\s*(.*)$", line, re.I)
+        if not m:
+            return None                     # a story script (or lyrics) with a stray line: not a chat
+        side = "left" if m.group(1) in ("<", "left") or m.group(1).lower() == "left" else "right"
+        msgs.append({"side": side, "text": m.group(2).partition("|")[0].strip()})
+    return (meta, title, msgs) if msgs else None
+
+
+def parse_chat(meta, title, msgs):
+    """Just a phone chat (no characters, no voice): `< other person` / `> me`, optional HOOK / CTA / CAPTION."""
+    warnings = []
+    kept = []
+    for m in msgs:
+        if m["text"]:
+            kept.append(m)
+        else:
+            warnings.append("chat: khali message chhod diya")
+    if len(kept) > 12:
+        warnings.append("chat bahut lambi hai (%d messages): purane messages upar se nikal jaayenge" % len(kept))
+    chat = {"title": title or "Chat", "messages": kept}
+    length = chat_length(len(kept), chat)
+    hook = meta.get("HOOK", "")
+    overlays = [{"text": hook, "style": "hook", "pos": [540, 190], "from": 0.0, "to": 2.2}] if hook else []
+    timeline = [{"wait": round(length, 2)}]
+    if meta.get("CTA"):
+        timeline.append({"hold": 2.0, "sfx": "pop", "volume": 0.5,
+                         "overlay": {"text": meta["CTA"], "style": "card", "pos": [540, 1350], "color": [236, 90, 70]}})
+    mv = meta.get("MUSIC", "").strip()
+    music = None
+    if mv.lower().startswith("beat"):
+        bpm = re.findall(r"\d+", mv)
+        music = {"type": "beat", "bpm": int(bpm[0]) if bpm else 90, "style": "soft", "volume": 0.3}
+    elif mv and mv.lower() != "none":
+        music = {"path": mv, "volume": 0.4}
+    scene = {"hook": hook, "meta": {"fps": 30, "tail": 0.6}, "background": {"type": "plain"}, "characters": {},
+             "overlays": overlays, "timeline": timeline, "chat": chat,
+             "post": {"caption": meta.get("CAPTION") or hook or (kept[0]["text"] if kept else ""),
+                      "hashtags": meta.get("HASHTAGS", "#chat #funny #relatable").split()}}
+    if music:
+        scene["music"] = music
+    return scene, warnings
+
+
 def parse_script(text):
     """Return (scene dict, warnings)."""
+    cht = _split_chat(text)
+    if cht:
+        return parse_chat(*cht)
     lyr = _split_lyrics(text)
     if lyr:
         return parse_lyrics(*lyr)
@@ -349,8 +463,7 @@ def parse_script(text):
     cur = None
 
     def new_scene(bg="room", title=None):
-        sc = {"background": bg if isinstance(bg, dict) else {"type": bg}, "lines": [], "title": title, "chat": [],
-              "chat_title": ""}
+        sc = {"background": bg if isinstance(bg, dict) else {"type": bg}, "lines": [], "title": title}
         scenes.append(sc)
         return sc
 
@@ -378,11 +491,17 @@ def parse_script(text):
                         n, w = part.split("=", 1)
                         add_cast(n.strip(), _words(w))
             elif key == "SCENE":
-                bg, _, title = val.partition("|")
+                bg, _, rest = val.partition("|")
+                title, _, frame = rest.partition("|")
                 bg, warn = resolve_background(bg.strip() or "room")
                 if warn:
                     warnings.append(warn)
+                frame = frame.strip().lower()
+                if frame and frame not in FRAMINGS:
+                    warnings.append("SCENE framing %r: wide / medium / inside" % frame)
+                    frame = ""
                 cur = new_scene(bg, title.strip() or None)
+                cur["framing"] = frame or None
             else:
                 meta[key] = val
             continue
@@ -393,15 +512,18 @@ def parse_script(text):
             continue
         if cur is None:
             cur = new_scene()
-        m = re.match(r"^CHAT\s*(left|right)?\s*:\s*(.*)$", line, re.I)
-        if m:
-            side, text = (m.group(1) or "").lower(), m.group(2).partition("|")[0].strip()
-            if not side:
-                cur["chat_title"] = text
-            elif text:
-                cur["chat"].append({"side": side, "text": text})
-            else:
-                warnings.append("CHAT %s: message khali hai" % side)
+        if re.match(r"^(CHAT\b|[<>]\s*\S)", line, re.I):
+            warnings.append("chat alag format hai, story script me nahi chalta (chat ke liye alag text likho: "
+                            "'< samne wala' / '> aap'): %r" % line[:40])
+            continue
+        m = re.match(r"^(?:CUT|SHOT)\b\s*:?\s*(\w*)\s*$", line, re.I)
+        if m:                                       # a new shot in the same place: a hard cut, its own set of characters
+            frame = m.group(1).lower()
+            if frame and frame not in FRAMINGS:
+                warnings.append("CUT %r: framing wide / medium / inside likho" % frame)
+                frame = ""
+            cur = new_scene(dict(cur["background"]), None)
+            cur["cut_in"], cur["framing"] = True, frame or None
             continue
         m = re.match(r"^OBJ\s*:\s*(.*)$", line, re.I)
         if m:
@@ -509,23 +631,24 @@ def parse_script(text):
                 ev.setdefault("hold", 0.6)
             tl.append(ev)
             first = False
-        if sc["chat"]:                              # the chat plays by itself: the CTA waits for its end
-            tl.append({"wait": round(chat_length(len(sc["chat"])), 2)})
         last = {"hold": 1.0}
         if si == len(scenes) - 1 and meta.get("CTA"):
             last = {"hold": 2.0, "sfx": "pop", "volume": 0.5,
                     "overlay": {"text": meta["CTA"], "style": "card",
-                                "pos": [540, 1250 if sc["chat"] else 640], "color": [236, 90, 70]}}
+                                "pos": [540, 640], "color": [236, 90, 70]}}
         tl.append(last)
         item = {"background": sc["background"], "cast": order + (["NARRATOR"] if narrated else []),
                 "characters": chars, "timeline": tl}
         if narrated:
             item["characters"]["NARRATOR"] = {}
             cast.setdefault("NARRATOR", dict(NARRATOR_SPEC))
-        if sc["chat"]:
-            item["chat"] = {"title": sc["chat_title"], "messages": [dict(m_) for m_ in sc["chat"]]}
+
         if sc["title"]:
             item["title"] = sc["title"]
+        if sc.get("framing"):
+            item["framing"] = sc["framing"]
+        if sc.get("cut_in"):
+            item["cut_in"] = True
         out_scenes.append(item)
 
     hook = meta.get("HOOK") or ""
@@ -555,8 +678,8 @@ def parse_script(text):
     if len([n for n in cast if n != "NARRATOR"]) > 3:
         warnings.append("more than 3 characters: the screen gets crowded")
     est = sum(audio.estimate_duration(ln[3]) + 0.3 for sc in scenes for ln in sc["lines"] if ln[0] == "say")
-    if est > 28:
-        warnings.append("script is long (~%.0fs of talking): reels work best under 25s" % est)
+    if est > 45:
+        warnings.append("script is long (~%.0fs of talking): most reels work best under 30s" % est)
     return scene, warnings
 
 

@@ -132,6 +132,16 @@
             <option value="expectation">Expectation vs reality</option>
           </select>
         </label>
+        <label id="toneWrap">Tone
+          <select id="tone">
+            <option value="auto">Auto (idea ke hisaab se)</option>
+            <option value="light">Light (family, relatable)</option>
+            <option value="dark">Dark comedy 💀</option>
+            <option value="satire">Satire (system par vyang)</option>
+            <option value="absurd">Absurd / ajeeb</option>
+            <option value="twist">Meetha shuru, tez twist</option>
+          </select>
+        </label>
         <label class="videoOpt">Quality
           <select id="width"><option value="1080">1080p (HD)</option><option value="720">720p (jaldi)</option></select>
         </label>
@@ -170,7 +180,7 @@
 </main>
 
 <!-- words the script format understands: same as studio/script.py vocab() (a test keeps them equal) -->
-<script type="application/json" id="vocab">{"places":["bus_stop","kitchen","market","night_road","office","plain","room","school","street"],"looks":["aunty","boy","college_boy","college_girl","dada","dadi","girl","kid","kid_girl","office_girl","office_guy","uncle"],"roles":["aunty","bachcha","behen","beta","beti","bhai","boss","brother","chacha","chachi","dad","dada","dadi","didi","dost","father","friend","maa","mom","mother","mummy","nana","nani","padosan","padosi","papa","sister","student","teacher","uncle"],"extras":["aadmi","aurat","bald","balding","beard","bindi","black","blazer","blue","braid","brown","bun","cap","chubby","cream","curly","dark","denim","earrings","fair","female","glasses","gold","green","grey","henna","khaki","kurta","ladka","ladki","long","magenta","male","man","maroon","moustache","mustard","navy","normal","olive","orange","pink","ponytail","purple","red","saffron","salwar","saree","shirt","short","side_part","sky","slim","spiky","sunglasses","teal","tilak","tshirt","tuft","turban","uniform","vest","wheatish","white","woman","yellow"],"expressions":["angry","cry","dead","grin","laugh","love","neutral","sad","shock","shout","sleepy","sly","smile","smug","surprised","think","wink"],"actions":["aeroplane","airplane","bhangra","clap","cry","dance","dance2","dance3","dance_walk","disco","facepalm","fail","fall","gaana","idle","jump","kamar_dard","laugh","naagin","nagin","none","point","salute","shock","shrug","sing","sleep","stand","sway","talk","thumka","walk","wave"],"props":["bag","ball","cup","mic","phone","spoon","stick"],"sfx":["beep","boing","clap","ding","laugh_track","pop","thud","whoosh"],"moves":["center","cheer","disco","down","drop","enter","exit","left","noprop","pump","right","shake","swing","up","up_left","up_right","walk"],"shots":["2shot","close","close_up","closeup","medium","two_shot","twoshot","wide"],"depth":["far","mid","near"],"objects":["auto","bags","bike","bin","car","cow","dustbin","gaadi","gai","garbage_truck","kachra","kachra_gaadi","rickshaw","scooter","table","thaila","truck"],"object_words":["center","enter","exit","front","go","left","right","to"]}</script>
+<script type="application/json" id="vocab">{"places":["bus_stop","kitchen","market","night_road","office","plain","room","school","street"],"looks":["aunty","boy","college_boy","college_girl","dada","dadi","girl","kid","kid_girl","office_girl","office_guy","uncle"],"roles":["aunty","bachcha","behen","beta","beti","bhai","boss","brother","chacha","chachi","dad","dada","dadi","didi","dost","father","friend","maa","mom","mother","mummy","nana","nani","padosan","padosi","papa","sister","student","teacher","uncle"],"extras":["aadmi","aurat","bald","balding","beard","bindi","black","blazer","blue","braid","brown","bun","cap","chubby","cream","curly","dark","denim","earrings","fair","female","glasses","gold","green","grey","henna","khaki","kurta","ladka","ladki","long","magenta","male","man","maroon","moustache","mustard","navy","normal","olive","orange","pink","ponytail","purple","red","saffron","salwar","saree","shirt","short","side_part","sky","slim","spiky","sunglasses","teal","tilak","tshirt","tuft","turban","uniform","vest","wheatish","white","woman","yellow"],"expressions":["angry","cry","dead","grin","laugh","love","neutral","sad","shock","shout","sleepy","sly","smile","smug","surprised","think","wink"],"actions":["aeroplane","airplane","bhangra","clap","cry","dance","dance2","dance3","dance_walk","disco","facepalm","fail","fall","gaana","idle","jump","kamar_dard","laugh","naagin","nagin","none","point","salute","shock","shrug","sing","sleep","stand","sway","talk","thumka","walk","wave"],"props":["bag","ball","cup","mic","phone","spoon","stick"],"sfx":["beep","boing","clap","ding","laugh_track","pop","thud","whoosh"],"moves":["center","cheer","disco","down","drop","enter","exit","left","noprop","pump","right","shake","swing","up","up_left","up_right","walk"],"shots":["2shot","close","close_up","closeup","medium","two_shot","twoshot","wide"],"depth":["far","mid","near"],"objects":["auto","bags","bicycle","bike","bin","bullet","car","cow","cycle","dustbin","gaadi","gai","garbage_truck","kachra","kachra_gaadi","motorcycle","rickshaw","scooter","table","thaila","truck"],"object_words":["center","enter","exit","front","go","left","right","to"],"rides":["auto","bike","car","cycle","scooter","truck"],"ride_words":["back","dismount","driver","getoff","ride","utar"],"framings":["inside","medium","wide"]}</script>
 <script>
 // ---------------------------------------------------------------- config
 // owner/repo come from the Pages address (<owner>.github.io/<repo>/); branch is saved per browser.
@@ -269,6 +279,20 @@ function checkActing(tokens) {
   const unknown = [], acts = [], exprs = [];
   for (let i = 0; i < tokens.length; i++) {
     const w = tokens[i], nxt = tokens[i + 1];
+    if (w === "ride") {                      // ride <vehicle> [back|driver]
+      if (SET.rides.has(nxt)) {
+        i++;
+        for (;;) {                       // back | driver | enter left|right | to left|center|right
+          const a = tokens[i + 1], b = tokens[i + 2];
+          if (a === "back" || a === "driver") i++;
+          else if ((a === "enter" && ["left", "right"].includes(b)) || (a === "to" && ["left", "center", "right"].includes(b))) i += 2;
+          else break;
+        }
+      }
+      else { unknown.push(`ride ${nxt || "?"} (${V.rides.join(", ")})`); if (nxt) i++; }
+      continue;
+    }
+    if (["getoff", "utar", "dismount"].includes(w)) { if (nxt === "left" || nxt === "right") i++; continue; }
     if ((w === "enter" || w === "exit") && (nxt === "left" || nxt === "right")) { i++; continue; }
     if (w === "walk" && ["left", "center", "right"].includes(nxt)) { i++; continue; }
     if (w === "point") { acts.push(w); if (["left", "right", "up", "down", "up_left", "up_right"].includes(nxt)) i++; continue; }
@@ -285,7 +309,34 @@ function checkActing(tokens) {
   return { unknown, lost: [...acts.slice(0, -1), ...exprs.slice(0, -1)] };
 }
 
+function isChatText(text) {          // a chat = only < / > lines (plus HOOK/CTA/CAPTION/HASHTAGS/MUSIC/CHAT:)
+  let msgs = 0;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("//")) continue;
+    if (/^(HOOK|CTA|CAPTION|HASHTAGS|MUSIC|SECONDS|CHAT)\s*:/i.test(line)) continue;
+    if (/^([<>]|CHAT\s+(left|right)\s*:)/i.test(line)) { msgs++; continue; }
+    return false;
+  }
+  return msgs > 0;
+}
+
+function lintChat(text) {
+  const out = [];
+  let n = 0;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    const m = line.match(/^([<>])\s*(.*)$/) || line.match(/^CHAT\s+(left|right)\s*:\s*(.*)$/i);
+    if (!m) continue;
+    n++;
+    if (!m[2].trim()) out.push(`"${short(line)}": message khali hai`);
+  }
+  if (n > 12) out.push(`${n} messages bahut zyada hain: purane messages upar se nikal jaayenge`);
+  return out;
+}
+
 function lintScript(text) {
+  if (isChatText(text)) return lintChat(text);          // chat: its own tiny format, no CAST / HOOK / CTA needed
   const out = [], cast = new Set(), used = [];
   let hook = false, cta = false, declared = false;
   const acting = (s, line) => {
@@ -327,12 +378,11 @@ function lintScript(text) {
       }
       continue;
     }
-    if (/^CHAT\b/i.test(line)) {          // phone-chat scene: CHAT: contact / CHAT left|right: message
-      const cm = line.match(/^CHAT\s*(left|right)?\s*:\s*(.*)$/i);
-      if (!cm) out.push(`"${short(line)}": CHAT left: ya CHAT right: likho`);
-      else if (cm[1] && !cm[2].trim()) out.push(`"${short(line)}": message khali hai`);
+    if ((m = line.match(/^(?:CUT|SHOT)\b\s*:?\s*(\w*)\s*$/i))) {   // CUT [wide|medium|inside]: a new shot, same place
+      if (m[1] && !SET.framings.has(m[1].toLowerCase())) out.push(`"${short(line)}": CUT ke baad wide / medium / inside likho`);
       continue;
     }
+    if (/^(CHAT\b|[<>])/i.test(line)) { out.push(`"${short(line)}": chat alag format hai, story script me nahi chalta (chat ke liye alag text likho)`); continue; }
     if ((m = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/))) { declared = true; cast.add(m[1]); continue; }
     if (/^(wait\s*[\d.]+|\.\.\.+)$/i.test(line)) continue;
     if ((m = line.match(/^([A-Za-z_]\w*)\s*->\s*(.+)$/))) { used.push(m[1]); acting(m[2], line); continue; }
@@ -377,6 +427,7 @@ function setMode(m) {
   $("go").textContent = m === "idea" ? "Script likho ✍️" : "✅ Approve: Video banao 🎬";
   $("polish").classList.toggle("hidden", m !== "script");
   $("hookWrap").classList.toggle("hidden", m !== "idea");
+  $("toneWrap").classList.toggle("hidden", m !== "idea");
   document.querySelectorAll(".videoOpt").forEach((x) => x.classList.toggle("hidden", m !== "script"));
   $("timeHint").textContent = m === "idea"
     ? "AI ko script likhne me ~1 minute lagta hai. Video tabhi banegi jab aap script approve karoge."
@@ -409,7 +460,7 @@ async function start(stage) {
     if (w.length && !confirm("Script me " + w.length + " dikkat(ein) hain (neeche list dekho).\n\nPhir bhi video banau?")) return;
   }
   const rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const inputs = { stage, hook: $("hook").value, request_id: rid };
+  const inputs = { stage, hook: $("hook").value, tone: $("tone").value, request_id: rid };
   if (stage === "script") {
     if (mode === "idea") inputs.instruction = text; else inputs.script_text = text;
   } else {

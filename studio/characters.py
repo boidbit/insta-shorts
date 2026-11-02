@@ -282,10 +282,11 @@ def skeleton(p):
     kneeR = add(hipR, vec(p["rl1"], TH))
     footR = add(kneeR, vec(p["rl2"], SH))
     shL, shR = (-56.0, -TORSO_H + 22), (56.0, -TORSO_H + 22)
-    elbL = add(shL, vec(p["la1"], UA))
-    handL = add(elbL, vec(p["la2"], LA))
-    elbR = add(shR, vec(p["ra1"], UA))
-    handR = add(elbR, vec(p["ra2"], LA))
+    ak = p.get("arm_k", 1.0)          # riders get longer arms so their hands reach the handlebar
+    elbL = add(shL, vec(p["la1"], UA * ak))
+    handL = add(elbL, vec(p["la2"], LA * ak))
+    elbR = add(shR, vec(p["ra1"], UA * ak))
+    handR = add(elbR, vec(p["ra2"], LA * ak))
     neck = (0.0, -TORSO_H + 4)
     hc = add(neck, rot((0.0, -(NECK_H + HEAD_RY * 0.8 * HEAD_SCALE)), d2r(p["head_tilt"])))
     fy = max(footL[1], footR[1]) + 12
