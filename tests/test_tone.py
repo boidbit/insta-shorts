@@ -73,6 +73,9 @@ class PromptTests(unittest.TestCase):
         self.assertIn("Dark comedy craft", s)
         self.assertIn("up to 10 spoken lines and 40 seconds", s)
         self.assertIn("three different premises", s)
+        self.assertIn("Story facts first", s)                        # the logic rule (who owes whom stays the same)
+        self.assertIn("contradict an earlier one", s)                # ...and the logic check before answering
+        self.assertIn("Story facts first", read("DIRECTOR_PROMPT.md"))
 
     def test_long_dark_stories_are_not_rejected(self):
         from studio import audio
