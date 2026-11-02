@@ -272,6 +272,120 @@ def school(s):
     return g.done()
 
 
+# ------------------------------------------------------------------ market (bazaar)
+def market(s):
+    g = G(s, color=(250, 232, 196))
+    g.vgrad(0, 760, (246, 196, 140), (252, 232, 190))
+    g.rect(0, 640, LW, 1300, (214, 168, 128), INK, 6)
+    g.line([(0, 560), (LW, 600), (LW, 560)], INK, 4)
+    for i, x in enumerate(range(0, LW + 90, 90)):                                   # bunting
+        g.poly([(x, 580 + (i % 2) * 6), (x + 70, 586), (x + 35, 650)],
+               [(214, 70, 64), (240, 190, 60), (70, 150, 96), (70, 120, 190)][i % 4], INK, 3)
+    g.line([(0, 580), (LW, 590)], INK, 5)
+    stalls = ((30, (206, 64, 60)), (385, (230, 170, 50)), (740, (62, 140, 96)))
+    for (x, col) in stalls:
+        w = 310
+        for k in range(8):                                                           # striped awning
+            g.rect(x + k * w / 8.0, 770, x + (k + 1) * w / 8.0, 880, col if k % 2 == 0 else (250, 246, 236), INK, 3)
+            g.circle(x + (k + 0.5) * w / 8.0, 880, w / 16.0, col if k % 2 == 0 else (250, 246, 236), INK, 3)
+        g.poly([(x - 14, 770), (x + w + 14, 770), (x + w - 14, 730), (x + 14, 730)], shade_c(col, 0.8), INK, 5)
+        g.line([(x, 900), (x, 1300)], INK, 9)
+        g.line([(x + w, 900), (x + w, 1300)], INK, 9)
+        g.rrect(x + 8, 1150, x + w - 8, 1300, 14, (160, 112, 76), INK, 6)
+        for j in range(5):                                                           # produce on the counter
+            cx = x + 40 + j * 56
+            g.circle(cx, 1128, 28, [(214, 64, 56), (240, 150, 50), (110, 176, 84), (230, 200, 70), (214, 64, 56)][(j + x // 300) % 5], INK, 4)
+            g.circle(cx + 26, 1146, 24, [(240, 150, 50), (110, 176, 84), (214, 64, 56)][(j + 1) % 3], INK, 4)
+        g.line([(x + 50, 900), (x + 50, 960)], INK, 3)
+        g.circle(x + 50, 976, 16, (255, 236, 150), INK, 4)                           # hanging bulb
+    g.rect(0, 1300, LW, LH, (208, 188, 150))
+    g.line([(0, 1300), (LW, 1300)], INK, 5)
+    for i in range(7):
+        y = 1300 + i * i * 16 + 14
+        g.line([(0, y), (LW, y)], (180, 160, 122), 3)
+    return g.done()
+
+
+def shade_c(c, k):
+    return tuple(max(0, min(255, int(v * k))) for v in c)
+
+
+# ------------------------------------------------------------------ office
+def office(s):
+    g = G(s, color=(226, 230, 238))
+    y_floor = 1290
+    g.rect(0, 0, LW, y_floor, (226, 230, 238))
+    g.rect(0, y_floor - 70, LW, y_floor, (204, 210, 222))
+    g.rect(620, 330, 1030, 900, (255, 255, 255), INK, 8)                              # big window with a skyline
+    g.rect(638, 348, 1012, 882, (170, 214, 240))
+    for (x0, w, h) in ((650, 70, 260), (730, 90, 360), (830, 70, 200), (910, 90, 320)):
+        g.rect(x0, 882 - h, x0 + w, 882, (110, 138, 168), INK, 4)
+        for wy in range(882 - h + 24, 860, 46):
+            g.rect(x0 + 12, wy, x0 + 26, wy + 24, (230, 240, 250))
+    g.line([(826, 348), (826, 882)], INK, 6)
+    g.rect(80, 420, 520, 760, (252, 252, 250), INK, 8)                                # whiteboard
+    g.line([(130, 500), (300, 480), (380, 520)], (60, 100, 190), 6)
+    g.line([(140, 580), (440, 570)], (60, 100, 190), 5)
+    g.rect(140, 640, 200, 700, (230, 120, 90))
+    g.circle(310, 250, 60, (255, 255, 255), INK, 7)                                   # wall clock
+    g.line([(310, 250), (310, 206)], INK, 6)
+    g.line([(310, 250), (344, 262)], INK, 6)
+    g.rect(0, y_floor, LW, LH, (98, 108, 128))
+    _floor_perspective(g, y_floor, (98, 108, 128), (82, 92, 110), (540, 900))
+    g.line([(0, y_floor), (LW, y_floor)], INK, 5)
+    g.rrect(120, 1130, 700, 1170, 8, (170, 120, 80), INK, 6)                          # desk with a monitor
+    g.rect(150, 1170, 176, 1290, (140, 96, 64), INK, 5)
+    g.rect(644, 1170, 670, 1290, (140, 96, 64), INK, 5)
+    g.rrect(260, 940, 560, 1110, 14, (46, 50, 60), INK, 6)
+    g.rect(276, 956, 544, 1094, (104, 168, 220))
+    g.line([(300, 1000), (480, 1000)], (240, 248, 255), 6)
+    g.line([(300, 1040), (430, 1040)], (240, 248, 255), 6)
+    g.rect(396, 1110, 424, 1130, (46, 50, 60))
+    g.rrect(300, 1112, 520, 1130, 6, (210, 214, 222), INK, 4)                         # keyboard
+    g.rrect(780, 1000, 940, 1290, 12, (120, 138, 160), INK, 6)                        # filing cabinet / water cooler
+    g.rrect(796, 920, 924, 1000, 20, (190, 226, 244), INK, 5)
+    g.rect(856, 1000, 864, 1040, INK)
+    return g.done()
+
+
+# ------------------------------------------------------------------ bus stop
+def bus_stop(s):
+    g = G(s)
+    g.vgrad(0, 1000, (150, 205, 240), (226, 240, 248))
+    g.circle(200, 240, 80, (255, 226, 130))
+    rnd = random.Random(11)
+    x = -30
+    while x < LW:
+        w = rnd.randint(170, 260)
+        h = rnd.randint(380, 720)
+        g.rect(x, 1180 - h, x + w, 1180, [(190, 176, 160), (160, 184, 200), (206, 176, 120)][rnd.randint(0, 2)], INK, 6)
+        for wy in range(1180 - h + 36, 1130, 100):
+            for wx in range(x + 24, x + w - 40, 62):
+                g.rect(wx, wy, wx + 30, wy + 54, (140, 175, 205), INK, 3)
+        x += w + 8
+    g.rect(0, 1180, LW, 1330, (206, 202, 192))
+    g.line([(0, 1180), (LW, 1180)], INK, 5)
+    g.line([(0, 1330), (LW, 1330)], INK, 6)
+    g.rect(0, 1330, LW, LH, (92, 94, 100))
+    for xx in range(-40, LW, 220):
+        g.rect(xx, 1700, xx + 120, 1718, (240, 220, 120))
+    g.rect(150, 1000, 160, 1330, (90, 110, 130), INK, 4)                              # shelter
+    g.rect(760, 1000, 770, 1330, (90, 110, 130), INK, 4)
+    g.rect(130, 960, 800, 1000, (70, 150, 150), INK, 6)
+    g.rect(160, 1000, 760, 1290, (190, 226, 240))
+    g.rect(190, 1030, 360, 1210, (240, 200, 90), INK, 5)                              # poster
+    g.circle(275, 1100, 36, (214, 70, 64), INK, 4)
+    g.rrect(420, 1218, 740, 1250, 8, (150, 104, 68), INK, 6)                          # bench
+    g.rect(440, 1250, 456, 1330, INK)
+    g.rect(704, 1250, 720, 1330, INK)
+    g.line([(930, 1330), (930, 800)], INK, 12)                                        # bus-stop pole + sign
+    g.circle(930, 770, 62, (60, 110, 200), INK, 7)
+    g.rrect(900, 748, 960, 790, 8, (255, 255, 255), INK, 4)
+    g.circle(912, 796, 7, INK, INK, 2)
+    g.circle(948, 796, 7, INK, INK, 2)
+    return g.done()
+
+
 # ------------------------------------------------------------------ plain / studio
 def plain(s, colors=None):
     c0, c1 = (colors or [(255, 214, 120), (255, 150, 110)])[:2]
@@ -323,6 +437,24 @@ def night_road(s, world_w=LW):
 
 
 # ------------------------------------------------------------------ public API
+# Things that move behind the characters: ("cloud", y, speed px/s, scale), ("birds", y, speed, count),
+# ("traffic", y, scale, period s) = a small vehicle crossing the far lane every `period` seconds.
+AMBIENT = {
+    "street": [("cloud", 190, 14, 1.0), ("cloud", 450, 9, 0.75), ("birds", 330, 60, 3), ("traffic", 1500, 0.4, 9.0)],
+    "bus_stop": [("cloud", 220, 11, 1.0), ("cloud", 460, 7, 0.7), ("birds", 360, 55, 2), ("traffic", 1470, 0.42, 7.5)],
+    "school": [("birds", 110, 48, 2)],
+}
+
+
+def _cloud_sprite(s, scale):
+    w, h = 260, 110
+    g = G(s * scale, w, h, (0, 0, 0, 0), "RGBA")
+    for (cx, cy, r) in ((70, 70, 44), (125, 50, 52), (185, 68, 42), (130, 78, 40)):
+        g.circle(cx, cy, r, (255, 255, 255, 235))
+    g.rect(60, 70, 200, 108, (255, 255, 255, 235))
+    return g.done()
+
+
 class Background:
     def __init__(self, spec, out_w, out_h):
         self.out_w, self.out_h = out_w, out_h
@@ -332,6 +464,8 @@ class Background:
             spec = {"type": spec}
         self.kind = spec.get("type", "plain")
         self.scroll = float(spec.get("scroll", 0.0))   # logical px per second
+        self.ambient = AMBIENT.get(self.kind, []) if spec.get("ambient", True) else []
+        self._clouds = {}
         self.static = None
         self.wide = None
         if self.kind == "image":
@@ -345,7 +479,8 @@ class Background:
             self.static = sky
             self.wide = wide
         else:
-            fn = {"kitchen": kitchen, "room": room, "street": street, "school": school}.get(self.kind)
+            fn = {"kitchen": kitchen, "room": room, "street": street, "school": school,
+                  "market": market, "office": office, "bus_stop": bus_stop}.get(self.kind)
             if fn:
                 self.static = fn(s)
             else:
@@ -359,9 +494,60 @@ class Background:
 
     def frame(self, t):
         if self.wide is None:
-            return self.static.copy()
-        off = int((t * self.scroll * self.out_w / LW) % self.out_w)
-        base = self.static.copy()
-        part = self.wide.crop((off, 0, off + self.out_w, self.out_h))
-        base.paste(part, (0, 0), part)
+            base = self.static.copy()
+        else:
+            off = int((t * self.scroll * self.out_w / LW) % self.out_w)
+            base = self.static.copy()
+            part = self.wide.crop((off, 0, off + self.out_w, self.out_h))
+            base.paste(part, (0, 0), part)
+        if self.ambient:
+            self._draw_ambient(base, t)
         return base
+
+    def _draw_ambient(self, img, t):
+        s = self.out_w / float(LW)
+        for n, item in enumerate(self.ambient):
+            kind = item[0]
+            if kind == "cloud":
+                _k, y, speed, scale = item
+                sp = self._clouds.get(scale)
+                if sp is None:
+                    sp = self._clouds[scale] = _cloud_sprite(s, scale)
+                span = self.out_w + 2 * sp.width
+                x = (n * 0.37 * span + t * speed * s) % span - sp.width
+                img.paste(sp, (int(x), int(y * s)), sp)
+            elif kind == "birds":
+                _k, y, speed, count = item
+                d = ImageDraw.Draw(img)
+                for b in range(count):
+                    span = self.out_w + 200 * s
+                    x = (b * 70 * s + t * speed * s + n * 190 * s) % span - 100 * s
+                    yy = y * s + math.sin(t * 1.3 + b) * 18 * s + b * 26 * s
+                    a = math.sin(t * 11 + b * 1.7) * 7 * s
+                    w = 15 * s
+                    d.line([(x - w, yy + a), (x, yy), (x + w, yy + a)], fill=INK, width=max(2, int(3 * s)))
+            elif kind == "traffic":
+                self._draw_traffic(img, t, item, s)
+
+    def _draw_traffic(self, img, t, item, s):
+        from . import objects                      # (objects imports this module, so import lazily)
+        _k, y, scale, period = item
+        cycle, ct = int(t // period), t % period
+        crossing = period * 0.62
+        if ct > crossing:
+            return
+        kinds = ("car", "auto", "scooter", "truck")
+        kind = kinds[cycle % len(kinds)]
+        right = cycle % 2 == 0
+        im, (ax, ay), wheels = objects.sprite(kind, s * scale)
+        p = ct / crossing
+        x = (-ax + p * (self.out_w + 2 * im.width)) if right else (self.out_w + im.width - p * (self.out_w + 2 * im.width))
+        if not right:
+            im = im.transpose(Image.FLIP_LEFT_RIGHT)
+            ax = im.width - ax
+        bob = math.sin(t * 17) * 2 * s
+        img.paste(im, (int(x - ax), int(y * s - ay + bob)), im)
+        for (wx, wy, r) in wheels:
+            w = objects.wheel_image(r, -(x) / max(r, 1.0) * 57.2958)
+            wxx = (im.width - wx) if not right else wx
+            img.paste(w, (int(x - ax + wxx - w.width / 2), int(y * s - ay + bob + wy - w.height / 2)), w)

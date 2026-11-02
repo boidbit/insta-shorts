@@ -49,7 +49,7 @@ from .characters import ACCESSORIES, EXPRESSIONS, HAIR_COLORS, HAIR_STYLES, LOOK
 from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS
 
 HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION")
-BACKGROUNDS = ("kitchen", "room", "street", "school", "night_road", "plain")
+BACKGROUNDS = ("kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road", "plain")
 PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick", "bag")
 SFX = ("pop", "boing", "whoosh", "ding", "thud", "clap", "beep", "laugh_track")
 SHOTS = tuple(SHOT_ZOOM) + tuple(SHOT_ALIASES)       # camera: wide, medium, close, two_shot (+ spellings)
