@@ -50,6 +50,14 @@ def _clean(text):
     return re.sub(r"[\U0001F000-\U0001FFFF☀-➿️]", "", text).strip()
 
 
+def quick(llm):
+    """A helper must never hold the video up: one try per model, short timeout, two models at most (then Roman)."""
+    if hasattr(llm, "models"):
+        llm.TRIES, llm.timeout, llm.temperature = 1, 40, 0.2
+        llm.models = llm.models[:2]
+    return llm
+
+
 def transliterate(lines, llm):
     """[roman] -> [devanagari] (None where the answer was unusable)."""
     raw = llm(SYSTEM, [{"role": "user", "content": json.dumps(lines, ensure_ascii=False)}], json_mode=True)
@@ -80,7 +88,7 @@ def fill_hindi(scene, llm=None, log=None):
                     log("  [hindi] %d line(s) without Devanagari and no AI key: the voice reads the Roman letters"
                         % len(lines))
                     return 0
-                llm = make_llm()
+                llm = quick(make_llm())
             hindi = transliterate(lines, llm)
         except (Exception, SystemExit) as e:        # noqa: BLE001  (GeminiLLM gives up with SystemExit)
             log("  [hindi] could not get Devanagari (%s): the voice reads the Roman letters" % str(e)[:200])

@@ -82,6 +82,8 @@ class GeminiLLM:
         self.key = key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         if not self.key:
             raise SystemExit("GEMINI_API_KEY is not set")
+        self.timeout = 180              # seconds per request
+        self.temperature = 0.9
 
     def __call__(self, system, messages, json_mode=True):
         body = {
@@ -89,7 +91,7 @@ class GeminiLLM:
             "contents": [{"role": "model" if m["role"] == "assistant" else "user", "parts": [{"text": m["content"]}]}
                          for m in messages],
             "generationConfig": {"responseMimeType": "application/json" if json_mode else "text/plain",
-                                 "maxOutputTokens": 8192, "temperature": 0.9},
+                                 "maxOutputTokens": 8192, "temperature": self.temperature},
         }
         last = None
         for i, model in enumerate(self.models):
@@ -97,7 +99,7 @@ class GeminiLLM:
                 req = urllib.request.Request(self.URL % model, data=json.dumps(body).encode("utf-8"),
                                              headers={"Content-Type": "application/json", "x-goog-api-key": self.key})
                 try:
-                    with urllib.request.urlopen(req, timeout=180) as r:
+                    with urllib.request.urlopen(req, timeout=self.timeout) as r:
                         data = json.loads(r.read().decode("utf-8"))
                     self.models = self.models[i:]       # stick with the model that answered
                     parts = (data.get("candidates") or [{}])[0].get("content", {}).get("parts", [])
