@@ -19,6 +19,23 @@ Page pe 3 tareeke hain:
 
 "Banao" dabao → progress bar → video, download button, caption copy button.
 
+### 🎭 Builder: jagah aur characters chuno, dialogue saade text me
+
+"Idea do" tab me upar **"Jagah aur characters khud chuno"** kholo:
+
+- **Jagah** (kamra, rasoi, bazaar, office…) aur max 3 **characters**: naam, kaun (papa, mummy, dost… har ek ki chhoti photo), baal, rang, kapde, colour, body, extra (chashma, mooch, topi…). Na chuno to "auto". Ye choice browser me yaad rehti hai.
+- Neeche box me **idea** likho → AI inhi characters aur jagah ke saath script likhta hai.
+- Ya seedha **dialogue** likho, har line `Naam: baat`:
+  ```
+  Papa: Sarkari gaadi se aana!
+  Beta: Ji papa ji!
+  Papa (gussa): Aur time pe aana.
+  ```
+  Button "📝 Script banao (bina AI)" ban jata hai: page khud poori script banata hai (HOOK, CAST, SCENE, shots, CTA, caption) aur "Apni script" tab me dikhata hai → padho → Approve.
+- Emotion: box ke neeche chips (😠 gussa, 😲 hairan, 😏 akad, 😂 hasi…) jis line pe cursor hai usme jud jaate hain. Na do to `?!` = hairan, 😂 = hasi apne aap.
+- Shots: khali line = naya shot. Na do to har baar bolne wala badalne pe CUT, aur do logon ki baat me zyada tar `CUT ots` (face-off).
+- **Devanagari likhne ki zarurat nahi:** video banate waqt workflow saari Roman lines ek hi AI request me Devanagari me badal deta hai (`GEMINI_API_KEY`), taaki Hindi awaaz sahi padhe. Bubble me aapka Roman text hi dikhta hai. Key na ho to awaaz Roman padhegi.
+
 AI key ke saath chalana: `GEMINI_API_KEY=xxxx python -m studio.web` (key: aistudio.google.com → Get API key). Model badalna ho to `GEMINI_MODEL` / `DIRECTOR_MODEL`.
 
 ## Script format (bina AI)
@@ -128,6 +145,8 @@ S (shock): Yeh kya hai?? | ...
 ```
 
 - `CUT wide` / `CUT inside` / `CUT medium` (default). `SCENE: jagah | title | wide` se bhi framing de sakte ho. Gaadi wala shot apne aap wide hota hai.
+- **Har CUT ek naya angle:** ek jagah ke andar har CUT par background alag hissa dikhata hai (paas se, ek side se, ya ulti taraf se = mirror), jaise camera ghooma ho. `CUT reverse` = jagah ko doosri taraf se dikhao.
+- **`CUT ots` (over the shoulder):** sunne wale ki peeth (sir + kandhe) bade size me aage kone me, bolne wala camera ki taraf. Peeche kaun dikhe: `CUT ots B`; na likho to shot ka doosra character, ya pichhle shot me jo bola tha. Do `CUT ots` aage-peeche = face-off (side apne aap badalti hai).
 - **Ek hi scale:** gaadi hamesha insaan ke anupaat me hoti hai (truck insaan se ~2 guna ooncha, car/auto lagbhag insaan jitni), aur rider khade character jitna hi bada hota hai. Wide shot me log chhote hote hain taaki poori gaadi frame me aaye; bade chehre ke liye `CUT inside` ya `CUT medium`.
 - Shot ek doosre ka state yaad nahi rakhte: jis shot me ladka gaadi me dikhna hai usme `L -> ride truck` dobara likho.
 - Auto camera sirf `medium` shots me zoom karta hai (wide aur inside "composed" shots hain).
@@ -142,6 +161,7 @@ Ready looks: `boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, ki
 
 - `skin`: fair, wheatish, brown, dark · `hair`: short, side_part, spiky, curly, balding, bald, long, braid, bun, ponytail · `hair_color`: black, brown, grey, white, henna
 - `outfit`: tshirt, shirt, kurta, salwar (dupatta ke saath), saree, uniform, blazer, vest · `color` / `accent` (dupatta, blouse, tie) / `pants` / `shoes` (black, white, chappal)
+- **Chehra** (face): `face` oval, round, long, square · `eyes` dot, big, small · `nose` hook, button, long, big · `brows` normal, thick, thin. Script me CAST words: `round_face big_eyes button_nose thick_brows`. Na likho to studio har character ko apna alag chehra deta hai (pehla character classic chehra), aur ek jaise do characters (do `college_boy`) ko alag baal, rang (skin) aur shirt ka colour.
 - `build`: slim, normal, chubby · `scale` (bachche ~0.72) · `accessories`: glasses, cap, turban, moustache, beard, bindi, tilak, earrings
 - 17 expressions, 17 actions (walk, talk, dance, point, laugh, shock, jump, wave, clap, cry, fall, facepalm, shrug, sway, sleep...)
 - **Desi dance pack** (music ki beat pe chalta hai, `MUSIC: beat 110`): `naagin` (haath maathe pe phan), `bhangra`, `aeroplane` (uncle special), `thumka`, `dance_walk` (chalte-chalte dance, `night_road` pe best), `kamar_dard` (hero dance… phir kamar jawab de deti hai), `sing` (mic apne aap haath me, mooh gaata hai). Example: `scripts/shaadi_dance.txt`.

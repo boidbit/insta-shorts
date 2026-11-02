@@ -79,6 +79,22 @@
   .setup ol { padding-left: 20px; margin: 8px 0; font-size: 14px; }
   code { background: var(--bg); padding: 1px 5px; border-radius: 5px; }
   a { color: var(--brand); }
+  details.builder { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  details.builder summary { cursor: pointer; font-weight: 600; }
+  .brow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .crow { display: flex; gap: 8px; align-items: center; padding: 8px; margin-top: 8px; border-radius: 10px;
+          background: var(--bg); }
+  .crow img { width: 56px; height: 70px; flex: none; object-fit: contain; }
+  .crow .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; flex: 1;
+                  min-width: 0; }
+  .crow .fields > * { width: 100%; min-width: 0; }
+  .brow label.grow { flex: 1 1 220px; min-width: 0; }
+  .brow label.grow input { flex: 1; min-width: 0; width: 100%; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .chip { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px;
+          padding: 4px 10px; font: inherit; font-size: 14px; cursor: pointer; }
+  .setup label { max-width: 100%; }
+  #token { width: 100%; max-width: 330px; }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -113,7 +129,26 @@
         <button class="tab" role="tab" data-mode="idea" aria-selected="true">💡 Idea do (AI)</button>
         <button class="tab" role="tab" data-mode="script" aria-selected="false">📝 Apni script</button>
       </div>
+      <details class="builder" id="builder">
+        <summary>🎭 Jagah aur characters khud chuno <span class="hint">(optional)</span></summary>
+        <div class="brow">
+          <label>Jagah <select id="bPlace"></select></label>
+          <button class="small" id="bAdd" type="button">➕ Character jodo</button>
+          <button class="small" id="bClear" type="button">Sab hatao</button>
+        </div>
+        <div id="bCast"></div>
+        <div class="brow">
+          <label class="grow">Hook <input type="text" id="bHook" placeholder="Pehli second ka text (khali = pehli line)"></label>
+        </div>
+        <div class="brow">
+          <label class="grow">CTA <input type="text" id="bCta" placeholder="Aakhir me (khali = Apne dost ko tag karo 👇)"></label>
+        </div>
+        <p class="hint">Neeche ya to <b>idea</b> likho (AI inhi characters aur jagah ke saath script likhega), ya seedhe
+          <b>dialogue</b>: har line <code>Naam: baat</code>, jaise <code>Papa: Sarkari gaadi se aana!</code>.
+          Khali line = naya shot (na do to shot apne aap badalte hain). Devanagari likhne ki zarurat nahi.</p>
+      </details>
       <textarea id="text" spellcheck="false"></textarea>
+      <div class="chips" id="chips"><span class="hint">Line me jodo:</span></div>
       <ul class="lint hidden" id="lint" aria-live="polite"></ul>
       <p class="hint" id="hint"></p>
       <button class="linkbtn" id="copyPrompt">🤖 ChatGPT / Claude / Gemini app se script likhwani hai? Unke liye poora prompt copy karo</button>
@@ -180,7 +215,7 @@
 </main>
 
 <!-- words the script format understands: same as studio/script.py vocab() (a test keeps them equal) -->
-<script type="application/json" id="vocab">{"places":["bus_stop","kitchen","market","night_road","office","plain","room","school","street"],"looks":["aunty","boy","college_boy","college_girl","dada","dadi","girl","kid","kid_girl","office_girl","office_guy","uncle"],"roles":["aunty","bachcha","behen","beta","beti","bhai","boss","brother","chacha","chachi","dad","dada","dadi","didi","dost","father","friend","maa","mom","mother","mummy","nana","nani","padosan","padosi","papa","sister","student","teacher","uncle"],"extras":["aadmi","aurat","bald","balding","beard","bindi","black","blazer","blue","braid","brown","bun","cap","chubby","cream","curly","dark","denim","earrings","fair","female","glasses","gold","green","grey","henna","khaki","kurta","ladka","ladki","long","magenta","male","man","maroon","moustache","mustard","navy","normal","olive","orange","pink","ponytail","purple","red","saffron","salwar","saree","shirt","short","side_part","sky","slim","spiky","sunglasses","teal","tilak","tshirt","tuft","turban","uniform","vest","wheatish","white","woman","yellow"],"expressions":["angry","cry","dead","grin","laugh","love","neutral","sad","shock","shout","sleepy","sly","smile","smug","surprised","think","wink"],"actions":["aeroplane","airplane","bhangra","clap","cry","dance","dance2","dance3","dance_walk","disco","facepalm","fail","fall","gaana","idle","jump","kamar_dard","laugh","naagin","nagin","none","point","salute","shock","shrug","sing","sleep","stand","sway","talk","thumka","walk","wave"],"props":["bag","ball","cup","mic","phone","spoon","stick"],"sfx":["beep","boing","clap","ding","laugh_track","pop","thud","whoosh"],"moves":["center","cheer","disco","down","drop","enter","exit","left","noprop","pump","right","shake","swing","up","up_left","up_right","walk"],"shots":["2shot","close","close_up","closeup","medium","two_shot","twoshot","wide"],"depth":["far","mid","near"],"objects":["auto","bags","bicycle","bike","bin","bullet","car","cow","cycle","dustbin","gaadi","gai","garbage_truck","kachra","kachra_gaadi","motorcycle","rickshaw","scooter","table","thaila","truck"],"object_words":["center","enter","exit","front","go","left","right","to"],"rides":["auto","bike","car","cycle","scooter","truck"],"ride_words":["back","dismount","driver","getoff","ride","utar"],"framings":["inside","medium","wide"]}</script>
+<script type="application/json" id="vocab">{"places":["bus_stop","kitchen","market","night_road","office","plain","room","school","street"],"looks":["aunty","boy","college_boy","college_girl","dada","dadi","girl","kid","kid_girl","office_girl","office_guy","uncle"],"roles":["aunty","bachcha","behen","beta","beti","bhai","boss","brother","chacha","chachi","dad","dada","dadi","didi","dost","father","friend","maa","mom","mother","mummy","nana","nani","padosan","padosi","papa","sister","student","teacher","uncle"],"extras":["aadmi","aurat","bald","balding","beard","big_eyes","big_nose","bindi","black","blazer","blue","braid","brown","bun","button_nose","cap","chubby","cream","curly","dark","denim","earrings","fair","female","glasses","gold","green","grey","henna","hook_nose","khaki","kurta","ladka","ladki","long","long_face","long_nose","magenta","male","man","maroon","moustache","mustard","navy","normal","normal_brows","olive","orange","oval_face","pink","ponytail","purple","red","round_face","saffron","salwar","saree","shirt","short","side_part","sky","slim","small_eyes","spiky","square_face","sunglasses","teal","thick_brows","thin_brows","tilak","tshirt","tuft","turban","uniform","vest","wheatish","white","woman","yellow"],"expressions":["angry","cry","dead","grin","laugh","love","neutral","sad","shock","shout","sleepy","sly","smile","smug","surprised","think","wink"],"actions":["aeroplane","airplane","bhangra","clap","cry","dance","dance2","dance3","dance_walk","disco","facepalm","fail","fall","gaana","idle","jump","kamar_dard","laugh","naagin","nagin","none","point","salute","shock","shrug","sing","sleep","stand","sway","talk","thumka","walk","wave"],"props":["bag","ball","cup","mic","phone","spoon","stick"],"sfx":["beep","boing","clap","ding","laugh_track","pop","thud","whoosh"],"moves":["center","cheer","disco","down","drop","enter","exit","left","noprop","pump","right","shake","swing","up","up_left","up_right","walk"],"shots":["2shot","close","close_up","closeup","medium","two_shot","twoshot","wide"],"depth":["far","mid","near"],"objects":["auto","bags","bicycle","bike","bin","bullet","car","cow","cycle","dustbin","gaadi","gai","garbage_truck","kachra","kachra_gaadi","motorcycle","rickshaw","scooter","table","thaila","truck"],"object_words":["center","enter","exit","front","go","left","right","to"],"rides":["auto","bike","car","cycle","scooter","truck"],"ride_words":["back","dismount","driver","getoff","ride","utar"],"framings":["inside","medium","ots","wide"],"angle_words":["over","over_shoulder","reverse","shoulder"],"role_looks":[["aunty","aunty"],["bachcha","kid"],["behen","college_girl"],["beta","college_boy"],["beti","college_girl"],["bhai","college_boy"],["boss","office_guy"],["brother","college_boy"],["chacha","uncle"],["chachi","aunty"],["dad","uncle"],["dada","dada"],["dadi","dadi"],["didi","college_girl"],["dost","boy"],["father","uncle"],["friend","boy"],["maa","aunty"],["mom","aunty"],["mother","aunty"],["mummy","aunty"],["nana","dada"],["nani","dadi"],["padosan","aunty"],["padosi","uncle"],["papa","uncle"],["sister","college_girl"],["student","kid"],["teacher","office_guy"],["uncle","uncle"]],"hair":["short","side_part","spiky","curly","balding","bald","long","braid","bun","ponytail"],"skin":["fair","wheatish","brown","dark"],"outfits":["tshirt","shirt","kurta","salwar","saree","uniform","blazer","vest"],"colors":["black","blue","brown","cream","denim","gold","green","grey","khaki","magenta","maroon","mustard","navy","olive","orange","pink","purple","red","saffron","sky","teal","white","yellow"],"accessories":["glasses","sunglasses","cap","turban","moustache","beard","bindi","tilak","earrings","tuft"],"builds":["slim","normal","chubby"]}</script>
 <script>
 // ---------------------------------------------------------------- config
 // owner/repo come from the Pages address (<owner>.github.io/<repo>/); branch is saved per browser.
@@ -221,6 +256,7 @@ const STEP_NAMES = {
   "Upload videos": "Upload", "Publish as release (the web page plays it from here)": "Publish",
 };
 const drafts = { idea: "", script: EXAMPLE_SCRIPT };
+const DRAFT_NOTE = $("draftNote").innerHTML;
 let mode = "idea", timer = null, busy = false;
 
 // ---------------------------------------------------------------- GitHub API
@@ -378,8 +414,9 @@ function lintScript(text) {
       }
       continue;
     }
-    if ((m = line.match(/^(?:CUT|SHOT)\b\s*:?\s*(\w*)\s*$/i))) {   // CUT [wide|medium|inside]: a new shot, same place
-      if (m[1] && !SET.framings.has(m[1].toLowerCase())) out.push(`"${short(line)}": CUT ke baad wide / medium / inside likho`);
+    if ((m = line.match(/^(?:CUT|SHOT)\b\s*:?\s*([\w\s,]*)$/i))) {   // CUT [wide|medium|inside|ots] [reverse] [name]: a new shot, same place
+      const bad = m[1].split(/[\s,]+/).filter((w) => w && !SET.framings.has(w.toLowerCase()) && !SET.angle_words.has(w.toLowerCase()) && !cast.has(w) && !/^[A-Z]\w*$/.test(w));
+      if (bad.length) out.push(`"${short(line)}": CUT ke baad wide / medium / inside / ots (+ reverse) likho`);
       continue;
     }
     if (/^(CHAT\b|[<>])/i.test(line)) { out.push(`"${short(line)}": chat alag format hai, story script me nahi chalta (chat ke liye alag text likho)`); continue; }
@@ -391,8 +428,8 @@ function lintScript(text) {
       const br = m[2] || "";
       if (/[?!]/.test(br) || words(br).length > 5) out.push(`"${short(line)}": brackets me dialogue hai; brackets me sirf acting words (shock, point…)`);
       else acting(br, line);
-      const speak = m[3].split("|")[1] || "";
-      if (!/[ऀ-ॿ]/.test(speak)) out.push(`"${short(line)}": "|" ke baad Devanagari nahi hai (awaaz galat padhegi)`);
+      const [roman, speak] = m[3].split("|");        // no "|" at all: the Devanagari is made when the video is made
+      if (speak !== undefined && !/[ऀ-ॿ]/.test(speak)) out.push(`"${short(line)}": "|" ke baad Devanagari nahi hai (awaaz galat padhegi)`);
       continue;
     }
     out.push(`"${short(line)}": ye line samajh nahi aayi`);
@@ -416,6 +453,139 @@ function showLint() {
 let lintTimer = null;
 $("text").addEventListener("input", () => { clearTimeout(lintTimer); lintTimer = setTimeout(showLint, 300); });
 
+// ---------------------------------------------------------------- builder (pure functions; tests run them in node)
+const ROLE_LOOK = Object.fromEntries(V.role_looks);
+const EMO = { gussa: "angry", ghussa: "angry", hairan: "surprised", shock: "shock", akad: "smug", smug: "smug",
+  hasi: "laugh", hans: "laugh", rona: "cry", ro: "cry", soch: "think", pyaar: "love", pyar: "love", chalak: "sly",
+  khush: "smile", dukhi: "sad", udaas: "sad", neend: "sleepy", mar: "dead", chilla: "shout", aankh: "wink" };
+const EMO_CHIPS = [["😠", "gussa"], ["😲", "hairan"], ["😱", "shock"], ["😏", "akad"], ["😂", "hasi"], ["😢", "rona"],
+  ["🤔", "soch"], ["😍", "pyaar"], ["😈", "chalak"], ["😄", "khush"], ["📢", "chilla"], ["💀", "mar"]];
+const HEADER_RE = /^(HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|OBJ)\s*:\s*(.*)$/i;
+const SAY_RE = /^([A-Za-z][\w ]{0,24}?)\s*(?:\(([^)]*)\))?\s*:\s*(\S.*)$/;
+const ACT_RE = /^([A-Za-z][\w ]{0,24}?)\s*->\s*(\S.*)$/;
+const DEFAULT_CTA = "Apne dost ko tag karo 👇";
+
+function isDialogue(text) {         // two or more "Naam: baat" lines = a ready dialogue, no AI needed
+  return text.split("\n").filter((l) => !HEADER_RE.test(l.trim()) && SAY_RE.test(l.trim())).length >= 2;
+}
+function ident(name) {              // "sharma ji" -> "SharmaJi" (a name the script format accepts)
+  return name.trim().split(/\s+/).map((w) => w[0].toUpperCase() + w.slice(1)).join("").replace(/\W/g, "") || "X";
+}
+function castWords(c) {
+  return [c.role || "boy", c.hair, c.skin, c.outfit, c.color, c.build, c.extra].filter((w) => w && w !== "auto").join(" ");
+}
+function autoEmotion(say) {
+  if (/\?/.test(say) && /!/.test(say)) return "surprised";
+  if (/😂|🤣|\bhaha/i.test(say)) return "laugh";
+  if (/😭|😢/.test(say)) return "cry";
+  if (/😡|😠/.test(say)) return "angry";
+  if (/😏/.test(say)) return "smug";
+  if (/😍|❤️/.test(say)) return "love";
+  if (/🤔/.test(say)) return "think";
+  return "";
+}
+function actingWords(words, say) {
+  const out = words.split(/[\s,]+/).filter(Boolean).map((w) => EMO[w.toLowerCase()] || w.toLowerCase());
+  if (!out.length && autoEmotion(say)) out.push(autoEmotion(say));
+  return out.join(", ");
+}
+function settingsLines(b, cast) {   // the builder's choices as script header lines
+  const out = [];
+  if (b.place && b.place !== "auto") out.push("SCENE: " + b.place);
+  if (cast.length) out.push("CAST: " + cast.map((c) => `${c.id} = ${c.words}`).join(", "));
+  if (b.hook) out.push("HOOK: " + b.hook);
+  if (b.cta) out.push("CTA: " + b.cta);
+  return out;
+}
+function builderCast(b) {
+  const out = [];
+  for (const c of (b.cast || [])) {
+    const base = ident(c.name || c.role || "dost");
+    let id = base, n = 2;
+    while (out.some((o) => o.id === id)) id = base + n++;
+    out.push({ key: (c.name || id).trim().toLowerCase(), id, words: castWords(c) });
+  }
+  return out;
+}
+// The idea goes to the AI with the builder's choices fixed.
+function ideaWithSettings(idea, b) {
+  const lines = settingsLines(b, builderCast(b));
+  if (!lines.length) return idea;
+  return (idea || "Koi idea nahi diya: in characters aur is jagah ke saath ek original desi comedy short khud socho.") +
+    "\n\nUse exactly these settings (do not change the place, the characters or their CAST words):\n" + lines.join("\n");
+}
+// "Naam: baat" lines (+ the builder's choices) -> a full script in the studio format. Returns {script, problems}.
+function buildScript(text, b) {
+  const cast = builderCast(b), used = [], meta = {}, rows = [], problems = [];
+  const who = (raw) => {
+    const key = raw.trim().toLowerCase();
+    if (/^(narrator|vo|narration|voiceover|voice_over)$/.test(key)) return "NARRATOR";
+    if (key === "all" || key === "sab") return "ALL";
+    let c = cast.find((x) => x.key === key || x.id.toLowerCase() === key.replace(/\s+/g, ""));
+    if (!c) {
+      const first = key.split(/\s+/)[0];
+      const role = ROLE_LOOK[first] || SET.looks.has(first) ? first
+        : (cast.filter((x) => x.auto).length % 2 ? "college_girl" : "college_boy");
+      c = { key, id: ident(raw), words: role, auto: true };
+      cast.push(c);
+    }
+    if (!used.includes(c)) used.push(c);
+    return c.id;
+  };
+  for (const raw of text.trim().split("\n")) {
+    const line = raw.trim();
+    let m;
+    if (!line) { rows.push({ cut: "CUT" }); continue; }
+    if (/^(CUT|SHOT)\b/i.test(line)) { rows.push({ cut: line, own: true }); continue; }
+    if ((m = line.match(HEADER_RE))) { meta[m[1].toUpperCase()] = m[2].trim(); continue; }
+    if ((m = line.match(ACT_RE))) { rows.push({ who: who(m[1]), act: m[2].trim() }); continue; }
+    if ((m = line.match(SAY_RE))) {
+      const [roman, dev] = m[3].split("|").map((x) => x.trim());
+      rows.push({ who: who(m[1]), say: roman, dev, acting: actingWords(m[2] || "", roman) });
+      continue;
+    }
+    problems.push(`"${short(line)}": samajh nahi aaya (Naam: baat likho)`);
+  }
+  // shots: the writer's own (blank lines / CUT) or automatic: the first two speakers share the first shot, after that
+  // every change of speaker is a CUT; with two or more speakers most cuts are over-the-shoulder (a face-off)
+  const own = rows.some((r) => r.cut);
+  const body = [];
+  const speakers = new Set(rows.filter((r) => r.say && r.who !== "NARRATOR" && r.who !== "ALL").map((r) => r.who));
+  let inShot = [], last = null, k = 0;
+  for (const r of rows) {
+    if (r.cut) {
+      if (body.length && !/^(CUT|SHOT)\b/i.test(body[body.length - 1])) body.push(r.cut);
+      continue;
+    }
+    const person = r.who !== "NARRATOR" && r.who !== "ALL";
+    if (!own && person && last && r.who !== last && !(k === 0 && inShot.length === 1)) {
+      k++;
+      body.push(speakers.size >= 2 && k % 3 !== 1 ? "CUT ots" : "CUT");
+      inShot = [];
+    }
+    if (person) { if (!inShot.includes(r.who)) inShot.push(r.who); last = r.who; }
+    if (r.act) body.push(`${r.who} -> ${r.act}`);
+    else body.push(`${r.who}${r.acting ? ` (${r.acting})` : ""}: ${r.say}${r.dev ? ` | ${r.dev}` : ""}`);
+  }
+  while (body.length && /^(CUT|SHOT)\b/i.test(body[body.length - 1])) body.pop();
+  const firstSay = (rows.find((r) => r.say) || {}).say || "";
+  const hook = meta.HOOK || b.hook || (firstSay.length > 60 ? firstSay.slice(0, 57) + "…" : firstSay);
+  const shown = used.filter((c) => c.id !== "NARRATOR");
+  const head = [
+    "HOOK: " + hook,
+    "CAST: " + shown.map((c) => `${c.id} = ${c.words}`).join(", "),
+    "SCENE: " + (meta.SCENE || (b.place && b.place !== "auto" ? b.place : "room")),
+  ];
+  if (meta.MUSIC) head.push("MUSIC: " + meta.MUSIC);
+  const tail = [
+    "CTA: " + (meta.CTA || b.cta || DEFAULT_CTA),
+    "CAPTION: " + (meta.CAPTION || hook),
+    "HASHTAGS: " + (meta.HASHTAGS || "#desicomedy #hindicomedy #relatable #funny"),
+  ];
+  return { script: [...head, ...body, ...tail].join("\n") + "\n", problems };
+}
+// ---------------------------------------------------------------- builder end
+
 // ---------------------------------------------------------------- make a reel
 function setMode(m) {
   drafts[mode] = $("text").value;
@@ -424,7 +594,8 @@ function setMode(m) {
   $("text").value = drafts[m];
   $("text").placeholder = m === "idea" ? "Idea yahan likho… (khali = AI khud soche)" : "Script yahan likho…";
   $("hint").textContent = HINTS[m];
-  $("go").textContent = m === "idea" ? "Script likho ✍️" : "✅ Approve: Video banao 🎬";
+  $("builder").classList.toggle("hidden", m !== "idea");
+  $("chips").classList.toggle("hidden", m !== "idea");
   $("polish").classList.toggle("hidden", m !== "script");
   $("hookWrap").classList.toggle("hidden", m !== "idea");
   $("toneWrap").classList.toggle("hidden", m !== "idea");
@@ -433,6 +604,7 @@ function setMode(m) {
     ? "AI ko script likhne me ~1 minute lagta hai. Video tabhi banegi jab aap script approve karoge."
     : "GitHub pe video banne me ~4-6 minute lagte hain. Page band kar ke wapas aao to bhi progress yahin milegi.";
   if (m !== "script") $("draftNote").classList.add("hidden");
+  goLabel();
   showLint();
 }
 
@@ -462,7 +634,7 @@ async function start(stage) {
   const rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const inputs = { stage, hook: $("hook").value, tone: $("tone").value, request_id: rid };
   if (stage === "script") {
-    if (mode === "idea") inputs.instruction = text; else inputs.script_text = text;
+    if (mode === "idea") inputs.instruction = ideaWithSettings(text, builder); else inputs.script_text = text;
   } else {
     Object.assign(inputs, { script_text: text, width: $("width").value, voice: String($("voice").checked),
                             draft_id: store.get("draft") });
@@ -489,6 +661,7 @@ async function showDraft(rid) {
   drafts.script = (rel.body || "").replace(/\r\n/g, "\n").trim() + "\n";
   store.set("draft", rid);
   setMode("script");
+  $("draftNote").innerHTML = DRAFT_NOTE;
   $("draftNote").classList.remove("hidden");
   $("text").focus();
 }
@@ -595,12 +768,113 @@ $("save").addEventListener("click", async () => {
   if (await checkConnection()) $("setup").open = false;
 });
 $("forget").addEventListener("click", () => { store.set("token", ""); checkConnection(); });
-$("go").addEventListener("click", () => start(mode === "idea" ? "script" : "video"));
+$("go").addEventListener("click", () => {
+  if (mode === "idea" && isDialogue($("text").value)) return dialogueToScript();
+  start(mode === "idea" ? "script" : "video");
+});
+
+// ---------------------------------------------------------------- builder (page)
+const PLACE_NAMES = { auto: "AI chune / kamra", room: "Ghar ka kamra", kitchen: "Rasoi", street: "Gali / sadak",
+  school: "School", market: "Bazaar", office: "Office", bus_stop: "Bus stop", night_road: "Raat ki sadak",
+  plain: "Saada rang" };
+let builder = { place: "auto", cast: [], hook: "", cta: "" };
+try { builder = Object.assign(builder, JSON.parse(store.get("builder") || "{}")); } catch {}
+const saveBuilder = () => store.set("builder", JSON.stringify(builder));
+const opt = (v, label) => el("option", { value: v, textContent: label || v });
+const pick = (list, value, first) => {
+  const s = el("select", {}, [opt("auto", first), ...list.map((x) => opt(x))]);
+  s.value = value || "auto";
+  return s;
+};
+function goLabel() {
+  if (mode !== "idea") { $("go").textContent = "✅ Approve: Video banao 🎬"; return; }
+  const dialogue = isDialogue($("text").value);
+  $("go").textContent = dialogue ? "📝 Script banao (bina AI)" : "Script likho ✍️";
+  $("hookWrap").classList.toggle("hidden", dialogue);         // the AI's hook / tone mean nothing for a ready dialogue
+  $("toneWrap").classList.toggle("hidden", dialogue);
+  $("timeHint").textContent = dialogue
+    ? "Script turant ban jayegi (AI nahi lagega). Phir padh ke Approve karo."
+    : "AI ko script likhne me ~1 minute lagta hai. Video tabhi banegi jab aap script approve karoge.";
+}
+function lookOf(role) { return ROLE_LOOK[role] || role || "boy"; }
+function renderBuilder() {
+  $("bPlace").replaceChildren(...["auto", ...V.places].map((p) => opt(p, PLACE_NAMES[p] || p)));
+  $("bPlace").value = builder.place || "auto";
+  $("bHook").value = builder.hook || "";
+  $("bCta").value = builder.cta || "";
+  $("bAdd").disabled = builder.cast.length >= 3;
+  $("bCast").replaceChildren(...builder.cast.map((c, i) => {
+    const img = el("img", { alt: c.role, src: `assets/looks/${lookOf(c.role)}.png` });
+    const name = el("input", { type: "text", value: c.name || "", placeholder: "Naam (jaise Papa)" });
+    const role = el("select", {}, [...[...V.roles, ...V.looks.filter((l) => !V.roles.includes(l))].map((r) => opt(r))]);
+    role.value = c.role || "boy";
+    const fields = [
+      ["hair", pick(V.hair, c.hair, "Baal: auto")], ["skin", pick(V.skin, c.skin, "Rang: auto")],
+      ["outfit", pick(V.outfits, c.outfit, "Kapde: auto")], ["color", pick(V.colors, c.color, "Colour: auto")],
+      ["build", pick(V.builds, c.build, "Body: auto")], ["extra", pick(V.accessories, c.extra, "Extra: kuch nahi")],
+    ];
+    const del = el("button", { type: "button", className: "small", textContent: "✕", title: "Hatao" });
+    name.addEventListener("input", () => { c.name = name.value.trim(); saveBuilder(); });
+    role.addEventListener("change", () => { c.role = role.value; img.src = `assets/looks/${lookOf(c.role)}.png`; saveBuilder(); });
+    for (const [k, sel] of fields) sel.addEventListener("change", () => { c[k] = sel.value; saveBuilder(); });
+    del.addEventListener("click", () => { builder.cast.splice(i, 1); saveBuilder(); renderBuilder(); });
+    return el("div", { className: "crow" }, [img, el("div", { className: "fields" },
+      [name, role, ...fields.map(([, sel]) => sel), del])]);
+  }));
+}
+$("bPlace").addEventListener("change", () => { builder.place = $("bPlace").value; saveBuilder(); });
+$("bHook").addEventListener("input", () => { builder.hook = $("bHook").value.trim(); saveBuilder(); });
+$("bCta").addEventListener("input", () => { builder.cta = $("bCta").value.trim(); saveBuilder(); });
+$("bAdd").addEventListener("click", () => {
+  const roles = ["papa", "beta", "mummy"];
+  builder.cast.push({ role: roles[builder.cast.length] || "dost" });
+  saveBuilder(); renderBuilder();
+});
+$("bClear").addEventListener("click", () => { builder = { place: "auto", cast: [], hook: "", cta: "" }; saveBuilder(); renderBuilder(); });
+$("chips").append(...EMO_CHIPS.map(([icon, word]) => {
+  const b = el("button", { type: "button", className: "chip", textContent: `${icon} ${word}` });
+  b.addEventListener("click", () => addEmotion(word));
+  return b;
+}), (() => {
+  const b = el("button", { type: "button", className: "chip", textContent: "✂️ naya shot" });
+  b.addEventListener("click", () => insertAtLineEnd("\n\n"));
+  return b;
+})());
+function insertAtLineEnd(str) {
+  const t = $("text"), v = t.value, end = v.indexOf("\n", t.selectionEnd);
+  const at = end < 0 ? v.length : end;
+  t.value = v.slice(0, at) + str + v.slice(at);
+  t.selectionStart = t.selectionEnd = at + str.length;
+  t.focus(); goLabel();
+}
+function addEmotion(word) {         // the line under the cursor: "Papa: ..." -> "Papa (gussa): ..."
+  const t = $("text"), v = t.value, pos = t.selectionStart;
+  const s0 = v.lastIndexOf("\n", pos - 1) + 1, e0 = v.indexOf("\n", pos), e = e0 < 0 ? v.length : e0;
+  const line = v.slice(s0, e), m = line.match(/^([^:(]+?)\s*(?:\(([^)]*)\))?\s*:/);
+  if (!m) { t.focus(); return; }
+  const words = (m[2] ? m[2] + ", " : "") + word;
+  const fixed = `${m[1].trim()} (${words}):` + line.slice(m[0].length);
+  t.value = v.slice(0, s0) + fixed + v.slice(e);
+  t.selectionStart = t.selectionEnd = s0 + fixed.length;
+  t.focus();
+}
+function dialogueToScript() {
+  const { script, problems } = buildScript($("text").value, builder);
+  drafts.idea = $("text").value;
+  drafts.script = script;
+  setMode("script");
+  $("draftNote").classList.remove("hidden");
+  $("draftNote").textContent = "📝 Aapke dialogue se script ban gayi (AI ke bina). Padho, chaho to badlo, phir Approve dabao. " +
+    "Devanagari video banate waqt apne aap ban jayegi." + (problems.length ? " Kuch lines chhoot gayi: " + problems.join("; ") : "");
+  store.set("draft", "");
+}
+$("text").addEventListener("input", goLabel);
+renderBuilder();
 $("polish").addEventListener("click", () => start("script"));
 $("copyPrompt").addEventListener("click", async () => {
   try {
     const rules = await (await fetch("SCRIPT_PROMPT.md", { cache: "no-store" })).text();
-    const idea = mode === "idea" ? $("text").value.trim() : drafts.idea.trim();
+    const idea = ideaWithSettings(mode === "idea" ? $("text").value.trim() : drafts.idea.trim(), builder);
     await navigator.clipboard.writeText(rules.trim() + "\n\n# My idea\n" + (idea || "<yahan apna idea likho>") + "\n");
     $("promptNote").classList.remove("hidden");
   } catch (e) {

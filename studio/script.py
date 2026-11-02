@@ -65,7 +65,8 @@ import os
 import re
 
 from . import actions, audio, objects, rides
-from .characters import ACCESSORIES, EXPRESSIONS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE, SKIN_TONES
+from .characters import (ACCESSORIES, EXPRESSIONS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE,
+                         SKIN_TONES)
 from .util import asset_path
 from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS, chat_length
 
@@ -77,7 +78,9 @@ NARRATION_NAMES = ("narrator", "vo", "narration", "voiceover", "voice_over")   #
 NARRATOR_SPEC = {"hidden": True, "voice": {"name": "hi-IN-MadhurNeural", "pitch": "-12Hz", "rate": "-4%",
                                            "gemini": "Charon"}}
 GETOFF_WORDS = ("getoff", "utar", "dismount")
-FRAMINGS = ("wide", "medium", "inside")
+FRAMINGS = ("wide", "medium", "inside", "ots")
+ANGLE_WORDS = ("reverse",)
+OTS_WORDS = ("over", "shoulder", "over_shoulder")
 SHOTS = tuple(SHOT_ZOOM) + tuple(SHOT_ALIASES)       # camera: wide, medium, close, two_shot (+ spellings)
 DEPTH_WORDS = tuple(DEPTHS)                         # near / mid / far: step towards or away from the camera
 DIRECTIONS = ("left", "right", "up", "down", "up_left", "up_right")
@@ -103,14 +106,18 @@ def vocab():
         "places": sorted(BACKGROUNDS),
         "looks": sorted(LOOKS), "roles": sorted(ROLE_LOOKS),
         "extras": sorted(set(ACCESSORIES) | set(HAIR_STYLES) | set(OUTFITS) | set(SKIN_TONES) | set(BUILDS)
-                         | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS)),
+                         | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS) | set(FACE_WORDS)),
         "expressions": sorted(EXPRESSIONS), "actions": sorted(actions.ACTIONS),
         "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS),
         "shots": sorted(SHOTS), "depth": sorted(DEPTH_WORDS),
         "objects": sorted(set(objects.OBJECTS) | set(objects.ALIASES)),
         "object_words": ["center", "enter", "exit", "front", "go", "left", "right", "to"],
         "rides": sorted(rides.RIDES), "ride_words": sorted(("ride", "back", "driver") + GETOFF_WORDS),
-        "framings": sorted(FRAMINGS),
+        "framings": sorted(FRAMINGS), "angle_words": sorted(ANGLE_WORDS + OTS_WORDS),
+        # the page's Builder pickers
+        "role_looks": sorted([r, l] for r, l in ROLE_LOOKS.items()), "hair": list(HAIR_STYLES),
+        "skin": list(SKIN_TONES), "outfits": list(OUTFITS), "colors": sorted(PALETTE), "accessories": list(ACCESSORIES),
+        "builds": list(BUILDS),
     }
 
 
@@ -140,6 +147,8 @@ def cast_spec(words, index, unknown=None):
             spec["skin"] = w
         elif w in ("slim", "normal", "chubby"):
             spec["build"] = w
+        elif w in FACE_WORDS:                          # round_face, big_eyes, button_nose, thick_brows...
+            spec[FACE_WORDS[w][0]] = FACE_WORDS[w][1]
         elif w in ("female", "woman", "ladki", "aurat"):
             female = True
         elif w in ("male", "man", "ladka", "aadmi"):
@@ -163,6 +172,59 @@ def cast_spec(words, index, unknown=None):
         voice.update(pitch="-10Hz", rate="-8%")
     spec["voice"] = voice
     return spec
+
+
+MALE_HAIR = ("short", "side_part", "curly", "spiky", "balding")
+FEMALE_HAIR = ("ponytail", "bun", "long", "braid")
+SKIN_ORDER = ("wheatish", "brown", "fair", "dark")
+SHIRT_ORDER = ("blue", "mustard", "red", "teal", "purple", "orange", "green", "maroon")
+
+
+def vary_cast(cast):
+    """Characters that share a look (two college_boys...) would be twins. Give each a different hair style and
+    skin tone, unless the script chose them. Only what the script left open is changed."""
+    seen = {}                                   # look -> [(hair, skin), ...] already on screen
+    colors = []                                 # shirt colours already on screen
+    for name, spec in cast.items():
+        if spec.get("hidden"):
+            continue
+        look = spec.get("look", "boy")
+        base = LOOKS.get(look, {})
+        hair, skin = spec.get("hair", base.get("hair")), spec.get("skin", base.get("skin"))
+        taken = seen.setdefault(look, [])
+        if (hair, skin) in taken:
+            female = look in FEMALE_LOOKS or spec.get("voice", {}).get("name", "").startswith("hi-IN-Swara")
+            if "hair" not in spec and hair not in ("bald",):
+                options = [h for h in (FEMALE_HAIR if female else MALE_HAIR) if all(h != t[0] for t in taken)]
+                if options:
+                    hair = spec["hair"] = options[0]
+            if (hair, skin) in taken or "skin" not in spec:
+                options = [k for k in SKIN_ORDER if k != skin and (hair, k) not in taken]
+                if "skin" not in spec and options:
+                    skin = spec["skin"] = options[(len(taken) - 1) % len(options)]
+        taken.append((hair, skin))
+        color = spec.get("color", base.get("color", "blue"))
+        if color in colors and "color" not in spec:          # same shirt as somebody else: pick a free colour
+            free = [c for c in SHIRT_ORDER if c not in colors]
+            if free:
+                color = spec["color"] = free[0]
+        colors.append(color)
+    return cast
+
+
+def ots_back(sc, before, order, cast):
+    """Whose back is in front of the camera in an over-the-shoulder shot: the name after `CUT ots`, else the one
+    who is spoken to (the second character of the shot), else whoever spoke last before this shot."""
+    if sc.get("back"):
+        return sc["back"] if sc["back"] in cast or sc["back"] in order else None
+    if len(order) >= 2:
+        return order[1]
+    for prev in reversed(before):
+        for ln in reversed(prev["lines"]):
+            if ln[0] in ("say", "do") and ln[1] not in order and ln[1].upper() not in ("ALL", "NARRATOR"):
+                return ln[1]
+    others = [n for n in cast if n not in order and n != "NARRATOR" and not cast[n].get("hidden")]
+    return others[0] if others else None
 
 
 def _stage(tokens, ev, scene_cast, who):
@@ -516,14 +578,30 @@ def parse_script(text):
             warnings.append("chat alag format hai, story script me nahi chalta (chat ke liye alag text likho: "
                             "'< samne wala' / '> aap'): %r" % line[:40])
             continue
-        m = re.match(r"^(?:CUT|SHOT)\b\s*:?\s*(\w*)\s*$", line, re.I)
+        m = re.match(r"^(?:CUT|SHOT)\b\s*:?\s*([\w\s,]*)$", line, re.I)
         if m:                                       # a new shot in the same place: a hard cut, its own set of characters
-            frame = m.group(1).lower()
-            if frame and frame not in FRAMINGS:
-                warnings.append("CUT %r: framing wide / medium / inside likho" % frame)
-                frame = ""
+            frame, reverse, back = "", False, None
+            for w in re.split(r"[\s,]+", m.group(1).strip()):
+                lw = w.lower()
+                if not w:
+                    continue
+                if lw in FRAMINGS and not frame:
+                    frame = lw
+                elif lw in OTS_WORDS and not frame:
+                    frame = "ots"
+                elif lw in ANGLE_WORDS:
+                    reverse = True
+                elif w in cast or (frame == "ots" and re.match(r"^[A-Z]\w*$", w) and back is None):
+                    back = w
+                else:
+                    warnings.append("CUT %r: framing wide / medium / inside / ots (+ reverse) likho" % w)
+            shot_no = cur.get("shot", 0) + 1
             cur = new_scene(dict(cur["background"]), None)
-            cur["cut_in"], cur["framing"] = True, frame or None
+            cur["cut_in"], cur["framing"], cur["shot"] = True, frame or None, shot_no
+            if reverse:
+                cur["reverse"] = True
+            if frame == "ots":
+                cur["back"] = back
             continue
         m = re.match(r"^OBJ\s*:\s*(.*)$", line, re.I)
         if m:
@@ -568,11 +646,25 @@ def parse_script(text):
             if declared and name not in cast:
                 warnings.append("%s CAST me nahi hai: CAST line me '%s = <role/look>' jodo" % (name, name))
             add_cast(name, [])
+        back = None
+        if sc.get("framing") == "ots":
+            back = ots_back(sc, scenes[:si], order, cast)
+            if back is None:
+                warnings.append("CUT ots: peeche se kaun dikhe? 'CUT ots B' likho (shot me ek aur character chahiye)")
+                sc["framing"] = None
         chars = {}
-        for name in order:
-            x, slot = _slot_x(order, name)
-            facing = "front" if len(order) != 2 else ("right" if slot == "left" else "left")
+        fronts = [n for n in order if n != back]
+        for name in fronts:
+            x, slot = _slot_x(fronts, name)
+            facing = "front" if len(fronts) != 2 else ("right" if slot == "left" else "left")
             chars[name] = {"slot": slot, "facing": facing}
+        if back:                                    # over the shoulder: back's back big in the near corner
+            side = "left" if sc.get("shot", 0) % 2 == 0 else "right"
+            chars[back] = {"slot": side, "view": "back"}
+            for name in fronts:
+                chars[name]["facing"] = side        # the speaker talks to the one in front of the camera
+            if back not in order:
+                order.append(back)
         tl = [{"t": 0.0, "who": "all", "action": "idle", "expression": "smile"}]
         if si == 0:
             tl.append({"t": 0.0, "sfx": "whoosh", "volume": 0.7, "camera": {"shake": 0.5}})
@@ -617,7 +709,8 @@ def parse_script(text):
             if ln[0] == "say":
                 ev["say"], ev["speak"] = ln[3], ln[4] or ln[3]
                 if not ln[4] and not re.search(r"[ऀ-ॿ]", ln[3]):
-                    warnings.append("no Devanagari for %r: the voice will read Roman letters" % ln[3][:30])
+                    warnings.append("no Devanagari for %r: made by the AI when the video is made (GEMINI_API_KEY), "
+                                    "else the voice reads Roman letters" % ln[3][:30])
                 others = [o for o in order if o != who]
                 if who == "NARRATOR":
                     ev["bubble"], ev["subtitle"] = False, True
@@ -649,8 +742,13 @@ def parse_script(text):
             item["framing"] = sc["framing"]
         if sc.get("cut_in"):
             item["cut_in"] = True
+        if sc.get("shot"):
+            item["angle"] = sc["shot"]
+        if sc.get("reverse"):
+            item["reverse"] = True
         out_scenes.append(item)
 
+    vary_cast(cast)
     hook = meta.get("HOOK") or ""
     if not hook:
         warnings.append("no HOOK: line - the first second has no hook text")
@@ -687,9 +785,15 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Plain-text script -> scene.json (no AI)")
     ap.add_argument("script")
     ap.add_argument("-o", "--out", default=None)
+    ap.add_argument("--no-hindi", action="store_true",
+                    help="do not ask the AI for Devanagari of Roman-only lines (the voice reads them as they are)")
     args = ap.parse_args(argv)
     with open(args.script, encoding="utf-8") as f:
         scene, warnings = parse_script(f.read())
+    if not args.no_hindi:
+        from .hindi import fill_hindi
+        if fill_hindi(scene):
+            warnings = [w for w in warnings if not w.startswith("no Devanagari")]
     for w in warnings:
         print("  [script] " + w)
     from .director import save

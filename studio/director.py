@@ -70,6 +70,13 @@ class AnthropicLLM:
         return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
 
 
+def successor(error_text):
+    """'models/gemini-2.0-flash is no longer available. Please update your code to use models/gemini-3.8-flash ...'
+    -> 'gemini-3.8-flash' (the model Google names in a 404), or None."""
+    m = re.search(r"\buse\s+(?:the\s+)?(?:models/)?(gemini-[\w.\-]+)", error_text)
+    return m.group(1).rstrip(".-") if m else None
+
+
 class GeminiLLM:
     URL = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent"
     BUSY = {429, 500, 502, 503, 504}    # overloaded / rate limited: wait and retry, then try another model
@@ -82,6 +89,8 @@ class GeminiLLM:
         self.key = key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         if not self.key:
             raise SystemExit("GEMINI_API_KEY is not set")
+        self.timeout = 180              # seconds per request
+        self.temperature = 0.9
 
     def __call__(self, system, messages, json_mode=True):
         body = {
@@ -89,22 +98,30 @@ class GeminiLLM:
             "contents": [{"role": "model" if m["role"] == "assistant" else "user", "parts": [{"text": m["content"]}]}
                          for m in messages],
             "generationConfig": {"responseMimeType": "application/json" if json_mode else "text/plain",
-                                 "maxOutputTokens": 8192, "temperature": 0.9},
+                                 "maxOutputTokens": 8192, "temperature": self.temperature},
         }
         last = None
-        for i, model in enumerate(self.models):
+        models = list(self.models)
+        i = 0
+        while i < len(models):
+            model = models[i]
             for attempt in range(self.TRIES):
                 req = urllib.request.Request(self.URL % model, data=json.dumps(body).encode("utf-8"),
                                              headers={"Content-Type": "application/json", "x-goog-api-key": self.key})
                 try:
-                    with urllib.request.urlopen(req, timeout=180) as r:
+                    with urllib.request.urlopen(req, timeout=self.timeout) as r:
                         data = json.loads(r.read().decode("utf-8"))
-                    self.models = self.models[i:]       # stick with the model that answered
+                    self.models = models[i:]            # stick with the model that answered
                     parts = (data.get("candidates") or [{}])[0].get("content", {}).get("parts", [])
                     return "".join(p.get("text", "") for p in parts)
                 except urllib.error.HTTPError as e:
-                    last = "Gemini error %d (%s): %s" % (e.code, model, e.read().decode("utf-8", "replace")[:300])
-                    if e.code == 404:                   # model retired / renamed: next model
+                    text = e.read().decode("utf-8", "replace")
+                    last = "Gemini error %d (%s): %s" % (e.code, model, text[:300])
+                    if e.code == 404:                   # model retired / renamed: the one Google names, then next
+                        new = successor(text)
+                        if new and new not in models:
+                            models.insert(i + 1, new)
+                            print("  [gemini] %s band ho gaya, ab %s" % (model, new), file=sys.stderr)
                         break
                     if e.code not in self.BUSY:
                         raise SystemExit(last)
@@ -115,6 +132,7 @@ class GeminiLLM:
                     print("  [gemini] %s busy, %ds baad dobara..." % (model, wait), file=sys.stderr)
                     _sleep(wait)
             print("  [gemini] %s se jawab nahi mila, agla model..." % model, file=sys.stderr)
+            i += 1
         raise SystemExit("%s\nSaare Gemini models abhi busy hain; 2-5 minute baad dobara try karo." % last)
 
 

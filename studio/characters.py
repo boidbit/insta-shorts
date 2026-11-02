@@ -65,6 +65,14 @@ HAIR_COLORS = {
 HAIR_STYLES = ("short", "side_part", "spiky", "curly", "balding", "bald", "long", "braid", "bun", "ponytail")
 OUTFITS = ("tshirt", "shirt", "kurta", "salwar", "saree", "uniform", "blazer", "vest")
 BUILDS = {"slim": (0.9, 0.0), "normal": (1.0, 6.0), "chubby": (1.2, 44.0)}
+# Face variety: every character on screen gets its own face (assign_faces), or the script picks one.
+FACE_SHAPES = {"oval": (1.0, 1.0), "round": (1.08, 0.94), "long": (0.9, 1.08), "square": (1.04, 0.98)}
+EYE_STYLES = ("dot", "big", "small")
+NOSE_STYLES = ("hook", "button", "long", "big")
+BROW_STYLES = {"normal": 9, "thick": 13, "thin": 6}
+FACE_WORDS = dict(
+    [(f + "_face", ("face", f)) for f in FACE_SHAPES] + [(e + "_eyes", ("eyes", e)) for e in EYE_STYLES if e != "dot"]
+    + [(n + "_nose", ("nose", n)) for n in NOSE_STYLES] + [(b + "_brows", ("brows", b)) for b in BROW_STYLES])
 ACCESSORIES = ("glasses", "sunglasses", "cap", "turban", "moustache", "beard", "bindi", "tilak", "earrings", "tuft")
 
 # Ready-made Indian looks. Anything in the character spec overrides these.
@@ -213,6 +221,33 @@ def color_of(c, default="blue", table=PALETTE):
     return table.get(default) or PALETTE[default]
 
 
+def assign_faces(cdefs):
+    """{name: spec} -> a copy where every visible character has a face of its own (face shape, eyes, nose, brows),
+    picked by position so that no two look alike. What a spec already says is kept."""
+    out, i = {}, 0
+    for name, spec in cdefs.items():
+        spec = dict(spec)
+        if not spec.get("hidden"):
+            spec.setdefault("face", list(FACE_SHAPES)[i % len(FACE_SHAPES)])
+            spec.setdefault("eyes", EYE_STYLES[i % len(EYE_STYLES)])
+            spec.setdefault("nose", NOSE_STYLES[(i * 3) % len(NOSE_STYLES)])
+            spec.setdefault("brows", list(BROW_STYLES)[i % len(BROW_STYLES)])
+            i += 1
+        out[name] = spec
+    return out
+
+
+def _head_pts(shape, n=64):
+    if shape != "square":
+        return closed_ellipse(0, 0, HEAD_RX, HEAD_RY, n)
+    pts = []
+    for i in range(n):                                  # a superellipse: a squarish head with round corners
+        a = 2 * math.pi * i / n
+        c, s_ = math.cos(a), math.sin(a)
+        pts.append((HEAD_RX * math.copysign(abs(c) ** 0.6, c), HEAD_RY * math.copysign(abs(s_) ** 0.6, s_)))
+    return pts
+
+
 def resolve_spec(spec):
     """Character spec with its `look` preset filled in (spec keys win)."""
     out = dict(LOOKS.get(spec.get("look"), {}))
@@ -358,7 +393,7 @@ def _draw_feet(S, sk, shoes, skin):
                 S.line([(c[0] - 26, c[1] + 6), (c[0] + 26, c[1] + 6)], 4, (190, 190, 190))
 
 
-def _draw_outfit(S, o, sk, cols, build):
+def _draw_outfit(S, o, sk, cols, build, back=False):
     outfit = o.get("outfit", "tshirt")
     main, accent, skin = cols["main"], cols["accent"], cols["skin"]
     bw, belly = BUILDS.get(build, BUILDS["normal"])
@@ -381,6 +416,10 @@ def _draw_outfit(S, o, sk, cols, build):
         # midriff + blouse
         S.poly(_torso_pts(top, waist + 8, sw, ww, ww + belly * 0.5, belly * 0.6), skin, INK, OUTLINE)
         S.poly(_torso_pts(top, -190, sw, ww, ww, 0)[:], accent, INK, OUTLINE)
+        if back:                    # seen from behind: the pallu falls down the back from the left shoulder
+            S.poly([(-sw * 0.35, top - 4), (-sw + 4, top + 6), (-ww * 0.6, waist + 40), (ww * 0.4, waist + 30)],
+                   main, INK, OUTLINE)
+            return
         # pallu: across the chest from the right hip to the left shoulder, hanging behind
         pallu = [(ww + belly * 0.6, waist + 10), (ww * 0.1, waist + 14), (-sw + 4, top + 6), (-sw * 0.35, top - 4)]
         S.poly(pallu, main, INK, OUTLINE)
@@ -398,6 +437,9 @@ def _draw_outfit(S, o, sk, cols, build):
 
     body = _torso_pts(top, hem, sw if outfit != "vest" else sw - 10, ww, hw, belly)
     S.poly(body, main, INK, OUTLINE)
+    if back:                        # the back of the clothes: a plain seam, no buttons / pockets / tie
+        S.line([(0, top + 30), (0, min(hem - 10, top + 200))], 3, shade(main, 0.85))
+        return
 
     if outfit == "vest":
         S.poly(ellipse_pts(0, top, 26, 40, 14, 0, 180), skin, INK, 4)
@@ -507,6 +549,62 @@ def _front_hair(S, HH, style, hc):
         S.line([HH((-30, -HEAD_RY + 18)), HH((-14, -HEAD_RY + 10))], 5, WHITE)
 
 
+def _back_of_head(S, HH, style, hc, acc, o, cols):
+    """The head seen from behind: hair over all of it (down to the nape), long hair / braid / bun / ponytail hanging
+    on the back, a cap or turban from behind. No face."""
+    covered = "turban" in acc or "cap" in acc
+    if style in ("long", "braid") and not covered:
+        tail = 150 if style == "long" else 60
+        S.poly([HH(q) for q in [(-HEAD_RX - 12, tail)] + ellipse_pts(0, -6, HEAD_RX + 10, HEAD_RY + 8, 30, 180, 360)
+                + [(HEAD_RX + 12, tail)] + bezier((HEAD_RX + 12, tail), (0, tail + 36), (-HEAD_RX - 12, tail), 10)[1:-1]],
+               hc, INK, OUTLINE)
+        if style == "braid":
+            for i in range(7):
+                S.poly(closed_ellipse(*HH((0, 70 + i * 30)), 17, 20, 18), hc, INK, 4)
+            S.dot(HH((0, 70 + 7 * 30)), 10, cols["accent"], INK, 4)
+    elif style not in ("bald",) and not covered:
+        nape = 30 if style == "balding" else 46
+        pts = ellipse_pts(0, 0, HEAD_RX + 4, HEAD_RY + 5, 36, 165, 375)
+        pts = pts + bezier(pts[-1], (0, nape + 22), pts[0], 10)[1:-1]
+        if style == "balding":                      # a fringe around the back, the crown bare
+            S.poly([HH(q) for q in ellipse_pts(0, 0, HEAD_RX + 4, HEAD_RY + 5, 24, 150, 390)
+                    + bezier((HEAD_RX * 0.9, -6), (0, -20), (-HEAD_RX * 0.9, -6), 8)], hc, INK, 4)
+        else:
+            S.poly([HH(q) for q in pts], hc, INK, OUTLINE)
+            if style == "curly":
+                for i in range(9):
+                    a = math.radians(170 + 200 * i / 8)
+                    S.dot(HH(((HEAD_RX + 2) * math.cos(a), (HEAD_RY + 2) * math.sin(a))), 22, hc, INK, 5)
+            elif style == "spiky":
+                for i in range(9):
+                    a = math.radians(200 + 140 * i / 8)
+                    tip = ((HEAD_RX + 28) * math.cos(a), (HEAD_RY + 30) * math.sin(a))
+                    S.poly([HH(q) for q in [(HEAD_RX * 0.8 * math.cos(a - 0.2), HEAD_RY * 0.8 * math.sin(a - 0.2)),
+                                            tip, (HEAD_RX * 0.8 * math.cos(a + 0.2), HEAD_RY * 0.8 * math.sin(a + 0.2))]],
+                           hc, INK, 4)
+            elif style == "bun":
+                S.dot(HH((0, -HEAD_RY * 0.55)), 38, hc, INK, OUTLINE)
+            elif style == "ponytail":
+                S.poly([HH(q) for q in bezier((-16, -10), (-30, 90), (0, 150), 10) + bezier((10, 150), (34, 80), (16, -10), 10)],
+                       hc, INK, OUTLINE)
+                S.dot(HH((0, -6)), 10, cols["accent"], INK, 4)
+    if "cap" in acc:
+        cap_col = color_of(o.get("cap_color", "red"), "red")
+        crown = ellipse_pts(0, 0, HEAD_RX + 5, HEAD_RY + 6, 24, 192, 348)
+        S.poly([HH(q) for q in crown + [(crown[-1][0], -30), (crown[0][0], -30)]], cap_col, INK, 6)
+        S.poly([HH(q) for q in [(-26, -30), (26, -30), (20, -8), (-20, -8)]], shade(cap_col, 0.78), INK, 4)
+    elif "turban" in acc:
+        tc = color_of(o.get("turban_color", o.get("cap_color", "saffron")), "saffron")
+        crown = ellipse_pts(0, -8, HEAD_RX + 12, HEAD_RY + 22, 24, 186, 354)
+        S.poly([HH(q) for q in crown + [(HEAD_RX + 6, 20), (0, 30), (-HEAD_RX - 6, 20)]], tc, INK, 6)
+        for j in range(3):
+            S.line([HH(q) for q in bezier((-HEAD_RX + 6, -30 - j * 24), (0, -60 - j * 26),
+                                          (HEAD_RX - 6, -30 - j * 24), 10)], 4, shade(tc, 0.75))
+    if "earrings" in acc:
+        for sgn in (-1, 1):
+            S.dot(HH((sgn * (HEAD_RX - 2), 36)), 7, GOLD, INK, 3)
+
+
 def _braid(S, HH, hc, accent):
     for i in range(8):
         S.poly(closed_ellipse(*HH((66 + (i % 2) * 6 - i * 1.5, 50 + i * 30)), 16, 20, 18), hc, INK, 4)
@@ -541,8 +639,12 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     hc = sk["hc"]
     ht = d2r(p["head_tilt"])
 
-    def HH(q):                      # head coordinates
-        return add(hc, rot((q[0] * HEAD_SCALE, q[1] * HEAD_SCALE), ht))
+    shape = o.get("face", "oval")
+    fx, fy = FACE_SHAPES.get(shape, (1.0, 1.0))
+    eye_style, nose, brow_w = o.get("eyes", "dot"), o.get("nose", "hook"), BROW_STYLES.get(o.get("brows"), 9)
+
+    def HH(q):                      # head coordinates (the face shape stretches the head and the hair with it)
+        return add(hc, rot((q[0] * HEAD_SCALE * fx, q[1] * HEAD_SCALE * fy), ht))
 
     def HF(q):                      # face coordinates (designed for a 100px head)
         f = FACE * HEAD_SCALE
@@ -555,7 +657,8 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         S.poly([HF(q) for q in pts], fill, outline, w * FACE * HEAD_SCALE)
 
     covered = "turban" in acc or "cap" in acc
-    if not ("turban" in acc):
+    back = o.get("view") == "back"          # seen from behind (the near shoulder of an over-the-shoulder shot)
+    if not ("turban" in acc) and not back:
         _back_hair(S, HH, hair, hcol)
 
     # ---- legs + feet ----
@@ -567,8 +670,8 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
 
     # ---- neck + torso ----
     S.tube([(0, -TORSO_H + 20), HH((0, HEAD_RY * 0.55))], 30, skin)
-    _draw_outfit(S, o, sk, cols, build)
-    if hair == "braid" and not covered:
+    _draw_outfit(S, o, sk, cols, build, back=back)
+    if hair == "braid" and not covered and not back:
         _braid(S, HH, hcol, cols["accent"])
 
     # ---- arms (normally behind the head; a pose can bring them in front, e.g. the naagin hood) ----
@@ -589,12 +692,22 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     # ---- head ----
     for sgn in (-1, 1):
         S.poly([HH(q) for q in closed_ellipse(sgn * (HEAD_RX - 2), 10, 14, 21, 20)], skin, INK, 5)
-    S.poly([HH(q) for q in closed_ellipse(0, 0, HEAD_RX, HEAD_RY, 64)], skin, INK, OUTLINE + 1)
+    S.poly([HH(q) for q in _head_pts(shape)], skin, INK, OUTLINE + 1)
     if "earrings" in acc:
         for sgn in (-1, 1):
             S.dot(HH((sgn * (HEAD_RX - 2), 36)), 7, GOLD, INK, 3)
             S.poly([HH(q) for q in [(sgn * (HEAD_RX - 2) - 8, 44), (sgn * (HEAD_RX - 2) + 8, 44),
                                     (sgn * (HEAD_RX - 2), 62)]], GOLD, INK, 3)
+
+    if back:
+        _back_of_head(S, HH, hair, hcol, acc, o, cols)
+        if p.get("arms_front"):
+            draw_arms()
+        top_extra = 26 if "turban" in acc else {"spiky": 34, "curly": 26, "bun": 48}.get(hair, 8)
+        anchors = dict(head_top=S.T(HH((0, -HEAD_RY - top_extra))), head_center=S.T(HH((0, 0))),
+                       mouth=S.T(HH((0, 40))), feet=S.T((0, sk["fy"])), hand_l=S.T(sk["handL"]),
+                       hand_r=S.T(sk["handR"]))
+        return S.ops, anchors
 
     eyes, mouth, brows = EXPRESSIONS.get(expr, EXPRESSIONS["neutral"])
     if blink and eyes not in NO_BLINK:
@@ -604,7 +717,13 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
 
     for sgn in (-1, 1):
         cx, cy = _eye_center(sgn, fdx)
-        if eyes == "dot":
+        if eyes == "dot" and eye_style == "big":
+            hpoly(closed_ellipse(cx, cy - 1, 18, 20, 24), WHITE, INK, 5)
+            hpoly(closed_ellipse(cx + lx * 1.2, cy + 1 + ly * 1.2, 10, 11, 18), INK, None)
+            hpoly(closed_ellipse(cx + lx * 1.2 - 3, cy - 3 + ly * 1.2, 3.5, 3.5, 10), WHITE, None)
+        elif eyes == "dot" and eye_style == "small":
+            hpoly(closed_ellipse(cx + lx, cy + ly, 7.5, 8.5, 16), INK, None)
+        elif eyes == "dot":
             hpoly(closed_ellipse(cx + lx, cy + ly, 11, 13, 20), INK, None)
             hpoly(closed_ellipse(cx + lx - 3, cy + ly - 5, 3.5, 3.5, 10), WHITE, None)
         elif eyes == "wide":
@@ -641,21 +760,29 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         ey = -4.0
         bc = hcol if hcol != HAIR_COLORS["white"] else (150, 150, 150)
         if brows == "angry":
-            hline([(sgn * 16 + fdx, ey - 22), (sgn * 56 + fdx, ey - 42)], 10, bc)
+            hline([(sgn * 16 + fdx, ey - 22), (sgn * 56 + fdx, ey - 42)], brow_w + 1, bc)
         elif brows == "sad":
-            hline([(sgn * 16 + fdx, ey - 42), (sgn * 56 + fdx, ey - 24)], 10, bc)
+            hline([(sgn * 16 + fdx, ey - 42), (sgn * 56 + fdx, ey - 24)], brow_w + 1, bc)
         elif brows == "up":
-            hline(ellipse_pts(sgn * 36 + fdx, ey - 40, 24, 10, 10, 200, 340), 9, bc)
+            hline(ellipse_pts(sgn * 36 + fdx, ey - 40, 24, 10, 10, 200, 340), brow_w, bc)
         elif brows == "think":
             if sgn > 0:
-                hline([(18 + fdx, ey - 42), (56 + fdx, ey - 54)], 10, bc)
+                hline([(18 + fdx, ey - 42), (56 + fdx, ey - 54)], brow_w + 1, bc)
             else:
-                hline([(-56 + fdx, ey - 32), (-18 + fdx, ey - 32)], 10, bc)
+                hline([(-56 + fdx, ey - 32), (-18 + fdx, ey - 32)], brow_w + 1, bc)
         else:
-            hline(ellipse_pts(sgn * 36 + fdx, ey - 24, 22, 8, 10, 205, 335), 9, bc)
+            hline(ellipse_pts(sgn * 36 + fdx, ey - 24, 22, 8, 10, 205, 335), brow_w, bc)
 
     # nose
-    hline(bezier((fdx + 4, 0), (fdx - 12, 26), (fdx + 6, 30), 8), 5, shade(skin, 0.62))
+    ncol = shade(skin, 0.62)
+    if nose == "button":
+        hline(ellipse_pts(fdx, 20, 9, 8, 10, 20, 160), 5, ncol)
+    elif nose == "long":
+        hline(bezier((fdx + 2, -6), (fdx - 16, 34), (fdx + 8, 36), 10), 5, ncol)
+    elif nose == "big":
+        hpoly(closed_ellipse(fdx, 22, 15, 12, 18), shade(skin, 0.9), ncol, 5)
+    else:
+        hline(bezier((fdx + 4, 0), (fdx - 12, 26), (fdx + 6, 30), 8), 5, ncol)
 
     # tears
     if expr == "cry":
