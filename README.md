@@ -30,6 +30,20 @@ Scene file chhoti hoti hai:
 
 Poora control chahiye to template ke upar kuch bhi override karo (`characters`, `timeline`, `background`...). `timeline` list override karne par poori replace hoti hai.
 
+## Look / depth (optional, `meta` me)
+
+Default me ye teen cheezein on hain; band karne ya adjust karne ke liye scene ke `meta` me likho:
+
+```json
+"meta": { "shadows": true, "depth": 0.3, "vignette": 0.18 }
+```
+
+- `shadows`: har character ke pairon ke neeche soft shadow; jump karne par chhota + halka ho jata hai.
+- `depth`: `0` = off. Character `y` ke hisaab se chhota/bada hota hai (`y` jitna upar/door, utna chhota). Default ground `y=1700` par size 1.0 hi rehta hai, to purane scenes nahi badalte. Background ki `horizon` (floor kahan se shuru) badalni ho: `"background": {"type": "room", "horizon": 1200}`.
+- `vignette`: `0` = off. Kone halke dark/warm (captions par asar nahi).
+
+`room` background me window ki dhoop ka halka patch floor par bana hua hai.
+
 ## Voice (Hindi) ka ek zaroori rule
 
 Bubble me dikhne wala text Roman Hinglish me hota hai (`say`), lekin TTS ko **Devanagari** chahiye (`speak`), warna uchcharan galat aata hai:

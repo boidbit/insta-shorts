@@ -71,6 +71,16 @@ def _floor_perspective(g, y_top, c_floor, c_line, vp=(540, 700)):
         g.line([(vp[0] + (xb - vp[0]) * (y_top - vp[1]) / (LH - vp[1]), y_top), (xb, LH)], c_line, 3)
 
 
+def _light_patch(g, pts, color=(255, 236, 170), alpha=52, blur=22):
+    """Soft translucent light shape (e.g. sunlight through a window) blended onto the canvas."""
+    from PIL import ImageFilter
+    layer = Image.new("RGBA", g.im.size, color + (0,))
+    ImageDraw.Draw(layer).polygon(g._p(pts), fill=color + (alpha,))
+    layer = layer.filter(ImageFilter.GaussianBlur(blur * g.k))
+    g.im = Image.alpha_composite(g.im.convert("RGBA"), layer).convert("RGB")
+    g.d = ImageDraw.Draw(g.im)
+
+
 # ------------------------------------------------------------------ kitchen
 def kitchen(s):
     g = G(s, color=(216, 210, 168))
@@ -175,6 +185,7 @@ def room(s):
         y = y_floor + i * i * 14 + 20
         g.line([(0, y), (LW, y)], (140, 100, 66), 3)
     g.line([(0, y_floor), (LW, y_floor)], INK, 5)
+    _light_patch(g, [(150, y_floor), (440, y_floor), (760, 1760), (210, 1830)])   # window light on the floor
     # window
     g.rect(110, 430, 450, 960, (255, 255, 255), INK, 8)
     g.rect(128, 448, 432, 942, (170, 214, 238))
@@ -323,7 +334,20 @@ def night_road(s, world_w=LW):
 
 
 # ------------------------------------------------------------------ public API
+# y (logical px) where the floor / road starts. Characters standing further up than this
+# are "behind" the camera plane and get drawn smaller (see Background.depth_scale).
+HORIZON = {"kitchen": 1300, "room": 1260, "school": 1290, "street": 1370, "night_road": 1380}
+REF_Y = 1700.0     # default ground line (scene.GROUND_Y): characters standing here are drawn at full size
+
+
 class Background:
+    def depth_scale(self, y, strength):
+        """Size multiplier for a character whose feet are at logical y. 1.0 at REF_Y."""
+        if strength <= 0 or self.horizon is None:
+            return 1.0
+        t = max(0.0, min(1.3, (y - self.horizon) / (REF_Y - self.horizon)))
+        return 1.0 - strength * (1.0 - t)
+
     def __init__(self, spec, out_w, out_h):
         self.out_w, self.out_h = out_w, out_h
         s = out_w / float(LW)
@@ -331,6 +355,7 @@ class Background:
         if isinstance(spec, str):
             spec = {"type": spec}
         self.kind = spec.get("type", "plain")
+        self.horizon = spec.get("horizon", HORIZON.get(self.kind))   # None -> no depth scaling
         self.scroll = float(spec.get("scroll", 0.0))   # logical px per second
         self.static = None
         self.wide = None

@@ -11,7 +11,8 @@ import subprocess
 import sys
 import time
 
-from PIL import Image
+import numpy as np
+from PIL import Image, ImageChops
 
 from . import actions, audio
 from .backgrounds import Background
@@ -19,6 +20,31 @@ from .characters import build_character, render_ops
 from .scene import camera_at, compile_scene
 from .text import bubble_image, styled_box
 from .util import LH, LW, clamp, ease_out, ease_out_back, load_scene
+
+def _shadow_sprite(w=256, h=64, peak=0.55):
+    """Soft elliptical blob (dark, radial falloff) used as the contact shadow."""
+    yy, xx = np.mgrid[0:h, 0:w].astype("float32")
+    d = np.sqrt(((xx + 0.5) / w * 2 - 1) ** 2 + ((yy + 0.5) / h * 2 - 1) ** 2)
+    a = np.clip(1.0 - d, 0.0, 1.0) ** 1.4 * peak
+    rgba = np.zeros((h, w, 4), dtype="uint8")
+    rgba[..., 0], rgba[..., 1], rgba[..., 2] = 24, 20, 34
+    rgba[..., 3] = (a * 255).astype("uint8")
+    return Image.fromarray(rgba, "RGBA")
+
+
+def _vignette(w, h, strength):
+    """RGB multiplier image (255 = untouched) that darkens the corners a touch and warms them slightly."""
+    if strength <= 0:
+        return None
+    yy, xx = np.mgrid[0:h, 0:w].astype("float32")
+    d = np.sqrt(((xx + 0.5) / w * 2 - 1) ** 2 + ((yy + 0.5) / h * 2 - 1) ** 2) / 1.4142
+    v = np.clip((d - 0.45) / 0.55, 0.0, 1.0)
+    v = v * v * (3 - 2 * v)
+    out = np.empty((h, w, 3), dtype="uint8")
+    for ch, k in enumerate((0.80, 0.95, 1.10)):     # R loses least, B most -> warm edges
+        out[..., ch] = np.clip((1.0 - strength * v * k) * 255, 0, 255).astype("uint8")
+    return Image.fromarray(out, "RGB")
+
 
 POS = {"top": (540, 330), "center": (540, 960), "lower": (540, 1450), "bottom": (540, 1560),
        "upper": (540, 520)}
@@ -33,6 +59,11 @@ class Renderer:
         self.H -= self.H % 2
         self.s = self.W / float(LW)
         self.bg = Background(self.plan.background, self.W, self.H)
+        meta = scene.get("meta", {})
+        self.shadows = bool(meta.get("shadows", True))         # soft contact shadow under each character
+        self.depth = float(meta.get("depth", 0.3))             # 0 = off; how much smaller far-away characters get
+        self._shadow = _shadow_sprite() if self.shadows else None
+        self._vig = _vignette(self.W, self.H, float(meta.get("vignette", 0.18)))   # 0 = off
         self._ov_cache = {}
         self._lip = {}
         self._label_cache = {}
@@ -66,6 +97,18 @@ class Renderer:
             a = rgba.getchannel("A").point(lambda v: int(v * alpha))
             rgba.putalpha(a)
         img.paste(rgba, (int(cx - ax), int(cy - ay)), rgba)
+
+    def _draw_shadow(self, img, x, y, k, height):
+        """Soft ellipse on the ground at logical (x, y). `height` = how far the body is lifted (logical px):
+        a jumping character gets a smaller, fainter shadow."""
+        h = max(0.0, height)
+        shrink = 1.0 / (1.0 + h / 260.0)
+        w = max(2, int(2 * 118 * k * shrink * self.s))
+        hh = max(2, int(2 * 20 * k * shrink * self.s))
+        sp = self._shadow.resize((w, hh), Image.BILINEAR)
+        a = 1.0 / (1.0 + h / 200.0)
+        sp.putalpha(sp.getchannel("A").point([int(v * a) for v in range(256)]))
+        img.paste(sp, (int(x * self.s - w / 2), int(y * self.s - hh / 2)), sp)
 
     # ------------------------------------------------------------ overlays
     def _overlay_image(self, o):
@@ -108,6 +151,9 @@ class Renderer:
         order = sorted(plan.chars.values(), key=lambda c: (c.pos_at(t)[1], c.pos_at(t)[0]))
         anchors = {}
         states = {}
+
+        # pass 1: state, pose and depth-scaled size of every character
+        prep = {}
         for c in order:
             st = c.state_at(t)
             states[c.name] = st
@@ -119,6 +165,18 @@ class Renderer:
             opts = dict(st["opts"], _x=x)
             pose = actions.pose_for(action, t - a_t0 if action != "walk" else t, st["speed"], st["intensity"],
                                     c.phase, opts)
+            k = c.scale * self.bg.depth_scale(y, self.depth)
+            prep[c.name] = (st, x, y, pose, k)
+
+        # pass 2: contact shadows go under *all* characters so they never cover a neighbour
+        if self.shadows:
+            for c in order:
+                _st, x, y, pose, k = prep[c.name]
+                self._draw_shadow(img, x + pose.get("shift", 0.0) * k, y + 6 * k, k, -pose.get("lift", 0.0) * k)
+
+        # pass 3: characters
+        for c in order:
+            st, x, y, pose, k = prep[c.name]
             look = st["look"]
             if isinstance(look, str) and look in plan.chars:
                 ox, _oy = plan.chars[look].pos_at(t)
@@ -135,7 +193,7 @@ class Renderer:
             blink = ((t + c.phase * 1.7) % 3.6) < 0.12
             spec = dict(c.spec)
             spec["facing"] = st["facing"]
-            ops, an = build_character(spec, pose, st["expression"], mouth_open, t, x, y, c.scale,
+            ops, an = build_character(spec, pose, st["expression"], mouth_open, t, x, y, k,
                                       blink=blink, prop=st["prop"], talking=bool(st["talking"]),
                                       tear_phase=(t * 1.1) % 1.0)
             r = render_ops(ops, s, self.W, self.H)
@@ -176,6 +234,9 @@ class Renderer:
             l = clamp(ccx - vw / 2, 0, self.W - vw)
             tp = clamp(ccy - vh / 2, 0, self.H - vh)
             img = img.resize((self.W, self.H), Image.BILINEAR, box=(l, tp, l + vw, tp + vh))
+
+        if self._vig is not None:      # lens vignette: screen-fixed, under the captions
+            img = ImageChops.multiply(img, self._vig)
 
         self._draw_overlays(img, t)    # captions stay screen-fixed (not zoomed)
 
