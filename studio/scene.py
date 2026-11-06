@@ -31,7 +31,7 @@ class Char:
 
     def pos_at(self, t):
         x, y = self.x, self.y
-        for (t0, t1, x0, y0, x1, y1) in self.moves:
+        for (t0, t1, x0, y0, x1, y1, *_r) in self.moves:
             if t < t0:
                 break
             e = ease_in_out((t - t0) / max(1e-6, t1 - t0))
@@ -140,7 +140,8 @@ def compile_scene(scene, use_tts=True, fps=None):
                 m = ev["move"]
                 x0, y0 = c.pos_at(t)
                 dur = float(m.get("dur", 0.8))
-                c.moves.append((t, t + dur, x0, y0, float(m.get("x", x0)), float(m.get("y", y0))))
+                c.moves.append((t, t + dur, x0, y0, float(m.get("x", x0)), float(m.get("y", y0)),
+                                bool(m.get("run") or ev.get("action") == "run")))
 
         if "say" in ev and who:
             c = chars[who[0]]

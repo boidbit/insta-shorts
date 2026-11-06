@@ -98,12 +98,12 @@ class Renderer:
             rgba.putalpha(a)
         img.paste(rgba, (int(cx - ax), int(cy - ay)), rgba)
 
-    def _draw_shadow(self, img, x, y, k, height):
+    def _draw_shadow(self, img, x, y, k, height, stretch=1.0):
         """Soft ellipse on the ground at logical (x, y). `height` = how far the body is lifted (logical px):
         a jumping character gets a smaller, fainter shadow."""
         h = max(0.0, height)
         shrink = 1.0 / (1.0 + h / 260.0)
-        w = max(2, int(2 * 118 * k * shrink * self.s))
+        w = max(2, int(2 * 118 * k * shrink * stretch * self.s))
         hh = max(2, int(2 * 20 * k * shrink * self.s))
         sp = self._shadow.resize((w, hh), Image.BILINEAR)
         a = 1.0 / (1.0 + h / 200.0)
@@ -159,12 +159,25 @@ class Renderer:
             states[c.name] = st
             x, y = c.pos_at(t)
             action, a_t0 = st["action"], st["action_t0"]
-            moving = any(t0 <= t < t1 for (t0, t1, *_r) in c.moves)
-            if moving and action in ("idle", "none", "stand"):
-                action, a_t0 = "walk", 0.0
-            opts = dict(st["opts"], _x=x)
-            pose = actions.pose_for(action, t - a_t0 if action != "walk" else t, st["speed"], st["intensity"],
-                                    c.phase, opts)
+            mv = next((m for m in c.moves if m[0] <= t < m[1]), None)
+            if mv and action in ("idle", "none", "stand", "talk"):
+                action, a_t0 = ("run" if mv[6] else "walk"), 0.0
+            if mv and st["facing"] == "front" and abs(mv[4] - mv[2]) > 1:
+                st["facing"] = "right" if mv[4] > mv[2] else "left"      # face the way you walk
+            # which way the character acts: toward its `look` target, else its facing, else toward screen centre
+            look = st["look"]
+            if "dir" in st["opts"] and st["opts"]["dir"] in (1, -1, "left", "right"):
+                dr = st["opts"]["dir"]
+                dr = -1 if dr in (-1, "left") else 1
+            elif isinstance(look, str) and look in plan.chars and look != c.name:
+                dr = 1 if plan.chars[look].pos_at(t)[0] >= x else -1
+            elif st["facing"] in ("left", "right"):
+                dr = -1 if st["facing"] == "left" else 1
+            else:
+                dr = 1 if x <= LW / 2 else -1
+            opts = dict(st["opts"], _x=x, _dir=dr, _facing=st["facing"])
+            pose = actions.pose_for(action, t - a_t0 if action not in ("walk", "run") else t, st["speed"],
+                                    st["intensity"], c.phase, opts)
             k = c.scale * self.bg.depth_scale(y, self.depth)
             prep[c.name] = (st, x, y, pose, k)
 
@@ -172,7 +185,13 @@ class Renderer:
         if self.shadows:
             for c in order:
                 _st, x, y, pose, k = prep[c.name]
-                self._draw_shadow(img, x + pose.get("shift", 0.0) * k, y + 6 * k, k, -pose.get("lift", 0.0) * k)
+                lean = math.sin(math.radians(pose.get("tilt", 0.0)))
+                if abs(lean) > 0.5:      # lying / falling: the shadow follows the body along the floor
+                    self._draw_shadow(img, x + (pose.get("dx", 0.0) + lean * 380) * k, y + 6 * k, k, 0.0,
+                                      stretch=1.0 + 2.2 * abs(lean))
+                else:
+                    self._draw_shadow(img, x + (pose.get("shift", 0.0) + pose.get("dx", 0.0)) * k, y + 6 * k, k,
+                                      -pose.get("lift", 0.0) * k)
 
         # pass 3: characters, with foreground props woven in by depth (a prop covers characters standing behind it)
         fg, fi = self.bg.foreground(t), 0
@@ -192,13 +211,22 @@ class Renderer:
             elif isinstance(look, (int, float)):
                 pose["look_x"] = float(look)
             mouth_open = 0.0
-            if st["talking"]:
+            talking = bool(st["talking"])
+            if talking:
                 mouth_open = self._lip_open(st["talking"], t)
+            elif pose.get("chew") is not None:          # eating: chewing mouth
+                mouth_open, talking = float(pose["chew"]), pose["chew"] > 0.1
             blink = ((t + c.phase * 1.7) % 3.6) < 0.12
             spec = dict(c.spec)
             spec["facing"] = st["facing"]
-            ops, an = build_character(spec, pose, st["expression"], mouth_open, t, x, y, k,
-                                      blink=blink, prop=st["prop"], talking=bool(st["talking"]),
+            if pose.get("prop_hand"):
+                spec["prop_hand"] = pose["prop_hand"]
+            expr = pose.get("face") or st["expression"]   # some actions carry their own face (yawn, sneeze...)
+            prop = st["prop"] if st["prop"] is not None else pose.get("prop")
+            if st["prop"] == "" or pose.get("hide_prop"):
+                prop = None
+            ops, an = build_character(spec, pose, expr, mouth_open, t, x, y, k,
+                                      blink=blink, prop=prop, talking=talking,
                                       tear_phase=(t * 1.1) % 1.0)
             r = render_ops(ops, s, self.W, self.H)
             if r:
