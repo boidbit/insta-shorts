@@ -16,6 +16,7 @@ from PIL import Image, ImageChops
 
 from . import actions, audio
 from .backgrounds import Background
+from .effects import Effects
 from .characters import build_character, render_ops
 from .scene import camera_at, compile_scene
 from .text import bubble_image, styled_box
@@ -64,6 +65,7 @@ class Renderer:
         self.depth = float(meta.get("depth", 0.3))             # 0 = off; how much smaller far-away characters get
         self._shadow = _shadow_sprite() if self.shadows else None
         self._vig = _vignette(self.W, self.H, float(meta.get("vignette", 0.18)))   # 0 = off
+        self.fx = Effects(self.plan.effects, self.s, self.W, self.H, self.plan.fps)
         self._ov_cache = {}
         self._lip = {}
         self._label_cache = {}
@@ -211,7 +213,7 @@ class Renderer:
             elif isinstance(look, (int, float)):
                 pose["look_x"] = float(look)
             mouth_open = 0.0
-            talking = bool(st["talking"])
+            talking = bool(st["talking"]) and st["talking"].get("bubble") != "thought"   # thoughts: lips shut
             if talking:
                 mouth_open = self._lip_open(st["talking"], t)
             elif pose.get("chew") is not None:          # eating: chewing mouth
@@ -236,6 +238,11 @@ class Renderer:
         for _d, part, fx, fy in fg[fi:]:      # props in front of everybody
             img.paste(part, (fx, fy), part)
 
+        self.fx.draw_world(img, t, anchors, plan.chars)     # sweat, ?, POW, glowing eyes, thrown objects...
+        # rain, fog, lightning, spotlight...: over the whole scene but under bubbles and captions
+        img = self.fx.draw_screen(img, t, {n: (a["head_center"][0] * s, a["head_center"][1] * s)
+                                           for n, a in anchors.items()})
+
         # labels + bubbles
         for c in order:
             st, an = states[c.name], anchors[c.name]
@@ -249,7 +256,9 @@ class Renderer:
                 self._paste_rgba(img, lab, hx * s, hy * s - lab.height / 2 - 18 * s)
                 top = hy - (lab.height / s) - 30
             sp = st["talking"]
-            if sp and sp.get("bubble", True):
+            if sp and sp.get("bubble") == "thought":
+                self.fx._thought(img, {"text": sp["text"], "_seed": 0}, t - sp["start"], 1.0, an)
+            elif sp and sp.get("bubble", True):
                 lt = t - sp["start"]
                 im0, _ = bubble_image(sp["text"], s, 0)
                 left = clamp(hx * s - im0.width * 0.35, 24 * s, self.W - im0.width - 24 * s)
@@ -262,12 +271,14 @@ class Renderer:
         z, cx, cy, dx, dy = camera_at(plan, t)
         if dx or dy:
             z = max(z, 1.05)
+        l, tp, vw, vh = 0.0, 0.0, float(self.W), float(self.H)
         if z > 1.001:
             vw, vh = self.W / z, self.H / z
             ccx, ccy = (cx + dx) * s, (cy + dy) * s
             l = clamp(ccx - vw / 2, 0, self.W - vw)
             tp = clamp(ccy - vh / 2, 0, self.H - vh)
             img = img.resize((self.W, self.H), Image.BILINEAR, box=(l, tp, l + vw, tp + vh))
+
 
         if self._vig is not None:      # lens vignette: screen-fixed, under the captions
             img = ImageChops.multiply(img, self._vig)

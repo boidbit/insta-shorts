@@ -2,7 +2,7 @@
 import math
 import sys
 
-from . import audio
+from . import audio, effects
 from .util import LW, LH, asset_path, clamp, ease_in_out, lerp
 
 SLOTS = {
@@ -12,7 +12,7 @@ SLOTS = {
 }
 GROUND_Y = 1700
 CHAR_ATTRS = ("action", "expression", "prop", "label", "look", "facing", "style", "point", "dir",
-              "lean", "speed", "intensity", "hands", "tint")
+              "lean", "speed", "intensity", "hands", "tint", "seat")
 
 
 class Char:
@@ -112,6 +112,7 @@ def compile_scene(scene, use_tts=True, fps=None):
     cam_events = []
     shakes = []
     plan.speech = []
+    plan.effects = []
     warned = [False]
     plan_end = 0.0
 
@@ -168,6 +169,28 @@ def compile_scene(scene, use_tts=True, fps=None):
             cursor = max(cursor, t + float(ev["hold"]))
             plan_end = max(plan_end, t + float(ev["hold"]))
 
+        if "fx" in ev:
+            for raw in (ev["fx"] if isinstance(ev["fx"], list) else [ev["fx"]]):
+                fx = effects.normalize(raw, t)
+                if "who" not in fx and who:
+                    fx["who"] = who[0]
+                plan.effects.append(fx)
+        if ev.get("action") == "throw" and ev.get("at") and who:
+            # thrown object flies from the thrower's hand to the target; target reacts on impact
+            src, dst = who[0], ev["at"]
+            release = t + 0.42
+            arrive = release + float(ev.get("flight", 0.55))
+            obj = ev.get("throw_prop") or ev.get("prop") or "chappal"
+            plan.effects.append({"type": "projectile", "src": src, "dst": dst, "prop": obj,
+                                 "from": release, "to": arrive, "arc": ev.get("arc", 160)})
+            chars[src].events.append({"t": release, "prop": ""})
+            if ev.get("hit", True) and dst in chars:
+                chars[dst].events.append({"t": arrive, "action": "hit_react"})
+                hp = audio.sfx_path(ev.get("hit_sfx", "thud"))
+                if hp:
+                    plan.sfx.append(dict(t=arrive, path=hp, volume=0.8))
+                plan.effects.append({"type": "pow", "who": dst, "text": ev.get("hit_text", "THAK!"),
+                                     "from": arrive, "to": arrive + 0.6})
         if "sfx" in ev:
             p = audio.sfx_path(ev["sfx"])
             if p:
@@ -185,6 +208,8 @@ def compile_scene(scene, use_tts=True, fps=None):
                 cam_events.append(cam)
 
     plan.overlays += [dict(o) for o in scene.get("overlays", [])]
+    for raw in scene.get("effects", []):
+        plan.effects.append(effects.normalize(raw, float(raw.get("from", 0.0)) if isinstance(raw, dict) else 0.0))
     if "caption" in scene:     # shorthand
         c = dict(scene["caption"]) if isinstance(scene["caption"], dict) else {"text": scene["caption"]}
         c.setdefault("style", "caption_box")
