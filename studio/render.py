@@ -576,6 +576,8 @@ class Renderer:
             m = self.plan.music
             musics.append(dict(path=m["path"], start=offset, dur=self.duration, volume=m["volume"],
                                loop=not m["generated"]))
+        for a in getattr(self.plan, "ambience", []):
+            musics.append(dict(path=a["path"], start=offset, dur=self.duration, volume=a["volume"], loop=True))
         return speech, sfx, musics
 
     def ffmpeg_cmd(self, out):

@@ -348,11 +348,18 @@ def compile_scene(scene, use_tts=True, fps=None):
             m = {"path": m}
         vol = float(m.get("volume", 0.35))
         if m.get("type") == "beat":
-            p = audio.beat_path(float(m.get("bpm", 104)), plan.duration, m.get("style", "desi"))
+            p = audio.beat_path(float(m.get("bpm", 104)), plan.duration, m.get("style", m.get("mood", "desi")),
+                                m.get("seed"))
         else:
             p = asset_path(m.get("path"))
         if p:
             plan.music = dict(path=p, volume=vol, generated=m.get("type") == "beat")
+    plan.ambience = []
+    amb = scene.get("ambience")
+    for a in (amb if isinstance(amb, list) else [amb] if amb else []):
+        a = {"type": a} if isinstance(a, str) else dict(a)
+        if a.get("type") in audio.AMBIENCE:
+            plan.ambience.append(dict(path=audio.ambience_path(a["type"]), volume=float(a.get("volume", 0.25))))
     return plan
 
 
