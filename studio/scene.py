@@ -156,6 +156,7 @@ def compile_scene(scene, use_tts=True, fps=None):
     shakes = []
     plan.speech = []
     plan.effects = []
+    plan.warps = []          # slow motion / freeze frames (story time)
     warned = [False]
     plan_end = 0.0
 
@@ -269,9 +270,26 @@ def compile_scene(scene, use_tts=True, fps=None):
             o = dict(ev["overlay"])
             o.setdefault("from", t)
             plan.overlays.append(o)
+        if "slowmo" in ev:
+            sm = ev["slowmo"] if isinstance(ev["slowmo"], dict) else {"rate": ev["slowmo"]}
+            rate = float(sm.get("rate", 0.35)) if not isinstance(sm.get("rate"), bool) else 0.35
+            plan.warps.append(("slow", t, max(0.05, min(1.0, rate)), float(sm.get("dur", 1.5))))
+        if "freeze" in ev:
+            fr = ev["freeze"] if isinstance(ev["freeze"], dict) else {"dur": ev["freeze"]}
+            plan.warps.append(("freeze", t, float(fr.get("dur", 1.0)) if not isinstance(fr.get("dur"), bool) else 1.0,
+                               fr.get("style", "plain")))
         if "camera" in ev:
             cam = dict(ev["camera"])
             cam["t"] = t
+            if cam.get("punch"):                     # quick snap zoom onto a face
+                cam_events.append({"t": t, "zoom": float(cam.get("zoom", 1.7)), "focus": cam["punch"],
+                                   "dur": float(cam.get("dur", 0.1))})
+                if cam.get("back"):
+                    cam_events.append({"t": t + float(cam["back"]), "zoom": 1.0, "dur": 0.3})
+            if cam.get("reveal"):                    # start close, pull back to the full shot
+                who_ = cam["reveal"] if isinstance(cam["reveal"], str) else None
+                cam_events.append({"t": t, "zoom": float(cam.get("from", 2.2)), "focus": who_, "dur": 0.001})
+                cam_events.append({"t": t + 0.002, "zoom": 1.0, "dur": float(cam.get("dur", 1.6))})
             if "shake" in cam:
                 shakes.append((t, float(cam["shake"]), float(cam.get("shake_dur", 0.5))))
             if "zoom" in cam or "focus" in cam:

@@ -24,6 +24,8 @@ from .scene import camera_at, compile_scene
 from .text import bubble_image, styled_box
 from .util import LH, LW, clamp, ease_out, ease_out_back, load_scene
 
+INF = float("inf")
+
 def _shadow_sprite(w=256, h=64, peak=0.55):
     """Soft elliptical blob (dark, radial falloff) used as the contact shadow."""
     yy, xx = np.mgrid[0:h, 0:w].astype("float32")
@@ -49,6 +51,132 @@ def _vignette(w, h, strength):
     return Image.fromarray(out, "RGB")
 
 
+class TimeWarp:
+    """Maps real (video) time <-> story (scene) time for slow motion and freeze frames."""
+
+    def __init__(self, warps, story_dur):
+        self.pieces = []                # (real_start, story_start, rate, real_len, style)
+        real = story = 0.0
+        for w in sorted(warps, key=lambda w_: w_[1]):
+            ts = w[1]
+            if ts < story:
+                continue
+            if ts > story:
+                self.pieces.append((real, story, 1.0, ts - story, None))
+                real, story = real + ts - story, ts
+            if w[0] == "slow":
+                rate, sdur = w[2], w[3]
+                self.pieces.append((real, story, rate, sdur / rate, None))
+                real, story = real + sdur / rate, story + sdur
+            else:
+                self.pieces.append((real, story, 0.0, w[2], w[3]))
+                real += w[2]
+        self.pieces.append((real, story, 1.0, INF, None))
+        self.duration = real + max(0.0, story_dur - story)
+
+    def at(self, T):
+        """(story time, freeze style or None) at real time T."""
+        for (r0, s0, rate, ln, style) in self.pieces:
+            if r0 <= T < r0 + ln:
+                return s0 + (T - r0) * rate, style
+        r0, s0, rate, _ln, _st = self.pieces[-1]
+        return s0 + (T - r0), None
+
+    def real(self, ts):
+        """Real time at which story time ts is shown (first time, if frozen)."""
+        for (r0, s0, rate, ln, _style) in self.pieces:
+            if rate > 0 and s0 <= ts < s0 + rate * ln:
+                return r0 + (ts - s0) / rate
+        r0, s0, _r, _l, _s = self.pieces[-1]
+        return r0 + (ts - s0)
+
+
+def build_ffmpeg_cmd(W, H, fps, duration, speech, sfx, musics, out):
+    """speech: [(path, start)], sfx: [(path, t, volume)], musics: [dict(path, start, dur, volume, loop)].
+    Speech ducks the music; everything is mixed and limited."""
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
+           "-s", "%dx%d" % (W, H), "-r", str(fps), "-i", "-"]
+    idx = 1
+    speech_lbl, fx_lbl, mus_lbl, filters = [], [], [], []
+    for path, start in speech:
+        cmd += ["-i", path]
+        filters.append("[%d:a]aresample=44100,aformat=channel_layouts=mono,adelay=%d:all=1,volume=1.0[s%d]"
+                       % (idx, int(start * 1000), idx))
+        speech_lbl.append("[s%d]" % idx)
+        idx += 1
+    for path, t, vol in sfx:
+        cmd += ["-i", path]
+        filters.append("[%d:a]aresample=44100,aformat=channel_layouts=mono,adelay=%d:all=1,volume=%.2f[f%d]"
+                       % (idx, int(t * 1000), vol, idx))
+        fx_lbl.append("[f%d]" % idx)
+        idx += 1
+    for m in musics:
+        if m.get("loop"):
+            cmd += ["-stream_loop", "-1"]
+        cmd += ["-i", m["path"]]
+        filters.append("[%d:a]aresample=44100,aformat=channel_layouts=mono,atrim=0:%.2f,adelay=%d:all=1,volume=%.2f[m%d]"
+                       % (idx, m["dur"], int(m.get("start", 0) * 1000), m["volume"], idx))
+        mus_lbl.append("[m%d]" % idx)
+        idx += 1
+
+    def merge(lbls, name):
+        if len(lbls) > 1:
+            filters.append("%samix=inputs=%d:normalize=0:duration=longest[%s]" % ("".join(lbls), len(lbls), name))
+        else:
+            filters.append("%sanull[%s]" % (lbls[0], name))
+        return "[%s]" % name
+
+    mus = merge(mus_lbl, "mus") if mus_lbl else None
+    mix_in = []
+    if speech_lbl:
+        sp = merge(speech_lbl, "sp")
+        if mus:
+            filters.append("%sasplit=2[spa][spb]" % sp)
+            filters.append("%s[spa]sidechaincompress=threshold=0.03:ratio=8:attack=15:release=300[duck]" % mus)
+            mix_in += ["[spb]", "[duck]"]
+        else:
+            mix_in.append(sp)
+    elif mus:
+        mix_in.append(mus)
+    if fx_lbl:
+        mix_in.append(merge(fx_lbl, "fx"))
+    if mix_in:
+        if len(mix_in) > 1:
+            filters.append("%samix=inputs=%d:normalize=0:duration=longest,apad,alimiter=limit=0.95[aout]"
+                           % ("".join(mix_in), len(mix_in)))
+        else:
+            filters.append("%sapad,alimiter=limit=0.95[aout]" % mix_in[0])
+        cmd += ["-filter_complex", ";".join(filters), "-map", "0:v", "-map", "[aout]"]
+    else:
+        cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-map", "0:v", "-map", "%d:a" % idx]
+    cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+            "-r", str(fps), "-c:a", "aac", "-b:a", "160k", "-ac", "2",
+            "-t", "%.3f" % duration, "-movflags", "+faststart", out]
+    return cmd
+
+
+def render_frames(r, out):
+    """Pipe r.frame_at(T) for every frame into ffmpeg. r: Renderer or MultiRenderer."""
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    cmd = build_ffmpeg_cmd(r.W, r.H, r.fps, r.duration, *r.audio_items(), out)
+    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    n = r.n_frames
+    t0 = time.time()
+    try:
+        for i in range(n):
+            img = r.frame_at(i / float(r.fps))
+            proc.stdin.write(img.tobytes())
+            if i % 30 == 0:
+                print("  frame %d/%d  (%.1fs)" % (i, n, time.time() - t0), flush=True)
+        proc.stdin.close()
+    except BrokenPipeError:
+        pass
+    rc = proc.wait()
+    if rc != 0:
+        raise SystemExit("ffmpeg failed (exit %d)" % rc)
+    print("done: %s  (%d frames, %.1fs video, %.0fs render)" % (out, n, r.duration, time.time() - t0))
+
+
 POS = {"top": (540, 330), "center": (540, 960), "lower": (540, 1450), "bottom": (540, 1560),
        "upper": (540, 520)}
 
@@ -67,6 +195,10 @@ class Renderer:
         self.depth = float(meta.get("depth", 0.3))             # 0 = off; how much smaller far-away characters get
         self._shadow = _shadow_sprite() if self.shadows else None
         self._vig = _vignette(self.W, self.H, float(meta.get("vignette", 0.18)))   # 0 = off
+        self.fps = self.plan.fps
+        self.warp = TimeWarp(self.plan.warps, self.plan.duration)
+        self.duration = round(self.warp.duration, 3)
+        self.n_frames = int(round(self.duration * self.fps))
         self.fx = Effects(self.plan.effects, self.s, self.W, self.H, self.plan.fps)
         self.objects = Objects(self.plan.objects, self.plan.obj_events, self.s, self.W, self.H)
         self._ov_cache = {}
@@ -426,93 +558,31 @@ class Renderer:
             img = Image.blend(Image.new("RGB", img.size, (0, 0, 0)), img, clamp(f))
         return img
 
-    # ------------------------------------------------------------ audio graph
+    # ------------------------------------------------------------ real time (slow motion / freeze aware)
+    def frame_at(self, T):
+        ts, style = self.warp.at(T)
+        img = self.frame(min(ts, self.plan.duration - 1e-3))
+        if style == "grey":
+            img = Image.blend(img, img.convert("L").convert("RGB"), 0.85)
+        return img
+
+    def audio_items(self, offset=0.0, with_music=True):
+        """Speech / sfx / music placed in REAL time (+ offset)."""
+        w = self.warp
+        speech = [(sp["audio"], offset + w.real(sp["start"])) for sp in self.plan.speech if sp.get("audio")]
+        sfx = [(fx["path"], offset + w.real(fx["t"]), fx["volume"]) for fx in self.plan.sfx]
+        musics = []
+        if with_music and self.plan.music:
+            m = self.plan.music
+            musics.append(dict(path=m["path"], start=offset, dur=self.duration, volume=m["volume"],
+                               loop=not m["generated"]))
+        return speech, sfx, musics
+
     def ffmpeg_cmd(self, out):
-        plan = self.plan
-        cmd = ["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
-               "-s", "%dx%d" % (self.W, self.H), "-r", str(plan.fps), "-i", "-"]
-        idx = 1
-        speech_lbl, fx_lbl, filters = [], [], []
-        for sp in plan.speech:
-            if sp.get("audio"):
-                cmd += ["-i", sp["audio"]]
-                ms = int(sp["start"] * 1000)
-                filters.append("[%d:a]aresample=44100,aformat=channel_layouts=mono,adelay=%d:all=1,volume=1.0[s%d]"
-                               % (idx, ms, idx))
-                speech_lbl.append("[s%d]" % idx)
-                idx += 1
-        for fx in plan.sfx:
-            cmd += ["-i", fx["path"]]
-            ms = int(fx["t"] * 1000)
-            filters.append("[%d:a]aresample=44100,aformat=channel_layouts=mono,adelay=%d:all=1,volume=%.2f[f%d]"
-                           % (idx, ms, fx["volume"], idx))
-            fx_lbl.append("[f%d]" % idx)
-            idx += 1
-        mus = None
-        if plan.music:
-            if not plan.music["generated"]:
-                cmd += ["-stream_loop", "-1"]
-            cmd += ["-i", plan.music["path"]]
-            filters.append("[%d:a]aresample=44100,aformat=channel_layouts=mono,atrim=0:%.2f,volume=%.2f[mus]"
-                          % (idx, plan.duration, plan.music["volume"]))
-            mus = "[mus]"
-            idx += 1
-
-        mix_in = []
-        if speech_lbl:
-            if len(speech_lbl) > 1:
-                filters.append("%samix=inputs=%d:normalize=0:duration=longest[sp]" % ("".join(speech_lbl), len(speech_lbl)))
-            else:
-                filters.append("%sanull[sp]" % speech_lbl[0])
-            if mus:
-                filters.append("[sp]asplit=2[spa][spb]")
-                filters.append("[mus][spa]sidechaincompress=threshold=0.03:ratio=8:attack=15:release=300[duck]")
-                mix_in += ["[spb]", "[duck]"]
-            else:
-                mix_in.append("[sp]")
-        elif mus:
-            mix_in.append(mus)
-        if fx_lbl:
-            if len(fx_lbl) > 1:
-                filters.append("%samix=inputs=%d:normalize=0:duration=longest[fx]" % ("".join(fx_lbl), len(fx_lbl)))
-            else:
-                filters.append("%sanull[fx]" % fx_lbl[0])
-            mix_in.append("[fx]")
-
-        if mix_in:
-            if len(mix_in) > 1:
-                filters.append("%samix=inputs=%d:normalize=0:duration=longest,apad,alimiter=limit=0.95[aout]"
-                               % ("".join(mix_in), len(mix_in)))
-            else:
-                filters.append("%sapad,alimiter=limit=0.95[aout]" % mix_in[0])
-            cmd += ["-filter_complex", ";".join(filters), "-map", "0:v", "-map", "[aout]"]
-        else:
-            cmd += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-map", "0:v", "-map", "%d:a" % idx]
-        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
-                "-r", str(plan.fps), "-c:a", "aac", "-b:a", "160k", "-ac", "2",
-                "-t", "%.3f" % plan.duration, "-movflags", "+faststart", out]
-        return cmd
+        return build_ffmpeg_cmd(self.W, self.H, self.fps, self.duration, *self.audio_items(), out)
 
     def render_video(self, out):
-        os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
-        cmd = self.ffmpeg_cmd(out)
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-        n = self.plan.n_frames
-        t0 = time.time()
-        try:
-            for i in range(n):
-                img = self.frame(i / float(self.plan.fps))
-                proc.stdin.write(img.tobytes())
-                if i % 30 == 0:
-                    el = time.time() - t0
-                    print("  frame %d/%d  (%.1fs)" % (i, n, el), flush=True)
-            proc.stdin.close()
-        except BrokenPipeError:
-            pass
-        rc = proc.wait()
-        if rc != 0:
-            raise SystemExit("ffmpeg failed (exit %d)" % rc)
-        print("done: %s  (%d frames, %.1fs video, %.0fs render)" % (out, n, self.plan.duration, time.time() - t0))
+        render_frames(self, out)
 
 
 def main(argv=None):
@@ -527,11 +597,15 @@ def main(argv=None):
 
     scene = load_scene(args.scene)
     name = os.path.splitext(os.path.basename(args.scene))[0]
-    r = Renderer(scene, args.width, use_tts=not args.no_tts, fps=args.fps)
+    if "scenes" in scene:                       # multi-scene video (cuts, transitions, split-screen)
+        from .multi import MultiRenderer
+        r = MultiRenderer(scene, args.width, use_tts=not args.no_tts, fps=args.fps)
+    else:
+        r = Renderer(scene, args.width, use_tts=not args.no_tts, fps=args.fps)
     if args.frame is not None:
         out = args.out or os.path.join("out", name + ".png")
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
-        r.frame(args.frame).save(out)
+        r.frame_at(args.frame).save(out)
         print("saved", out)
         return
     out = args.out or os.path.join("out", name + ".mp4")
