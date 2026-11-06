@@ -368,6 +368,90 @@ def night_road(s):
     return sky_img, [l.done() for l in (st, far, near, gr)]
 
 
+# ------------------------------------------------------------------ foreground props
+# Pieces drawn AFTER the characters. Each has a depth y: it is drawn in front of characters standing
+# above that y (further back) and behind characters standing below it. So with a table at depth 1620,
+# a character at the default ground line (1700) stands in front of it, while one that `move`s back to
+# y=1450 stands behind it.
+FG_FRONT = 2000          # in front of every character
+WOOD, WOOD_D = (176, 124, 78), (140, 96, 58)
+
+
+def _fg_canvas(s):
+    return G(s, color=(0, 0, 0, 0), mode="RGBA")
+
+
+def _table_like(s, x0, x1, top, floor, top_col, leg_col, front_col=None, deco=None):
+    """A low table / counter seen from the front: soft floor shadow, legs or a solid front panel, a top slab."""
+    g = _fg_canvas(s)
+    g.ellipse(x0 - 30, floor - 16, x1 + 30, floor + 24, (0, 0, 0, 60))
+    if front_col:
+        g.rect(x0 + 10, top + 40, x1 - 10, floor - 4, front_col, INK, 5)
+        g.line([((x0 + x1) // 2, top + 50), ((x0 + x1) // 2, floor - 10)], INK, 4)
+    else:
+        for lx in (x0 + 22, x1 - 52):
+            g.rect(lx, top + 36, lx + 30, floor, leg_col, INK, 5)
+    g.rrect(x0, top, x1, top + 44, 10, top_col, INK, 6)
+    if deco:
+        deco(g)
+    return g
+
+
+def fg_table(s):
+    def deco(g):       # mug + two books
+        g.rect(430, 1448, 500, 1478, (190, 70, 64), INK, 4)
+        g.rect(440, 1428, 490, 1450, (232, 226, 206), INK, 4)
+        g.rrect(540, 1440, 660, 1480, 4, (110, 160, 130), INK, 4)
+    return _table_like(s, 380, 700, 1480, 1620, WOOD, WOOD_D, deco=deco)
+
+
+def fg_island(s):
+    def deco(g):       # pot on the counter
+        g.rrect(480, 1424, 570, 1480, 8, (170, 172, 172), INK, 5)
+        g.line([(468, 1440), (484, 1440)], INK, 8)
+    return _table_like(s, 330, 750, 1480, 1620, (214, 208, 190), WOOD_D, front_col=(182, 174, 100), deco=deco)
+
+
+def fg_desk(s):
+    def deco(g):       # book + pencil cup
+        g.rrect(450, 1442, 580, 1480, 4, (70, 110, 170), INK, 4)
+        g.rect(630, 1432, 668, 1480, (232, 226, 206), INK, 4)
+        g.line([(642, 1432), (638, 1400)], (230, 190, 60), 6)
+    return _table_like(s, 380, 700, 1480, 1620, (160, 110, 68), (110, 110, 116), deco=deco)
+
+
+def fg_bench(s):
+    g = _fg_canvas(s)
+    g.ellipse(330, 1604, 770, 1644, (0, 0, 0, 60))
+    for lx in (380, 700):
+        g.rect(lx, 1500, lx + 24, 1620, (96, 100, 108), INK, 5)
+    for y in (1390, 1430, 1470):                       # backrest slats
+        g.rrect(360, y, 740, y + 28, 6, WOOD, INK, 5)
+    g.rrect(350, 1510, 750, 1544, 8, WOOD_D, INK, 6)    # seat
+    return g
+
+
+def fg_poles(s):
+    """Dark tree trunks that sweep past in front of everything (scrolls faster than the ground)."""
+    g = _wide_layer(s, (7, 8, 16))
+    for ox in (0, LW):
+        g.rect(ox + 700, -20, ox + 756, LH + 20, (7, 8, 16))
+        g.poly([(ox + 700, 640), (ox + 700, 690), (ox + 560, 560), (ox + 540, 520)], (7, 8, 16))
+        g.poly([(ox + 756, 880), (ox + 756, 930), (ox + 880, 810), (ox + 900, 770)], (7, 8, 16))
+    return g
+
+
+# name -> (draw fn, depth y, scroll speed multiplier or None for a fixed prop)
+FG_PROPS = {
+    "table": (fg_table, 1620, None),
+    "island": (fg_island, 1620, None),
+    "desk": (fg_desk, 1620, None),
+    "bench": (fg_bench, 1620, None),
+    "poles": (fg_poles, FG_FRONT, 1.6),
+}
+DEFAULT_FG = {"night_road": ["poles"]}      # everything else: none unless the scene asks
+
+
 # ------------------------------------------------------------------ public API
 # y (logical px) where the floor / road starts. Characters standing further up than this
 # are "behind" the camera plane and get drawn smaller (see Background.depth_scale).
@@ -395,6 +479,7 @@ class Background:
         self.parallax = float(spec.get("parallax", 1.0))   # 0 = all layers move with the ground
         self.static = None
         self.layers = []       # scrolling layers, back-to-front: (RGBA strip, y offset, speed multiplier)
+        self.fg = []           # foreground props: (depth y, RGBA strip, x, y, speed multiplier or None)
         if self.kind == "image":
             im = Image.open(asset_path(spec["path"])).convert("RGB")
             r = max(out_w / im.width, out_h / im.height)
@@ -420,6 +505,37 @@ class Background:
                 self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
         if self.layers and self.static.size != (out_w, out_h):
             self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
+
+        names = spec.get("foreground", DEFAULT_FG.get(self.kind, []))
+        names = [names] if isinstance(names, str) else (names if isinstance(names, (list, tuple)) else [])
+        for name in names:
+            if name not in FG_PROPS:
+                raise ValueError("unknown foreground prop %r (have: %s)" % (name, ", ".join(sorted(FG_PROPS))))
+            fn, depth, mult = FG_PROPS[name]
+            im = fn(s).done()
+            want = (out_w * 2 if mult else out_w, out_h)
+            if im.size != want:
+                im = im.resize(want, Image.LANCZOS)
+            bb = im.getchannel("A").getbbox()
+            if not bb:
+                continue
+            if mult:        # scrolling: keep full width, trim rows only
+                self.fg.append((depth, im.crop((0, bb[1], im.width, bb[3])), 0, bb[1], mult))
+            else:           # fixed: trim to the content box
+                self.fg.append((depth, im.crop(bb), bb[0], bb[1], None))
+        self.fg.sort(key=lambda f: f[0])
+
+    def foreground(self, t):
+        """[(depth y, image, x, y), ...] sorted back-to-front, ready to paste at time t."""
+        out = []
+        for depth, strip, x, y, mult in self.fg:
+            if mult:
+                speed = 1.0 + self.parallax * (mult - 1.0)      # parallax 0 -> same speed as the ground
+                o = int((t * self.scroll * speed * self.out_w / LW) % self.out_w)
+                out.append((depth, strip.crop((o, 0, o + self.out_w, strip.height)), x, y))
+            else:
+                out.append((depth, strip, x, y))
+        return out
 
     def frame(self, t):
         if not self.layers:

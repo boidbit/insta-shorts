@@ -174,9 +174,13 @@ class Renderer:
                 _st, x, y, pose, k = prep[c.name]
                 self._draw_shadow(img, x + pose.get("shift", 0.0) * k, y + 6 * k, k, -pose.get("lift", 0.0) * k)
 
-        # pass 3: characters
+        # pass 3: characters, with foreground props woven in by depth (a prop covers characters standing behind it)
+        fg, fi = self.bg.foreground(t), 0
         for c in order:
             st, x, y, pose, k = prep[c.name]
+            while fi < len(fg) and fg[fi][0] <= y:
+                img.paste(fg[fi][1], (fg[fi][2], fg[fi][3]), fg[fi][1])
+                fi += 1
             look = st["look"]
             if isinstance(look, str) and look in plan.chars:
                 ox, _oy = plan.chars[look].pos_at(t)
@@ -201,6 +205,8 @@ class Renderer:
                 layer, (ox, oy) = r
                 img.paste(layer, (ox, oy), layer)
             anchors[c.name] = an
+        for _d, part, fx, fy in fg[fi:]:      # props in front of everybody
+            img.paste(part, (fx, fy), part)
 
         # labels + bubbles
         for c in order:

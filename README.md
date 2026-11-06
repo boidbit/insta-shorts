@@ -46,6 +46,25 @@ Default me ye teen cheezein on hain; band karne ya adjust karne ke liye scene ke
 
 `night_road` ab parallax ke saath scroll hota hai: taare/chaand bahut dheere, door ki pahadiyan dheere, paas ki pahadiyan thoda tez, aur sadak + lamp post poori `scroll` speed se. Purana "sab ek speed" look chahiye to `"background": {"type": "night_road", "scroll": 220, "parallax": 0}` (default `1`; `0.5` = aadha asar).
 
+## Foreground props (character ke aage/peeche)
+
+Background me `foreground` do to kuch cheezein characters ke **upar** draw hoti hain. Har cheez ki ek depth `y` hoti hai: jo character us `y` se upar (door/peeche) khada hai wo cheez ke peeche chhupta hai, jo neeche (paas) hai wo aage dikhta hai. Default ground `y=1700` par character hamesha aage rehta hai; peeche khada karne ke liye `"y": 1540` do (ya `move`).
+
+```json
+"background": { "type": "kitchen", "foreground": ["island"] },
+"characters": { "B": { "x": 540, "y": 1540 } }
+```
+
+| Prop | Kahan ka | Depth |
+|---|---|---|
+| `table` | room (coffee table) | 1620 |
+| `island` | kitchen (solid counter, peeche khade ke pair chhup jaate hain) | 1620 |
+| `desk` | school | 1620 |
+| `bench` | street | 1620 |
+| `poles` | night_road: tez guzarte ped ke tane, sabse aage | - |
+
+Koi bhi prop kisi bhi background par laga sakte ho. `night_road` par `poles` default hain; band karne ke liye `"foreground": []`. Camera zoom foreground ke saath hota hai, captions/bubbles hamesha upar rehte hain.
+
 ## Voice (Hindi) ka ek zaroori rule
 
 Bubble me dikhne wala text Roman Hinglish me hota hai (`say`), lekin TTS ko **Devanagari** chahiye (`speak`), warna uchcharan galat aata hai:
