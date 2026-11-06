@@ -12,7 +12,7 @@ SLOTS = {
 }
 GROUND_Y = 1700
 CHAR_ATTRS = ("action", "expression", "prop", "label", "look", "facing", "style", "point", "dir",
-              "lean", "speed", "intensity", "hands", "tint", "seat")
+              "lean", "speed", "intensity", "hands", "tint", "on", "visible")
 
 
 class Char:
@@ -41,7 +41,7 @@ class Char:
     def state_at(self, t):
         st = dict(action="idle", action_t0=0.0, expression=self.spec.get("expression", "neutral"),
                   prop=self.spec.get("prop"), label=None, look=self.spec.get("look"),
-                  facing=self.spec.get("facing", "front"),
+                  facing=self.spec.get("facing", "front"), visible=self.spec.get("visible", True), on=None,
                   speed=1.0, intensity=1.0, opts={}, talking=None)
         for ev in self.events:
             if ev["t"] > t + 1e-9:
@@ -51,7 +51,8 @@ class Char:
                 st["action_t0"] = ev["t"]
                 st["speed"], st["intensity"] = 1.0, 1.0
                 st["opts"] = {}
-            for key in ("expression", "prop", "label", "look", "facing"):
+                st["on"] = ev.get("on")
+            for key in ("expression", "prop", "label", "look", "facing", "visible"):
                 if key in ev:
                     st[key] = ev[key]
             for key in ("speed", "intensity"):
@@ -104,6 +105,16 @@ def compile_scene(scene, use_tts=True, fps=None):
         chars[name] = Char(name, spec, float(x), float(y), i)
     plan.chars = chars
 
+    # ---- objects (set pieces) ----
+    plan.objects = []
+    for i, ob in enumerate(scene.get("objects", [])):
+        ob = dict(ob)
+        ob.setdefault("id", "%s%d" % (ob.get("type", "obj"), i + 1))
+        plan.objects.append(ob)
+    obj_by_id = {o["id"]: o for o in plan.objects}
+    plan.obj_events = []
+    plan.lights = []
+
     # ---- timeline ----
     cursor = 0.0
     gap = float(meta.get("line_gap", 0.35))
@@ -137,6 +148,16 @@ def compile_scene(scene, use_tts=True, fps=None):
                 e["expression"] = ev["emotion"]
             if len(e) > 1:
                 c.events.append(e)
+            if ev.get("on") in obj_by_id:          # sit / lie on an object: snap onto it
+                ob = obj_by_id[ev["on"]]
+                x0, y0 = c.pos_at(t)
+                dx = float(ev.get("on_dx", 0))
+                if ob.get("type") == "bed" and ev.get("action", "") in ("lie_down", "lie", "sleep_lie", "rofl"):
+                    head = 1 if ob.get("flip") else -1           # head on the pillow end
+                    dx = dx or -head * 400 * float(ob.get("scale", 1.0))
+                    c.events.append({"t": t, "dir": head})
+                c.moves.append((t, t + 0.001, x0, y0, float(ob.get("x", 540)) + dx,
+                                float(ob.get("y", 1700)) + 1, False))
             if "move" in ev:
                 m = ev["move"]
                 x0, y0 = c.pos_at(t)
@@ -169,6 +190,13 @@ def compile_scene(scene, use_tts=True, fps=None):
             cursor = max(cursor, t + float(ev["hold"]))
             plan_end = max(plan_end, t + float(ev["hold"]))
 
+        if "object" in ev:
+            for oid in (ev["object"] if isinstance(ev["object"], list) else [ev["object"]]):
+                plan.obj_events.append({"t": t, "object": oid, "state": ev.get("state")})
+        if "lights" in ev:
+            v = ev["lights"]
+            lvl = {"on": 1.0, "off": 0.32, "dim": 0.6}.get(v, v) if not isinstance(v, (int, float)) else float(v)
+            plan.lights.append((t, float(lvl)))
         if "fx" in ev:
             for raw in (ev["fx"] if isinstance(ev["fx"], list) else [ev["fx"]]):
                 fx = effects.normalize(raw, t)

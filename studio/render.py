@@ -16,7 +16,8 @@ from PIL import Image, ImageChops
 
 from . import actions, audio
 from .backgrounds import Background
-from .effects import Effects
+from .effects import Effects, Patch
+from .objects import Objects
 from .characters import build_character, render_ops
 from .scene import camera_at, compile_scene
 from .text import bubble_image, styled_box
@@ -66,6 +67,7 @@ class Renderer:
         self._shadow = _shadow_sprite() if self.shadows else None
         self._vig = _vignette(self.W, self.H, float(meta.get("vignette", 0.18)))   # 0 = off
         self.fx = Effects(self.plan.effects, self.s, self.W, self.H, self.plan.fps)
+        self.objects = Objects(self.plan.objects, self.plan.obj_events, self.s, self.W, self.H)
         self._ov_cache = {}
         self._lip = {}
         self._label_cache = {}
@@ -112,6 +114,38 @@ class Renderer:
         sp.putalpha(sp.getchannel("A").point([int(v * a) for v in range(256)]))
         img.paste(sp, (int(x * self.s - w / 2), int(y * self.s - hh / 2)), sp)
 
+    def _light_level(self, t):
+        lvl = 1.0
+        prev_t, prev = 0.0, 1.0
+        for (t0, v) in sorted(self.plan.lights):
+            if t < t0:
+                break
+            prev, lvl, prev_t = lvl, v, t0
+        if t - prev_t < 0.18:             # quick fade between levels
+            lvl = prev + (lvl - prev) * (t - prev_t) / 0.18
+        return lvl
+
+    def _darken(self, img, level, t):
+        """Lights off: the room goes dark blue; lamps, TVs and tubelights that are on keep glowing."""
+        k = clamp(level)
+        tint = (int(255 * k * 0.85), int(255 * k * 0.9), int(255 * min(1.0, k * 1.35)))
+        img = ImageChops.multiply(img, Image.new("RGB", img.size, tint))
+        for (x, y, typ, sc) in self.objects.lights_on(t):
+            if typ == "tubelight" and level < 0.5:
+                continue
+            cy = {"lamp": y - 650 * sc, "tv": y - 460 * sc, "tubelight": y - 1150 * sc}[typ]
+            r = {"lamp": 420, "tv": 380, "tubelight": 600}[typ] * sc
+            col = (255, 226, 150) if typ != "tv" else (170, 200, 255)
+            p = Patch(x, cy, r, r, self.s, 1)
+            for i in range(10):
+                rr = r * (1 - i / 10.0)
+                p.ellipse(x, cy, rr, rr, col + (int(16 + i * 2),), None)
+            small = p.im
+            base = img.convert("RGBA")
+            base.alpha_composite(small, (int(round(p.ox * self.s)), int(round(p.oy * self.s))))
+            img = base.convert("RGB")
+        return img
+
     # ------------------------------------------------------------ overlays
     def _overlay_image(self, o):
         key = json.dumps([o.get("text"), o.get("style"), o.get("color"), o.get("size"), o.get("max_w")], default=str)
@@ -150,6 +184,9 @@ class Renderer:
     def frame(self, t):
         plan, s = self.plan, self.s
         img = self.bg.frame(t).convert("RGB")
+        light = self._light_level(t)
+        for im, (px, py) in self.objects.wall(t, power=light >= 0.5):     # doors, windows, clocks, fans...
+            img.paste(im, (px, py), im)
         order = sorted(plan.chars.values(), key=lambda c: (c.pos_at(t)[1], c.pos_at(t)[0]))
         anchors = {}
         states = {}
@@ -181,12 +218,21 @@ class Renderer:
             pose = actions.pose_for(action, t - a_t0 if action not in ("walk", "run") else t, st["speed"],
                                     st["intensity"], c.phase, opts)
             k = c.scale * self.bg.depth_scale(y, self.depth)
+            seat = self.objects.seat_height(st.get("on")) if st.get("on") else None
+            if seat is not None:
+                if action in ("sit",):          # line the hips up with the seat top
+                    natural = 208.0 if st["facing"] == "front" else 166.0
+                    pose["lift"] = pose.get("lift", 0.0) + natural - seat / k
+                elif action in ("lie_down", "lie", "sleep_lie", "rofl"):
+                    pose["lift"] = pose.get("lift", 0.0) - seat / k
             prep[c.name] = (st, x, y, pose, k)
 
         # pass 2: contact shadows go under *all* characters so they never cover a neighbour
         if self.shadows:
             for c in order:
                 _st, x, y, pose, k = prep[c.name]
+                if not _st.get("visible", True):
+                    continue
                 lean = math.sin(math.radians(pose.get("tilt", 0.0)))
                 if abs(lean) > 0.5:      # lying / falling: the shadow follows the body along the floor
                     self._draw_shadow(img, x + (pose.get("dx", 0.0) + lean * 380) * k, y + 6 * k, k, 0.0,
@@ -196,12 +242,15 @@ class Renderer:
                                       -pose.get("lift", 0.0) * k)
 
         # pass 3: characters, with foreground props woven in by depth (a prop covers characters standing behind it)
-        fg, fi = self.bg.foreground(t), 0
+        fg = sorted(self.bg.foreground(t) + self.objects.floor(t), key=lambda f: f[0])
+        fi = 0
         for c in order:
             st, x, y, pose, k = prep[c.name]
             while fi < len(fg) and fg[fi][0] <= y:
                 img.paste(fg[fi][1], (fg[fi][2], fg[fi][3]), fg[fi][1])
                 fi += 1
+            if not st.get("visible", True):
+                continue
             look = st["look"]
             if isinstance(look, str) and look in plan.chars:
                 ox, _oy = plan.chars[look].pos_at(t)
@@ -239,12 +288,16 @@ class Renderer:
             img.paste(part, (fx, fy), part)
 
         self.fx.draw_world(img, t, anchors, plan.chars)     # sweat, ?, POW, glowing eyes, thrown objects...
+        if light < 0.995:
+            img = self._darken(img, light, t)
         # rain, fog, lightning, spotlight...: over the whole scene but under bubbles and captions
         img = self.fx.draw_screen(img, t, {n: (a["head_center"][0] * s, a["head_center"][1] * s)
                                            for n, a in anchors.items()})
 
         # labels + bubbles
         for c in order:
+            if c.name not in anchors:
+                continue
             st, an = states[c.name], anchors[c.name]
             hx, hy = an["head_top"]
             top = hy

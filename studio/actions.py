@@ -407,7 +407,7 @@ def sit_floor(t, sp, I, ph, o):
 def lie_down(t, sp, I, ph, o):
     d = _d(o)
     pose = dict(tilt=88, la1=-6, la2=-4, ra1=6, ra2=4, ll1=-3, ll2=-2, rl1=3, rl2=2,
-                head_tilt=-4, lift=-1.5 * sin(2 * pi * 0.3 * t))
+                head_tilt=-4, lift=-62 - 1.5 * sin(2 * pi * 0.3 * t))
     return _side(d, pose)
 
 
