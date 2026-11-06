@@ -18,6 +18,7 @@ from . import actions, audio
 from .backgrounds import Background
 from .effects import Effects, Patch
 from .objects import Objects
+from .animals import ANIMALS, build_animal
 from .characters import build_character, render_ops
 from .scene import camera_at, compile_scene
 from .text import bubble_image, styled_box
@@ -215,8 +216,12 @@ class Renderer:
             else:
                 dr = 1 if x <= LW / 2 else -1
             opts = dict(st["opts"], _x=x, _dir=dr, _facing=st["facing"])
-            pose = actions.pose_for(action, t - a_t0 if action not in ("walk", "run") else t, st["speed"],
-                                    st["intensity"], c.phase, opts)
+            if c.spec.get("kind") in ANIMALS:
+                pose = {}
+            else:
+                pose = actions.pose_for(action, t - a_t0 if action not in ("walk", "run") else t, st["speed"],
+                                        st["intensity"], c.phase, opts)
+            pose["_anim"] = (action, t - a_t0, bool(mv), bool(mv and mv[6]), dr)
             k = c.scale * self.bg.depth_scale(y, self.depth)
             seat = self.objects.seat_height(st.get("on")) if st.get("on") else None
             if seat is not None:
@@ -276,9 +281,14 @@ class Renderer:
             prop = st["prop"] if st["prop"] is not None else pose.get("prop")
             if st["prop"] == "" or pose.get("hide_prop"):
                 prop = None
-            ops, an = build_character(spec, pose, expr, mouth_open, t, x, y, k,
-                                      blink=blink, prop=prop, talking=talking,
-                                      tear_phase=(t * 1.1) % 1.0)
+            if spec.get("kind") in ANIMALS:
+                a_act, a_at, a_mv, a_run, a_dir = pose["_anim"]
+                ops, an = build_animal(spec, a_act, a_at, t, x, y, k, a_dir, a_mv, a_run,
+                                       mouth_open if talking else 0.0, expr)
+            else:
+                ops, an = build_character(spec, pose, expr, mouth_open, t, x, y, k,
+                                          blink=blink, prop=prop, talking=talking,
+                                          tear_phase=(t * 1.1) % 1.0)
             r = render_ops(ops, s, self.W, self.H)
             if r:
                 layer, (ox, oy) = r

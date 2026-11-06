@@ -17,6 +17,8 @@ CHAR_ATTRS = ("action", "expression", "prop", "label", "look", "facing", "style"
 
 class Char:
     def __init__(self, name, spec, x, ground_y, index):
+        from .characters import apply_preset
+        spec = apply_preset(spec)
         self.name = name
         self.spec = spec
         self.x = x
