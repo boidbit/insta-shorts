@@ -17,7 +17,7 @@ from PIL import Image, ImageChops
 from . import actions, audio
 from .backgrounds import Background
 from .effects import Effects, Patch
-from .objects import Objects
+from .objects import VEHICLES, Objects
 from .animals import ANIMALS, build_animal
 from .characters import build_character, render_ops
 from .scene import camera_at, compile_scene
@@ -115,6 +115,34 @@ class Renderer:
         sp.putalpha(sp.getchannel("A").point([int(v * a) for v in range(256)]))
         img.paste(sp, (int(x * self.s - w / 2), int(y * self.s - hh / 2)), sp)
 
+    def _ride_geom(self, riding, c, x, y, t, st):
+        """Vehicle seat / handlebar / pedals in the rider's body coordinates (facing right)."""
+        vid, seat = riding
+        ob = self.objects.objs[vid]
+        V = VEHICLES[ob["type"]]
+        _vx, _vy, dirn, dist = self.objects.pos(vid, t)
+        e = -1 if (bool(ob.get("flip")) != (dirn < 0)) else 1
+        sc = float(ob.get("scale", 1.0))
+        k = c.scale * self.bg.depth_scale(y, self.depth)
+        f = sc / k
+        seats = V["seats"]
+        sx, hip_h = seats.get(seat) or next(iter(seats.values()))
+        g = {"dir": e, "hip_h": hip_h * f, "lean": 3 if not V["enclosed"] else 0}
+        if seat == "driver" and V.get("hands"):
+            hx, hh = V["hands"]
+            g["hands"] = ((hx - sx) * f, -(hh - hip_h) * f)
+        fe = V.get("feet")
+        if seat == "driver" and fe:
+            if fe[0] == "crank":
+                _c, cx, ch, r = fe
+                wr = V["wheels"][0][1]
+                g["crank"] = ((cx - sx) * f, (hip_h - ch) * f, r * f, dist / max(1.0, wr * sc) * 1.6)
+            else:
+                g["pegs"] = ((fe[0] - sx) * f, (hip_h - fe[1]) * f)
+        elif fe and not V["enclosed"]:
+            g["pegs"] = ((0 - sx) * f * 0.3, (hip_h - 90) * f)
+        return g
+
     def _light_level(self, t):
         lvl = 1.0
         prev_t, prev = 0.0, 1.0
@@ -199,7 +227,11 @@ class Renderer:
             states[c.name] = st
             x, y = c.pos_at(t)
             action, a_t0 = st["action"], st["action_t0"]
-            mv = next((m for m in c.moves if m[0] <= t < m[1]), None)
+            riding = c.ride_at(t) if c.rides else None
+            if riding:
+                riding = self._ride_geom(riding, c, x, y, t, st)
+                action = "ride"
+            mv = None if riding else next((m for m in c.moves if m[0] <= t < m[1]), None)
             if mv and action in ("idle", "none", "stand", "talk"):
                 action, a_t0 = ("run" if mv[6] else "walk"), 0.0
             if mv and st["facing"] == "front" and abs(mv[4] - mv[2]) > 1:
@@ -215,7 +247,10 @@ class Renderer:
                 dr = -1 if st["facing"] == "left" else 1
             else:
                 dr = 1 if x <= LW / 2 else -1
-            opts = dict(st["opts"], _x=x, _dir=dr, _facing=st["facing"])
+            if riding:
+                dr = riding["dir"]
+                st["facing"] = "right" if dr > 0 else "left"
+            opts = dict(st["opts"], _x=x, _dir=dr, _facing=st["facing"], _ride=riding)
             if c.spec.get("kind") in ANIMALS:
                 pose = {}
             else:

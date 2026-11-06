@@ -848,6 +848,35 @@ def drive(t, sp, I, ph, o):
                        hand("L", (132, -274 - st), (0, 1)), tilt=-2))
 
 
+def ride(t, sp, I, ph, o):
+    """Sitting on / in a vehicle. The renderer passes the geometry in body coordinates (facing right):
+    _ride = {hip_h, hands (x, y) or None, crank (cx, cy, r, angle) or pegs (x, y) or None}."""
+    d = _d(o)
+    g = o.get("_ride") or {}
+    hip_h = g.get("hip_h", 250.0)
+    if g.get("crank"):
+        cx, cy, r, a = g["crank"]
+        f1 = (cx + r * math.cos(a), cy + r * math.sin(a))
+        f2 = (cx - r * math.cos(a), cy - r * math.sin(a))
+        legs = _P(foot("R", f1, (1, -0.3)), foot("L", f2, (1, -0.3)))
+        fy = max(f1[1], f2[1])
+    elif g.get("pegs"):
+        px, py = g["pegs"]
+        legs = _P(foot("R", (px + 8, py), (1, -0.3)), foot("L", (px - 8, py), (1, -0.3)))
+        fy = py
+    else:                                                       # inside a car / auto / bus: seated, legs tucked
+        legs = dict(rl1=86, rl2=0, ll1=80, ll2=-4, sh_k=0.55)
+        fy = 165 * math.cos(math.radians(86)) + 165 * 0.55
+    if g.get("hands"):
+        hx, hy = g["hands"]
+        arms = _P(hand("R", (hx, hy), (0, 1)), hand("L", (hx - 14, hy + 6), (0, 1)))
+    else:
+        arms = _P(hand("R", (90, -20), (0, 1)), hand("L", (70, -10), (0, 1)))
+    pose = _P(legs, arms, lift=(fy + 8) - hip_h, tilt=float(g.get("lean", 4)),
+              head_dy=1.5 * sin(2 * pi * 2 * t) if g.get("bumpy") else 0.0)
+    return _side(d, pose)
+
+
 # ------------------------------------------------------------------ hands-on interactions
 def throw(t, sp, I, ph, o):
     d = _d(o)
@@ -1123,7 +1152,7 @@ ACTIONS = {
     # everyday
     "eat": eat, "drink": drink, "phone_call": phone_call, "call": phone_call, "text": text, "type": text,
     "read": read, "write": write, "count_money": count_money, "wash_hands": wash_hands, "sweep": sweep,
-    "cook": cook, "stir": cook, "brush_teeth": brush_teeth, "drive": drive,
+    "cook": cook, "stir": cook, "brush_teeth": brush_teeth, "drive": drive, "ride": ride,
     # interactions
     "throw": throw, "catch": catch, "kick": kick, "slap": slap, "punch": punch, "box": box, "push": push,
     "dodge": dodge, "high_five": high_five, "handshake": handshake, "hug": hug, "pat_back": pat_back,

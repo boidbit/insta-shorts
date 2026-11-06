@@ -49,6 +49,32 @@ SPEC = {
     "plant": (110, 380, 20, False, None, False),
     "box": (110, 200, 20, False, None, False),
     "bucket": (80, 160, 20, False, None, False),
+    "cycle": (260, 360, 20, False, None, False),
+    "bike": (290, 400, 20, False, None, False),
+    "auto": (320, 790, 20, False, None, False),
+    "car": (380, 600, 20, False, None, False),
+    "bus": (580, 790, 20, False, None, False),
+    "train": (700, 720, 20, False, None, False),
+}
+
+# Default size of each vehicle next to a (big-headed, ~860 px tall) character; "scale" multiplies this.
+VEHICLE_SIZE = {"cycle": 1.3, "bike": 1.35, "auto": 1.45, "car": 1.5, "bus": 1.35, "train": 1.0}
+
+# Riding geometry, for a vehicle facing right (x relative to the vehicle, h = height above the ground).
+# seats: name -> (x, hip height). hands: (x, h) of the handlebar / steering wheel for the driver.
+# feet: "crank" (pedalling around (x, h, r)) or (x, h) foot pegs; None = legs hidden inside the body.
+VEHICLES = {
+    "cycle": dict(seats={"driver": (-40, 262), "back": (-150, 250)}, hands=(122, 312), feet=("crank", 10, 76, 46),
+                  enclosed=False, wheels=((-150, 70), (150, 70))),
+    "bike": dict(seats={"driver": (-30, 280), "back": (-140, 288)}, hands=(150, 350), feet=(10, 110),
+                 enclosed=False, wheels=((-175, 76), (175, 76))),
+    "auto": dict(seats={"driver": (80, 250), "passenger": (-150, 240), "back": (-150, 240)}, hands=(200, 330),
+                 feet=None, enclosed=True, wheels=((-170, 62), (220, 56))),
+    "car": dict(seats={"driver": (70, 196), "passenger": (-110, 196), "back": (-110, 196)}, hands=(170, 290),
+                feet=None, enclosed=True, wheels=((-215, 62), (215, 62))),
+    "bus": dict(seats={"driver": (430, 330), "passenger": (100, 330), "back": (-250, 330)}, hands=(520, 410),
+                feet=None, enclosed=True, wheels=((-360, 72), (360, 72))),
+    "train": dict(seats={}, hands=None, feet=None, enclosed=True, wheels=()),
 }
 ALL = set(SPEC)
 
@@ -382,7 +408,145 @@ def d_bucket(o, st, t, ob):
     o.ellipse(0, -150, 70, 14, (130, 190, 240, 255))
 
 
+def _wheel(o, x, r, ang, hub=(170, 170, 176, 255)):
+    o.ellipse(x, -r, r, r, (40, 40, 44, 255), INK, 5)
+    o.ellipse(x, -r, r * 0.62, r * 0.62, hub, INK, 4)
+    for i in range(3):
+        a = ang + i * math.pi / 3
+        o.line([(x - r * 0.6 * math.cos(a), -r - r * 0.6 * math.sin(a)),
+                (x + r * 0.6 * math.cos(a), -r + r * 0.6 * math.sin(a))], (90, 90, 96, 255), 4)
+
+
+def d_cycle(o, st, t, ob):
+    ang = ob.get("_wheel", 0.0)
+    c = tuple(ob.get("color", (200, 50, 50))) + (255,)
+    o.shadow(230, 16)
+    for x in (-150, 150):
+        o.ellipse(x, -70, 70, 70, None, (40, 40, 44, 255), 10)
+        for i in range(4):
+            a = ang + i * math.pi / 4
+            o.line([(x - 64 * math.cos(a), -70 - 64 * math.sin(a)), (x + 64 * math.cos(a), -70 + 64 * math.sin(a))],
+                   (150, 150, 156, 255), 2)
+    crank = (10, -76)
+    o.line([(-150, -70), crank, (-40, -240), (-150, -70)], c, 9)
+    o.line([crank, (110, -250), (-40, -240)], c, 9)
+    o.line([(110, -250), (150, -70)], c, 9)
+    o.line([(110, -250), (122, -312), (90, -322)], INK, 7)
+    o.rect(-80, -262, 0, -244, (40, 40, 44, 255), INK, 3)
+    ca = ang * 1.6
+    o.line([(crank[0] - 46 * math.cos(ca), crank[1] - 46 * math.sin(ca)),
+            (crank[0] + 46 * math.cos(ca), crank[1] + 46 * math.sin(ca))], (60, 60, 64, 255), 7)
+
+
+def d_bike(o, st, t, ob):
+    ang = ob.get("_wheel", 0.0)
+    c = tuple(ob.get("color", (40, 90, 170))) + (255,)
+    o.shadow(260, 18)
+    _wheel(o, -175, 76, ang)
+    _wheel(o, 175, 76, ang)
+    o.poly([(-200, -150), (-60, -140), (60, -170), (120, -150), (100, -110), (-170, -100)], (70, 70, 76, 255))
+    o.poly([(-120, -250), (40, -250), (60, -200), (-110, -190)], (40, 40, 44, 255))         # seat
+    o.poly([(30, -270), (130, -270), (140, -200), (40, -190)], c)                            # tank
+    o.line([(120, -260), (175, -76)], (90, 90, 96, 255), 10)
+    o.line([(120, -280), (150, -350), (110, -360)], INK, 8)
+    o.ellipse(170, -290, 24, 20, (250, 236, 150, 255))
+    o.poly([(-230, -170), (-150, -170), (-160, -140), (-240, -150)], c)                       # rear fender
+
+
+def d_auto(o, st, t, ob):
+    ang = ob.get("_wheel", 0.0)
+    o.shadow(300, 20)
+    yel, grn = (250, 210, 50, 255), (40, 140, 80, 255)
+    o.poly([(-280, -770), (180, -770), (230, -640), (-280, -640)], (30, 30, 34, 255))         # canopy
+    o.line([(-270, -640), (-270, -300)], (30, 30, 34, 255), 12)
+    o.line([(170, -640), (210, -300)], (30, 30, 34, 255), 10)
+    o.poly([(-290, -300), (-30, -300), (-30, -110), (-290, -110)], grn)                       # rear body
+    o.poly([(-30, -300), (180, -300), (250, -240), (250, -110), (-30, -110)], yel)            # front cowl
+    o.line([(-30, -300), (-30, -110)], INK, 5)
+    o.ellipse(240, -200, 18, 16, (250, 236, 150, 255))
+    _wheel(o, -170, 62, ang)
+    _wheel(o, 220, 56, ang)
+
+
+def d_car(o, st, t, ob):
+    ang = ob.get("_wheel", 0.0)
+    c = tuple(ob.get("color", (210, 60, 60))) + (255,)
+    o.shadow(340, 20)
+    o.poly([(-230, -290), (-170, -570), (130, -570), (210, -290)], (180, 220, 240, 70), INK, 6)   # glass
+    o.line([(-30, -570), (-20, -290)], c, 14)
+    o.line([(-170, -570), (-230, -290)], c, 12)
+    o.line([(130, -570), (210, -290)], c, 12)
+    o.line([(-170, -570), (130, -570)], c, 14)
+    o.poly([(-340, -290), (330, -290), (360, -200), (350, -90), (-350, -90), (-360, -200)], c)
+    o.line([(-20, -280), (-20, -100)], INK, 4)
+    o.ellipse(340, -230, 18, 14, (250, 236, 150, 255))
+    o.rect(-360, -230, -334, -200, (220, 60, 50, 255), INK, 3)
+    _wheel(o, -215, 62, ang)
+    _wheel(o, 215, 62, ang)
+
+
+def d_bus(o, st, t, ob):
+    ang = ob.get("_wheel", 0.0)
+    c = tuple(ob.get("color", (60, 120, 200))) + (255,)
+    o.shadow(560, 24)
+    o.rect(-560, -780, 560, -110, c, INK, 7)
+    o.rect(-560, -260, 560, -230, (250, 250, 250, 255), None)
+    for i in range(6):
+        x = -520 + i * 150
+        o.rect(x, -730, x + 120, -460, (180, 220, 240, 70), INK, 4)
+    o.rect(440, -730, 540, -380, (180, 220, 240, 70), INK, 4)                                # windshield
+    o.rect(380, -440, 430, -120, (60, 70, 90, 255), INK, 4)                                  # door
+    o.ellipse(540, -180, 20, 16, (250, 236, 150, 255))
+    _wheel(o, -360, 72, ang)
+    _wheel(o, 360, 72, ang)
+
+
+def d_train(o, st, t, ob):
+    n = int(ob.get("coaches", 4))
+    c = tuple(ob.get("color", (150, 50, 40))) + (255,)
+    o.rect(-60, -40, 0, 0, None, None)
+    for i in range(n + 1):
+        x1 = 600 - i * 1240
+        x0 = x1 - 1200
+        if i == 0:                                         # engine
+            o.poly([(x0, -680), (x1 - 160, -680), (x1, -520), (x1, -80), (x0, -80)], (60, 70, 110, 255), INK, 7)
+            o.rect(x1 - 300, -620, x1 - 170, -470, (180, 220, 240, 255), INK, 5)
+            o.ellipse(x1 - 30, -200, 26, 22, (250, 236, 150, 255))
+        else:
+            o.rect(x0, -680, x1, -80, c, INK, 7)
+            for j in range(7):
+                wx = x0 + 60 + j * 160
+                o.rect(wx, -600, wx + 110, -460, (180, 220, 240, 255), INK, 4)
+            o.rect(x0 + 20, -330, x1 - 20, -300, (240, 200, 80, 255), None)
+        for wx in (x0 + 140, x0 + 300, x1 - 300, x1 - 140):
+            o.ellipse(wx, -60, 56, 56, (40, 40, 44, 255), INK, 5)
+        o.rect(x1, -260, x1 + 40, -220, (40, 40, 44, 255), INK, 3)
+
+
 DRAW = {k: globals()["d_" + k] for k in SPEC}
+
+
+def obj_pos(ob, events, oid, t):
+    """(x, y, direction, distance travelled) of an object at time t, following its "move" events."""
+    x, y = float(ob.get("x", 540)), float(ob.get("y", 1700))
+    dirn, dist = 1, 0.0
+    for ev in events:
+        if ev["t"] > t:
+            break
+        if ev["object"] != oid or not ev.get("move"):
+            continue
+        m = ev["move"]
+        x1, y1 = float(m.get("x", x)), float(m.get("y", y))
+        dur = max(1e-3, float(m.get("dur", 2.0)))
+        u = min(1.0, (t - ev["t"]) / dur)
+        if m.get("ease", True):
+            u = u * u * (3 - 2 * u)
+        nx, ny = x + (x1 - x) * u, y + (y1 - y) * u
+        if abs(x1 - x) > 1:
+            dirn = 1 if x1 > x else -1
+        dist += math.hypot(nx - x, ny - y)
+        x, y = nx, ny
+    return x, y, dirn, dist
 
 
 class Objects:
@@ -396,15 +560,18 @@ class Objects:
         self.events = sorted(events, key=lambda e: e["t"])
         self._cache = {}
 
+    def pos(self, oid, t):
+        return obj_pos(self.objs[oid], self.events, oid, t)
+
     def state(self, oid, t):
         ob = self.objs[oid]
         st = ob.get("state", "on" if ob.get("type") in ("tubelight", "fan") else "idle")
-        x, y = ob.get("x", 540), ob.get("y", 1700)
         for ev in self.events:
             if ev["t"] > t:
                 break
-            if ev["object"] == oid:
-                st = ev.get("state", st)
+            if ev["object"] == oid and ev.get("state") is not None:
+                st = ev["state"]
+        x, y, _d, _dist = self.pos(oid, t)
         return st, x, y
 
     def seat_height(self, oid):
@@ -418,14 +585,22 @@ class Objects:
         typ = ob.get("type")
         hw, h_up, h_dn, _wall, _seat, _light = SPEC[typ]
         sc = float(ob.get("scale", 1.0))
-        x, y = ob.get("x", 540), ob.get("y", 1700)
-        animated = typ in ("clock", "fan", "tv", "tree", "bush", "phone")
+        x, y, dirn, dist = self.pos(ob["id"], t)
+        vehicle = typ in VEHICLES
+        animated = vehicle or typ in ("clock", "fan", "tv", "tree", "bush", "phone")
         key = (ob["id"], st) if not animated else None
         if key and key in self._cache:
             return self._cache[key]
         cy = y - (h_up - h_dn) * sc / 2
-        p = Patch(x, cy, hw * sc + 10, (h_up + h_dn) * sc / 2 + 10, self.s)
-        DRAW[typ](O(p, x, y, sc, ob.get("flip")), st, t, ob)
+        if typ == "train":                     # very long: draw only what is on screen, no supersampling
+            p = Patch(540, cy, 620, (h_up + h_dn) * sc / 2 + 10, self.s, 1)
+        else:
+            p = Patch(x, cy, hw * sc + 10, (h_up + h_dn) * sc / 2 + 10, self.s)
+        flip = bool(ob.get("flip")) != (dirn < 0)
+        if vehicle:
+            wr = VEHICLES[typ]["wheels"][0][1] if VEHICLES[typ]["wheels"] else 60
+            ob = dict(ob, _wheel=-dist / max(1.0, wr * sc) * (-1 if flip else 1))
+        DRAW[typ](O(p, x, y, sc, flip), st, t, ob)
         small = p.im.reduce(p.ss)
         res = (small, (int(round(p.ox * self.s)), int(round(p.oy * self.s))))
         if key:
@@ -445,13 +620,16 @@ class Objects:
         return out
 
     def floor(self, t):
-        """[(depth y, image, px, py)] of floor pieces, depth-sorted like foreground props."""
+        """[(depth y, image, px, py)] of floor pieces, depth-sorted like foreground props.
+        Enclosed vehicles sort just in front of their riders, cycles/bikes just behind them."""
         out = []
         for oid, ob in self.objs.items():
             if ob.get("type") in SPEC and not SPEC[ob["type"]][3]:
                 st, _x, y = self.state(oid, t)
                 im, (px, py) = self._image(ob, st, t)
-                out.append((y, im, px, py))
+                v = VEHICLES.get(ob["type"])
+                depth = y + (2.0 if v and v["enclosed"] else -0.5 if v else 0.0)   # riders stand at y + 1
+                out.append((depth, im, px, py))
         return sorted(out, key=lambda f: f[0])
 
     def lights_on(self, t):

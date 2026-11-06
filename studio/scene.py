@@ -12,7 +12,7 @@ SLOTS = {
 }
 GROUND_Y = 1700
 CHAR_ATTRS = ("action", "expression", "prop", "label", "look", "facing", "style", "point", "dir",
-              "lean", "speed", "intensity", "hands", "tint", "on", "visible")
+              "lean", "speed", "intensity", "hands", "tint", "on", "visible", "ride")
 
 
 class Char:
@@ -26,12 +26,25 @@ class Char:
         self.scale = float(spec.get("scale", 1.0))
         self.phase = float(spec.get("phase", index * 0.9))
         self.events = []        # sorted by t
+        self.rides = []         # (t, vehicle id or None, seat)
+        self.vehicle_pos = None  # set by compile_scene: (vid, seat, t) -> (x, y)
         self.moves = []         # (t0, t1, x0, y0, x1, y1)
         self.speech = []        # dicts
         v = spec.get("voice", {})
         self.voice = v if isinstance(v, dict) else {"name": v}
 
+    def ride_at(self, t):
+        cur = None
+        for (t0, vid, seat) in self.rides:
+            if t0 > t:
+                break
+            cur = (vid, seat) if vid else None
+        return cur
+
     def pos_at(self, t):
+        r = self.ride_at(t) if self.rides else None
+        if r and self.vehicle_pos:
+            return self.vehicle_pos(r[0], r[1], t)
         x, y = self.x, self.y
         for (t0, t1, x0, y0, x1, y1, *_r) in self.moves:
             if t < t0:
@@ -109,13 +122,30 @@ def compile_scene(scene, use_tts=True, fps=None):
 
     # ---- objects (set pieces) ----
     plan.objects = []
+    from .objects import VEHICLE_SIZE
     for i, ob in enumerate(scene.get("objects", [])):
         ob = dict(ob)
         ob.setdefault("id", "%s%d" % (ob.get("type", "obj"), i + 1))
+        if ob.get("type") in VEHICLE_SIZE:
+            ob["scale"] = float(ob.get("scale", 1.0)) * VEHICLE_SIZE[ob["type"]]
         plan.objects.append(ob)
     obj_by_id = {o["id"]: o for o in plan.objects}
     plan.obj_events = []
     plan.lights = []
+    from .objects import VEHICLES, obj_pos
+
+    def vehicle_pos(vid, seat, t):
+        ob = obj_by_id[vid]
+        evs = sorted(plan.obj_events, key=lambda e: e["t"])
+        vx, vy, dirn, _dist = obj_pos(ob, evs, vid, t)
+        V = VEHICLES.get(ob.get("type"), {})
+        seats = V.get("seats") or {"driver": (0, 250)}
+        sx, _h = seats.get(seat) or next(iter(seats.values()))
+        e = -1 if (bool(ob.get("flip")) != (dirn < 0)) else 1
+        return vx + sx * e * float(ob.get("scale", 1.0)), vy + 1
+    plan.vehicle_pos = vehicle_pos
+    for c in chars.values():
+        c.vehicle_pos = vehicle_pos
 
     # ---- timeline ----
     cursor = 0.0
@@ -150,6 +180,14 @@ def compile_scene(scene, use_tts=True, fps=None):
                 e["expression"] = ev["emotion"]
             if len(e) > 1:
                 c.events.append(e)
+            if "ride" in ev:                        # get on (vehicle id) / off ("" or null) a vehicle
+                vid = ev["ride"] if ev["ride"] in obj_by_id else None
+                if vid is None and c.ride_at(t):
+                    px, py = c.pos_at(t)               # stay where you got off
+                    c.rides.append((t, None, None))
+                    c.moves.append((t, t + 0.001, px, py, px, py, False))
+                else:
+                    c.rides.append((t, vid, ev.get("seat", "driver")))
             if ev.get("on") in obj_by_id:          # sit / lie on an object: snap onto it
                 ob = obj_by_id[ev["on"]]
                 x0, y0 = c.pos_at(t)
@@ -194,7 +232,9 @@ def compile_scene(scene, use_tts=True, fps=None):
 
         if "object" in ev:
             for oid in (ev["object"] if isinstance(ev["object"], list) else [ev["object"]]):
-                plan.obj_events.append({"t": t, "object": oid, "state": ev.get("state")})
+                plan.obj_events.append({"t": t, "object": oid, "state": ev.get("state"), "move": ev.get("move")})
+                if ev.get("move"):
+                    plan_end = max(plan_end, t + float(ev["move"].get("dur", 2.0)))
         if "lights" in ev:
             v = ev["lights"]
             lvl = {"on": 1.0, "off": 0.32, "dim": 0.6}.get(v, v) if not isinstance(v, (int, float)) else float(v)
