@@ -1,0 +1,125 @@
+{
+  "background": {
+    "type": "chai_tapri"
+  },
+  "music": {
+    "type": "beat",
+    "style": "comedy",
+    "bpm": 104,
+    "volume": 0.18,
+    "seed": 2
+  },
+  "ambience": {
+    "type": "street",
+    "volume": 0.2
+  },
+  "meta": {
+    "line_gap": 0.3,
+    "tail": 1.0
+  },
+  "objects": [
+    {
+      "id": "bench1",
+      "type": "bench",
+      "x": 300,
+      "y": 1690,
+      "scale": 0.8
+    }
+  ],
+  "characters": {
+    "A": {
+      "preset": "uncle",
+      "x": 300,
+      "facing": "right",
+      "prop": "chai"
+    },
+    "B": {
+      "preset": "boy",
+      "hair": "spiky",
+      "color": "green",
+      "x": 800,
+      "voice": {
+        "name": "hi-IN-MadhurNeural",
+        "pitch": "+20Hz"
+      }
+    }
+  },
+  "caption": {
+    "text": "Udhaar wale dost 😂",
+    "style": "caption_box",
+    "pos": "top"
+  },
+  "timeline": [
+    {
+      "t": 0.0,
+      "who": "A",
+      "action": "sit",
+      "on": "bench1",
+      "fx": {
+        "type": "steam",
+        "at": "hand_r",
+        "dur": 2.4
+      }
+    },
+    {
+      "t": 0.2,
+      "who": "B",
+      "action": "walk",
+      "move": {
+        "x": 640,
+        "dur": 1.0
+      }
+    },
+    {
+      "t": 1.3,
+      "who": "B",
+      "action": "rub_hands",
+      "say": "Uncle, 100 rupay udhaar milenge?",
+      "speak": "अंकल, सौ रुपये उधार मिलेंगे?",
+      "look": "A"
+    },
+    {
+      "who": "A",
+      "action": "drink",
+      "expression": "sly",
+      "say": "Pichhle 500 kab doge?",
+      "speak": "पिछले पाँच सौ कब दोगे?",
+      "on": "bench1"
+    },
+    {
+      "who": "B",
+      "action": "scratch_head",
+      "fx": "question",
+      "say": "Wo... next month pakka!",
+      "speak": "वो... नेक्स्ट मंथ पक्का!"
+    },
+    {
+      "who": "A",
+      "action": "throw",
+      "at": "B",
+      "prop": "chappal",
+      "expression": "angry",
+      "sfx": "whoosh"
+    },
+    {
+      "wait": 1.1
+    },
+    {
+      "who": "B",
+      "action": "run",
+      "move": {
+        "x": 1300,
+        "dur": 1.0,
+        "run": true
+      },
+      "fx": "dust",
+      "hold": 1.2
+    },
+    {
+      "who": "A",
+      "action": "laugh",
+      "sfx": "laugh_track",
+      "hold": 1.2
+    }
+  ]
+}

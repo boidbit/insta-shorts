@@ -1,0 +1,301 @@
+{
+  "music": {
+    "type": "beat",
+    "style": "suspense",
+    "bpm": 72,
+    "volume": 0.22,
+    "seed": 5
+  },
+  "transition": {
+    "type": "fade",
+    "dur": 0.5
+  },
+  "scenes": [
+    {
+      "background": {
+        "type": "jungle",
+        "time": "evening"
+      },
+      "ambience": {
+        "type": "jungle",
+        "volume": 0.35
+      },
+      "meta": {
+        "duration": 5.5
+      },
+      "characters": {
+        "R": {
+          "preset": "boy",
+          "accessories": [
+            "cap"
+          ],
+          "cap_color": "green",
+          "prop": "torch",
+          "x": -120,
+          "voice": {
+            "name": "hi-IN-MadhurNeural",
+            "pitch": "+6Hz"
+          }
+        }
+      },
+      "overlays": [
+        {
+          "type": "chapter",
+          "text": "Jungle ki raat",
+          "subtitle": "Part 1",
+          "from": 0.2,
+          "dur": 2.2
+        }
+      ],
+      "timeline": [
+        {
+          "t": 0.0,
+          "fx": {
+            "type": "fireflies",
+            "count": 16
+          }
+        },
+        {
+          "t": 0.0,
+          "who": "R",
+          "move": {
+            "x": 560,
+            "dur": 3.6
+          },
+          "expression": "smile",
+          "sfx": "footsteps",
+          "volume": 0.6
+        },
+        {
+          "t": 3.8,
+          "who": "R",
+          "say": "Kitna shaant jungle hai...",
+          "speak": "कितना शांत जंगल है...",
+          "action": "look_around"
+        }
+      ]
+    },
+    {
+      "transition": "cut",
+      "background": {
+        "type": "jungle",
+        "time": "evening"
+      },
+      "ambience": {
+        "type": "jungle",
+        "volume": 0.3
+      },
+      "meta": {
+        "duration": 4.2
+      },
+      "characters": {
+        "R": {
+          "preset": "boy",
+          "accessories": [
+            "cap"
+          ],
+          "cap_color": "green",
+          "prop": "torch",
+          "x": 560,
+          "facing": "right",
+          "voice": {
+            "name": "hi-IN-MadhurNeural",
+            "pitch": "+6Hz"
+          }
+        }
+      },
+      "timeline": [
+        {
+          "t": 0.4,
+          "sfx": "thud",
+          "volume": 0.7
+        },
+        {
+          "t": 0.6,
+          "who": "R",
+          "action": "look_back",
+          "expression": "shock",
+          "fx": "exclaim",
+          "camera": {
+            "punch": "R",
+            "back": 1.4
+          }
+        },
+        {
+          "t": 1.2,
+          "sfx": "heartbeat",
+          "volume": 0.9
+        },
+        {
+          "t": 1.4,
+          "who": "R",
+          "expression": "scared",
+          "fx": "sweat",
+          "action": "scared"
+        },
+        {
+          "t": 2.4,
+          "who": "R",
+          "say": "Ye... kya tha?",
+          "speak": "ये... क्या था?",
+          "bubble": "thought"
+        }
+      ]
+    },
+    {
+      "transition": {
+        "type": "dip",
+        "dur": 0.7
+      },
+      "background": {
+        "type": "jungle",
+        "time": "night"
+      },
+      "ambience": {
+        "type": "night",
+        "volume": 0.35
+      },
+      "meta": {
+        "duration": 10.0
+      },
+      "objects": [
+        {
+          "id": "bush1",
+          "type": "bush",
+          "x": 800,
+          "y": 1720,
+          "scale": 1.2
+        }
+      ],
+      "characters": {
+        "R": {
+          "preset": "boy",
+          "accessories": [
+            "cap"
+          ],
+          "cap_color": "green",
+          "prop": "torch",
+          "x": 180,
+          "facing": "right",
+          "voice": {
+            "name": "hi-IN-MadhurNeural",
+            "pitch": "+6Hz"
+          }
+        },
+        "C": {
+          "kind": "cat",
+          "x": 820,
+          "y": 1740,
+          "color": [
+            70,
+            70,
+            76
+          ],
+          "visible": false
+        }
+      },
+      "timeline": [
+        {
+          "t": 0.0,
+          "who": "R",
+          "action": "sneak",
+          "move": {
+            "x": 560,
+            "dur": 2.4
+          },
+          "expression": "nervous"
+        },
+        {
+          "t": 1.0,
+          "object": "bush1",
+          "state": "rustle",
+          "sfx": "wind",
+          "volume": 0.5
+        },
+        {
+          "t": 2.6,
+          "who": "R",
+          "action": "peek",
+          "look": "right"
+        },
+        {
+          "t": 2.8,
+          "fx": {
+            "type": "glow_eyes",
+            "pos": [
+              800,
+              1560
+            ],
+            "dur": 2.4
+          },
+          "sfx": "drumroll",
+          "volume": 0.6
+        },
+        {
+          "t": 3.0,
+          "camera": {
+            "zoom": 1.35,
+            "focus": [
+              700,
+              1300
+            ],
+            "dur": 1.6
+          }
+        },
+        {
+          "t": 5.2,
+          "object": "bush1",
+          "state": "idle",
+          "camera": {
+            "zoom": 1.0,
+            "dur": 0.3
+          }
+        },
+        {
+          "t": 5.2,
+          "who": "C",
+          "visible": true,
+          "action": "bark",
+          "say": "Meow!",
+          "speak": "म्याऊँ!",
+          "voice": {
+            "name": "hi-IN-SwaraNeural",
+            "pitch": "+40Hz"
+          }
+        },
+        {
+          "t": 5.6,
+          "who": "R",
+          "action": "faint",
+          "sfx": "boing",
+          "fx": "dizzy"
+        },
+        {
+          "t": 6.4,
+          "freeze": {
+            "dur": 1.0,
+            "style": "grey"
+          },
+          "sfx": "record_scratch"
+        },
+        {
+          "t": 6.4,
+          "overlay": {
+            "text": "Billi se dar gaya 😂",
+            "style": "card",
+            "pos": "center",
+            "dur": 2.0
+          }
+        }
+      ]
+    }
+  ],
+  "overlays": [
+    {
+      "type": "endcard",
+      "text": "Aage kya hua? 👇",
+      "sub": "Comment me batao",
+      "from": 18.0
+    }
+  ]
+}

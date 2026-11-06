@@ -9,13 +9,10 @@ import os
 import re
 import sys
 
-from . import actions
-from .characters import EXPRESSIONS, PALETTE
 from .scene import compile_scene
 from .util import ROOT, load_scene
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
-BACKGROUNDS = {"kitchen", "room", "street", "school", "night_road", "plain", "image"}
 
 
 def extract_json(text):
@@ -29,43 +26,34 @@ def extract_json(text):
 
 def problems(scene_dict, tmp_path):
     """Return a list of human-readable problems (empty list = good)."""
+    from .lint import lint
     out = []
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(scene_dict, f, ensure_ascii=False)
         scene = load_scene(tmp_path)
+        out += lint(scene)
+        if "scenes" in scene:
+            from .multi import MultiRenderer
+            MultiRenderer(scene, 120, use_tts=False)
+            return out
         plan = compile_scene(scene, use_tts=False)
     except Exception as e:  # noqa: BLE001
-        return ["scene does not load/compile: %r" % (e,)]
-    bg = scene.get("background", {})
-    bgt = bg.get("type") if isinstance(bg, dict) else bg
-    if bgt and bgt not in BACKGROUNDS:
-        out.append("unknown background %r" % bgt)
-    for name, c in plan.chars.items():
-        col = c.spec.get("color", "blue")
-        if isinstance(col, str) and col not in PALETTE:
-            out.append("character %s: unknown color %r" % (name, col))
-        for ev in c.events:
-            if "action" in ev and ev["action"] not in actions.ACTIONS:
-                out.append("character %s: unknown action %r" % (name, ev["action"]))
-            if "expression" in ev and ev["expression"] not in EXPRESSIONS:
-                out.append("character %s: unknown expression %r" % (name, ev["expression"]))
-    if plan.duration > 40:
-        out.append("video too long (%.0fs); keep it under 25s" % plan.duration)
-    for raw in scene.get("timeline", []):
-        if "say" in raw and not raw.get("speak"):
-            out.append("line %r has no 'speak' (Devanagari) text" % raw["say"][:30])
+        return out + ["scene does not load/compile: %r" % (e,)]
+    if plan.duration > 90:                    # names, keys and references are checked by lint() above
+        out.append("one scene is %.0fs long; split a long story into several \"scenes\"" % plan.duration)
     return out
 
 
 def call_model(client, model, system, messages):
-    resp = client.messages.create(model=model, max_tokens=6000, system=system, messages=messages)
+    resp = client.messages.create(model=model, max_tokens=16000, system=system, messages=messages)
     return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
 
 
 def direct(instruction, model=DEFAULT_MODEL, client=None, tmp_path=None, max_tries=3):
+    from .lint import vocabulary
     with open(os.path.join(ROOT, "DIRECTOR_PROMPT.md"), encoding="utf-8") as f:
-        system = f.read()
+        system = f.read() + "\n\n" + vocabulary()
     if client is None:
         import anthropic
         client = anthropic.Anthropic()

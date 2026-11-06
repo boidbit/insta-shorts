@@ -424,6 +424,16 @@ class Renderer:
             pose["_anim"] = (action, t - a_t0, bool(mv), bool(mv and mv[6]), dr)
             k = c.scale * self.bg.depth_scale(y, self.depth)
             seat = self.objects.seat_height(st.get("on")) if st.get("on") else None
+            if seat is not None and action not in ("sit", "lie_down", "lie", "sleep_lie", "rofl") and \
+                    c.spec.get("kind") not in ANIMALS:
+                # an upper-body action while seated (drink, talk, phone...): keep the sitting legs
+                legs = actions.pose_for("sit", 0.0, 1.0, 1.0, c.phase, opts)
+                for kk in ("ll1", "ll2", "rl1", "rl2", "th_k"):
+                    if kk in legs:
+                        pose[kk] = legs[kk]
+                for kk in ("tilt", "lift", "shift", "dx"):
+                    pose.pop(kk, None)
+                action = "sit"
             if seat is not None:
                 if action in ("sit",):          # line the hips up with the seat top
                     natural = 208.0 if st["facing"] == "front" else 166.0
@@ -599,6 +609,9 @@ def main(argv=None):
 
     scene = load_scene(args.scene)
     name = os.path.splitext(os.path.basename(args.scene))[0]
+    from .lint import lint
+    for wmsg in lint(scene):                    # typos would otherwise fall back silently
+        print("  [warn] " + wmsg, file=sys.stderr)
     if "scenes" in scene:                       # multi-scene video (cuts, transitions, split-screen)
         from .multi import MultiRenderer
         r = MultiRenderer(scene, args.width, use_tts=not args.no_tts, fps=args.fps)

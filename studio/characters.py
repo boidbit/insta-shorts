@@ -83,6 +83,14 @@ def _rgb(v, table, default):
     return table.get(v, default)
 
 
+PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick", "chai", "glass", "plate", "samosa", "chappal", "bag", "money",
+         "newspaper", "book", "notebook", "pen", "laptop", "umbrella", "remote", "broom", "belan", "pillow", "gift",
+         "balloon", "trophy", "torch", "key", "bat", "flag", "camera", "banana", "bottle", "letter", "toothbrush",
+         "dumbbell", "box")
+ACCESSORIES = ("glasses", "cap", "tuft", "moustache", "beard", "bindi", "turban", "topi", "police_cap", "bow",
+               "earrings", "headband")
+OUTFITS = ("saree", "dupatta", "skirt", "tie", "stethoscope")
+
 HEAD_R = 100.0
 TORSO_W = 150.0
 TORSO_H = 330.0
@@ -121,6 +129,7 @@ EXPRESSIONS = {
     "love": ("heart", "smile", None),
     "sleepy": ("closed", "flat", None),
     "sad": ("dot", "frown", "sad"),
+    "relaxed": ("relaxed", "flat", None),
     "yawn": ("closed", "yawn", None),
     "scared": ("wide", "wavy", "sad"),
     "nervous": ("dot", "wavy", "sad"),

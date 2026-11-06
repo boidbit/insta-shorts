@@ -1,0 +1,27 @@
+{
+  "background": { "type": "room", "time": "evening" },
+  "music": { "type": "beat", "style": "lofi", "bpm": 84, "volume": 0.16, "seed": 9 },
+  "meta": { "tail": 1.0 },
+  "objects": [
+    { "id": "sofa1", "type": "sofa", "x": 330, "y": 1600, "scale": 0.8 },
+    { "id": "tv1", "type": "tv", "x": 860, "y": 1640, "scale": 0.75, "state": "on" },
+    { "id": "lamp1", "type": "lamp", "x": 620, "y": 1560, "scale": 0.8 },
+    { "id": "fan1", "type": "fan", "x": 540, "y": 1900 }
+  ],
+  "characters": {
+    "P": { "preset": "uncle", "x": 330, "y": 1601, "facing": "front" },
+    "K": { "preset": "kid", "x": 600, "y": 1720, "facing": "left" }
+  },
+  "caption": { "text": "India vs Pakistan, last over 🏏", "style": "caption_box", "pos": "top" },
+  "timeline": [
+    { "t": 0.0, "who": "P", "action": "sit", "on": "sofa1", "expression": "excited" },
+    { "t": 0.3, "who": "K", "action": "celebrate", "expression": "excited" },
+    { "t": 1.4, "who": "P", "say": "Bas 6 run chahiye!", "speak": "बस छह रन चाहिए!", "fx": "sparkle" },
+    { "t": 3.0, "lights": "off", "object": "tv1", "state": "off", "sfx": "thud" },
+    { "t": 3.0, "who": ["P", "K"], "expression": "shock", "fx": "exclaim" },
+    { "t": 3.1, "camera": { "punch": "P", "back": 1.2 } },
+    { "t": 3.6, "who": "P", "action": "stomp", "expression": "cry", "fx": "tears_spray", "sfx": "sad_trombone" },
+    { "t": 4.6, "object": "lamp1", "state": "on", "who": "K", "say": "Papa, lamp jala diya!", "speak": "पापा, लैंप जला दिया!", "action": "thumbs_up" },
+    { "who": "P", "action": "facepalm", "expression": "sad", "say": "Lamp me match thodi chalega!", "speak": "लैंप में मैच थोड़ी चलेगा!", "hold": 1.2 }
+  ]
+}
