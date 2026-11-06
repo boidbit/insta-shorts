@@ -14,7 +14,7 @@ import time
 import numpy as np
 from PIL import Image, ImageChops
 
-from . import actions, audio
+from . import actions, audio, ui
 from .backgrounds import Background
 from .effects import Effects, Patch
 from .objects import VEHICLES, Objects
@@ -183,12 +183,44 @@ class Renderer:
                                              o.get("color"), o.get("size"), o.get("max_w"))
         return self._ov_cache[key]
 
+    UI_DUR = {"notification": 3.0, "loading": 3.0, "counter": 3.0, "timecard": 1.6, "chapter": 2.2}
+    UI_POS = {"chat": (540, 980), "notification": (540, 150), "loading": (540, 900), "counter": (540, 720),
+              "chapter": (540, 330)}
+
+    def _draw_ui(self, img, o, t, t0, t1):
+        typ = o["type"]
+        lt = t - t0
+        dur = (t1 - t0) if t1 < 1e8 else 3.0
+        im = ui.render(o, lt, self.s, dur, (self.W, self.H))
+        if im is None:
+            return img
+        fade = clamp(lt / 0.2) * (clamp((t1 - t) / 0.25) if t1 < 1e8 else 1.0)
+        if fade < 0.999:
+            im.putalpha(im.getchannel("A").point([int(v * fade) for v in range(256)]))
+        if typ in ("timecard", "endcard"):
+            base = img.convert("RGBA")
+            base.alpha_composite(im)
+            return base.convert("RGB")
+        pos = o.get("pos", self.UI_POS.get(typ, (540, 900)))
+        px, py = POS[pos] if isinstance(pos, str) else pos
+        if typ == "notification":           # slides down from the top, and back up at the end
+            py = py - 260 * (1 - ease_out(lt / 0.3)) - (260 * (1 - clamp((t1 - t) / 0.3)) if t1 < 1e8 else 0)
+        elif typ == "chat":
+            py += 120 * (1 - ease_out(lt / 0.3))
+        self._paste_rgba(img, im, px * self.s, py * self.s)
+        return img
+
     def _draw_overlays(self, img, t):
         for o in self.plan.overlays:
             t0 = float(o.get("from", 0.0))
             t1 = o.get("to")
-            t1 = float(t1) if t1 is not None else (t0 + float(o["dur"]) if "dur" in o else 1e9)
+            dflt = self.UI_DUR.get(o.get("type"))
+            t1 = float(t1) if t1 is not None else (t0 + float(o["dur"]) if "dur" in o else
+                                                   (t0 + dflt if dflt else 1e9))
             if not (t0 <= t < t1):
+                continue
+            if o.get("type") in ui.TYPES:
+                img = self._draw_ui(img, o, t, t0, t1)
                 continue
             im = self._overlay_image(o)
             pos = o.get("pos", "top")
@@ -208,6 +240,7 @@ class Renderer:
             if t1 < 1e8:
                 al *= clamp((t1 - t) / 0.2)
             self._paste_rgba(img, im, px * self.s, py * self.s, sc, al)
+        return img
 
     # ------------------------------------------------------------ one frame
     def frame(self, t):
@@ -381,7 +414,7 @@ class Renderer:
         if self._vig is not None:      # lens vignette: screen-fixed, under the captions
             img = ImageChops.multiply(img, self._vig)
 
-        self._draw_overlays(img, t)    # captions stay screen-fixed (not zoomed)
+        img = self._draw_overlays(img, t)    # captions stay screen-fixed (not zoomed)
 
         # fades
         f = 1.0
