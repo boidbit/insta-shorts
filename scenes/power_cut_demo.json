@@ -1,7 +1,7 @@
 {
   "background": { "type": "room", "time": "evening" },
   "music": { "type": "beat", "style": "lofi", "bpm": 84, "volume": 0.16, "seed": 9 },
-  "meta": { "tail": 1.0 },
+  "meta": { "tail": 0.6 },
   "objects": [
     { "id": "sofa1", "type": "sofa", "x": 330, "y": 1600, "scale": 0.8 },
     { "id": "tv1", "type": "tv", "x": 860, "y": 1640, "scale": 0.75, "state": "on" },

@@ -12,25 +12,66 @@ def _stance(spread=1.0):
     return dict(ll1=-9 * spread, ll2=-3 * spread, rl1=9 * spread, rl2=3 * spread)
 
 
+def _n(t, ph=0.0):
+    """Smooth pseudo-noise in -1..1 (sum of incommensurate sines): organic, never repeats exactly."""
+    return (sin(t * 0.73 + ph) * 0.5 + sin(t * 1.37 + ph * 2.1) * 0.3 + sin(t * 2.91 + ph * 3.7) * 0.2)
+
+
 def idle(t, sp, I, ph, o):
-    w = 2 * pi * 0.7 * sp
     d = _stance()
-    d.update(tilt=1.2 * sin(w * t + ph) * I, head_tilt=2.0 * sin(w * t * 0.5 + ph) * I,
-             la1=-14 + 2 * sin(w * t), ra1=14 - 2 * sin(w * t))
+    breathe = sin(2 * pi * 0.28 * t + ph)
+    d.update(tilt=1.6 * _n(t * 0.8, ph) * I, shift=4 * _n(t * 0.45, ph + 1) * I,
+             head_tilt=2.5 * _n(t * 0.9, ph + 2) * I, head_dy=1.2 * breathe,
+             la1=-14 + 3 * _n(t, ph + 3), la2=-8 + 4 * _n(t * 1.1, ph + 4),
+             ra1=14 + 3 * _n(t, ph + 5), ra2=8 + 4 * _n(t * 1.1, ph + 6),
+             ll1=-9 + 1.5 * _n(t * 0.45, ph + 1), rl1=9 + 1.5 * _n(t * 0.45, ph + 1))
     return d
+
+
+ANGRY = {"angry", "shout", "determined", "disgust"}
+HAPPY = {"smile", "grin", "laugh", "lol", "excited", "love", "wink", "blush"}
+SAD = {"sad", "cry", "hurt", "bored", "sleepy", "yawn"}
+SCARED = {"scared", "nervous", "shock", "surprised", "cringe", "dizzy"}
+COOL = {"smug", "sly", "proud", "evil", "kiss"}
+THINK = {"think", "confused", "shh"}
 
 
 def talk(t, sp, I, ph, o):
+    """Talking. The gesture style follows the expression; big moves land on loud syllables (o["_amp"])."""
+    d = _d(o)
+    e = o.get("_expr", "neutral")
+    amp = clamp(o.get("_amp", 0.5)) * I
     w = 2 * pi * 1.1 * sp
-    d = _stance()
-    d.update(
-        tilt=1.5 * sin(w * 0.5 * t + ph) * I,
-        head_tilt=4.0 * sin(w * t + ph) * I,
-        ra1=38 + 20 * sin(w * t + ph) * I, ra2=70 + 28 * sin(w * t + 1.2 + ph) * I,
-        la1=-16 + 4 * sin(w * 0.5 * t),
-        lift=-3 * abs(sin(w * t + ph)) * I,
-    )
-    return d
+    n1, n2 = _n(t * 1.6, ph), _n(t * 1.3, ph + 2)
+    if e in ANGRY:                                  # jabbing finger, leaning in
+        jab = (0.3 + 0.7 * amp)
+        pose = _P(hand("R", (120 + 110 * jab, -330 - 20 * n1), (0, 1)), hand("L", (-90, -70), (-1, 0.2)),
+                  dict(ll1=-14, rl1=14), finger="R", tilt=5 + 4 * amp, head_dx=5 + 4 * amp,
+                  head_tilt=3 * n2, lift=-4 * amp)
+    elif e in HAPPY:                                # open arms, bouncy
+        op = 0.4 + 0.6 * amp
+        pose = _P(hand("R", (110 + 70 * op, -240 - 70 * op + 10 * n1), (1, 0.6)),
+                  hand("L", (-110 - 70 * op, -240 - 70 * op + 10 * n2), (-1, 0.6)),
+                  dict(ll1=-11, rl1=11), lift=-7 * amp * abs(sin(w * 2 * t)), head_tilt=5 * n1, tilt=2 * n2)
+    elif e in SAD:                                  # small low gestures, head down
+        pose = _P(hand("R", (70 + 25 * amp, -130 - 30 * amp), (1, 1)), hand("L", (-62, -110), (-1, 1)),
+                  dict(ll1=-7, rl1=7), head_dy=7, look_y=0.5, head_tilt=-3 + 2 * n1, tilt=-1)
+    elif e in SCARED:                               # hands up at the chest, fidgety
+        tr = 2.5 * sin(2 * pi * 9 * t)
+        pose = _P(hand("R", (46 + 12 * amp, -262 - 20 * amp), (1, 1)), hand("L", (-40, -256), (-1, 1)),
+                  dict(ll1=-4, rl1=4), shift=tr, tilt=-3, look_x=0.4 * n1, head_dy=-2 * amp)
+    elif e in COOL:                                 # hand on the hip, lazy gesture
+        pose = _P(hand("L", (-72, -92), (-1, -0.3)), hand("R", (120 + 40 * amp, -210 - 50 * amp + 8 * n1), (1, 0.5)),
+                  dict(ll1=-12, rl1=12), head_tilt=6 + 3 * n2, tilt=-2)
+    elif e in THINK:                                # hand near the chin
+        pose = _P(hand("R", (26 + 10 * amp, -320 + 6 * n1), (1, 1)), hand("L", (46, -214), (-0.3, 1)),
+                  dict(ll1=-9, rl1=9), look_y=-0.4, head_tilt=4 * n2)
+    else:                                           # neutral: one hand talks, emphasis on loud words
+        pose = _P(hand("R", (100 + 70 * amp + 15 * n1, -200 - 80 * amp + 12 * n2), (1, 0.7)),
+                  hand("L", (-70 - 20 * amp * max(0.0, n2), -110 - 30 * amp * max(0.0, n2)), (-1, 0.6)),
+                  dict(ll1=-9, rl1=9), head_tilt=4 * sin(w * t + ph) * I + 3 * n1, tilt=1.5 * n2,
+                  lift=-3 * amp)
+    return _side(d, pose)
 
 
 def dance(t, sp, I, ph, o):
@@ -222,40 +263,54 @@ HEAD = (0.0, -414.0)
 
 
 def _ik(base, target, l1, l2, prefer):
-    """Two-bone IK. Returns (upper angle, lower angle) in the rig's convention (0 = down, +90 = right).
-    `prefer` = direction the elbow / knee should bulge toward."""
+    """Two-bone IK in the picture plane. Returns (upper angle, lower angle, upper scale, lower scale).
+    The elbow/knee bulges toward `prefer`. When that preference becomes ambiguous (prefer nearly along the
+    shoulder->target line) the limb straightens and foreshortens instead of snapping to the other side,
+    so motion stays continuous and the hand still lands on the target."""
     dx, dy = target[0] - base[0], target[1] - base[1]
     dist = math.hypot(dx, dy)
-    dist = max(abs(l1 - l2) + 1e-3, min(l1 + l2 - 1e-3, dist)) if dist > 1e-6 else 1e-3
-    phi = math.degrees(math.atan2(dx, dy))
-    ca = (l1 * l1 + dist * dist - l2 * l2) / (2 * l1 * dist)
-    alpha = math.degrees(math.acos(max(-1.0, min(1.0, ca))))
-    best = None
-    for a1 in (phi + alpha, phi - alpha):
-        ex = base[0] + l1 * math.sin(math.radians(a1))
-        ey = base[1] + l1 * math.cos(math.radians(a1))
-        score = (ex - base[0]) * prefer[0] + (ey - base[1]) * prefer[1]
-        if best is None or score > best[0]:
-            best = (score, a1, ex, ey)
-    _sc, a1, ex, ey = best
-    a2 = math.degrees(math.atan2(target[0] - ex, target[1] - ey))
-    return a1, a2
+    if dist < 1e-6:
+        dx, dy, dist = 0.0, 1.0, 1.0
+    ux, uy = dx / dist, dy / dist
+    nx, ny = -uy, ux
+    D = max(abs(l1 - l2) + 1e-3, min(l1 + l2 - 1e-3, dist))
+    a = (l1 * l1 - l2 * l2 + D * D) / (2 * D)
+    h = math.sqrt(max(0.0, l1 * l1 - a * a))
+    pl = math.hypot(prefer[0], prefer[1]) or 1.0
+    sgn = (prefer[0] * nx + prefer[1] * ny) / pl
+    f = clamp(abs(sgn) / 0.35)
+    f = f * f * (3 - 2 * f)
+    he = h * f * (1 if sgn >= 0 else -1)
+    ex, ey = base[0] + ux * a + nx * he, base[1] + uy * a + ny * he
+    hx, hy = base[0] + ux * D, base[1] + uy * D
+    # Hand close to the shoulder/hip: the two-bone solution swings around fast there, so pull the
+    # elbow/knee toward the preferred direction (a real arm keeps its elbow out / down).
+    near = clamp((0.62 * (l1 + l2) - D) / (0.62 * (l1 + l2)))
+    if near > 0:
+        px_, py_ = prefer[0] / pl, prefer[1] / pl
+        ex = ex + (base[0] + px_ * l1 * 0.9 - ex) * near
+        ey = ey + (base[1] + py_ * l1 * 0.9 - ey) * near
+    a1 = math.degrees(math.atan2(ex - base[0], ey - base[1]))
+    a2 = math.degrees(math.atan2(hx - ex, hy - ey))
+    k1 = math.hypot(ex - base[0], ey - base[1]) / l1
+    k2 = math.hypot(hx - ex, hy - ey) / l2
+    return a1, a2, k1, k2
 
 
 def hand(side, target, prefer=None, k=1.0):
     """Arm angles that put the hand at `target` (body coords). k = arm stretch (pass the same arm_k)."""
     if prefer is None:
         prefer = (1.0 if side == "R" else -1.0, 0.5)
-    a1, a2 = _ik(SHOULDER[side], target, UA * k, LA * k, prefer)
-    k = "ra" if side == "R" else "la"
-    return {k + "1": a1, k + "2": a2}
+    a1, a2, k1, k2 = _ik(SHOULDER[side], target, UA * k, LA * k, prefer)
+    p = "ra" if side == "R" else "la"
+    return {p + "1": a1, p + "2": a2, p + "_k1": k1, p + "_k2": k2}
 
 
 def foot(side, target, prefer=None):
     """Leg angles that put the foot at `target` (body coords, feet normally around y=+330)."""
     if prefer is None:
         prefer = (1.0 if side == "R" else -1.0, 0.0)
-    a1, a2 = _ik(HIP[side], target, TH_, SH_, prefer)
+    a1, a2, _k1, _k2 = _ik(HIP[side], target, TH_, SH_, prefer)
     k = "rl" if side == "R" else "ll"
     return {k + "1": a1, k + "2": a2}
 
@@ -276,6 +331,7 @@ def _lerp2(p, q, e):
 _SWAP = {"la1": "ra1", "la2": "ra2", "ra1": "la1", "ra2": "la2",
          "ll1": "rl1", "ll2": "rl2", "rl1": "ll1", "rl2": "ll2"}
 _NEG = {"tilt", "shift", "head_tilt", "look_x", "dx", "head_dx", "head_facing"}
+_SWAPK = {"la_k1": "ra_k1", "la_k2": "ra_k2", "ra_k1": "la_k1", "ra_k2": "la_k2"}
 _LR = {"L": "R", "R": "L"}
 
 
@@ -287,6 +343,8 @@ def _side(d, pose):
     for k, v in pose.items():
         if k in _SWAP:
             out[_SWAP[k]] = -v
+        elif k in _SWAPK:
+            out[_SWAPK[k]] = v
         elif k in _NEG and isinstance(v, (int, float)):
             out[k] = -v
         elif k in ("finger", "thumb", "prop_hand"):
@@ -313,6 +371,21 @@ def _P(*parts, **kw):
     return out
 
 
+def _mix(p1, p2, w):
+    """Blend two poses (angles the short way round)."""
+    w = clamp(w)
+    w = w * w * (3 - 2 * w)
+    out = dict(p2 if w >= 0.5 else p1)
+    for k in set(p1) | set(p2):
+        a, b = p1.get(k), p2.get(k)
+        if isinstance(a, (int, float)) and isinstance(b, (int, float)) and not isinstance(a, bool):
+            if k in ("la1", "la2", "ra1", "ra2", "ll1", "ll2", "rl1", "rl2", "tilt", "head_tilt"):
+                out[k] = a + (((b - a + 180) % 360) - 180) * w
+            else:
+                out[k] = a + (b - a) * w
+    return out
+
+
 def _once(t, t0, dur):
     """0..1 progress of a sub-move that starts at t0 and lasts dur."""
     return clamp((t - t0) / dur)
@@ -335,9 +408,9 @@ def _gait(t, freq, thigh, knee, ph=0.0):
 # ------------------------------------------------------------------ movement
 def run(t, sp, I, ph, o):
     d = _d(o)
-    w = 2 * pi * 2.3 * sp
+    w = 2 * pi * 2.1 * sp
     a = w * t + ph
-    legs = _gait(t, 2.3 * sp, 42 * I, 75, ph)
+    legs = _gait(t, 2.1 * sp, 36 * I, 62, ph)
     ua_l, ua_r = -38 * sin(a + pi), -38 * sin(a)
     pose = _P(legs, la1=ua_l, la2=ua_l + 100, ra1=ua_r, ra2=ua_r + 100,
               lift=-14 * abs(cos(a)), tilt=9 * I, head_tilt=-4, look_x=0.7)
@@ -466,8 +539,7 @@ def get_up(t, sp, I, ph, o):
 def wake_up(t, sp, I, ph, o):
     if t < 0.9:
         return get_up(t, sp, I, ph, o)
-    p = yawn(t - 0.9, sp, I, ph, o)
-    return p
+    return _mix(get_up(0.9, sp, I, ph, o), yawn(t - 0.9, sp, I, ph, o), (t - 0.9) / 0.3)
 
 
 def turn_around(t, sp, I, ph, o):
@@ -530,11 +602,10 @@ def jump_over(t, sp, I, ph, o):
     d = _d(o)
     p = _once(t, 0, 0.7)
     h = 230 * sin(pi * p) * I
-    if 0 < p < 1:
-        pose = _P(dict(rl1=72, rl2=-14, ll1=58, ll2=-24), hand("R", (170, -420)), hand("L", (140, -440), (0, 1)),
-                  lift=-h, tilt=6)
-    else:
-        pose = dict(ll1=-14, ll2=-4, rl1=14, rl2=4)
+    stand = _P(dict(ll1=-14, ll2=-4, rl1=14, rl2=4), hand("R", (80, -110)), hand("L", (-80, -110)))
+    tuck = _P(dict(rl1=72, rl2=-14, ll1=58, ll2=-24), hand("R", (170, -420)), hand("L", (140, -440), (0, 1)), tilt=6)
+    pose = _mix(stand, tuck, sin(pi * p) * 1.6)
+    pose["lift"] = -h
     return _side(d, pose)
 
 
@@ -1040,11 +1111,12 @@ def bowl(t, sp, I, ph, o):
 
 
 def race_start(t, sp, I, ph, o):
-    if t >= 0.8:
-        return run(t - 0.8, sp, I, ph, o)
     d = _d(o)
-    return _side(d, _P(dict(ll1=-30, ll2=40, rl1=60, rl2=-10), hand("R", (120, 40)), hand("L", (100, 40)),
-                       tilt=28, face="determined"))
+    ready = _side(d, _P(dict(ll1=-30, ll2=40, rl1=60, rl2=-10), hand("R", (120, 40)), hand("L", (100, 40)),
+                        tilt=28, face="determined"))
+    if t < 0.8:
+        return ready
+    return _mix(ready, run(t - 0.8, sp, I, ph, o), (t - 0.8) / 0.25)
 
 
 def jumping_jacks(t, sp, I, ph, o):
@@ -1089,7 +1161,7 @@ def bhangra(t, sp, I, ph, o):
 
 def garba(t, sp, I, ph, o):
     w = 2 * pi * 0.75 * sp
-    side = 1 if sin(w * t + ph) >= 0 else -1
+    side = clamp(sin(w * t + ph) * 2.2, -1, 1)
     clapk = abs(sin(2 * w * t + ph))
     return _P(hand("R", (side * 130 + 14, -320 - 20 * clapk), (1, 0.3)),
               hand("L", (side * 130 - 14, -320 - 20 * clapk), (-1, 0.3)),

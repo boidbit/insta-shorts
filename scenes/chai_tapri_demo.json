@@ -14,8 +14,7 @@
     "volume": 0.2
   },
   "meta": {
-    "line_gap": 0.3,
-    "tail": 1.0
+    "tail": 0.6
   },
   "objects": [
     {

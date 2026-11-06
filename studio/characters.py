@@ -248,10 +248,10 @@ def skeleton(p):
     footR = add(kneeR, vec(p["rl2"], sh))
     shL, shR = (-52.0, -TORSO_H + 55), (52.0, -TORSO_H + 55)
     ak = p.get("arm_k", 1.0)                 # >1 = cartoon stretch (overhead gestures)
-    elbL = add(shL, vec(p["la1"], UA * ak))
-    handL = add(elbL, vec(p["la2"], LA * ak))
-    elbR = add(shR, vec(p["ra1"], UA * ak))
-    handR = add(elbR, vec(p["ra2"], LA * ak))
+    elbL = add(shL, vec(p["la1"], UA * ak * p.get("la_k1", 1.0)))     # *_k < 1: foreshortened segment
+    handL = add(elbL, vec(p["la2"], LA * ak * p.get("la_k2", 1.0)))
+    elbR = add(shR, vec(p["ra1"], UA * ak * p.get("ra_k1", 1.0)))
+    handR = add(elbR, vec(p["ra2"], LA * ak * p.get("ra_k2", 1.0)))
     neck = (0.0, -TORSO_H + 6)
     hc = add(neck, rot((0.0, -HEAD_R * 0.9 * p.get("head_k", 1.0)), d2r(p["head_tilt"])))
     hc = (hc[0] + p.get("head_dx", 0.0), hc[1] + p.get("head_dy", 0.0))
@@ -605,7 +605,8 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     eyes, mouth, brows = EXPRESSIONS.get(expr, EXPRESSIONS["neutral"]) if expr != "_back" else (None, None, None)
     if blink and eyes and eyes not in NO_BLINK:
         eyes = "closed"
-    fdx = facing * 14 + p["look_x"] * 5
+    ff = p.get("_facing_f")
+    fdx = (ff if ff is not None and p.get("head_facing") is None else facing) * 14 + p["look_x"] * 5
     lx, ly = p["look_x"] * 7, p["look_y"] * 5
 
     for sgn in (-1, 1):

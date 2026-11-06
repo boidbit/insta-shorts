@@ -13,7 +13,7 @@
     "l4": "To bill bhi dosti ka hissa hai, de de!",
     "s4": "तो बिल भी दोस्ती का हिस्सा है, दे दे!"
   },
-  "meta": { "line_gap": 0.35, "tail": 0.9 },
+  "meta": { "line_gap": 0.12, "tail": 0.5 },
   "background": { "type": "{bg}" },
   "music": { "type": "beat", "bpm": 90, "volume": 0.16 },
   "characters": {

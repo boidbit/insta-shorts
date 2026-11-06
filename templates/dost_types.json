@@ -15,7 +15,7 @@
     "speak_c": "भाई पाँच सौ उधार देना, कल पक्का वापस!",
     "outro": "Tumhare group me kaun hai? Comment karo 👇"
   },
-  "meta": { "line_gap": 0.45, "tail": 0.3 },
+  "meta": { "line_gap": 0.15, "tail": 0.3 },
   "background": { "type": "{bg}" },
   "music": { "type": "beat", "bpm": 96, "volume": 0.22 },
   "characters": {

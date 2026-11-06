@@ -53,6 +53,41 @@ def synth_tts(text, voice=None, rate="+0%", pitch="+0Hz"):
     return out if os.path.isfile(out) and os.path.getsize(out) > 1000 else None
 
 
+def trim_silence(path):
+    """Cut the dead air TTS puts before and after a line (it adds up to long pauses between lines)."""
+    out = os.path.splitext(path)[0] + ".trim.wav"
+    if os.path.isfile(out) and os.path.getsize(out) > 1000:
+        return out
+    flt = ("silenceremove=start_periods=1:start_threshold=-40dB:start_silence=0.03,areverse,"
+           "silenceremove=start_periods=1:start_threshold=-40dB:start_silence=0.06,areverse")
+    try:
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", path, "-af", flt, "-ar", "24000", "-ac", "1", out],
+                       check=True, timeout=60, capture_output=True)
+    except Exception:
+        return path
+    return out if os.path.isfile(out) and os.path.getsize(out) > 1000 else path
+
+
+def shift_value(val, delta, unit):
+    """'+10%' + 5 -> '+15%';  '-8Hz' + 6 -> '-2Hz'."""
+    try:
+        n = int(round(float(str(val).replace(unit, "").strip() or 0)))
+    except ValueError:
+        n = 0
+    n += int(round(delta))
+    return "%s%d%s" % ("+" if n >= 0 else "-", abs(n), unit)
+
+
+# How a line is delivered for each expression: (rate % change, pitch Hz change)
+EMOTION_VOICE = {
+    "angry": (8, 4), "shout": (10, 8), "determined": (5, 0), "disgust": (2, -4),
+    "smile": (3, 4), "grin": (4, 5), "laugh": (6, 10), "lol": (6, 10), "excited": (9, 12), "love": (-2, 6),
+    "wink": (2, 4), "blush": (0, 6), "sad": (-10, -8), "cry": (-8, -2), "hurt": (-6, -4), "bored": (-12, -6),
+    "sleepy": (-14, -8), "scared": (10, 12), "nervous": (8, 8), "shock": (8, 14), "surprised": (6, 12),
+    "smug": (-3, -4), "sly": (-4, -3), "proud": (-2, -2), "evil": (-6, -8), "think": (-6, -2), "confused": (-3, 4),
+}
+
+
 def audio_duration(path):
     try:
         r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
@@ -63,7 +98,7 @@ def audio_duration(path):
 
 
 def estimate_duration(text):
-    return max(1.2, len(text) * 0.07 + 0.45)
+    return max(0.9, len(text) * 0.058 + 0.3)
 
 
 def lip_envelope(path, fps):

@@ -48,7 +48,9 @@ A longer story, or one that changes place, is a MULTI-SCENE file (each item is a
 - `expression`: from the vocabulary. `prop`: a held prop ("" drops it). `label`: name tag ("" hides it). `look`: a character name | left | right.
 - `say` (Hinglish, Roman letters, max ~45 characters) + `speak` (the SAME sentence in Devanagari, for the Hindi voice). `"bubble": "thought"` = thought cloud, lips shut.
   A `say` event advances the cursor by the spoken length, so consecutive `say` events become a conversation. Give each speaker a distinct voice pitch.
-- `hold`: seconds to keep the cursor still after this event (use on the last event). `{ "wait": 1.0 }` just advances the cursor.
+- `hold`: seconds to keep the cursor still after this event (use on the last event). `{ "wait": 1.0 }` just advances the cursor (use short waits, 0.3-0.6 s, only for comic beats; lines already flow tightly).
+- `interrupt`: true on a `say` event = this line cuts in before the previous speaker finishes (their voice is cut off). Great for arguments.
+- Always set an `expression` on spoken lines: it changes the talking gestures AND the voice (angry = faster/higher, sad = slower/lower).
 - `move`: { "x": 800, "y": 1700, "dur": 1.0, "run": false } walks (or runs) the character. Smaller y = further away (drawn smaller).
 - `visible`: false / true hides or shows a character (enter / exit through a door).
 - `on`: "<object id>" with action sit / lie_down / sleep_lie: sits on a chair / sofa / bench / stool, lies on a bed.

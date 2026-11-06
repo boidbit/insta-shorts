@@ -149,7 +149,10 @@ def compile_scene(scene, use_tts=True, fps=None):
 
     # ---- timeline ----
     cursor = 0.0
-    gap = float(meta.get("line_gap", 0.35))
+    gap = float(meta.get("line_gap", 0.12))
+    voice_speed = float(meta.get("voice_speed", 10))      # % added to every voice (TTS default is slow for reels)
+    voice_emotion = bool(meta.get("voice_emotion", True))  # expression changes how a line is spoken
+    last_sp = None
     plan.sfx = []
     plan.overlays = []
     cam_events = []
@@ -163,6 +166,9 @@ def compile_scene(scene, use_tts=True, fps=None):
     for raw in scene.get("timeline", []):
         ev = dict(raw)
         t = float(ev["t"]) if "t" in ev and ev["t"] is not None else cursor
+        if ev.get("interrupt") and "t" not in ev and last_sp is not None:
+            ov = 0.35 if ev["interrupt"] is True else float(ev["interrupt"])
+            t = max(last_sp["start"] + 0.3, cursor - gap - ov)    # cut in before the other person finishes
         plan_end = max(plan_end, t)
         if "wait" in ev:
             cursor = t + float(ev["wait"])
@@ -212,21 +218,34 @@ def compile_scene(scene, use_tts=True, fps=None):
             speak = ev.get("speak", text)
             v = dict(c.voice)
             v.update(ev.get("voice", {}) if isinstance(ev.get("voice"), dict) else {})
+            rate, pitch = audio.shift_value(v.get("rate", "+0%"), voice_speed, "%"), v.get("pitch", "+0Hz")
+            if voice_emotion:
+                ex = ev.get("expression", ev.get("emotion"))
+                if ex is None:
+                    ex = next((e["expression"] for e in reversed(c.events) if "expression" in e and e["t"] <= t),
+                              c.spec.get("expression", "neutral"))
+                dr_, dp_ = audio.EMOTION_VOICE.get(ex, (0, 0))
+                rate, pitch = audio.shift_value(rate, dr_, "%"), audio.shift_value(pitch, dp_, "Hz")
             path, dur = None, None
             if use_tts and ev.get("tts", True):
-                path = audio.synth_tts(speak, v.get("name"), v.get("rate", "+0%"), v.get("pitch", "+0Hz"))
+                path = audio.synth_tts(speak, v.get("name"), rate, pitch)
                 if path:
+                    path = audio.trim_silence(path)
                     dur = audio.audio_duration(path)
                 elif not warned[0]:
                     print("  [tts] unavailable -> using estimated timing, video will have no voice", file=sys.stderr)
                     warned[0] = True
             if dur is None:
                 dur = float(ev.get("duration", audio.estimate_duration(speak)))
-            sp = dict(who=c.name, text=text, start=t, end=t + dur + 0.12, audio=path, bubble=ev.get("bubble", True))
+            if ev.get("interrupt") and last_sp is not None and last_sp["end"] > t:
+                last_sp["end"] = t + 0.1                         # the other person gets cut off
+                last_sp["cut"] = t + 0.1 - last_sp["start"]
+            sp = dict(who=c.name, text=text, start=t, end=t + dur + 0.08, audio=path, bubble=ev.get("bubble", True))
             c.speech.append(sp)
             plan.speech.append(sp)
+            last_sp = sp
             cursor = max(cursor, t + dur + gap)
-            plan_end = max(plan_end, t + dur + 0.12)
+            plan_end = max(plan_end, t + dur + 0.08)
         if "hold" in ev:
             cursor = max(cursor, t + float(ev["hold"]))
             plan_end = max(plan_end, t + float(ev["hold"]))
@@ -316,7 +335,7 @@ def compile_scene(scene, use_tts=True, fps=None):
         plan.duration = float(meta["duration"])
     else:
         last = max(plan_end, float(meta.get("min_duration", 4.0)))
-        plan.duration = round(last + float(meta.get("tail", 0.9)), 2)
+        plan.duration = round(last + float(meta.get("tail", 0.5)), 2)
     plan.n_frames = int(round(plan.duration * plan.fps))
 
     # ---- camera segments ----

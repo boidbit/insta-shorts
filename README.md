@@ -95,6 +95,14 @@ Secret `ANTHROPIC_API_KEY` add karo (Settings → Secrets → Actions). Phir Run
 
 `studio/director.py` Claude se scene JSON banwata hai (`DIRECTOR_PROMPT.md` rules + code se bani poori vocabulary ke saath), `lint` ki har galti khud sudharwata hai, aur phir render ho jata hai. Lambi script (kuch minute) do to multi-scene file banti hai. Local me: `python -m studio.director "idea ya poori script" -o scenes/generated/x.json`.
 
+## Smoothness, pacing, jaan (automatic)
+
+- **Smooth movement**: ek action se doosre action par jaate waqt pose ~0.3s me blend hota hai (haath seedhi line me chalte hain), aankhein/chehra dheere mudta hai, expression badalne par blink hota hai, blink random hote hain.
+- **Tight pacing**: lines ke beech default gap `0.12s` (pehle 0.35s), end tail `0.5s`, aur har TTS clip ke aage-peeche ki khamoshi kaat di jaati hai. Awaaz default 10% tez (`"meta": {"voice_speed": 10}`).
+- **Beech me tokna**: `{"who": "B", "interrupt": true, "say": ...}` → B pehle wale ke khatam hone se pehle bolta hai aur pehle wale ki awaaz kat jaati hai.
+- **Emotion ke hisaab se**: bolte waqt haath ka style expression se (angry = ungli dikhana, smile = haath kholna, sad = chhote gestures, smug = kamar pe haath...) aur bade gesture tez syllables pe. Awaaz ka pitch/speed bhi expression se badalta hai (band karna: `"meta": {"voice_emotion": false}`).
+- **Sunne wale**: jo nahi bol raha wo bolne wale ko dekhta hai, beech-beech me sir hilata hai, gusse se peeche hat-ta hai, sawal pe sir tedha karta hai.
+
 ## Kya-kya bana sakte ho (reference)
 
 Poora schema + har naam ki list `DIRECTOR_PROMPT.md` aur `python -m studio.lint` se milti hai. **Galat naam (typo) silently ignore nahi hota**: render ke time `[warn]` dikhta hai, aur `python -m studio.lint scenes/x.json` se pehle hi check kar sakte ho.

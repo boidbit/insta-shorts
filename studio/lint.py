@@ -25,7 +25,7 @@ EVENT_KEYS = {"t", "who", "wait", "hold", "say", "speak", "voice", "tts", "durat
               "overlay", "camera", "fx", "object", "state", "lights", "slowmo", "freeze", "at", "throw_prop", "flight",
               "arc", "hit", "hit_sfx", "hit_text", "seat", "on_dx", "emotion", "action", "expression", "prop", "label",
               "look", "facing", "style", "point", "dir", "lean", "speed", "intensity", "hands", "tint", "on", "visible",
-              "ride", "comment", "_comment"}
+              "ride", "interrupt", "comment", "_comment"}
 CHAR_KEYS = {"color", "slot", "x", "y", "scale", "facing", "accessories", "cap_color", "voice", "prop", "prop_hand",
              "expression", "look", "phase", "preset", "hair", "hair_color", "skin", "body", "head_k", "outfit",
              "outfit_color", "barefoot", "kind", "turban_color", "moustache_color", "visible", "flies", "comment"}
