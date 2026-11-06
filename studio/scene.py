@@ -236,6 +236,9 @@ def compile_scene(scene, use_tts=True, fps=None):
                 cam_events.append(cam)
 
     plan.overlays += [dict(o) for o in scene.get("overlays", [])]
+    bgspec = plan.background if isinstance(plan.background, dict) else {"type": plan.background}
+    if bgspec.get("time") == "rain" and not any(e.get("type") == "rain" for e in plan.effects):
+        plan.effects.append(effects.normalize({"type": "rain"}, 0.0))
     for raw in scene.get("effects", []):
         plan.effects.append(effects.normalize(raw, float(raw.get("from", 0.0)) if isinstance(raw, dict) else 0.0))
     if "caption" in scene:     # shorthand

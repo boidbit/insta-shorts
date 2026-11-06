@@ -474,7 +474,9 @@ class Background:
         if isinstance(spec, str):
             spec = {"type": spec}
         self.kind = spec.get("type", "plain")
-        self.horizon = spec.get("horizon", HORIZON.get(self.kind))   # None -> no depth scaling
+        from .locations import LOC_HORIZON
+        self.kind = {"living_room": "room", "classroom": "school"}.get(self.kind, self.kind)
+        self.horizon = spec.get("horizon", HORIZON.get(self.kind, LOC_HORIZON.get(self.kind)))   # None -> no depth scaling
         self.scroll = float(spec.get("scroll", 0.0))   # logical px per second (ground speed)
         self.parallax = float(spec.get("parallax", 1.0))   # 0 = all layers move with the ground
         self.static = None
@@ -496,13 +498,18 @@ class Background:
                 if bb:
                     self.layers.append((im.crop((0, bb[1], im.width, bb[3])), bb[1], mult))
         else:
-            fn = {"kitchen": kitchen, "room": room, "street": street, "school": school}.get(self.kind)
+            from .locations import LOCATIONS
+            fn = dict({"kitchen": kitchen, "room": room, "living_room": room, "street": street, "school": school,
+                       "classroom": school}, **LOCATIONS).get(self.kind)
             if fn:
                 self.static = fn(s)
             else:
                 self.static = plain(s, spec.get("colors"))
             if self.static.size != (out_w, out_h):
                 self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
+        if spec.get("time"):                       # night / evening / sunset / dawn / rain re-lighting
+            from .locations import grade
+            self.static = grade(self.static, spec["time"])
         if self.layers and self.static.size != (out_w, out_h):
             self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
 
