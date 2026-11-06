@@ -3,6 +3,7 @@ plus support for your own PNG/JPG backgrounds."""
 import math
 import random
 
+import numpy as np
 from PIL import Image, ImageDraw
 
 from .util import LW, LH, asset_path
@@ -291,46 +292,80 @@ def plain(s, colors=None):
     return g.done()
 
 
-# ------------------------------------------------------------------ night road (scrolling)
-def night_road(s, world_w=LW):
-    """Returns (static sky, scrolling ground wide image). Ground repeats every 1080."""
+# ------------------------------------------------------------------ night road (scrolling, parallax)
+# Layers back-to-front with their speed relative to `scroll` (the ground speed). Distant things move
+# slower, which is what sells the depth. `background.parallax` scales this: 1 = full (default),
+# 0 = every layer scrolls with the ground (the old flat look).
+NIGHT_LAYER_SPEEDS = (0.04, 0.2, 0.45, 1.0)     # stars+moon, far hills, near hills, ground
+
+
+def _wide_layer(s, tint):
+    """Transparent 2-tile-wide canvas. `tint` is the RGB of the (invisible) background pixels so the
+    supersample reduce does not leave dark fringes on the edges of bright things."""
+    return G(s, w=LW * 2, color=tuple(tint) + (0,), mode="RGBA")
+
+
+def night_road(s):
+    """Returns (static sky gradient, [wide RGBA layer, ...]) back-to-front, one per NIGHT_LAYER_SPEEDS.
+    Every wide layer repeats every 1080 logical px; each tile is also drawn one tile to the left and
+    to the right of the canvas so shapes that overhang a tile edge continue into the neighbour and
+    nothing pops when the scroll wraps."""
     sky = G(s)
     sky.vgrad(0, 1300, (10, 12, 38), (42, 36, 86))
-    rnd = random.Random(3)
-    for _ in range(90):
-        x, y, r = rnd.randint(0, LW), rnd.randint(0, 900), rnd.choice((2, 2, 3, 4))
-        sky.circle(x, y, r, (255, 250, 220))
-    sky.circle(820, 330, 110, (252, 244, 214))
-    sky.circle(782, 304, 110, (17, 18, 49))      # crescent bite
-    sky.circle(820, 330, 112, None, (252, 244, 214), 3)
     sky_img = sky.done()
+    tiles = (-LW, 0, LW, 2 * LW)
 
-    gr = G(s, w=LW * 2, color=(0, 0, 0, 0), mode="RGBA")
-    for ox in (0, LW):
+    # stars + crescent moon (slowest)
+    st = _wide_layer(s, (252, 244, 214))
+    rnd = random.Random(3)
+    stars = [(rnd.randint(0, LW), rnd.randint(0, 900), rnd.choice((2, 2, 3, 4))) for _ in range(90)]
+    for ox in tiles:
+        for (x, y, r) in stars:
+            st.circle(ox + x, y, r, (255, 250, 220))
+        st.circle(ox + 820, 330, 110, (252, 244, 214))
+        st.circle(ox + 782, 304, 110, (252, 244, 214, 0))      # crescent bite: punch a hole, not paint over
+        st.circle(ox + 820, 330, 112, None, (252, 244, 214), 3)
+
+    # far hills: lighter, bluer, with a few tiny distant lights
+    far = _wide_layer(s, (32, 34, 76))
+    for ox in tiles:
+        for (hx, hy, hr) in [(60, 1090, 300), (470, 1060, 340), (880, 1100, 300)]:
+            far.ellipse(ox + hx - hr, hy - hr * 0.5, ox + hx + hr, hy + hr * 0.9, (32, 34, 76))
+        for (wx, wy) in [(200, 1010), (330, 1030), (700, 990), (760, 1015), (1010, 1030)]:
+            far.rect(ox + wx, wy, ox + wx + 8, wy + 8, (214, 190, 120))
+
+    # near hills + lit windows
+    near = _wide_layer(s, (20, 22, 52))
+    for ox in tiles:
         for (hx, hy, hr) in [(120, 1120, 260), (520, 1160, 320), (900, 1110, 240)]:
-            gr.ellipse(ox + hx - hr, hy - hr * 0.55, ox + hx + hr, hy + hr * 0.9, (20, 22, 52))
+            near.ellipse(ox + hx - hr, hy - hr * 0.55, ox + hx + hr, hy + hr * 0.9, (20, 22, 52))
         for (wx, wy) in [(80, 1090), (150, 1120), (610, 1080), (680, 1120), (940, 1090)]:
-            gr.rect(ox + wx, wy, ox + wx + 22, wy + 28, (255, 214, 120))
+            near.rect(ox + wx, wy, ox + wx + 22, wy + 28, (255, 214, 120))
+
+    # ground: footpath, road, lane marks, lamp post (moves at the full scroll speed)
+    gr = _wide_layer(s, (30, 32, 50))
     gr.rect(0, 1240, LW * 2, 1380, (30, 32, 50))           # footpath
     gr.rect(0, 1380, LW * 2, LH, (26, 26, 36))               # road
     gr.line([(0, 1380), (LW * 2, 1380)], (60, 62, 90), 6)
+    # lamp glow: smooth radial falloff (a patch per lamp, not stacked flat discs)
+    R = 190
+    n = int(2 * R * gr.k)
+    yy, xx = np.mgrid[0:n, 0:n].astype("float32")
+    dist = np.sqrt((xx - n / 2) ** 2 + (yy - n / 2) ** 2) / (n / 2)
+    patch = np.zeros((n, n, 4), dtype="uint8")
+    patch[..., 0], patch[..., 1], patch[..., 2] = 255, 220, 140
+    patch[..., 3] = (np.clip(1 - dist, 0, 1) ** 2 * 48).astype("uint8")
+    patch = Image.fromarray(patch, "RGBA")
     for ox in (0, LW):
-        for xx in (20, 380, 740):
-            gr.rect(ox + xx, 1700, ox + xx + 190, 1722, (214, 196, 120))
+        for xx_ in (20, 380, 740):
+            gr.rect(ox + xx_, 1700, ox + xx_ + 190, 1722, (214, 196, 120))
         lx = ox + 300
         gr.line([(lx, 1260), (lx, 780)], (14, 14, 22), 16)
         gr.line([(lx, 790), (lx + 90, 790)], (14, 14, 22), 12)
         gr.ellipse(lx + 60, 790, lx + 130, 822, (255, 226, 150))
-        glow = Image.new("RGBA", gr.im.size, (0, 0, 0, 0))
-        gd = ImageDraw.Draw(glow)
-        for i in range(12):
-            a = 9
-            r = (170 - i * 13) * gr.k
-            gd.ellipse([(lx + 95) * gr.k - r, 806 * gr.k - r, (lx + 95) * gr.k + r, 806 * gr.k + r],
-                       fill=(255, 220, 140, a))
-        gr.im.alpha_composite(glow)
-        gr.d = ImageDraw.Draw(gr.im)
-    return sky_img, gr.done()
+        gr.im.alpha_composite(patch, (int((lx + 95 - R) * gr.k), int((806 - R) * gr.k)))
+
+    return sky_img, [l.done() for l in (st, far, near, gr)]
 
 
 # ------------------------------------------------------------------ public API
@@ -356,9 +391,10 @@ class Background:
             spec = {"type": spec}
         self.kind = spec.get("type", "plain")
         self.horizon = spec.get("horizon", HORIZON.get(self.kind))   # None -> no depth scaling
-        self.scroll = float(spec.get("scroll", 0.0))   # logical px per second
+        self.scroll = float(spec.get("scroll", 0.0))   # logical px per second (ground speed)
+        self.parallax = float(spec.get("parallax", 1.0))   # 0 = all layers move with the ground
         self.static = None
-        self.wide = None
+        self.layers = []       # scrolling layers, back-to-front: (RGBA strip, y offset, speed multiplier)
         if self.kind == "image":
             im = Image.open(asset_path(spec["path"])).convert("RGB")
             r = max(out_w / im.width, out_h / im.height)
@@ -366,9 +402,14 @@ class Background:
             l, t = (im.width - out_w) // 2, (im.height - out_h) // 2
             self.static = im.crop((l, t, l + out_w, t + out_h))
         elif self.kind == "night_road":
-            sky, wide = night_road(s)
+            sky, wides = night_road(s)
             self.static = sky
-            self.wide = wide
+            for im, mult in zip(wides, NIGHT_LAYER_SPEEDS):
+                if im.size != (out_w * 2, out_h):
+                    im = im.resize((out_w * 2, out_h), Image.LANCZOS)
+                bb = im.getchannel("A").getbbox()      # keep only the rows that have content (faster)
+                if bb:
+                    self.layers.append((im.crop((0, bb[1], im.width, bb[3])), bb[1], mult))
         else:
             fn = {"kitchen": kitchen, "room": room, "street": street, "school": school}.get(self.kind)
             if fn:
@@ -377,16 +418,22 @@ class Background:
                 self.static = plain(s, spec.get("colors"))
             if self.static.size != (out_w, out_h):
                 self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
-        if self.wide is not None:
-            self.wide = self.wide.resize((out_w * 2, out_h), Image.LANCZOS) if self.wide.size != (out_w * 2, out_h) else self.wide
-            if self.static.size != (out_w, out_h):
-                self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
+        if self.layers and self.static.size != (out_w, out_h):
+            self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
 
     def frame(self, t):
-        if self.wide is None:
+        if not self.layers:
             return self.static.copy()
-        off = int((t * self.scroll * self.out_w / LW) % self.out_w)
         base = self.static.copy()
-        part = self.wide.crop((off, 0, off + self.out_w, self.out_h))
-        base.paste(part, (0, 0), part)
+        for strip, y0, mult in self.layers:
+            speed = 1.0 - self.parallax * (1.0 - mult)
+            off = (t * self.scroll * speed * self.out_w / LW) % self.out_w
+            o = int(off)
+            part = strip.crop((o, 0, o + self.out_w, strip.height))
+            if speed < 0.99:
+                # distant layers crawl a fraction of a pixel per frame: blend with the next column
+                # so they glide instead of stepping (the ground stays crisp)
+                nxt = strip.crop((o + 1, 0, o + 1 + self.out_w, strip.height))
+                part = Image.blend(part, nxt, off - o)
+            base.paste(part, (0, y0), part)
         return base

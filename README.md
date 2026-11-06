@@ -44,6 +44,8 @@ Default me ye teen cheezein on hain; band karne ya adjust karne ke liye scene ke
 
 `room` background me window ki dhoop ka halka patch floor par bana hua hai.
 
+`night_road` ab parallax ke saath scroll hota hai: taare/chaand bahut dheere, door ki pahadiyan dheere, paas ki pahadiyan thoda tez, aur sadak + lamp post poori `scroll` speed se. Purana "sab ek speed" look chahiye to `"background": {"type": "night_road", "scroll": 220, "parallax": 0}` (default `1`; `0.5` = aadha asar).
+
 ## Voice (Hindi) ka ek zaroori rule
 
 Bubble me dikhne wala text Roman Hinglish me hota hai (`say`), lekin TTS ko **Devanagari** chahiye (`speak`), warna uchcharan galat aata hai:
