@@ -106,7 +106,7 @@ Agar text me `CAST:` / `SCENE:` / `A -> ...` / `NAME: ...` wali koi line nahi ha
 
 ## Aur shabd: jagah, set, jaanwar, screen cards, sound, slow-motion
 
-Ye sab script me seedhe chalte hain (page ka checker bhi inhe jaanta hai). AI writer (`SCRIPT_PROMPT.md`) ko abhi ye shabd nahi bataye gaye: naye prompt me daaloge tabhi AI inhe use karega.
+Ye sab script me seedhe chalte hain (page ka checker bhi inhe jaanta hai), aur AI writer (`SCRIPT_PROMPT.md`) ko bhi ye sab shabd pata hain. Ek test (`tests/test_prompt_words.py`) dhyan rakhta hai ki prompt me koi aisa shabd na ho jo studio na samjhe.
 
 - **Zyada acting:** ~140 actions (`run, sit, lie_down, eat, drink, phone_call, slap, hug, high_five, pushup, garba, hookstep, moonwalk...`), 38 expressions (`scared, nervous, cringe, confused, proud, dizzy, evil, blush...`) aur ~37 cheezein haath me (`chai, samosa, laptop, umbrella, chappal, belan, book...`). Poori list page ke word list me hai (`python -m studio.script --sync-page` usse code se banata hai).
 - **Bolte waqt haath feeling ke hisaab se:** gussa = ungli dikhana, khushi = khule haath, dukh = chhote neeche haath, dar = seene pe haath, smug = kamar pe haath, soch = thodi pe haath. Sunne wale bolne wale ko dekhte hain, sir hilate hain, gusse se peeche hat-te hain, sawaal pe sir tedha karte hain. Ek pose doosre me smooth badalta hai, aankhen random time pe jhapakti hain.
@@ -236,7 +236,7 @@ Page ke "Idea do (AI)" tab me **Tone** dropdown hai (ya idea me ek line `TONE: d
 | `twist` | Meetha shuru, aakhir me tez twist. |
 
 - Har tone ke saath AI ko ek chhota example (exact format me) milta hai, jisse style samajh aati hai.
-- Length: default 4-7 lines / 12-25 sec; jis kahani ko setup chahiye (dark twist, satire, gaadi) wo 10 lines / 40 sec tak ja sakti hai.
+- Length: koi fixed limit nahi. Aam taur pe 5-10 lines; line itni lambi jitni baat saaf samjhane ke liye chahiye (~100 characters tak). AI flow lambi script ko ab rokta nahi.
 - **Teen cheezein kabhi nahi:** kisi group (dharm, jaati, kshetra, gender, shareer, disability) ya asli, naam wale insaan ko nishana banane wala mazaak; sexual content; khud ko ya doosron ko nuksaan pahunchane ya jurm sikhane wali baat. Baaki sab (maut, qarz, bhrasht daftar, bhoot, kismat) allowed hai. Ye seema isliye bhi hai ki Instagram aise content ki reach daba deta hai, aur Gemini/Claude jaise AI use khud refuse karte hain.
 
 ## Templates (`templates/`)

@@ -71,29 +71,22 @@ class PromptTests(unittest.TestCase):
                 self.assertIn(must, text, (name, must))
         s = read("SCRIPT_PROMPT.md")
         self.assertIn("Dark comedy craft", s)
-        self.assertIn("up to 10 spoken lines and 40 seconds", s)
+        self.assertIn("no fixed time limit", s)                       # the length is open (user's choice)
         self.assertIn("three different premises", s)
         self.assertIn("Story facts first", s)                        # the logic rule (who owes whom stays the same)
         self.assertIn("contradict an earlier one", s)                # ...and the logic check before answering
         self.assertIn("Story facts first", read("DIRECTOR_PROMPT.md"))
 
-    def test_long_dark_stories_are_not_rejected(self):
-        from studio import audio
-        self.assertGreaterEqual(director.MAX_SECONDS, 40)
-        line = "Ye ek lambi si line hai jo kaafi der tak chalti hai"
-
-        def script(seconds):
-            n, total = 0, 0.0
-            while total < seconds:
-                total += audio.estimate_duration(line) + 0.3
-                n += 1
-            body = "\n".join("A (smile): %s | ये एक लंबी सी लाइन है जो काफ़ी देर तक चलती है" % line for _ in range(n))
-            return "HOOK: h\nCAST: A = dost\nSCENE: room\n%s\nCTA: c\n" % body
-
-        _, warns = parse_script(script(38))                          # a 38 s story is fine
+    def test_long_stories_are_not_rejected(self):
+        """No length limit: a long, detailed script passes the AI writer's checks."""
+        line = "Ye ek lambi si line hai jo kaafi der tak chalti hai aur poori baat saaf saaf samjhati hai"
+        body = "\n".join("A (smile): %s | ये एक लंबी सी लाइन है जो काफ़ी देर तक चलती है" % line for _ in range(14))
+        text = "HOOK: h\nCAST: A = dost\nSCENE: room\n%s\nCTA: c\nCAPTION: c\n" % body
+        _, warns = parse_script(text)
         self.assertFalse([w for w in warns if "long" in w], warns)
-        _, warns = parse_script(script(52))                          # a really long one still gets a nudge
-        self.assertTrue([w for w in warns if "long" in w], warns)
+        import tempfile
+        probs = director.script_problems(text, os.path.join(tempfile.mkdtemp(), "x.json"))
+        self.assertFalse([p for p in probs if "long" in p], probs)
 
 
 class WriterTests(unittest.TestCase):

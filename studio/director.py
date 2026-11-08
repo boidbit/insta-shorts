@@ -25,13 +25,12 @@ import urllib.request
 from . import actions, hooks
 from .characters import ACCESSORIES, EXPRESSIONS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE
 from .scene import compile_scene, split_scenes, static_overlays
+from .script import BACKGROUNDS          # every place the script format knows (jungle, bank, gym...)
 from .util import ROOT, load_scene
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
 # tried in order: a retired model (404) or one that stays busy (503/429) hands over to the next
 GEMINI_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.0-flash"]
-BACKGROUNDS = {"kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road", "plain", "image"}
-MAX_SECONDS = 40.0
 _sleep = time.sleep     # tests replace it
 
 
@@ -193,9 +192,9 @@ def problems(scene_dict, tmp_path):
         where = "scene %d: " % (i + 1) if len(subs) > 1 else ""
         bg = sub.get("background", {})
         bgt = bg.get("type") if isinstance(bg, dict) else bg
-        if bgt and bgt not in BACKGROUNDS:
+        if bgt and bgt not in BACKGROUNDS and bgt != "image":
             out.append(where + "unknown background %r" % bgt)
-        if len(plan.chars) > 3:
+        if len([c for c in plan.chars.values() if not c.spec.get("hidden")]) > 3:     # a narrator has no body
             out.append(where + "more than 3 characters")
         for name, c in plan.chars.items():
             out += [where + p for p in _char_problems(name, c.spec)]
@@ -208,9 +207,7 @@ def problems(scene_dict, tmp_path):
             if "say" in raw and not raw.get("speak"):
                 out.append(where + "line %r has no 'speak' (Devanagari) text" % str(raw["say"])[:30])
 
-    total = sum(p.duration for p in plans)
-    if total > MAX_SECONDS:
-        out.append("video too long (%.0fs); keep it between 10 and 40 seconds (most between 15 and 30)" % total)
+    # (no length limit: a story takes as long as it needs to be clear)
 
     # hook: text + a hook overlay at t=0 + something happening in the first second
     if not scene.get("hook"):
@@ -221,7 +218,8 @@ def problems(scene_dict, tmp_path):
     p0 = plans[0]
     first_line = min([sp["start"] for sp in p0.speech] or [99])
     busy = any(ev["t"] <= 0.6 and ev.get("action") not in (None, "idle", "none", "stand")
-               for c in p0.chars.values() for ev in c.events)
+               for c in p0.chars.values() for ev in c.events) \
+        or any(m[0] <= 0.6 and m[1] - m[0] > 0.01 for c in p0.chars.values() for m in c.moves)   # walks in
     if first_line > 1.2 and not busy:
         out.append("nothing happens in the first second: start the first line by t=0.6 or open on a big action + sfx")
 
