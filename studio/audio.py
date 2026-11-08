@@ -32,13 +32,14 @@ def have_tts():
         return False
 
 
-def synth_tts(text, voice=None, rate="+0%", pitch="+0Hz"):
-    """Return path of the voice clip (leading/trailing silence trimmed) or None if synthesis is unavailable."""
+def synth_tts(text, voice=None, rate="+0%", pitch="+0Hz", trim=False):
+    """Return path of the voice clip or None if synthesis is unavailable.
+    trim=True cuts edge-tts's leading/trailing silence (used by the 2.5d style)."""
     voice = voice or DEFAULT_VOICE
     key = hashlib.sha1(("%s|%s|%s|%s" % (text, voice, rate, pitch)).encode("utf-8")).hexdigest()[:16]
     raw = os.path.join(_cache("tts"), key + ".mp3")
     out = os.path.join(_cache("tts"), key + "_trim.wav")
-    if os.path.isfile(out) and os.path.getsize(out) > 1000:
+    if trim and os.path.isfile(out) and os.path.getsize(out) > 1000:
         return out
     if not (os.path.isfile(raw) and os.path.getsize(raw) > 1000):
         if not have_tts():
@@ -54,11 +55,13 @@ def synth_tts(text, voice=None, rate="+0%", pitch="+0Hz"):
             return None
         if not (os.path.isfile(raw) and os.path.getsize(raw) > 1000):
             return None
+    if not trim:
+        return raw
     # edge-tts pads every clip with ~1 s of silence: cut it so dialogue feels snappy
-    trim = ("silenceremove=start_periods=1:start_threshold=-45dB,areverse,"
-            "silenceremove=start_periods=1:start_threshold=-45dB,areverse,apad=pad_dur=0.06")
+    trim_af = ("silenceremove=start_periods=1:start_threshold=-45dB,areverse,"
+               "silenceremove=start_periods=1:start_threshold=-45dB,areverse,apad=pad_dur=0.06")
     try:
-        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", raw, "-af", trim, "-ac", "1", "-ar", "24000", out],
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", raw, "-af", trim_af, "-ac", "1", "-ar", "24000", out],
                        check=True, timeout=60)
     except Exception:
         return raw

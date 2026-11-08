@@ -1,0 +1,57 @@
+name: Golden frames (2d stays 2d)
+
+# Guards the two styles:
+#  1. compare-base (blocking): renders the 2d demo frames with main's code AND with this code on the
+#     same runner. They must be pixel-identical, so 2.5d work can never change the classic 2d look.
+#  2. check (informational): compares both styles with the PNGs committed in tests/golden/.
+on:
+  pull_request:
+  push:
+    paths:
+      - "studio/**"
+      - "templates/**"
+      - "scenes/**"
+      - "tests/**"
+      - ".github/workflows/golden.yml"
+  workflow_dispatch:
+
+jobs:
+  golden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout the base code (PR base, otherwise main)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || 'main' }}
+          path: base
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: System packages (fonts, emoji)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-color-emoji fonts-liberation libraqm0
+
+      - name: Python packages
+        run: pip install -r requirements.txt
+
+      - name: 2d must be pixel-identical to the base code
+        run: python -m tests.golden compare-base --base base
+
+      - name: Compare with committed golden frames (informational)
+        continue-on-error: true
+        run: python -m tests.golden check
+
+      - name: Upload diff images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-diffs
+          path: tests/out/*_DIFF.png
+          if-no-files-found: ignore

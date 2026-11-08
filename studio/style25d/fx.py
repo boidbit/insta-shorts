@@ -6,8 +6,8 @@ camera can move/zoom them sharply and they get depth-sorted with the characters.
 import math
 import random
 
-from .characters import INK, Sketch, bezier, closed_ellipse, ellipse_pts
-from .util import clamp, ease_out
+from ..characters import INK, Sketch, bezier, closed_ellipse, ellipse_pts
+from ..util import clamp, ease_out
 
 JUTE = (218, 188, 124)
 

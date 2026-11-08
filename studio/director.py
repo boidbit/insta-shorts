@@ -2,6 +2,10 @@
 
     export ANTHROPIC_API_KEY=...
     python -m studio.director "3 dost, ek ko chai pe bill dena hai" -o scenes/generated/chai.json
+    python -m studio.director --style 2.5d "gali me chai wala udhaar" -o scenes/generated/gali.json
+
+Each style has its own prompt (DIRECTOR_PROMPT.md for 2d, DIRECTOR_PROMPT_25D.md for 2.5d), so the model
+only ever sees the options of the style you asked for.
 """
 import argparse
 import json
@@ -9,13 +13,13 @@ import os
 import re
 import sys
 
-from . import actions
+from . import actions, styles
 from .characters import EXPRESSIONS, PALETTE
 from .scene import compile_scene
 from .util import ROOT, load_scene
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
-BACKGROUNDS = {"kitchen", "room", "street", "school", "night_road", "plain", "image"}
+PROMPTS = {"2d": "DIRECTOR_PROMPT.md", "2.5d": "DIRECTOR_PROMPT_25D.md"}
 
 
 def extract_json(text):
@@ -27,20 +31,26 @@ def extract_json(text):
     return json.loads(text[a:b + 1])
 
 
-def problems(scene_dict, tmp_path):
+def problems(scene_dict, tmp_path, style="2d"):
     """Return a list of human-readable problems (empty list = good)."""
     out = []
     try:
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(scene_dict, f, ensure_ascii=False)
         scene = load_scene(tmp_path)
+    except Exception as e:  # noqa: BLE001
+        return ["scene does not load: %r" % (e,)]
+    mix = styles.problems(scene)
+    if mix:
+        return mix
+    got = styles.scene_style(scene)
+    if got != styles.normalize(style):
+        return ["this must be a %s scene but it is %s%s" % (style, got,
+                ' (add "style": "2.5d")' if styles.normalize(style) == "2.5d" else ' (remove "style")')]
+    try:
         plan = compile_scene(scene, use_tts=False)
     except Exception as e:  # noqa: BLE001
-        return ["scene does not load/compile: %r" % (e,)]
-    bg = scene.get("background", {})
-    bgt = bg.get("type") if isinstance(bg, dict) else bg
-    if bgt and bgt not in BACKGROUNDS:
-        out.append("unknown background %r" % bgt)
+        return ["scene does not compile: %r" % (e,)]
     for name, c in plan.chars.items():
         col = c.spec.get("color", "blue")
         if isinstance(col, str) and col not in PALETTE:
@@ -63,8 +73,9 @@ def call_model(client, model, system, messages):
     return "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
 
 
-def direct(instruction, model=DEFAULT_MODEL, client=None, tmp_path=None, max_tries=3):
-    with open(os.path.join(ROOT, "DIRECTOR_PROMPT.md"), encoding="utf-8") as f:
+def direct(instruction, model=DEFAULT_MODEL, client=None, tmp_path=None, max_tries=3, style="2d"):
+    style = styles.normalize(style)
+    with open(os.path.join(ROOT, PROMPTS[style]), encoding="utf-8") as f:
         system = f.read()
     if client is None:
         import anthropic
@@ -77,7 +88,7 @@ def direct(instruction, model=DEFAULT_MODEL, client=None, tmp_path=None, max_tri
         text = call_model(client, model, system, messages)
         try:
             scene = extract_json(text)
-            probs = problems(scene, tmp_path)
+            probs = problems(scene, tmp_path, style)
         except Exception as e:  # noqa: BLE001
             scene, probs = None, ["output was not valid JSON: %r" % (e,)]
         if not probs:
@@ -100,8 +111,9 @@ def main(argv=None):
     ap.add_argument("instruction")
     ap.add_argument("-o", "--out", default=None)
     ap.add_argument("--model", default=os.environ.get("DIRECTOR_MODEL", DEFAULT_MODEL))
+    ap.add_argument("--style", default="2d", help="2d (classic stickman, default) or 2.5d")
     args = ap.parse_args(argv)
-    scene = direct(args.instruction, args.model)
+    scene = direct(args.instruction, args.model, style=args.style)
     out = args.out or os.path.join(ROOT, "scenes", "generated", slug(args.instruction) + ".json")
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:

@@ -7,7 +7,7 @@ import random
 from PIL import Image, ImageDraw
 
 from .scenery import Cv, Layer, Layered, fill_tex, mix, motes, mul, steam, toward, vgrad
-from .util import LH, LW
+from ..util import LH, LW
 
 VP = (560, 800)
 INK = (46, 36, 34, 255)

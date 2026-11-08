@@ -12,7 +12,7 @@ from PIL import Image, ImageDraw
 
 from .scenery import (Cv, Layer, Layered, Sprite, along, catenary, fill_tex, mix, mul, quad_image, sign_image,
                       steam, sub_quad, vgrad, birds)
-from .util import LH, LW
+from ..util import LH, LW
 
 VP = (560, 930)
 SUN = (582, 760)

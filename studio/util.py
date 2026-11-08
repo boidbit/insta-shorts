@@ -67,12 +67,14 @@ def _read_json(path):
 
 
 def resolve_template(name):
+    """A template is found by name in templates/, templates/2d/ or templates/25d/ (or by path)."""
     if os.path.isfile(name):
         return name
-    for cand in (os.path.join(ROOT, "templates", name),
-                 os.path.join(ROOT, "templates", name + ".json")):
-        if os.path.isfile(cand):
-            return cand
+    for folder in ("", "2d", "25d"):
+        for cand in (os.path.join(ROOT, "templates", folder, name),
+                     os.path.join(ROOT, "templates", folder, name + ".json")):
+            if os.path.isfile(cand):
+                return cand
     raise FileNotFoundError("template not found: %s" % name)
 
 

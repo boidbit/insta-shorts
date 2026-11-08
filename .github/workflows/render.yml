@@ -4,9 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       scene:
-        description: "Scene file to render, e.g. scenes/tag_karo_demo.json (ignored if 'instruction' is filled)"
+        description: "Scene file to render, e.g. scenes/2d/tag_karo_demo.json or scenes/25d/gali_25d_demo.json ('all' = every scene of the chosen style; ignored if 'instruction' is filled)"
         required: false
-        default: "scenes/tag_karo_demo.json"
+        default: "scenes/2d/tag_karo_demo.json"
+      style:
+        description: "Style: used for scene=all and for the AI director (2d = classic stickman, 2.5d = layered parallax look)"
+        type: choice
+        options: ["2d", "2.5d", "all"]
+        required: false
+        default: "2d"
       instruction:
         description: "AI director: plain-language idea (needs ANTHROPIC_API_KEY secret). Leave empty to render the scene file."
         required: false
@@ -22,7 +28,7 @@ on:
         default: true
   push:
     paths:
-      - "scenes/*.json"
+      - "scenes/**/*.json"
 
 jobs:
   render:
@@ -58,9 +64,11 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           INSTRUCTION: ${{ inputs.instruction }}
+          STYLE: ${{ inputs.style }}
         run: |
           mkdir -p scenes/generated
-          python -m studio.director "$INSTRUCTION" -o scenes/generated/directed.json
+          [ "$STYLE" = "all" ] && STYLE="2d"
+          python -m studio.director --style "$STYLE" "$INSTRUCTION" -o scenes/generated/directed.json
           cat scenes/generated/directed.json
 
       - name: Decide which scenes to render
@@ -69,17 +77,23 @@ jobs:
           EVENT: ${{ github.event_name }}
           INSTRUCTION: ${{ inputs.instruction }}
           SCENE: ${{ inputs.scene }}
+          STYLE: ${{ inputs.style }}
           BEFORE: ${{ github.event.before }}
         run: |
           if [ "$EVENT" = "workflow_dispatch" ]; then
             if [ -n "$INSTRUCTION" ]; then LIST="scenes/generated/directed.json"
-            elif [ "$SCENE" = "all" ]; then LIST="$(ls scenes/*.json)"
+            elif [ "$SCENE" = "all" ]; then
+              LIST=""
+              for f in $(find scenes/2d scenes/25d -name '*.json' | sort); do
+                st=$(python -m studio.render "$f" --print-style)
+                if [ "$STYLE" = "all" ] || [ "$STYLE" = "$st" ]; then LIST="$LIST $f"; fi
+              done
             else LIST="$SCENE"; fi
           else
-            LIST="$(git diff --name-only --diff-filter=AM "$BEFORE" HEAD -- 'scenes/*.json' 2>/dev/null || true)"
-            [ -z "$LIST" ] && LIST="$(git diff --name-only --diff-filter=AM HEAD~1 HEAD -- 'scenes/*.json' 2>/dev/null || true)"
+            LIST="$(git diff --name-only --diff-filter=AM "$BEFORE" HEAD -- ':(glob)scenes/**/*.json' 2>/dev/null || true)"
+            [ -z "$LIST" ] && LIST="$(git diff --name-only --diff-filter=AM HEAD~1 HEAD -- ':(glob)scenes/**/*.json' 2>/dev/null || true)"
             # first push / new branch: nothing to diff against -> render every scene
-            [ -z "$LIST" ] && LIST="$(ls scenes/*.json)"
+            [ -z "$LIST" ] && LIST="$(find scenes/2d scenes/25d -name '*.json' | sort)"
           fi
           echo "Scenes: $LIST"
           { echo "list<<EOF"; echo "$LIST"; echo "EOF"; } >> "$GITHUB_OUTPUT"
@@ -90,14 +104,16 @@ jobs:
           WIDTH: ${{ inputs.width || '1080' }}
           VOICE: ${{ inputs.voice }}
         run: |
-          mkdir -p out
           FLAGS=""
           [ "$VOICE" = "false" ] && FLAGS="--no-tts"
           for f in $LIST; do
             name=$(basename "$f" .json)
-            python -m studio.render "$f" -o "out/$name.mp4" --width "$WIDTH" $FLAGS
-            python -m studio.render "$f" --frame 1.5 -o "out/$name.png" --width 540 $FLAGS
-            echo "- \`$name.mp4\`" >> "$GITHUB_STEP_SUMMARY"
+            st=$(python -m studio.render "$f" --print-style)
+            dir="out/$(echo "$st" | tr -d '.')"          # out/2d or out/25d
+            mkdir -p "$dir"
+            python -m studio.render "$f" -o "$dir/$name.mp4" --width "$WIDTH" $FLAGS
+            python -m studio.render "$f" --frame 1.5 -o "$dir/$name.png" --width 540 $FLAGS
+            echo "- \`$st\` \`$name.mp4\`" >> "$GITHUB_STEP_SUMMARY"
           done
 
       - name: Upload videos
@@ -105,7 +121,7 @@ jobs:
         with:
           name: stickman-videos
           path: |
-            out/*.mp4
-            out/*.png
+            out/**/*.mp4
+            out/**/*.png
             scenes/generated/*.json
           if-no-files-found: error

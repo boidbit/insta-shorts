@@ -13,7 +13,7 @@ import random
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
-from .util import LH, LW, clamp
+from ..util import LH, LW, asset_path, clamp
 
 WARM = (255, 206, 120)
 
@@ -221,7 +221,7 @@ def quad_image(cv, img, quad):
 
 def sign_image(text, bg, fg, w=900, h=180, border=(40, 30, 30)):
     """Flat signboard image (to be warped with quad_image)."""
-    from .text import font
+    from ..text import font
     im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     d.rounded_rectangle([0, 0, w - 1, h - 1], radius=int(h * 0.12), fill=bg + (255,), outline=border + (255,),
@@ -786,3 +786,55 @@ PRESETS = {
     "kitchen_25d": _lazy("scenery_kitchen", "kitchen_25d"),
     "gali_25d": _lazy("scenery_gali", "gali_25d"),
 }
+
+
+# ------------------------------------------------------------------ the 2.5d background object
+class Backdrop:
+    """What the 2.5d renderer draws behind/in front of the characters: a layered preset, or your own
+    image / a plain gradient as a single layer on the character plane. (No 2d background code is used.)"""
+
+    def __init__(self, spec, out_w, out_h, zmax=1.0):
+        self.out_w, self.out_h = out_w, out_h
+        s = out_w / float(LW)
+        spec = spec or {"type": "plain"}
+        if isinstance(spec, str):
+            spec = {"type": spec}
+        kind = spec.get("type", "plain")
+        k = s * max(1.0, zmax)
+        if kind in PRESETS:
+            self.layered = PRESETS[kind](s, zmax)
+        elif kind == "image":
+            im = Image.open(asset_path(spec["path"])).convert("RGBA")
+            W, H = int(round(LW * k)), int(round(LH * k))
+            r = max(W / float(im.width), H / float(im.height))
+            im = im.resize((int(im.width * r + 1), int(im.height * r + 1)), Image.LANCZOS)
+            l, t = (im.width - W) // 2, (im.height - H) // 2
+            self.layered = Layered([Layer(im.crop((l, t, l + W, t + H)), k, 1.0, None, "image")], [])
+        elif kind == "plain":
+            cols = spec.get("colors") or [[255, 214, 150], [250, 160, 120]]
+            im = vgrad(0.5 * s, [(0, tuple(cols[0])), (LH, tuple(cols[-1]))])
+            self.layered = Layered([Layer(im, 0.5 * s, 1.0, None, "plain")], [])
+        else:
+            raise ValueError("unknown 2.5d background %r" % kind)
+
+    @property
+    def light(self):
+        return self.layered.light
+
+    @property
+    def horizon(self):
+        return self.layered.horizon
+
+    @property
+    def sprites(self):
+        return self.layered.sprites
+
+    def frame_cam(self, t, view):
+        return self.layered.compose(t, view, self.out_w, self.out_h).convert("RGB")
+
+    def front(self, img, t, view):
+        if self.layered.front:
+            part = self.layered.compose(t, view, self.out_w, self.out_h, layers=self.layered.front)
+            img.paste(part, (0, 0), part)
+        return img
+

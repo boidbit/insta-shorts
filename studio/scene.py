@@ -2,7 +2,7 @@
 import math
 import sys
 
-from . import audio
+from . import audio, styles
 from .util import LW, LH, asset_path, clamp, ease_in_out, lerp
 
 SLOTS = {
@@ -83,7 +83,10 @@ def _norm_who(who, names):
 
 def compile_scene(scene, use_tts=True, fps=None):
     plan = Plan()
+    plan.style = styles.check(scene)          # refuses scenes that mix 2d and 2.5d features
     meta = scene.get("meta", {})
+    # edge-tts pads clips with ~1 s of silence. 2.5d trims it (snappier); 2d keeps the original timing.
+    trim_voice = bool(meta.get("trim_voice", plan.style == "2.5d"))
     plan.fps = int(fps or meta.get("fps", 30))
     plan.fade_in = float(meta.get("fade_in", 0.0))
     plan.fade_out = float(meta.get("fade_out", 0.0))
@@ -161,7 +164,8 @@ def compile_scene(scene, use_tts=True, fps=None):
             v.update(ev.get("voice", {}) if isinstance(ev.get("voice"), dict) else {})
             path, dur = None, None
             if use_tts and ev.get("tts", True):
-                path = audio.synth_tts(speak, v.get("name"), v.get("rate", "+0%"), v.get("pitch", "+0Hz"))
+                path = audio.synth_tts(speak, v.get("name"), v.get("rate", "+0%"), v.get("pitch", "+0Hz"),
+                                       trim=trim_voice)
                 if path:
                     dur = audio.audio_duration(path)
                 elif not warned[0]:
@@ -241,7 +245,8 @@ def compile_scene(scene, use_tts=True, fps=None):
         f = cam.get("focus")
         if isinstance(f, str) and f in chars:
             fx, fy = chars[f].pos_at(cam["t"])
-            tc = (fx + float(cam.get("dx", 0)), fy - float(cam.get("head", 560)) * chars[f].scale)
+            head = float(cam.get("head", 560)) * (chars[f].scale if plan.style == "2.5d" else 1.0)
+            tc = (fx + float(cam.get("dx", 0)), fy - head)
         elif isinstance(f, str) and f in objs:
             tc = (float(objs[f]["x"]) + float(cam.get("dx", 0)), float(objs[f]["y"]) - float(cam.get("head", 120)))
         elif isinstance(f, (list, tuple)):

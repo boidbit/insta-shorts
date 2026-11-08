@@ -76,26 +76,11 @@ SWEAT = {"nervous", "scared"}
 # Eyes that should not be replaced by a "blink"
 NO_BLINK = {"happy", "relaxed", "closed", "x", "heart", "wink"}
 
-# "toon" body: thick outlined limbs, kurta-pajama, chappals, cel shading
-TOON_OUT = 7.0
-TOON_LEG_W = 60.0
-TOON_ARM_W = 44.0
-TOON_WRIST_W = 26.0
 HAIR = (36, 30, 28)
-SOLE = (96, 60, 40)
 
 
 def shade(c, f):
     return tuple(max(0, min(255, int(v * f))) for v in c[:3])
-
-
-def _thick(S, pts, w, color, light, ow=TOON_OUT, hi=True):
-    """A fat cartoon limb: ink outline, shadow tone, then a highlight pushed toward the light."""
-    S.line(pts, w + 2 * ow, INK)
-    S.line(pts, w, shade(color, 0.8) if hi else color)
-    if hi:
-        ox, oy = light * w * 0.15, -w * 0.06
-        S.line([(x + ox, y + oy) for x, y in pts], w * 0.6, color)
 
 
 def d2r(a):
@@ -261,8 +246,13 @@ def _eye_center(sgn, face_dx, ey=-4.0, ex=34.0):
 
 
 def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
-                    blink=False, prop=None, talking=False, tear_phase=0.0):
-    """Return (ops, anchors) in global logical coordinates."""
+                    blink=False, prop=None, talking=False, tear_phase=0.0, body=None):
+    """Return (ops, anchors) in global logical coordinates.
+
+    `body` is the style's body plug-in (studio.style2d.body.STICK or studio.style25d.body.TOON). It draws
+    everything below the head and decides the head base / eye style. Face, hair, props are shared."""
+    if body is None:
+        raise ValueError("build_character needs a body (style2d.body.STICK or style25d.body.TOON)")
     p = dict(DEFAULT_POSE)
     p.update({kk: vv for kk, vv in pose.items() if vv is not None or kk == "finger"})
     sk = skeleton(p)
@@ -271,35 +261,10 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     color = tuple(c) if isinstance(c, (list, tuple)) else PALETTE.get(c, PALETTE["blue"])
     cap_col = PALETTE.get(spec.get("cap_color", "red"), PALETTE["red"])
     facing = {"left": -1, "right": 1}.get(spec.get("facing", "front"), 0)
-    toon = spec.get("body") == "toon"
     light = float(spec.get("_light", -1))           # -1: key light from screen-left, +1: from the right
     skin = _rgb(spec.get("skin"), SKIN)
 
-    if toon:
-        _toon_body(S, sk, p, spec, color, skin, light)
-    else:
-        # ---- legs (+ shoes) ----
-        for side, hip, knee, foot in (("L", sk["hipL"], sk["kneeL"], sk["footL"]),
-                                      ("R", sk["hipR"], sk["kneeR"], sk["footR"])):
-            S.line([hip, knee, foot], LEG_W)
-            sgn = -1 if side == "L" else 1
-            S.poly(closed_ellipse(foot[0] + sgn * 16, foot[1] - 6, 32, 15, 24), INK, None)
-
-        # ---- torso (bean, slightly wider at the bottom) ----
-        torso = []
-        for i in range(48):
-            a = 2 * math.pi * i / 48
-            rx = (TORSO_W / 2) * (1 + 0.14 * math.sin(a))
-            torso.append((rx * math.cos(a), (-TORSO_H / 2 + 4) + (TORSO_H / 2 + 14) * math.sin(a)))
-        S.poly(torso, color, INK, OUTLINE)
-
-        # ---- arms ----
-        for side, sh, elb, hand, a1, a2 in (("L", sk["shL"], sk["elbL"], sk["handL"], p["la1"], p["la2"]),
-                                            ("R", sk["shR"], sk["elbR"], sk["handR"], p["ra1"], p["ra2"])):
-            S.line([sh, elb, hand], ARM_W)
-            S.dot(hand, 15, INK)
-            if p.get("finger") == side:
-                S.line([hand, add(hand, vec(a2, 44))], 9)
+    body.draw_body(S, sk, p, spec, color, skin, light)
     tip = None
     if prop:
         side = spec.get("prop_hand", "R")
@@ -310,7 +275,7 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
 
     # ---- head ----
     ht = d2r(p["head_tilt"])
-    hs = float(spec.get("head_scale", 1.28 if toon else 1.0))
+    hs = float(spec.get("head_scale", body.head_scale))
     hc = add(sk["neck"], rot((0.0, -HEAD_R * 0.9 * hs), ht)) if hs != 1.0 else sk["hc"]
 
     def H(q):
@@ -323,17 +288,7 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         S.poly([H(q) for q in pts], fill, outline, w)
 
     fdx = facing * 14 + p["look_x"] * 5
-    if toon:
-        # ears, then a cel-shaded head: shadow tone + lit disc pushed toward the light + ink rim
-        for sgn in (-1, 1):
-            ex = sgn * (HEAD_R - 4) + facing * -6
-            hpoly(closed_ellipse(ex, 10, 22, 27, 24), skin, INK, TOON_OUT)
-            hline(ellipse_pts(ex - sgn * 2, 12, 10, 14, 10, 100 - sgn * 60, 260 - sgn * 60), 4, shade(skin, 0.7))
-        hpoly(closed_ellipse(0, 0, HEAD_R, HEAD_R, 64), shade(skin, 0.84), None)
-        hpoly(closed_ellipse(light * HEAD_R * 0.1, -HEAD_R * 0.06, HEAD_R * 0.9, HEAD_R * 0.92, 64), skin, None)
-        hpoly(closed_ellipse(0, 0, HEAD_R, HEAD_R, 64), None, INK, OUTLINE + 1)
-    else:
-        S.poly([H(q) for q in closed_ellipse(0, 0, HEAD_R, HEAD_R, 64)], skin, INK, OUTLINE + 1)
+    body.draw_head(hpoly, hline, skin, facing, light)
 
     if expr == "burnt":       # soot patches (eyes stay white so they still read)
         soot = (58, 54, 54)
@@ -351,7 +306,7 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
 
     for sgn in (-1, 1):
         cx, cy = _eye_center(sgn, fdx)
-        if eyes == "dot" and toon:      # big cartoon eye: white + pupil + catch-light
+        if eyes == "dot" and body.big_eyes:     # big cartoon eye: white + pupil + catch-light
             hpoly(closed_ellipse(cx, cy - 2, 18, 21, 24), WHITE, INK, 5)
             hpoly(closed_ellipse(cx + lx * 1.2, cy + ly * 1.2, 9, 10, 18), INK, None)
             hpoly(closed_ellipse(cx + lx * 1.2 + 3, cy + ly * 1.2 - 4, 3, 3, 8), WHITE, None)
@@ -470,7 +425,7 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     # accessories
     accs = list(spec.get("accessories", []))
     if expr == "burnt":
-        accs = [a_ for a_ in accs if a_ not in ("hair_short", "hair_curly", "tuft", "cap")] + ["hair_frizz"]
+        accs = [a_ for a_ in accs if a_ not in ("hair_short", "hair_curly", "hair_bun", "tuft", "cap")] + ["hair_frizz"]
     for acc in accs:
         if acc == "hair_short":
             top = ellipse_pts(0, 0, HEAD_R + 5, HEAD_R + 5, 30, 192, 348)
@@ -548,61 +503,6 @@ def _rgb(c, default):
     if isinstance(c, (list, tuple)):
         return tuple(int(v) for v in c[:3])
     return PALETTE.get(c, default)
-
-
-def _toon_body(S, sk, p, spec, color, skin, light):
-    """Kurta-pajama cartoon body on the same skeleton as the stickman (so every action works)."""
-    pj = _rgb(spec.get("pants"), (236, 230, 214))
-
-    # ---- legs: chappal + skin foot, then pajama ----
-    for side, hip, knee, foot in (("L", sk["hipL"], sk["kneeL"], sk["footL"]),
-                                  ("R", sk["hipR"], sk["kneeR"], sk["footR"])):
-        sgn = -1 if side == "L" else 1
-        S.poly(closed_ellipse(foot[0] + sgn * 18, foot[1] - 4, 48, 13, 24), SOLE, INK, 5)
-        S.poly(closed_ellipse(foot[0] + sgn * 16, foot[1] - 17, 38, 16, 24), skin, INK, 5)
-        S.line([(foot[0] - 6 + sgn * 6, foot[1] - 26), (foot[0] + sgn * 30, foot[1] - 10)], 10, SOLE)
-        ankle = (knee[0] + (foot[0] - knee[0]) * 0.78, knee[1] + (foot[1] - knee[1]) * 0.78)
-        _thick(S, [(hip[0] * 0.8, hip[1] - 10), knee, ankle], TOON_LEG_W, pj, light)
-
-    # ---- neck ----
-    S.line([(0.0, -TORSO_H + 30), (0.0, -TORSO_H - 20)], 44 + 2 * TOON_OUT, INK)
-    S.line([(0.0, -TORSO_H + 30), (0.0, -TORSO_H - 20)], 44, shade(skin, 0.86))
-
-    # ---- kurta ----
-    half = [(-30, -TORSO_H + 30), (-62, -TORSO_H + 40), (-86, -TORSO_H + 56), (-96, -TORSO_H + 86),
-            (-98, -200), (-100, -100), (-106, 0), (-114, 70), (-118, 112), (-90, 122), (-50, 127), (0, 129)]
-    body = half + [(-x, y) for (x, y) in reversed(half[:-1])]
-    S.poly(body, shade(color, 0.78), None)
-    lit = [(x if x * light >= 0 else x * 0.55, y) for (x, y) in body]
-    S.poly(lit, color, None)
-    S.poly(body, None, INK, TOON_OUT)
-    # collar band + placket with buttons + a couple of cloth folds
-    S.line(ellipse_pts(0, -TORSO_H + 30, 34, 14, 12, 10, 170), 6, shade(color, 0.6))
-    S.line([(0, -TORSO_H + 44), (0, -170)], 5, shade(color, 0.6))
-    for by in (-TORSO_H + 64, -228, -192):
-        S.dot((6, by), 5, shade(color, 0.5))
-    S.line(bezier((-70, 40), (-60, 84), (-78, 118)), 4, shade(color, 0.62))
-    S.line(bezier((62, 50), (54, 88), (70, 120)), 4, shade(color, 0.62))
-    S.line(bezier((-40, -40), (-20, -10), (-46, 30)), 4, shade(color, 0.68))
-
-    # ---- arms: skin wrist, sleeve over it, then the hand ----
-    for side, sh, elb, hand, a2 in (("L", sk["shL"], sk["elbL"], sk["handL"], p["la2"]),
-                                    ("R", sk["shR"], sk["elbR"], sk["handR"], p["ra2"])):
-        sgn = -1 if side == "L" else 1
-        sh2 = (sh[0] + sgn * 26, sh[1] + 4)
-        wrist = (elb[0] + (hand[0] - elb[0]) * 0.7, elb[1] + (hand[1] - elb[1]) * 0.7)
-        _thick(S, [wrist, hand], TOON_WRIST_W, skin, light, hi=False)
-        _thick(S, [sh2, elb, wrist], TOON_ARM_W, color, light)
-        d = vec(a2, 1.0)
-        n = (-d[1] * sgn, d[0] * sgn)
-        S.poly(closed_ellipse(hand[0] + n[0] * 16 - d[0] * 4, hand[1] + n[1] * 16 - d[1] * 4, 10, 10, 14),
-               skin, INK, 5)
-        S.poly(closed_ellipse(hand[0] + d[0] * 4, hand[1] + d[1] * 4, 21, 19, 22,
-                              math.degrees(math.atan2(d[1], d[0]))), skin, INK, 5)
-        if p.get("finger") == side:
-            tipp = add(hand, vec(a2, 50))
-            S.line([hand, tipp], 13 + 10, INK)
-            S.line([hand, tipp], 13, skin)
 
 
 def render_ops(ops, s, frame_w, frame_h, SS=2):

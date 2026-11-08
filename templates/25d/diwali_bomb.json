@@ -1,5 +1,23 @@
 {
-  "about": "2.5D demo: layered Diwali rooftop (parallax + depth of field + glowing lights), toon kurta characters, perspective depth, sparks/boom fx, real camera moves.",
+  "name": "diwali_bomb",
+  "style": "2.5d",
+  "about": "2.5D Diwali chhat: Pappu sutli bomb jalata hai, phuss hota hai, dekhne jaata hai... BOOM. Lines (say/speak) aur caption badlo.",
+  "vars": {
+    "caption": "Har ghar me ek Pappu hota hai 😂🪔",
+    "l1": "Pappu, jaldi laga na bomb!",
+    "s1": "पप्पू, जल्दी लगा ना बम!",
+    "l2": "Bhaago!",
+    "s2": "भागो!",
+    "l3": "Arre, ye to phuss ho gaya!",
+    "s3": "अरे, ये तो फुस्स हो गया!",
+    "l4": "Ruko, main dekhta hoon.",
+    "s4": "रुको, मैं देखता हूँ।",
+    "l5": "Pappu NAHI!!",
+    "s5": "पप्पू नहीं!!",
+    "l6": "Happy... Diwali.",
+    "s6": "हैप्पी, दिवाली।",
+    "cta": "Tag karo apne Pappu ko 👇"
+  },
   "meta": {
     "fps": 30,
     "line_gap": 0.3,
@@ -16,7 +34,6 @@
   },
   "characters": {
     "A": {
-      "body": "toon",
       "color": [
         236,
         178,
@@ -35,7 +52,6 @@
       }
     },
     "B": {
-      "body": "toon",
       "color": [
         64,
         112,
@@ -69,7 +85,7 @@
     }
   ],
   "caption": {
-    "text": "Har ghar me ek Pappu hota hai 😂🪔",
+    "text": "{caption}",
     "style": "caption_box",
     "pos": "top"
   },
@@ -96,8 +112,8 @@
       "action": "point",
       "point": "left",
       "look": "A",
-      "say": "Pappu, jaldi laga na bomb!",
-      "speak": "पप्पू, जल्दी लगा ना बम!",
+      "say": "{l1}",
+      "speak": "{s1}",
       "voice": {
         "rate": "+14%"
       }
@@ -160,8 +176,8 @@
         "zoom": 1.0,
         "dur": 0.45
       },
-      "say": "Bhaago!",
-      "speak": "भागो!",
+      "say": "{l2}",
+      "speak": "{s2}",
       "voice": {
         "rate": "+20%"
       }
@@ -197,8 +213,8 @@
       "action": "shrug",
       "expression": "think",
       "look": "bomb",
-      "say": "Arre, ye to phuss ho gaya!",
-      "speak": "अरे, ये तो फुस्स हो गया!",
+      "say": "{l3}",
+      "speak": "{s3}",
       "voice": {
         "rate": "+12%"
       }
@@ -217,8 +233,8 @@
         "y": 1530,
         "dur": 1.1
       },
-      "say": "Ruko, main dekhta hoon.",
-      "speak": "रुको, मैं देखता हूँ।",
+      "say": "{l4}",
+      "speak": "{s4}",
       "voice": {
         "rate": "+10%"
       }
@@ -243,8 +259,8 @@
       "who": "B",
       "action": "shock",
       "expression": "shout",
-      "say": "Pappu NAHI!!",
-      "speak": "पप्पू नहीं!!",
+      "say": "{l5}",
+      "speak": "{s5}",
       "voice": {
         "rate": "+22%"
       }
@@ -291,8 +307,8 @@
     },
     {
       "who": "A",
-      "say": "Happy... Diwali.",
-      "speak": "हैप्पी, दिवाली।",
+      "say": "{l6}",
+      "speak": "{s6}",
       "voice": {
         "rate": "-8%",
         "pitch": "+10Hz"
@@ -305,7 +321,7 @@
       "sfx": "laugh_track",
       "volume": 0.5,
       "overlay": {
-        "text": "Tag karo apne Pappu ko 👇",
+        "text": "{cta}",
         "style": "caption_box",
         "pos": "bottom",
         "anim": "pop"

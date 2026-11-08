@@ -1,0 +1,198 @@
+{
+  "name": "gali_udhaar",
+  "style": "2.5d",
+  "about": "2.5D gali (golden hour): dost chai tapri par udhaar maangta hai. Chaiwala counter ke peeche hai. Lines aur caption badlo.",
+  "vars": {
+    "caption": "Har gali me ek aisa dost 😂",
+    "l1": "Chotu, ek cutting chai, udhaar pe!",
+    "s1": "छोटू, एक कटिंग चाय, उधार पे!",
+    "l2": "Pichhla udhaar kab dega?",
+    "s2": "पिछला उधार कब देगा?",
+    "l3": "Wo bhi agle mahine de dunga!",
+    "s3": "वो भी अगले महीने दे दूँगा!",
+    "l4": "Chal nikal!",
+    "s4": "चल निकल!",
+    "cta": "Tag karo udhaar wale dost ko 👇"
+  },
+  "meta": {
+    "fps": 30,
+    "line_gap": 0.3,
+    "tail": 0.5,
+    "fade_out": 0.4
+  },
+  "background": {
+    "type": "gali_25d"
+  },
+  "music": {
+    "type": "beat",
+    "bpm": 96,
+    "volume": 0.12
+  },
+  "characters": {
+    "A": {
+      "color": [
+        70,
+        120,
+        190
+      ],
+      "x": -180,
+      "y": 1660,
+      "accessories": [
+        "hair_short"
+      ],
+      "expression": "grin",
+      "voice": {
+        "name": "hi-IN-MadhurNeural",
+        "pitch": "+18Hz",
+        "rate": "+8%"
+      }
+    },
+    "B": {
+      "color": [
+        236,
+        232,
+        220
+      ],
+      "pants": [
+        196,
+        186,
+        166
+      ],
+      "x": 990,
+      "y": 1268,
+      "accessories": [
+        "moustache",
+        "tuft"
+      ],
+      "prop": "kettle",
+      "expression": "neutral",
+      "voice": {
+        "name": "hi-IN-MadhurNeural",
+        "pitch": "-12Hz",
+        "rate": "+4%"
+      }
+    }
+  },
+  "caption": {
+    "text": "{caption}",
+    "style": "caption_box",
+    "pos": "top"
+  },
+  "timeline": [
+    {
+      "t": 0.0,
+      "who": "all",
+      "action": "idle"
+    },
+    {
+      "t": 0.0,
+      "camera": {
+        "zoom": 1.22,
+        "focus": [
+          560,
+          1020
+        ],
+        "dur": 0
+      }
+    },
+    {
+      "t": 0.15,
+      "camera": {
+        "zoom": 1.0,
+        "dur": 2.6
+      }
+    },
+    {
+      "t": 0.2,
+      "who": "A",
+      "move": {
+        "x": 520,
+        "y": 1640,
+        "dur": 1.6
+      }
+    },
+    {
+      "t": 1.9,
+      "who": "A",
+      "action": "wave",
+      "look": "B",
+      "say": "{l1}",
+      "speak": "{s1}"
+    },
+    {
+      "who": "B",
+      "expression": "sly",
+      "look": "A",
+      "camera": {
+        "zoom": 1.7,
+        "focus": [
+          930,
+          1080
+        ],
+        "dur": 0.5
+      },
+      "say": "{l2}",
+      "speak": "{s2}"
+    },
+    {
+      "who": "A",
+      "action": "shrug",
+      "expression": "smug",
+      "camera": {
+        "zoom": 1.3,
+        "focus": [
+          600,
+          1130
+        ],
+        "dur": 0.5
+      },
+      "say": "{l3}",
+      "speak": "{s3}"
+    },
+    {
+      "who": "B",
+      "action": "point",
+      "point": "left",
+      "expression": "angry",
+      "prop": "",
+      "camera": {
+        "zoom": 1.7,
+        "focus": [
+          930,
+          1080
+        ],
+        "dur": 0.4
+      },
+      "say": "{l4}",
+      "speak": "{s4}"
+    },
+    {
+      "who": "A",
+      "action": "idle",
+      "expression": "shock",
+      "move": {
+        "x": -260,
+        "y": 1700,
+        "dur": 0.9
+      },
+      "speed": 2.2,
+      "sfx": "whoosh",
+      "camera": {
+        "zoom": 1.0,
+        "dur": 0.6
+      }
+    },
+    {
+      "who": "B",
+      "action": "idle",
+      "expression": "smug",
+      "overlay": {
+        "text": "{cta}",
+        "style": "caption_box",
+        "pos": "bottom",
+        "anim": "pop"
+      },
+      "hold": 2.0
+    }
+  ]
+}
