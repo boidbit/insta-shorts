@@ -22,7 +22,7 @@ import time
 import urllib.error
 import urllib.request
 
-from . import actions, hooks
+from . import actions, hooks, styles
 from .characters import ACCESSORIES, EXPRESSIONS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE
 from .scene import compile_scene, split_scenes, static_overlays
 from .script import BACKGROUNDS          # every place the script format knows (jungle, bank, gym...)
@@ -236,7 +236,7 @@ def script_problems(text, tmp_path):
         scene, warnings = parse_script(text)
     except Exception as e:  # noqa: BLE001
         return ["script could not be read: %s" % e]
-    out = list(warnings)
+    out = [w for w in warnings if not w.startswith("STYLE 2.5d:")]     # "looks flat in 2.5d" is only a note
     if not re.search(r"^CAPTION:", text, re.M | re.I):
         out.append("missing CAPTION: line")
     if not re.search(r"^CTA:", text, re.M | re.I):
@@ -272,11 +272,26 @@ def _iterate(llm, system, first_msg, parse, check, json_mode, log, max_tries):
     raise SystemExit("director could not produce a valid result: %s" % last)
 
 
-def _setup(hook_style, llm, tmp_path, rng, log, prompt_file, fmt, tone="auto", idea=""):
+STYLE_PROMPT = {"2.5d": "SCRIPT_PROMPT_25D.md"}     # added after the base prompt for that style
+
+
+def style_prompt(style):
+    """The extra prompt section for a style ("" for 2d)."""
+    name = STYLE_PROMPT.get(styles.normalize(style or "2d"))
+    if not name:
+        return ""
+    with open(os.path.join(ROOT, name), encoding="utf-8") as f:
+        return f.read().strip()
+
+
+def _setup(hook_style, llm, tmp_path, rng, log, prompt_file, fmt, tone="auto", idea="", style="2d"):
     rng = rng or random.Random()
     log = log or (lambda m: print(m, file=sys.stderr))
     with open(os.path.join(ROOT, prompt_file), encoding="utf-8") as f:
         base = f.read()
+    extra = style_prompt(style)
+    if extra:
+        base = base.rstrip() + "\n\n" + extra + "\n"
     key, _hook = hooks.pick(hook_style, rng)
     tone_key = hooks.pick_tone(tone, idea, rng)
     log("  [director] hook style: %s, tone: %s" % (key, tone_key))
@@ -292,25 +307,40 @@ def _tone_and_idea(instruction, tone):
     return (tone if tone in hooks.TONES else (inline or "auto")), idea
 
 
-def direct(instruction="", hook_style="auto", llm=None, tmp_path=None, max_tries=3, rng=None, log=None, tone="auto"):
+def direct(instruction="", hook_style="auto", llm=None, tmp_path=None, max_tries=3, rng=None, log=None, tone="auto",
+           style="2d"):
     """Return a checked scene dict. `llm(system, messages, json_mode) -> text`."""
     tone, instruction = _tone_and_idea(instruction, tone)
     system, key, llm, tmp_path, rng, log = _setup(hook_style, llm, tmp_path, rng, log, "DIRECTOR_PROMPT.md", "json",
-                                                  tone, instruction)
+                                                  tone, instruction, style)
     scene = _iterate(llm, system, request_text(instruction, hooks.random_topic(rng)), extract_json,
                      lambda s: problems(s, tmp_path), True, log, max_tries)
     scene.setdefault("meta", {})["hook_style"] = key
+    if styles.normalize(style or "2d") != "2d":
+        scene["style"] = styles.normalize(style)
     return scene
 
 
 def write_script(instruction="", hook_style="auto", llm=None, tmp_path=None, max_tries=3, rng=None, log=None,
-                 tone="auto"):
+                 tone="auto", style="2d"):
     """Return a checked plain-text script (for a human to read, edit and approve)."""
     tone, instruction = _tone_and_idea(instruction, tone)
     system, _key, llm, tmp_path, rng, log = _setup(hook_style, llm, tmp_path, rng, log, "SCRIPT_PROMPT.md", "script",
-                                                   tone, instruction)
-    return _iterate(llm, system, request_text(instruction, hooks.random_topic(rng)), extract_script,
+                                                   tone, instruction, style)
+    text = _iterate(llm, system, request_text(instruction, hooks.random_topic(rng)), extract_script,
                     lambda t: script_problems(t, tmp_path), False, log, max_tries)
+    return with_style_line(text, style)
+
+
+def with_style_line(text, style):
+    """Make sure a 2.5d script says so (`STYLE: 2.5d` right after HOOK:), whatever the AI wrote."""
+    style = styles.normalize(style or "2d")
+    lines = [ln for ln in text.splitlines() if not re.match(r"^\s*STYLE\s*:", ln, re.I)]
+    if style == "2d":
+        return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+    at = next((i + 1 for i, ln in enumerate(lines) if re.match(r"^\s*HOOK\s*:", ln, re.I)), 0)
+    lines.insert(at, "STYLE: %s" % style)
+    return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
 
 
 def post_text(scene):
@@ -349,12 +379,14 @@ def main(argv=None):
     ap.add_argument("--script-only", action="store_true", help="write a readable script (.txt) instead of a scene")
     ap.add_argument("--provider", default=None, choices=["anthropic", "gemini"])
     ap.add_argument("--model", default=None)
+    ap.add_argument("--style", default="2d", choices=["2d", "2.5d"],
+                    help="look of the video: 2d (default) or 2.5d (SCRIPT_PROMPT_25D.md is added to the prompt)")
     args = ap.parse_args(argv)
 
     llm = make_llm(args.provider, args.model)
     rng = random.Random()
     if args.script_only:
-        text = write_script(args.instruction, args.hook, llm, rng=rng, tone=args.tone)
+        text = write_script(args.instruction, args.hook, llm, rng=rng, tone=args.tone, style=args.style)
         out = args.out or os.path.join(ROOT, "scripts", "generated", slug(args.instruction or "auto") + ".txt")
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
         with open(out, "w", encoding="utf-8") as f:
@@ -364,11 +396,11 @@ def main(argv=None):
     used = []
     base = args.out or os.path.join(ROOT, "scenes", "generated", slug(args.instruction or "auto") + ".json")
     for i in range(max(1, args.count)):
-        style = args.hook
-        if style == "auto" and args.count > 1:
-            style, _h = hooks.pick("auto", rng, avoid=used)
-            used.append(style)
-        scene = direct(args.instruction, style, llm, rng=rng, tone=args.tone)
+        hook_style = args.hook
+        if hook_style == "auto" and args.count > 1:
+            hook_style, _h = hooks.pick("auto", rng, avoid=used)
+            used.append(hook_style)
+        scene = direct(args.instruction, hook_style, llm, rng=rng, tone=args.tone, style=args.style)
         out = base if args.count == 1 else "%s_%d.json" % (os.path.splitext(base)[0], i + 1)
         print(save(scene, out))
 

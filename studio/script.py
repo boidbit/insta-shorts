@@ -25,6 +25,8 @@ Script format (one thing per line):
   any action / expression.  `ALL -> ...` does it for everybody in the scene.
 - `SCENE: background | title` starts a new place (kitchen, room, street, school, market, office, bus_stop, night_road,
   plain), or your own picture: `SCENE: gali` uses assets/backgrounds/gali.png (.jpg/.webp), or a path `SCENE: assets/backgrounds/gali.jpg`.
+- `STYLE: 2.5d` (optional, after HOOK) = the 2.5D look: kitchen, gully, chai_tapri, kirana and terrace become layered
+  sets with depth (parallax, depth blur, glowing lights). Default `STYLE: 2d` = the normal look.
 - `wait 1.5` (or `...`) pauses.
 - Shots: `CUT` starts a new shot in the same place (a hard cut) and shows only the characters who speak or act in it;
   `CUT wide` = everybody small so a whole vehicle fits, `CUT inside` = the inside of a vehicle (the driver big, in
@@ -65,13 +67,13 @@ import os
 import re
 import zlib
 
-from . import actions, audio, objects, rides
+from . import actions, audio, objects, rides, styles
 from .characters import (ACCESSORIES, EXPRESSIONS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE,
                          SKIN_TONES)
 from .util import asset_path
 from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS, chat_length
 
-HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION")
+HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE")
 from .locations import LOCATIONS as _LOC   # noqa: E402
 
 BACKGROUNDS = tuple(dict.fromkeys(("kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road",
@@ -661,7 +663,7 @@ def parse_chat(meta, title, msgs):
     return scene, warnings
 
 
-HEADER_WORDS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "OBJ", "NARRATOR",
+HEADER_WORDS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "OBJ", "NARRATOR",
                 "LIGHTS", "AMBIENCE", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
 
 
@@ -1042,6 +1044,16 @@ def parse_script(text):
     }
     if music:
         scene["music"] = music
+    if meta.get("STYLE"):
+        try:
+            scene["style"] = styles.normalize(meta["STYLE"])
+        except ValueError:
+            warnings.append("STYLE %r: 2d ya 2.5d likho" % meta["STYLE"])
+    if scene.get("style") == "2.5d":
+        flat = sorted({sc["background"].get("type") for sc in scenes} - set(styles.PLACES_25D))
+        if flat:
+            warnings.append("STYLE 2.5d: %s 2.5D me flat dikhegi (2.5D jagahein: %s)"
+                            % (", ".join(map(str, flat)), ", ".join(sorted(styles.PLACES_25D))))
     if len([n for n in cast if n != "NARRATOR"]) > 3:
         warnings.append("more than 3 characters: the screen gets crowded")
     return scene, warnings

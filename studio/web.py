@@ -45,6 +45,7 @@ def run_job(job):
     try:
         mode, text = req.get("mode", "idea"), req.get("text", "")
         hook_style = req.get("hook") or "auto"
+        style = req.get("style") if req.get("style") in ("2d", "2.5d") else None
         if mode == "json":
             scene = json.loads(text)
         elif mode == "script" and not (req.get("use_ai") and director.provider_name()):
@@ -54,13 +55,14 @@ def run_job(job):
                 log("⚠ " + w)
         else:
             job["stage"] = "AI kahani likh raha hai"
-            scene = director.direct(text, hook_style, log=log)
+            scene = director.direct(text, hook_style, log=log, style=style or "2d")
         base = os.path.join(OUT, job["id"])
         director.save(scene, base + ".json")
         job["scene"] = scene
         job["post"] = director.post_text(scene)
         job["stage"] = "Video ban raha hai"
-        video = make_video(load_scene(base + ".json"), int(req.get("width", 720)), use_tts=bool(req.get("voice", True)))
+        video = make_video(load_scene(base + ".json"), int(req.get("width", 720)), use_tts=bool(req.get("voice", True)),
+                           style=style)
         job["duration"] = video.duration
         video.frame(min(1.0, video.duration / 2)).resize((270, 480)).save(base + ".png")
         video.render_video(base + ".mp4", progress=lambda f: job.update(progress=round(f, 3)))

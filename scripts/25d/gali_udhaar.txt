@@ -1,0 +1,13 @@
+HOOK: Har gali me ek aisa dost hota hai 😂
+STYLE: 2.5d
+CAST: A = dost curly green tshirt, B = uncle moustache kurta
+SCENE: chai_tapri
+A (grin, wave): Chotu bhaiya, ek cutting chai dena, udhaar pe! | छोटू भैया, एक कटिंग चाय देना, उधार पे!
+B (sly, arms_crossed): Pichhla udhaar kab chukayega beta? | पिछला उधार कब चुकाएगा बेटा?
+CUT
+A (smug, shrug): Wo bhi agle mahine, pakka promise! | वो भी अगले महीने, पक्का प्रॉमिस!
+B (angry, point left, boing): Chal nikal yahan se! | चल निकल यहाँ से!
+A -> exit left
+CTA: Tag karo udhaar wale dost ko 👇
+CAPTION: Har gali ka ek udhaar king 😂☕
+HASHTAGS: #desicomedy #chai #udhaar #dosti #relatable

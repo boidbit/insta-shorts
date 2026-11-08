@@ -1,0 +1,13 @@
+HOOK: Har ghar ki kahani 😂
+STYLE: 2.5d
+CAST: M = mummy saree pink bun, B = beta spiky blue tshirt
+SCENE: kitchen
+B (grin, rub_hands): Mummy, bahut bhookh lagi hai, khana kab banega? | मम्मी, बहुत भूख लगी है, खाना कब बनेगा?
+M (angry, point): Pehle sink ke saare bartan dho, phir khana milega! | पहले सिंक के सारे बर्तन धो, फिर खाना मिलेगा!
+CUT
+B (shock): Achanak meri bhookh hi khatam ho gayi. | अचानक मेरी भूख ही ख़त्म हो गई।
+B -> exit left
+M -> facepalm
+CTA: Tag karo us bhai ko 👇
+CAPTION: Bartan ka naam suno aur bhookh gayab 😂
+HASHTAGS: #mummy #desicomedy #kitchen #relatable #funny

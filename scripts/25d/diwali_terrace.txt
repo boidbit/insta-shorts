@@ -1,0 +1,12 @@
+HOOK: Diwali pe har ghar ka Pappu 😂🪔
+STYLE: 2.5d
+CAST: P = beta curly yellow kurta, D = papa moustache maroon kurta
+SCENE: terrace
+D (smile, point): Pappu, zara dhyaan se phuljhadi jalana! | पप्पू, ज़रा ध्यान से फुलझड़ी जलाना!
+P (smug, thumbs_up): Papa, main to expert hoon! | पापा, मैं तो एक्सपर्ट हूँ!
+CUT
+P (shock, scared, shake): Arre... meri chappal jal gayi! | अरे... मेरी चप्पल जल गई!
+D -> facepalm
+CTA: Tag karo apne Pappu ko 👇
+CAPTION: Har saal ka same expert 🪔😂
+HASHTAGS: #diwali #desicomedy #family #relatable #pappu

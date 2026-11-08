@@ -19,6 +19,21 @@ Page pe 3 tareeke hain:
 
 "Banao" dabao → progress bar → video, download button, caption copy button.
 
+## 2 style: 2D (normal) aur 2.5D ✨
+
+Har video ke liye style chuno: GitHub Pages wale page pe sabse upar **Style: 2D / 2.5D** (page yaad rakhta hai), local page (`python -m studio.web`) me **Style** dropdown.
+
+| Style | Kya hota hai |
+|---|---|
+| **2D** (default) | Studio ka normal look, bilkul pehle jaisa (koi farq nahi: `tests/golden.py` har bar pixel-by-pixel check karta hai). |
+| **2.5D** | Wahi log, wahi script, wahi saare shabd. Bas ye 5 jagah **gehrai wale sets** ban jaati hain: `kitchen` (din ki rasoi, khidki ke bahar ka nazara, jaali wali dhoop, cooker ki bhaap), `gully` / `chai_tapri` / `kirana` (golden-hour gali: kirana dukaan, bijli ka khamba + taar, chai tapri), `terrace` (Diwali ki raat ki chhat: jhalar, diye, patakhe). Camera zoom/shot badalne pe door ki cheezein dheere aur paas ki tez khiskti hain (parallax), door ka hissa halka blur, lights chamakti hain, aage blur me cheezein. Baaki jagah 2.5D me bhi normal dikhti hain. |
+
+- Script me: `HOOK:` ke baad `STYLE: 2.5d` likho (na likho = 2D). Page ka Style button aur script ki ye line saath-saath badalte hain.
+- Time word bhi chalta hai: `SCENE: kitchen night` / `SCENE: gully rain` (set ka rang badalta hai, lights jalti rehti hain). `terrace` hamesha raat hai.
+- Gali ke signboard pe likha hai, isliye reverse shot (CUT) me gali kabhi ulti (mirror) nahi hoti.
+- Example: `scripts/25d/gali_udhaar.txt`, `scripts/25d/kitchen_mummy.txt`, `scripts/25d/diwali_terrace.txt`.
+- Command line: `python -m studio.render scene.json --style 2.5d` (ya `2d`): script ki STYLE line se zyada chalta hai.
+
 ### 🎭 Builder: jagah aur characters chuno, dialogue saade text me
 
 "Idea do" tab me upar **"Jagah aur characters khud chuno"** kholo:
@@ -134,7 +149,7 @@ Page pe "Approve: Video banao" ke upar do options (page yaad rakhta hai):
 | Dialogue text | `Bubble me` (pehle jaisa), `Neeche subtitle` (bubble nahi, shabd neeche, Instagram caption se upar), `Bubble + subtitle`, `Koi text nahi` (sirf awaaz) | `--dialogue bubble/subtitle/both/none` |
 | Hook card | `Pehli line ke saath` (pehle jaisa), `Pehle hook, phir baat` (hook card 1.7s akela, phir kahani), `Hook card nahi` | `--hook over/first/off` |
 
-GitHub Actions me ye `dialogue` aur `intro` inputs hain.
+GitHub Actions me ye `dialogue` aur `intro` inputs hain. Style ka input `style`: `auto` (script ki `STYLE:` line, warna 2D) / `2d` / `2.5d`; page apna chuna hua style bhejta hai.
 
 ## Chat video (alag, chhota format)
 
@@ -286,11 +301,13 @@ Tests: `python -m unittest discover -s tests` (network/key nahi chahiye).
 3. Script **Apni script** tab me aa jati hai: padho, jo badalna ho badlo → **✅ Approve: Video banao 🎬** (`stage=video`, ~4-6 min). Apni likhi script bhi seedha yahin se approve kar sakte ho, ya "AI se sudharo" se pehle AI ka version dekh sakte ho.
 4. Video GitHub **Release** (`reel-…`) me publish hoti hai; page wahi chalata hai, download + caption copy deta hai. Approve hua draft apne aap hat jata hai. "Pichli reels" me sab purani videos.
 
-**Doosre AI (ChatGPT, Claude, Gemini app) se script:** koi code nahi chahiye, script sirf simple text hai. Page pe "🤖 … prompt copy karo" dabao → us AI me paste karo (aakhri line me apna idea) → jo script mile wo "📝 Apni script" me paste karo. Page turant check karta hai (brackets me dialogue, anjaan shabd, Devanagari missing, CAST me naam nahi…) aur galti ho to Approve se pehle batata hai. Prompt file: `SCRIPT_PROMPT.md`.
+**Doosre AI (ChatGPT, Claude, Gemini app) se script:** koi code nahi chahiye, script sirf simple text hai. Page pe do button hain: **📋 2D prompt copy** aur **📋 2.5D prompt copy** → jo style chahiye uska prompt us AI me paste karo (aakhri line me apna idea) → jo script mile wo "📝 Apni script" me paste karo. Page turant check karta hai (brackets me dialogue, anjaan shabd, Devanagari missing, CAST me naam nahi…) aur galti ho to Approve se pehle batata hai. 2.5D prompt se bani script me `STYLE: 2.5d` line hoti hai, to paste karte hi page ka Style 2.5D ho jata hai. Prompt files: `SCRIPT_PROMPT.md` (2D) aur 2.5D = `SCRIPT_PROMPT.md` + `SCRIPT_PROMPT_25D.md` (sirf 2.5D wala hissa alag file me, taaki dono prompt kabhi alag-alag purane na pade). Page ke "Script likho" (AI) me bhi chuna hua style jata hai: workflow AI ko wahi prompt deta hai.
 
 **AI key kahan daalni hai:** repo → Settings → Secrets and variables → Actions → **Repository secrets** → New repository secret → Name `GEMINI_API_KEY` (ya `ANTHROPIC_API_KEY`). `GOOGLE_API_KEY`, `GEMINI_KEY`, `AI_API_KEY` naam bhi chalte hain. *Environment* (`github-pages`), Codespaces ya Dependabot secrets workflow ko nahi dikhte.
 
 Branch: page us branch pe workflow chalata hai jo settings me likha hai (default `desi-toons-studio`). Repo public hai to releases (videos) bhi public dikhte hain.
+
+**2D na badle, iski guarantee:** workflow **Golden frames** har push / PR pe `desi-toons-studio` ka code aur naya code dono se 2D frames banata hai aur pixel-by-pixel milata hai (`python tests/golden.py compare-base --base <checkout>`). 2.5D ke frames `tests/golden/25d/` se milaye jaate hain (`python tests/golden.py check`).
 
 ## Webpage ko apne server pe daalna
 

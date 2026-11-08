@@ -1,0 +1,62 @@
+name: Golden frames (2d stays 2d)
+
+# Guards the two looks:
+#  1. compare-base (blocking): renders the 2d frames with the desi-toons-studio code AND with this code on the
+#     same runner. They must be pixel-identical, so 2.5D work can never change the normal look.
+#  2. check (informational): compares 2d and 2.5d frames with the PNGs committed in tests/golden/.
+on:
+  pull_request:
+  push:
+    paths:
+      - "studio/**"
+      - "tests/**"
+      - "scripts/**"
+      - "scenes/**"
+      - ".github/workflows/golden.yml"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Branch with the reference 2d look"
+        required: false
+        default: "desi-toons-studio"
+
+jobs:
+  golden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout the reference 2d code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base || 'desi-toons-studio' }}
+          path: base
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: System packages (fonts, emoji)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-color-emoji fonts-liberation libraqm0
+
+      - name: Python packages
+        run: pip install -r requirements.txt
+
+      - name: 2d must be pixel-identical to the reference code
+        run: python tests/golden.py compare-base --base base
+
+      - name: Compare with committed golden frames (informational)
+        continue-on-error: true
+        run: python tests/golden.py check
+
+      - name: Upload diff images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-diffs
+          path: tests/out/*_DIFF.png
+          if-no-files-found: ignore

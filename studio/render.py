@@ -18,7 +18,7 @@ import time
 import numpy as np
 from PIL import Image, ImageChops, ImageOps
 
-from . import actions, audio, objects, rides, ui
+from . import actions, audio, objects, rides, styles, ui
 from .backgrounds import Background
 from .characters import LA, UA, DEFAULT_POSE, build_character, render_ops, skeleton
 from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_at, compile_music, compile_scene,
@@ -325,7 +325,13 @@ class Renderer(Output):
         self.W, self.H = frame_size(width)
         self.s = self.W / float(LW)
         ang = self.plan.angle
-        self.bg = Background(self.plan.background, int(self.W * ang["zoom"] + 0.5), int(self.H * ang["zoom"] + 0.5))
+        # 2.5D style: kitchen / gully / chai_tapri / kirana / terrace are layered parallax sets (style25d);
+        # everything else (and every 2d scene) uses the normal flat place below, unchanged.
+        preset = styles.preset_for(scene)
+        self.bd25 = self._backdrop25(preset, scene) if preset else None
+        bg_spec = {"type": "plain", "foreground": [], "ambient": False} if self.bd25 else self.plan.background
+        self.bg = Background(bg_spec, int(self.W * ang["zoom"] + 0.5), int(self.H * ang["zoom"] + 0.5))
+        self._view25_t, self._view25_v = None, None
         self.overlay_layer = OverlayLayer(self.s)
         self.fx = Effects(self.plan.effects, self.s, self.W, self.H, self.plan.fps)
         self.sets = Sets(self.plan.sets, self.plan.set_events, self.s, self.W, self.H)
@@ -345,7 +351,11 @@ class Renderer(Output):
         self.shadows = bool(meta.get("shadows", True))          # soft contact shadow under each character
         self._shadow = _shadow_sprite() if self.shadows else None
         own_picture = (scene.get("background") or {}).get("type") == "image"      # the user's picture stays as it is
-        self._vig = _vignette(self.W, self.H, float(meta.get("vignette", 0.0 if own_picture else 0.16)))   # 0 = off
+        vig_default = 0.0 if own_picture else 0.16
+        if self.bd25:
+            vig_default = float(self.bd25.light.get("vignette", vig_default))
+        self._vig = _vignette(self.W, self.H, float(meta.get("vignette", vig_default)))   # 0 = off
+        self._tint25 = tuple(self.bd25.light["ambient"]) if self.bd25 and self.bd25.light.get("ambient") else None
 
     # ------------------------------------------------------------ helpers
     def _lip_open(self, sp, t):
@@ -377,9 +387,44 @@ class Renderer(Output):
                 return float(sum(seg) / len(seg)) if len(seg) else 0.0
         return 0.5 + 0.2 * math.sin(t * 2.1) * math.sin(t * 0.9 + 1.0)
 
+    # ------------------------------------------------------------ 2.5D sets
+    def _backdrop25(self, preset, scene):
+        from .locations import grade
+        from .style25d.scenery import StudioBackdrop
+        time = (scene.get("background") or {}).get("time")
+        native = styles.NATIVE_TIME.get(preset)
+        same = time in (None, "", "day", native) or (native == "sunset" and time == "evening")
+        cams = [sg[3] for sg in self.plan.cam_segments] + ([1.05] if self.plan.shakes else [])
+        zmax = self.plan.angle["zoom"] * max([1.0] + cams)
+        return StudioBackdrop(preset, self.W, self.H, zmax=min(zmax, 2.4), time=None if same else time, grade=grade)
+
+    def _view25(self, t):
+        """Shot angle + in-shot camera at time t, as StudioBackdrop wants it (computed like _background and the
+        camera crop in story_frame)."""
+        if self._view25_t == t:
+            return self._view25_v
+        ang, s = self.plan.angle, self.s
+        za = ang["zoom"]
+        left = top = 0.0
+        if za > 1.001:
+            sz = s * za
+            left = clamp(ang["x"] * sz - self.W / 2.0, 0, self.bg.out_w - self.W)
+            top = clamp(GROUND_Y * (sz - s), 0, self.bg.out_h - self.H)
+        z, cx, cy, dx, dy = camera_at(self.plan, t)
+        if dx or dy:
+            z = max(z, 1.05)
+        vw, vh = self.W / max(z, 1.0), self.H / max(z, 1.0)
+        mirror = ang["mirror"] and self.bd25.preset not in styles.NO_MIRROR
+        v = dict(za=za, La=int(left) / (s * za), Ta=int(top) / (s * za), zc=max(z, 1.0), mirror=mirror,
+                 vl=clamp((cx + dx) * s - vw / 2, 0, self.W - vw), vt=clamp((cy + dy) * s - vh / 2, 0, self.H - vh))
+        self._view25_t, self._view25_v = t, v
+        return v
+
     def _background(self, t):
         """The place, seen from this shot's angle: drawn bigger (crisp, not blown up), the part around angle x, with the
         ground line where the people stand kept in place; mirrored for a reverse shot."""
+        if self.bd25 is not None:
+            return self.bd25.image(t, self._view25(t))
         img = self.bg.frame(t).convert("RGB")
         ang = self.plan.angle
         z = ang["zoom"]
@@ -394,6 +439,8 @@ class Renderer(Output):
 
     def _foreground(self, t):
         """The place's foreground props, placed like the background of this shot (angle zoom / mirror)."""
+        if self.bd25 is not None:
+            return self.bd25.floor_items(self._view25(t))
         items = self.bg.foreground(t)
         ang = self.plan.angle
         z = ang["zoom"]
@@ -826,6 +873,10 @@ class Renderer(Output):
             r = render_ops(P["ops"], s, self.W, self.H)
             if r:
                 layer, (ox, oy) = r
+                if self._tint25:                    # 2.5D: the set's light falls on the people too
+                    rgb = ImageChops.multiply(layer.convert("RGB"), Image.new("RGB", layer.size, self._tint25))
+                    rgb.putalpha(layer.getchannel("A"))
+                    layer = rgb
                 img.paste(layer, (ox, oy), layer)
             anchors[c.name] = P["an"]
             rf = P["rf"]
@@ -860,6 +911,8 @@ class Renderer(Output):
                     self._draw_crank(img, o, t)
                 for c in riders:
                     draw_char(c)
+        if self.bd25 is not None:                   # 2.5D: blurred things right in front of the lens
+            self.bd25.paste_front(img, t, self._view25(t))
 
         self.fx.draw_world(img, t, anchors, plan.chars)     # sweat, ?, POW, glowing eyes, thrown objects...
         if light < 0.995:
@@ -994,9 +1047,11 @@ class Sequence(Output):
         return img
 
 
-def make_video(scene, width=1080, use_tts=True, fps=None, tts_provider=None, dialogue=None, hook=None):
+def make_video(scene, width=1080, use_tts=True, fps=None, tts_provider=None, dialogue=None, hook=None, style=None):
     if dialogue or hook:
         scene = apply_options(scene, dialogue, hook)
+    if style:                                       # "2d" / "2.5d" from the command line / web page wins
+        scene = dict(scene, style=styles.normalize(style))
     if scene.get("scenes"):
         return Sequence(scene, width, use_tts, fps, tts_provider)
     return Renderer(scene, width, use_tts, fps, tts_provider)
@@ -1015,6 +1070,8 @@ def main(argv=None):
     ap.add_argument("--frame", type=float, default=None, help="render one PNG frame at this time (seconds)")
     ap.add_argument("--dialogue", choices=DIALOGUE_MODES, default=None,
                     help="spoken words: bubble (default) | subtitle (at the bottom) | both | none (voice only)")
+    ap.add_argument("--style", choices=["2d", "2.5d"], default=None,
+                    help="look: 2d (default) | 2.5d (kitchen, gully, chai_tapri, kirana, terrace as layered sets)")
     ap.add_argument("--hook", choices=HOOK_MODES, default=None, dest="hook_mode",
                     help="hook card: over (over the first line, default) | first (hook card, then the story) | off")
     args = ap.parse_args(argv)
@@ -1022,7 +1079,7 @@ def main(argv=None):
     scene = load_scene(args.scene)
     name = os.path.splitext(os.path.basename(args.scene))[0]
     r = make_video(scene, args.width, use_tts=not args.no_tts, fps=args.fps, tts_provider=args.tts,
-                   dialogue=args.dialogue, hook=args.hook_mode)
+                   dialogue=args.dialogue, hook=args.hook_mode, style=args.style)
     if args.frame is not None:
         out = args.out or os.path.join("out", name + ".png")
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)

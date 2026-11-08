@@ -73,6 +73,12 @@
       <p class="hint" id="hint"></p>
 
       <div class="row">
+        <label>Style
+          <select id="style">
+            <option value="2d">2D (normal)</option>
+            <option value="2.5d">2.5D ✨ (gehrai: kitchen, gully, chai_tapri, kirana, terrace)</option>
+          </select>
+        </label>
         <label id="hookWrap">Hook style
           <select id="hook"><option value="auto">Auto (AI chune)</option></select>
         </label>
@@ -155,7 +161,7 @@ async function loadInfo() {
 
 async function make() {
   const body = { mode, text: $("text").value, hook: $("hook").value, width: +$("width").value,
-                 voice: $("voice").checked, use_ai: $("useAi").checked };
+                 voice: $("voice").checked, use_ai: $("useAi").checked, style: $("style").value };
   $("go").disabled = true;
   $("status").classList.remove("hidden");
   $("errBox").textContent = ""; $("log").textContent = "";

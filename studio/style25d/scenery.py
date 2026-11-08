@@ -11,9 +11,9 @@ import math
 import random
 
 import numpy as np
-from PIL import Image, ImageChops, ImageDraw, ImageFilter
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
 
-from ..util import LH, LW, asset_path, clamp
+from ..util import LH, LW, clamp
 
 WARM = (255, 206, 120)
 
@@ -788,53 +788,122 @@ PRESETS = {
 }
 
 
-# ------------------------------------------------------------------ the 2.5d background object
-class Backdrop:
-    """What the 2.5d renderer draws behind/in front of the characters: a layered preset, or your own
-    image / a plain gradient as a single layer on the character plane. (No 2d background code is used.)"""
+# ------------------------------------------------------------------ the studio's 2.5d set
+class StudioBackdrop:
+    """A 2.5D preset as the studio renderer uses it.
 
-    def __init__(self, spec, out_w, out_h, zmax=1.0):
-        self.out_w, self.out_h = out_w, out_h
-        s = out_w / float(LW)
-        spec = spec or {"type": "plain"}
-        if isinstance(spec, str):
-            spec = {"type": spec}
-        kind = spec.get("type", "plain")
-        k = s * max(1.0, zmax)
-        if kind in PRESETS:
-            self.layered = PRESETS[kind](s, zmax)
-        elif kind == "image":
-            im = Image.open(asset_path(spec["path"])).convert("RGBA")
-            W, H = int(round(LW * k)), int(round(LH * k))
-            r = max(W / float(im.width), H / float(im.height))
-            im = im.resize((int(im.width * r + 1), int(im.height * r + 1)), Image.LANCZOS)
-            l, t = (im.width - W) // 2, (im.height - H) // 2
-            self.layered = Layered([Layer(im.crop((l, t, l + W, t + H)), k, 1.0, None, "image")], [])
-        elif kind == "plain":
-            cols = spec.get("colors") or [[255, 214, 150], [250, 160, 120]]
-            im = vgrad(0.5 * s, [(0, tuple(cols[0])), (LH, tuple(cols[-1]))])
-            self.layered = Layered([Layer(im, 0.5 * s, 1.0, None, "plain")], [])
-        else:
-            raise ValueError("unknown 2.5d background %r" % kind)
+    The studio draws everything into a frame and then crops/zooms it for the camera. So every layer is
+    painted into that frame *already corrected* for the camera: after the crop the floor layer (d = 1)
+    lands exactly where the flat background would, while far layers zoom and slide less (parallax) and
+    the blurred foreground (d > 1) more. view = dict(za, La, Ta, zc, vl, vt, mirror): the shot angle
+    (zoom za, left/top in logical units) and the in-shot camera (zoom zc, crop window left/top in px).
+    """
+
+    def __init__(self, preset, out_w, out_h, zmax=1.0, time=None, grade=None):
+        self.preset = preset
+        self.W, self.H = out_w, out_h
+        self.s = out_w / float(LW)
+        self.layered = PRESETS[preset](self.s, zmax)
+        self._cache = {}
+        self._sprite_cache = {}
+        if time and grade:
+            self._regrade(time, grade)
+        sky = self.layered.back[0].im
+        self.fill = sky.getpixel((0, 0))[:3] + (255,)
 
     @property
     def light(self):
         return self.layered.light
 
-    @property
-    def horizon(self):
-        return self.layered.horizon
+    def _regrade(self, time, grade):
+        """Re-light the painted layers for another time of day; glowing lights (screen layers) stay bright."""
+        def regrade(im):
+            rgb = grade(im.convert("RGB"), time)
+            rgb.putalpha(im.getchannel("A"))
+            return rgb
+        for ly in self.layered.back + self.layered.front:
+            if ly.mode != "screen" and ly.im.width > 8:
+                ly.im = regrade(ly.im)
+        for sp in self.layered.sprites:
+            sp.im = regrade(sp.im)
 
-    @property
-    def sprites(self):
-        return self.layered.sprites
+    def _total(self, view):
+        za, zc = view["za"], max(1.0, view["zc"])
+        Z = za * zc
+        return Z, view["La"] + view["vl"] / (self.s * za), view["Ta"] + view["vt"] / (self.s * za)
 
-    def frame_cam(self, t, view):
-        return self.layered.compose(t, view, self.out_w, self.out_h).convert("RGB")
+    def _paste(self, canvas, ly, t, view, Z, L, T, V):
+        zl = max(1.0, 1.0 + (Z - 1.0) * ly.d)
+        cx, cy = L + LW / (2.0 * Z), T + LH / (2.0 * Z)
+        clx, cly = LW / 2.0 + (cx - LW / 2.0) * ly.d, LH / 2.0 + (cy - LH / 2.0) * ly.d
+        vwl, vhl = LW / zl, LH / zl
+        Ll = clamp(clx - vwl / 2.0, 0, LW - vwl)
+        Tl = clamp(cly - vhl / 2.0, 0, LH - vhl)
+        zc = max(1.0, view["zc"])
+        im = ly.image_at(t)
+        k = ly.k
+        a = zl * self.s / (zc * k)                     # frame px per layer px
+        bx, by = V[0] - Ll * zl * self.s / zc, V[1] - Tl * zl * self.s / zc
+        qx0, qy0 = max(0.0, -bx / a), max(0.0, -by / a)
+        qx1, qy1 = min(float(im.width), (self.W - bx) / a), min(float(im.height), (self.H - by) / a)
+        if qx1 - qx0 < 1 or qy1 - qy0 < 1:
+            return
+        dx0, dy0 = int(round(bx + qx0 * a)), int(round(by + qy0 * a))
+        dx1, dy1 = int(round(bx + qx1 * a)), int(round(by + qy1 * a))
+        if dx1 <= dx0 or dy1 <= dy0:
+            return
+        key = (id(ly), round(qx0, 1), round(qy0, 1), round(qx1, 1), round(qy1, 1), dx1 - dx0, dy1 - dy0)
+        if ly.fn is None and key in self._cache:
+            part = self._cache[key]
+        else:
+            part = im.resize((dx1 - dx0, dy1 - dy0), Image.BILINEAR, box=(qx0, qy0, qx1, qy1))
+            if ly.fn is None:
+                if len(self._cache) > 64:
+                    self._cache.clear()
+                self._cache[key] = part
+        if ly.mode == "screen":                         # lights add brightness instead of painting over
+            region = canvas.crop((dx0, dy0, dx1, dy1)).convert("RGB")
+            prem = Image.composite(part.convert("RGB"), Image.new("RGB", part.size, 0), part.getchannel("A"))
+            canvas.paste(ImageChops.screen(region, prem), (dx0, dy0))
+        else:
+            canvas.alpha_composite(part, dest=(dx0, dy0))
 
-    def front(self, img, t, view):
+    def _canvas(self, layers, t, view, fill):
+        Z, L, T = self._total(view)
+        zc = max(1.0, view["zc"])
+        vw = self.W / zc
+        vx = self.W - view["vl"] - vw if view["mirror"] else view["vl"]
+        canvas = Image.new("RGBA", (self.W, self.H), fill)
+        for ly in layers:
+            self._paste(canvas, ly, t, view, Z, L, T, (vx, view["vt"]))
+        return ImageOps.mirror(canvas) if view["mirror"] else canvas
+
+    def image(self, t, view):
+        """The set behind the people, as an RGB frame (before the camera crop)."""
+        return self._canvas(self.layered.back, t, view, self.fill).convert("RGB")
+
+    def paste_front(self, img, t, view):
+        """Blurred things right in front of the lens, over the people."""
         if self.layered.front:
-            part = self.layered.compose(t, view, self.out_w, self.out_h, layers=self.layered.front)
-            img.paste(part, (0, 0), part)
+            front = self._canvas(self.layered.front, t, view, (0, 0, 0, 0))
+            img.paste(front, (0, 0), front)
         return img
 
+    def floor_items(self, view):
+        """Set pieces depth-sorted with the people (e.g. the chai counter): [(depth y, image, x, y)] in px."""
+        out = []
+        za = view["za"]
+        for sp in self.layered.sprites:
+            sc = self.s * za / sp.k
+            key = (id(sp), round(sc, 4), view["mirror"])
+            if key not in self._sprite_cache:
+                im = sp.im.resize((max(1, int(round(sp.im.width * sc))), max(1, int(round(sp.im.height * sc)))),
+                                  Image.BILINEAR)
+                self._sprite_cache[key] = ImageOps.mirror(im) if view["mirror"] else im
+            im = self._sprite_cache[key]
+            x = (sp.x0 - view["La"]) * za * self.s
+            y = (sp.y0 - view["Ta"]) * za * self.s
+            if view["mirror"]:
+                x = self.W - x - im.width
+            out.append((sp.ground_y, im, int(round(x)), int(round(y))))
+        return out

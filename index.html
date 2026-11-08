@@ -52,6 +52,11 @@
   .lint.bad { border-color: var(--err); }
   .lint li { margin: 2px 0; }
   .lint.good { list-style: none; padding-left: 12px; color: var(--ok); }
+  .stylebar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 0 0 12px; }
+  .stylebar .opt { border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+  .stylebar .opt:has(input:checked) { border-color: var(--brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 30%, transparent); }
+  .stylebar input { margin: 0 6px 0 0; accent-color: var(--brand); }
+  .promptcopy { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
   .linkbtn { background: none; border: 0; padding: 0; margin-top: 8px; color: var(--brand); cursor: pointer;
              font: inherit; font-size: 14px; text-align: left; text-decoration: underline; }
   .banner { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--accent); color: var(--accent-ink);
@@ -125,6 +130,13 @@
 
   <div class="grid">
     <section class="card">
+      <div class="stylebar" role="radiogroup" aria-label="Video style">
+        <span class="hint">Style:</span>
+        <label class="opt"><input type="radio" name="style" value="2d" checked>2D (normal)</label>
+        <label class="opt"><input type="radio" name="style" value="2.5d">2.5D ✨ (gehrai / parallax)</label>
+        <span class="hint hidden" id="styleHint">2.5D me <b>rasoi (kitchen), gali (gully / chai_tapri / kirana) aur chhat (terrace)</b>
+          gehrai wale sets ban jaate hain; baaki jagah normal dikhti hain.</span>
+      </div>
       <div class="tabs" role="tablist">
         <button class="tab" role="tab" data-mode="idea" aria-selected="true">💡 Idea do (AI)</button>
         <button class="tab" role="tab" data-mode="script" aria-selected="false">📝 Apni script</button>
@@ -151,7 +163,11 @@
       <div class="chips" id="chips"><span class="hint">Line me jodo:</span></div>
       <ul class="lint hidden" id="lint" aria-live="polite"></ul>
       <p class="hint" id="hint"></p>
-      <button class="linkbtn" id="copyPrompt">🤖 ChatGPT / Claude / Gemini app se script likhwani hai? Unke liye poora prompt copy karo</button>
+      <div class="promptcopy">
+        <span class="hint">🤖 ChatGPT / Claude / Gemini app se script likhwani hai? Unke liye poora prompt copy karo:</span>
+        <button class="small" id="copyPrompt" data-style="2d" type="button">📋 2D prompt copy</button>
+        <button class="small" id="copyPrompt25" data-style="2.5d" type="button">📋 2.5D prompt copy</button>
+      </div>
       <p class="hint hidden" id="promptNote">Prompt copy ho gaya. Us AI me paste karo (aakhri line me apna idea likho) → jo script mile wo "📝 Apni script" tab me paste karo → upar wala checker dekho → Approve.</p>
       <div class="row">
         <label id="hookWrap">Hook
@@ -322,7 +338,7 @@ async function checkConnection() {
 // ---------------------------------------------------------------- script checker (mirrors studio/script.py)
 const V = JSON.parse($("vocab").textContent);
 const SET = Object.fromEntries(Object.entries(V).map(([k, v]) => [k, new Set(v)]));
-const HEADERS = new Set(["HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "OBJ", "LIGHTS", "LIGHT", "AMBIENCE",
+const HEADERS = new Set(["HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "OBJ", "LIGHTS", "LIGHT", "AMBIENCE",
   "NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD"]);
 const words = (s) => s.toLowerCase().split(/[\s,|]+/).map((w) => w.replace(/^[\[\](){}'"]+|[\[\](){}'"]+$/g, "")).filter(Boolean);
 const short = (s) => (s.length > 45 ? s.slice(0, 45) + "…" : s);
@@ -513,7 +529,7 @@ const EMO = { gussa: "angry", ghussa: "angry", hairan: "surprised", shock: "shoc
   khush: "smile", dukhi: "sad", udaas: "sad", neend: "sleepy", mar: "dead", chilla: "shout", aankh: "wink" };
 const EMO_CHIPS = [["😠", "gussa"], ["😲", "hairan"], ["😱", "shock"], ["😏", "akad"], ["😂", "hasi"], ["😢", "rona"],
   ["🤔", "soch"], ["😍", "pyaar"], ["😈", "chalak"], ["😄", "khush"], ["📢", "chilla"], ["💀", "mar"]];
-const HEADER_RE = /^(HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|OBJ|LIGHTS?|AMBIENCE|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)\s*:\s*(.*)$/i;
+const HEADER_RE = /^(HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|OBJ|LIGHTS?|AMBIENCE|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)\s*:\s*(.*)$/i;
 const SAY_RE = /^([A-Za-z][\w ]{0,24}?)\s*(?:\(([^)]*)\))?\s*:\s*(\S.*)$/;
 const ACT_RE = /^([A-Za-z][\w ]{0,24}?)\s*->\s*(\S.*)$/;
 const DEFAULT_CTA = "Apne dost ko tag karo 👇";
@@ -567,8 +583,27 @@ function ideaWithSettings(idea, b) {
   return (idea || "Koi idea nahi diya: in characters aur is jagah ke saath ek original desi comedy short khud socho.") +
     "\n\nUse exactly these settings (do not change the place, the characters or their CAST words):\n" + lines.join("\n");
 }
+// Video style. Places that become layered depth sets in 2.5D: same list as studio/styles.py PLACES_25D (a test keeps
+// them equal).
+const STYLE_PLACES = ["chai_tapri", "gully", "kirana", "kitchen", "terrace"];
+// The script's own `STYLE:` line: "2d" / "2.5d", or "" when it has none.
+function styleOf(text) {
+  const m = (text || "").match(/^\s*STYLE\s*:\s*([\w.]+)/im);
+  if (!m) return "";
+  const v = m[1].toLowerCase();
+  return ["2.5d", "25d", "2_5d", "2.5"].includes(v) ? "2.5d" : (["2d", "flat"].includes(v) ? "2d" : "");
+}
+// Put the style in a script: 2.5D = a `STYLE: 2.5d` line right after HOOK (or on top); 2D = no STYLE line.
+function withStyle(text, style) {
+  const lines = (text || "").split("\n").filter((l) => !/^\s*STYLE\s*:/i.test(l));
+  if (style === "2.5d") {
+    const at = lines.findIndex((l) => /^\s*HOOK\s*:/i.test(l));
+    lines.splice(at + 1, 0, "STYLE: 2.5d");
+  }
+  return lines.join("\n");
+}
 // "Naam: baat" lines (+ the builder's choices) -> a full script in the studio format. Returns {script, problems}.
-function buildScript(text, b) {
+function buildScript(text, b, style = "2d") {
   const cast = builderCast(b), used = [], meta = {}, rows = [], problems = [];
   const who = (raw) => {
     const key = raw.trim().toLowerCase();
@@ -631,6 +666,7 @@ function buildScript(text, b) {
   const shown = used.filter((c) => c.id !== "NARRATOR");
   const head = [
     "HOOK: " + hook,
+    ...(style === "2.5d" ? ["STYLE: 2.5d"] : []),
     "CAST: " + shown.map((c) => `${c.id} = ${c.words}`).join(", "),
     "SCENE: " + (meta.SCENE || (b.place && b.place !== "auto" ? b.place : "room")),
   ];
@@ -646,7 +682,7 @@ function buildScript(text, b) {
 // Mirrors unflatten() in studio/script.py.
 function unflatten(text) {
   if ((text.match(/\n/g) || []).length >= 3 || !/\b(HOOK|CAST|SCENE)\s*:/.test(text)) return text;
-  const heads = "HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|OBJ|NARRATOR|LIGHTS|AMBIENCE|NOTIFY|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD";
+  const heads = "HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|OBJ|NARRATOR|LIGHTS|AMBIENCE|NOTIFY|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD";
   let t = text.trim().replace(new RegExp(`\\s+(?=(?:${heads})\\s*:)`, "g"), "\n");
   t = t.replace(new RegExp(`\\s+(?=(?:CUT|SHOT)\\b(?:\\s+(?:${V.framings.join("|")}|reverse|over|[A-Z]\\w*))*\\s+[A-Z]\\w*\\s*[(:\\-])`, "g"), "\n");
   const cast = (t.match(/^CAST\s*:\s*(.*)$/m) || [, ""])[1];
@@ -678,6 +714,10 @@ function setMode(m) {
     ? "AI ko script likhne me ~1 minute lagta hai. Video tabhi banegi jab aap script approve karoge."
     : "GitHub pe video banne me ~4-6 minute lagte hain. Page band kar ke wapas aao to bhi progress yahin milegi.";
   if (m !== "script") $("draftNote").classList.add("hidden");
+  if (m === "script") {                         // an AI draft / pasted script with a STYLE: line sets the picker
+    const st = styleOf($("text").value);
+    if (st && st !== currentStyle()) setStyle(st, true);
+  }
   goLabel();
   showLint();
 }
@@ -706,7 +746,7 @@ async function start(stage) {
     if (w.length && !confirm("Script me " + w.length + " dikkat(ein) hain (neeche list dekho).\n\nPhir bhi video banau?")) return;
   }
   const rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const inputs = { stage, hook: $("hook").value, tone: $("tone").value, request_id: rid };
+  const inputs = { stage, hook: $("hook").value, tone: $("tone").value, style: currentStyle(), request_id: rid };
   if (stage === "script") {
     if (mode === "idea") inputs.instruction = ideaWithSettings(text, builder); else inputs.script_text = text;
   } else {
@@ -876,8 +916,12 @@ function goLabel() {
     : "AI ko script likhne me ~1 minute lagta hai. Video tabhi banegi jab aap script approve karoge.";
 }
 function lookOf(role) { return ROLE_LOOK[role] || role || "boy"; }
+function placeLabel(p) {
+  const name = PLACE_NAMES[p] || p;
+  return currentStyle() === "2.5d" && STYLE_PLACES.includes(p) ? name + " ✨ 2.5D" : name;
+}
 function renderBuilder() {
-  $("bPlace").replaceChildren(...["auto", ...V.places].map((p) => opt(p, PLACE_NAMES[p] || p)));
+  $("bPlace").replaceChildren(...["auto", ...V.places].map((p) => opt(p, placeLabel(p))));
   $("bPlace").value = builder.place || "auto";
   $("bHook").value = builder.hook || "";
   $("bCta").value = builder.cta || "";
@@ -938,7 +982,7 @@ function addEmotion(word) {         // the line under the cursor: "Papa: ..." ->
   t.focus();
 }
 function dialogueToScript() {
-  const { script, problems } = buildScript($("text").value, builder);
+  const { script, problems } = buildScript($("text").value, builder, currentStyle());
   drafts.idea = $("text").value;
   drafts.script = script;
   setMode("script");
@@ -950,17 +994,49 @@ function dialogueToScript() {
 $("text").addEventListener("input", goLabel);
 renderBuilder();
 $("polish").addEventListener("click", () => start("script"));
-$("copyPrompt").addEventListener("click", async () => {
+async function copyPrompt(style) {
+  const files = style === "2.5d" ? ["SCRIPT_PROMPT.md", "SCRIPT_PROMPT_25D.md"] : ["SCRIPT_PROMPT.md"];
   try {
-    const rules = await (await fetch("SCRIPT_PROMPT.md", { cache: "no-store" })).text();
+    const parts = [];
+    for (const f of files) parts.push((await (await fetch(f, { cache: "no-store" })).text()).trim());
     const idea = ideaWithSettings(mode === "idea" ? $("text").value.trim() : drafts.idea.trim(), builder);
-    await navigator.clipboard.writeText(rules.trim() + "\n\n# My idea\n" + (idea || "<yahan apna idea likho>") + "\n");
+    await navigator.clipboard.writeText(parts.join("\n\n") + "\n\n# My idea\n" + (idea || "<yahan apna idea likho>") + "\n");
     $("promptNote").classList.remove("hidden");
+    $("promptNote").textContent = (style === "2.5d" ? "2.5D" : "2D") + " prompt copy ho gaya. Us AI me paste karo (aakhri line " +
+      "me apna idea likho) → jo script mile wo \"📝 Apni script\" tab me paste karo → upar wala checker dekho → Approve." +
+      (style === "2.5d" ? " (Script me STYLE: 2.5d line hogi, to Style apne aap 2.5D ho jayega.)" : "");
   } catch (e) {
     $("promptNote").classList.remove("hidden");
     $("promptNote").textContent = "Copy nahi ho paya (" + e.message + "). Prompt yahan hai: " +
-      new URL("SCRIPT_PROMPT.md", location.href).href;
+      files.map((f) => new URL(f, location.href).href).join(" + ");
   }
+}
+$("copyPrompt").addEventListener("click", () => copyPrompt("2d"));
+$("copyPrompt25").addEventListener("click", () => copyPrompt("2.5d"));
+
+// ---------------------------------------------------------------- style (2D / 2.5D)
+function currentStyle() {
+  const r = document.querySelector('input[name="style"]:checked');
+  return r ? r.value : "2d";
+}
+function setStyle(style, fromText) {
+  const r = document.querySelector(`input[name="style"][value="${style}"]`);
+  if (r) r.checked = true;
+  store.set("style", style === "2.5d" ? style : "");
+  $("styleHint").classList.toggle("hidden", style !== "2.5d");
+  const keep = $("bPlace").value;
+  renderBuilder();
+  $("bPlace").value = keep;
+  if (!fromText) {                    // the script carries its style too (a STYLE: line), so both always agree
+    if (mode === "script" && $("text").value.trim()) $("text").value = withStyle($("text").value, style);
+    else if (drafts.script.trim()) drafts.script = withStyle(drafts.script, style);
+  }
+}
+document.querySelectorAll('input[name="style"]').forEach((r) => r.addEventListener("change", () => setStyle(currentStyle())));
+$("text").addEventListener("input", () => {          // a pasted / typed STYLE: line moves the picker
+  if (mode !== "script") return;
+  const st = styleOf($("text").value);
+  if (st && st !== currentStyle()) setStyle(st, true);
 });
 $("copy").addEventListener("click", async () => {
   try { await navigator.clipboard.writeText($("post").value); $("copy").textContent = "✅ Copy ho gaya"; }
@@ -968,6 +1044,7 @@ $("copy").addEventListener("click", async () => {
   setTimeout(() => ($("copy").textContent = "📋 Caption copy"), 1500);
 });
 
+setStyle(store.get("style") === "2.5d" ? "2.5d" : "2d", true);
 setMode("idea");
 checkConnection();
 loadGallery();
