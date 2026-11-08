@@ -582,6 +582,9 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         t = float(ev["t"]) if "t" in ev and ev["t"] is not None else cursor
         if lead and "t" in ev and ev["t"] is not None and not (float(ev["t"]) == 0.0 and "who" not in ev):
             t += lead                               # (the sound / shake at 0 stays with the hook card)
+        if ev.get("interrupt") and "say" in ev and ev.get("t") is None and plan.speech:
+            ov = 0.35 if ev["interrupt"] is True else float(ev["interrupt"])
+            t = max(plan.speech[-1]["start"] + 0.3, cursor - gap - ov)   # cuts in before the other one finishes
         plan_end = max(plan_end, t)
         if "wait" in ev:
             cursor = t + float(ev["wait"])
@@ -629,10 +632,17 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             v.update(ev.get("voice", {}) if isinstance(ev.get("voice"), dict) else {})
             path, dur = None, None
             if ti in batch:
-                path = batch[ti]
+                path = audio.trim_silence(batch[ti]) if meta.get("trim_voice", True) else batch[ti]
                 dur = audio.audio_duration(path)
             elif per_line_edge and ev.get("tts", True):
-                path = audio.synth_tts(speak, v.get("name"), v.get("rate", "+0%"), v.get("pitch", "+0Hz"))
+                rate, pitch = v.get("rate", "+0%"), v.get("pitch", "+0Hz")
+                if meta.get("emotion_voice", True):  # an angry line comes faster, a sad one slower and lower...
+                    d_rate, d_pitch = audio.EMOTION_VOICE.get(ev.get("expression") or c.state_at(t)["expression"],
+                                                              (0, 0))
+                    rate, pitch = audio.shift_value(rate, d_rate, "%"), audio.shift_value(pitch, d_pitch, "Hz")
+                path = audio.synth_tts(speak, v.get("name"), rate, pitch)
+                if path and meta.get("trim_voice", True):
+                    path = audio.trim_silence(path)
                 if path:
                     dur = audio.audio_duration(path)
                 elif not warned[0]:
@@ -649,6 +659,11 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                       shot=ev.get("shot"))
             c.speech.append(sp)
             plan.speech.append(sp)
+            if ev.get("interrupt") and len(plan.speech) > 1:
+                prev = plan.speech[-2]
+                if prev["end"] > t and prev["who"] != sp["who"]:      # the other person gets cut off
+                    prev["end"] = t + 0.1
+                    prev["cut"] = t + 0.1 - prev["start"]
             if subtitle:                            # voice-over / subtitle mode: the words at the bottom while spoken
                 plan.overlays.append({"text": text, "style": "subtitle", "from": t,
                                       "pos": "bottom" if ev.get("subtitle") else "lower",   # above Instagram's caption

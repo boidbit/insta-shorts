@@ -151,7 +151,7 @@ PITCHES = ["+0Hz", "+14Hz", "-8Hz", "+24Hz", "-14Hz"]
 BUILDS = ("slim", "normal", "chubby")
 GENDER_WORDS = ("female", "woman", "ladki", "aurat", "male", "man", "ladka", "aadmi")
 MOVE_WORDS = ("enter", "exit", "walk", "left", "right", "center", "up", "down", "up_left", "up_right",
-              "pump", "swing", "cheer", "disco", "shake", "drop", "noprop")
+              "pump", "swing", "cheer", "disco", "shake", "drop", "noprop", "interrupt", "beech_me")
 
 
 def vocab():
@@ -382,6 +382,8 @@ def _stage(tokens, ev, scene_cast, who):
             ev.setdefault("fx", []).append(fxn if fxn != "glow_eyes" else {"type": "glow_eyes", "dur": 3.0})
         elif w == "shake":
             ev["camera"] = {"shake": 0.6}
+        elif w in ("interrupt", "beech_me"):        # B (interrupt, angry): ... cuts A off mid-sentence
+            ev["interrupt"] = True
         elif w in SHOTS:
             ev["shot"] = SHOT_ALIASES.get(w, w)
         elif w in DEPTH_WORDS:

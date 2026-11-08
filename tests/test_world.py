@@ -236,5 +236,43 @@ class VideoOptionTests(unittest.TestCase):
         self.assertIn("--dialogue $DIALOGUE --hook $INTRO", flow)
 
 
+class VoiceTests(unittest.TestCase):
+    def test_interrupt_cuts_the_other_line(self):
+        text = JUNGLE.replace("B (think, question):", "B (interrupt, think, question):")
+        scene, warns = parse_script(text)
+        self.assertEqual(warns, [])
+        p = compile_scene(split_scenes(scene)[0], use_tts=False)
+        a, b = p.speech[0], p.speech[1]
+        self.assertLess(b["start"], compile_scene(split_scenes(parse_script(JUNGLE)[0])[0], use_tts=False)
+                        .speech[0]["end"])                               # B starts before A would have finished
+        self.assertAlmostEqual(a["end"], b["start"] + 0.1, places=3)    # A is cut off
+        self.assertIn("cut", a)
+
+    def test_cut_line_is_trimmed_in_the_mix(self):
+        from studio.render import Renderer
+        scene, _ = parse_script(JUNGLE.replace("B (think, question):", "B (interrupt, think, question):"))
+        r = Renderer(split_scenes(scene)[0], width=270, use_tts=False)
+        r.speech[0]["audio"] = __file__                                  # any input: only the filter text is checked
+        self.assertIn("atrim=0:%.2f" % r.speech[0]["cut"], " ".join(r.ffmpeg_cmd("x.mp4")))
+
+    @unittest.skipUnless(__import__("shutil").which("ffmpeg"), "needs ffmpeg")
+    def test_dead_air_is_trimmed(self):
+        import subprocess
+        import tempfile
+        from studio import audio
+        d = tempfile.mkdtemp()
+        wav = os.path.join(d, "line.wav")
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono:d=0.5",
+                        "-f", "lavfi", "-i", "sine=f=300:d=1.0:sample_rate=24000", "-f", "lavfi", "-i",
+                        "anullsrc=r=24000:cl=mono:d=0.6", "-filter_complex", "[0][1][2]concat=n=3:v=0:a=1", wav],
+                       check=True)
+        self.assertLess(audio.audio_duration(audio.trim_silence(wav)), 1.25)
+
+    def test_emotion_shifts_the_edge_voice(self):
+        from studio import audio
+        self.assertEqual(audio.shift_value("+0%", audio.EMOTION_VOICE["angry"][0], "%"), "+8%")
+        self.assertEqual(audio.shift_value("-14Hz", audio.EMOTION_VOICE["sad"][1], "Hz"), "-22Hz")
+
+
 if __name__ == "__main__":
     unittest.main()

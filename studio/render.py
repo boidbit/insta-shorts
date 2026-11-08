@@ -183,8 +183,10 @@ class Output:
             if sp.get("audio"):
                 cmd += ["-i", sp["audio"]]
                 ms = int(sp["start"] * 1000)
-                filters.append("[%d:a]aresample=44100,aformat=channel_layouts=mono,adelay=%d:all=1,volume=1.0[s%d]"
-                               % (idx, ms, idx))
+                cut = ",atrim=0:%.2f,afade=t=out:st=%.2f:d=0.06" % (sp["cut"], max(0.0, sp["cut"] - 0.06)) \
+                    if sp.get("cut") else ""             # interrupted: the line stops where the other one cuts in
+                filters.append("[%d:a]aresample=44100,aformat=channel_layouts=mono%s,adelay=%d:all=1,volume=1.0[s%d]"
+                               % (idx, cut, ms, idx))
                 speech_lbl.append("[s%d]" % idx)
                 idx += 1
         for fx in self.sfx:
