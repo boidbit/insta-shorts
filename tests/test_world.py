@@ -287,6 +287,27 @@ class VoiceTests(unittest.TestCase):
                        check=True)
         self.assertLess(audio.audio_duration(audio.trim_silence(wav)), 1.25)
 
+    @unittest.skipUnless(__import__("shutil").which("ffmpeg"), "needs ffmpeg")
+    def test_a_rewritten_line_is_trimmed_again(self):
+        """The bhoot video: the Gemini take was split again (right this time) into the same file names, but the
+        trimmed copy cached by name was the old, wrong cut, so the dog still talked in the boy's shot."""
+        import subprocess
+        import tempfile
+        from studio import audio
+        d = tempfile.mkdtemp()
+        wav = os.path.join(d, "line_001.wav")
+
+        def make(seconds):
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono:d=0.3",
+                            "-f", "lavfi", "-i", "sine=f=300:d=%s:sample_rate=24000" % seconds, "-filter_complex",
+                            "[0][1]concat=n=2:v=0:a=1", wav], check=True)
+        make(1.0)
+        first = audio.audio_duration(audio.trim_silence(wav))
+        make(3.0)                                                   # same name, new content
+        second = audio.audio_duration(audio.trim_silence(wav))
+        self.assertLess(first, 1.3)
+        self.assertGreater(second, 2.7)
+
     def test_emotion_shifts_the_edge_voice(self):
         from studio import audio
         self.assertEqual(audio.shift_value("+0%", audio.EMOTION_VOICE["angry"][0], "%"), "+8%")

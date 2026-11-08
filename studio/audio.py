@@ -71,7 +71,11 @@ def synth_tts(text, voice=None, rate="+0%", pitch="+0Hz"):
 
 def trim_silence(path):
     """Cut the dead air a voice has before and after a line (it adds up to long pauses between lines)."""
-    out = os.path.splitext(path)[0] + ".trim.wav"
+    # keyed by the CONTENT of the line: a Gemini line file is rewritten in place when the take is split again,
+    # and a trim cached by file name alone handed back the old, wrongly cut voice
+    with open(path, "rb") as f:
+        tag = hashlib.sha1(f.read()).hexdigest()[:12]
+    out = os.path.splitext(path)[0] + ".trim-%s.wav" % tag
     if os.path.isfile(out) and os.path.getsize(out) > 1000:
         return out
     flt = ("silenceremove=start_periods=1:start_threshold=-40dB:start_silence=0.03,areverse,"
