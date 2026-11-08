@@ -119,5 +119,44 @@ class AnimalTests(unittest.TestCase):
         self.assertEqual(img.size, (270, 480))
 
 
+UI = """HOOK: Salary aayi aur gayi 💸
+CAST: A = office_guy glasses
+SCENE: office
+NOTIFY: Bank | Salary credited | Balance: Rs 50,012
+A (excited, jump): Salary aa gayi! | सैलरी आ गई!
+COUNTER: Balance 50000 -> 12
+LOADING: Dimaag loading...
+TIMECARD: 5 minute baad...
+CHAPTER: Chapter 2 | EMI ka din
+A (dead, fall, thud): Barah rupaye | बारह रुपये
+ENDCARD: Follow karo | @desitoons
+CTA: Tag karo 👇
+"""
+
+
+class UiTests(unittest.TestCase):
+    def test_ui_lines(self):
+        scene, warns = parse_script(UI)
+        self.assertEqual(warns, [])
+        tl = scene["timeline"] if "timeline" in scene else scene["scenes"][0]["timeline"]
+        ui = [e["overlay"] for e in tl if "overlay" in e and e["overlay"].get("type")]
+        self.assertEqual([o["type"] for o in ui], ["notification", "counter", "loading", "timecard", "chapter", "endcard"])
+        self.assertEqual(ui[0]["app"], "Bank")
+        self.assertEqual((ui[1]["start"], ui[1]["end"], ui[1]["label"]), (50000, 12, "Balance"))
+        cta = next(e["overlay"] for e in tl if "overlay" in e and e["overlay"].get("style") == "card")
+        self.assertGreater(cta["pos"][1], 1000)                             # under the end card, not on it
+
+    def test_ui_frames_render(self):
+        scene, _ = parse_script(UI)
+        r = Renderer(split_scenes(scene)[0], width=270, use_tts=False)
+        for o in r.plan.overlays:
+            if o.get("type"):
+                r.frame(float(o["from"]) + 0.5)
+
+    def test_bad_counter_warns(self):
+        _, warns = parse_script(UI.replace("Balance 50000 -> 12", "Balance"))
+        self.assertTrue(any("COUNTER" in w for w in warns))
+
+
 if __name__ == "__main__":
     unittest.main()

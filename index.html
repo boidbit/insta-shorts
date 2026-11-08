@@ -307,7 +307,8 @@ async function checkConnection() {
 // ---------------------------------------------------------------- script checker (mirrors studio/script.py)
 const V = JSON.parse($("vocab").textContent);
 const SET = Object.fromEntries(Object.entries(V).map(([k, v]) => [k, new Set(v)]));
-const HEADERS = new Set(["HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "OBJ", "LIGHTS", "LIGHT"]);
+const HEADERS = new Set(["HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "OBJ", "LIGHTS", "LIGHT",
+  "NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD"]);
 const words = (s) => s.toLowerCase().split(/[\s,|]+/).map((w) => w.replace(/^[\[\](){}'"]+|[\[\](){}'"]+$/g, "")).filter(Boolean);
 const short = (s) => (s.length > 45 ? s.slice(0, 45) + "…" : s);
 
@@ -393,6 +394,14 @@ function lintScript(text) {
       const key = m[1].toUpperCase(), val = m[2].trim();
       if (key === "HOOK") hook = !!val;
       if (key === "CTA") cta = !!val;
+      if (["NOTIFY", "NOTIFICATION", "LOADING", "TIMECARD", "CHAPTER", "ENDCARD"].includes(key)) {
+        if (!val) out.push(`${key}: ke baad text likho`);
+        continue;
+      }
+      if (key === "COUNTER") {
+        if (!/\|\s*-?\d+|\d+\s*(->|to|se)\s*-?\d+$/.test(val)) out.push(`COUNTER: "COUNTER: Rotiyan | 0 | 14" likho (label | shuru | aakhri number)`);
+        continue;
+      }
       if (key === "LIGHTS" || key === "LIGHT") {
         if (!["on", "off", "dim"].includes(val.toLowerCase())) out.push(`LIGHTS: on / off / dim likho`);
         continue;
@@ -478,7 +487,7 @@ const EMO = { gussa: "angry", ghussa: "angry", hairan: "surprised", shock: "shoc
   khush: "smile", dukhi: "sad", udaas: "sad", neend: "sleepy", mar: "dead", chilla: "shout", aankh: "wink" };
 const EMO_CHIPS = [["😠", "gussa"], ["😲", "hairan"], ["😱", "shock"], ["😏", "akad"], ["😂", "hasi"], ["😢", "rona"],
   ["🤔", "soch"], ["😍", "pyaar"], ["😈", "chalak"], ["😄", "khush"], ["📢", "chilla"], ["💀", "mar"]];
-const HEADER_RE = /^(HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|OBJ|LIGHTS?)\s*:\s*(.*)$/i;
+const HEADER_RE = /^(HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|OBJ|LIGHTS?|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)\s*:\s*(.*)$/i;
 const SAY_RE = /^([A-Za-z][\w ]{0,24}?)\s*(?:\(([^)]*)\))?\s*:\s*(\S.*)$/;
 const ACT_RE = /^([A-Za-z][\w ]{0,24}?)\s*->\s*(\S.*)$/;
 const DEFAULT_CTA = "Apne dost ko tag karo 👇";
@@ -555,7 +564,11 @@ function buildScript(text, b) {
     let m;
     if (!line) { rows.push({ cut: "CUT" }); continue; }
     if (/^(CUT|SHOT)\b/i.test(line)) { rows.push({ cut: line, own: true }); continue; }
-    if ((m = line.match(HEADER_RE))) { meta[m[1].toUpperCase()] = m[2].trim(); continue; }
+    if ((m = line.match(HEADER_RE))) {
+      if (/^(OBJ|LIGHTS?|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)$/i.test(m[1])) rows.push({ raw: line });   // story lines: kept in place
+      else meta[m[1].toUpperCase()] = m[2].trim();
+      continue;
+    }
     if ((m = line.match(ACT_RE))) { rows.push({ who: who(m[1]), act: m[2].trim() }); continue; }
     if ((m = line.match(SAY_RE))) {
       const [roman, dev] = m[3].split("|").map((x) => x.trim());
@@ -575,6 +588,7 @@ function buildScript(text, b) {
       if (body.length && !/^(CUT|SHOT)\b/i.test(body[body.length - 1])) body.push(r.cut);
       continue;
     }
+    if (r.raw) { body.push(r.raw); continue; }
     const person = r.who !== "NARRATOR" && r.who !== "ALL";
     if (!own && person && last && r.who !== last && !(k === 0 && inShot.length === 1)) {
       k++;
@@ -606,7 +620,7 @@ function buildScript(text, b) {
 // Mirrors unflatten() in studio/script.py.
 function unflatten(text) {
   if ((text.match(/\n/g) || []).length >= 3 || !/\b(HOOK|CAST|SCENE)\s*:/.test(text)) return text;
-  const heads = "HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|OBJ|NARRATOR";
+  const heads = "HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|OBJ|NARRATOR|LIGHTS|NOTIFY|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD";
   let t = text.trim().replace(new RegExp(`\\s+(?=(?:${heads})\\s*:)`, "g"), "\n");
   t = t.replace(new RegExp(`\\s+(?=(?:CUT|SHOT)\\b(?:\\s+(?:${V.framings.join("|")}|reverse|over|[A-Z]\\w*))*\\s+[A-Z]\\w*\\s*[(:\\-])`, "g"), "\n");
   const cast = (t.match(/^CAST\s*:\s*(.*)$/m) || [, ""])[1];

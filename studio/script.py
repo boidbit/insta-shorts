@@ -481,6 +481,45 @@ def parse_lyrics(meta, lyrics):
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp")
 
 
+UI_WORDS = ("NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
+
+
+def ui_line(key, val):
+    """`NOTIFY: Bank | Rs 5 credited | Balance: Rs 7`, `LOADING: Dimaag loading...`, `COUNTER: Rotiyan | 0 | 14`,
+    `TIMECARD: 3 ghante baad...`, `CHAPTER: Chapter 2 | Exam ka din`, `ENDCARD: Follow karo | @page`
+    -> (overlay spec, seconds the story waits, warning)."""
+    parts = [p.strip() for p in val.split("|")]
+    if not parts[0]:
+        return None, 0, "%s: ke baad text likho" % key
+    if key in ("NOTIFY", "NOTIFICATION"):
+        app, title, text = (["", parts[0], ""] if len(parts) == 1 else
+                            [parts[0], parts[1], ""] if len(parts) == 2 else parts[:3])
+        return {"type": "notification", "app": app or "Message", "title": title, "text": text}, 1.4, None
+    if key == "LOADING":
+        return {"type": "loading", "label": parts[0]}, 2.6, None
+    if key == "COUNTER":
+        nums = [p for p in parts[1:] if re.match(r"^-?\d+$", p)]
+        if not nums:
+            m = re.match(r"^(.*?)\s+(-?\d+)\s*(?:->|to|se)\s*(-?\d+)$", parts[0])
+            if m:
+                parts, nums = [m.group(1)], [m.group(2), m.group(3)]
+        if not nums:
+            return None, 0, "COUNTER: 'COUNTER: Rotiyan | 0 | 14' likho (label | shuru | aakhri number)"
+        a, b = (0, int(nums[0])) if len(nums) == 1 else (int(nums[0]), int(nums[1]))
+        return {"type": "counter", "label": parts[0], "start": a, "end": b}, 2.6, None
+    if key == "TIMECARD":
+        return {"type": "timecard", "text": parts[0]}, 1.6, None
+    if key == "CHAPTER":
+        spec = {"type": "chapter", "text": parts[0]}
+        if len(parts) > 1:
+            spec["subtitle"] = parts[1]
+        return spec, 2.0, None
+    spec = {"type": "endcard", "text": parts[0]}          # ENDCARD
+    if len(parts) > 1:
+        spec["sub"] = parts[1]
+    return spec, 2.4, None
+
+
 def resolve_background(raw):
     """`street` / `gali` (= assets/backgrounds/gali.png) / `assets/backgrounds/x.jpg` -> (background dict, warning)."""
     name = raw.strip()
@@ -606,7 +645,8 @@ def parse_chat(meta, title, msgs):
     return scene, warnings
 
 
-HEADER_WORDS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "OBJ", "NARRATOR")
+HEADER_WORDS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "OBJ", "NARRATOR",
+                "LIGHTS", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
 
 
 def unflatten(text):
@@ -729,6 +769,16 @@ def parse_script(text):
             if frame == "ots":
                 cur["back"] = back
             continue
+        m = re.match(r"^(NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)\s*:\s*(.*)$", line, re.I)
+        if m:
+            if cur is None:
+                cur = new_scene()
+            spec, hold, warn = ui_line(m.group(1).upper(), m.group(2).strip())
+            if warn:
+                warnings.append(warn)
+            if spec:
+                cur["lines"].append(("ui", spec, hold))
+            continue
         m = re.match(r"^LIGHTS?\s*:\s*(on|off|dim)\s*$", line, re.I)
         if m:
             if cur is None:
@@ -826,6 +876,9 @@ def parse_script(text):
             if ln[0] == "lights":
                 tl.append({"lights": ln[1]})
                 continue
+            if ln[0] == "ui":
+                tl.append({"overlay": dict(ln[1]), "hold": ln[2]})
+                continue
             if ln[0] == "obj":
                 oev = {"obj": ln[1]}
                 if first:
@@ -885,7 +938,9 @@ def parse_script(text):
         if si == len(scenes) - 1 and meta.get("CTA"):
             last = {"hold": 2.0, "sfx": "pop", "volume": 0.5,
                     "overlay": {"text": meta["CTA"], "style": "card",
-                                "pos": [540, 640], "color": [236, 90, 70]}}
+                                "pos": [540, 1460 if any(ln[0] == "ui" and ln[1]["type"] == "endcard"
+                                                         for ln in sc["lines"]) else 640],   # below an end card
+                                "color": [236, 90, 70]}}
         tl.append(last)
         sc_sets = []
         if sc.get("sets"):

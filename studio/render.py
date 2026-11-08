@@ -17,7 +17,7 @@ import time
 
 from PIL import Image, ImageOps
 
-from . import actions, audio, objects, rides
+from . import actions, audio, objects, rides, ui
 from .backgrounds import Background
 from .characters import DEFAULT_POSE, build_character, render_ops, skeleton
 from .scene import GROUND_Y, camera_at, compile_music, compile_scene, prepare_voice, split_scenes, static_overlays
@@ -58,12 +58,39 @@ class OverlayLayer:
             self._cache[key] = chat_image(o["chat"], shown, self.s, typing=typing)
         return self._cache[key]
 
+    UI_DUR = {"notification": 3.0, "loading": 3.0, "counter": 3.0, "timecard": 1.6, "chapter": 2.2}
+    UI_POS = {"notification": (540, 150), "loading": (540, 900), "counter": (540, 720), "chapter": (540, 330)}
+
+    def _draw_ui(self, img, o, t, t0, t1):
+        """Phone notification, loading bar, counter, time card, chapter card, end card (studio/ui.py)."""
+        typ, lt = o["type"], t - t0
+        W, H = img.size
+        im = ui.render(o, lt, self.s, (t1 - t0) if t1 < 1e8 else 3.0, (W, H))
+        if im is None:
+            return
+        fade = clamp(lt / 0.2) * (clamp((t1 - t) / 0.25) if t1 < 1e8 else 1.0)
+        if typ in ("timecard", "endcard"):          # full screen
+            if fade < 0.999:
+                im.putalpha(im.getchannel("A").point([int(v * fade) for v in range(256)]))
+            img.paste(im, (0, 0), im)
+            return
+        pos = o.get("pos", self.UI_POS.get(typ, (540, 900)))
+        px, py = POS[pos] if isinstance(pos, str) else pos
+        if typ == "notification":                   # slides down from the top, and back up at the end
+            py = py - 260 * (1 - ease_out(lt / 0.3)) - (260 * (1 - clamp((t1 - t) / 0.3)) if t1 < 1e8 else 0)
+        paste_rgba(img, im, px * self.s, py * self.s, 1.0, fade)
+
     def draw(self, img, overlays, t):
         for o in overlays:
             t0 = float(o.get("from", 0.0))
             t1 = o.get("to")
-            t1 = float(t1) if t1 is not None else (t0 + float(o["dur"]) if "dur" in o else 1e9)
+            dflt = self.UI_DUR.get(o.get("type"))
+            t1 = float(t1) if t1 is not None else (t0 + float(o["dur"]) if "dur" in o else
+                                                   (t0 + dflt if dflt else 1e9))
             if not (t0 <= t < t1):
+                continue
+            if o.get("type") in ui.TYPES and o.get("type") != "chat" and not o.get("chat"):
+                self._draw_ui(img, o, t, t0, t1)
                 continue
             if o.get("chat"):                       # phone chat: shows the messages whose time has come
                 msgs = o["chat"].get("messages", [])
