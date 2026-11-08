@@ -167,6 +167,12 @@ class Output:
                            % (idx, ms, fx["volume"], idx))
             fx_lbl.append("[f%d]" % idx)
             idx += 1
+        for amb in getattr(self, "ambience", []):     # looped sound beds, mixed with the sound effects
+            cmd += ["-stream_loop", "-1", "-i", amb["path"]]
+            filters.append("[%d:a]aresample=44100,aformat=channel_layouts=mono,atrim=0:%.2f,adelay=%d:all=1,"
+                           "volume=%.2f[f%d]" % (idx, amb["dur"], int(amb["start"] * 1000), amb["volume"], idx))
+            fx_lbl.append("[f%d]" % idx)
+            idx += 1
         mus = None
         if self.music:
             if not self.music["generated"]:
@@ -253,6 +259,7 @@ class Renderer(Output):
         self._label_cache = {}
         self.fps, self.duration, self.n_frames = self.plan.fps, self.plan.duration, self.plan.n_frames
         self.speech, self.sfx, self.music = self.plan.speech, self.plan.sfx, self.plan.music
+        self.ambience = self.plan.ambience
 
     # ------------------------------------------------------------ helpers
     def _lip_open(self, sp, t):
@@ -597,6 +604,7 @@ class Sequence(Output):
         self.n_frames = int(round(self.duration * fps))
         self.speech = [dict(sp, start=sp["start"] + o) for p, o in zip(self.parts, self.offsets) for sp in p.speech]
         self.sfx = [dict(fx, t=fx["t"] + o) for p, o in zip(self.parts, self.offsets) for fx in p.sfx]
+        self.ambience = [dict(a, start=a["start"] + o) for p, o in zip(self.parts, self.offsets) for a in p.ambience]
         self.music = compile_music(scene.get("music") or meta.get("music"), self.duration)
         self.overlays = static_overlays(scene)
         self.overlay_layer = OverlayLayer(self.s)

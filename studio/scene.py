@@ -764,6 +764,17 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     m = scene.get("music") or meta.get("music")
     plan.music = compile_music(m, plan.duration)
     plan.bpm = float(meta.get("bpm") or music_bpm(m) or 96)     # dances move on this beat
+    # a sound bed around the scene (rain, street, office, night, jungle, crowd, wind, sea), looped under everything
+    plan.ambience = []
+    amb = scene.get("ambience")
+    bg = scene.get("background") if isinstance(scene.get("background"), dict) else {}
+    if amb is None and bg.get("time") == "rain":
+        amb = "rain"                                # it rains: you hear it
+    for a in (amb if isinstance(amb, list) else [amb] if amb else []):
+        a = {"type": a} if isinstance(a, str) else dict(a)
+        if a.get("type") in audio.AMBIENCE:
+            plan.ambience.append(dict(path=audio.ambience_path(a["type"]), volume=float(a.get("volume", 0.22)),
+                                      start=0.0, dur=plan.duration))
     return plan
 
 
@@ -789,7 +800,7 @@ def compile_music(m, duration):
         m = {"path": m}
     vol = float(m.get("volume", 0.35))
     if m.get("type") == "beat":
-        p = audio.beat_path(float(m.get("bpm", 104)), duration, m.get("style", "desi"))
+        p = audio.beat_path(float(m.get("bpm", 104)), duration, m.get("style", "desi"), seed=m.get("seed"))
     else:
         p = asset_path(m.get("path"))
     return dict(path=p, volume=vol, generated=m.get("type") == "beat") if p else None

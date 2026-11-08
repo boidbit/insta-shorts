@@ -158,5 +158,31 @@ class UiTests(unittest.TestCase):
         self.assertTrue(any("COUNTER" in w for w in warns))
 
 
+class SoundTests(unittest.TestCase):
+    def test_music_mood_and_ambience(self):
+        text = ROOM.replace("SCENE: room night", "SCENE: room night\nMUSIC: sad\nAMBIENCE: rain")
+        text = text.replace("(scared, sweat)", "(scared, sweat, knock)")
+        scene, warns = parse_script(text)
+        self.assertEqual(warns, [])
+        self.assertEqual((scene["music"]["style"], scene["music"]["bpm"]), ("sad", 72))
+        self.assertIn("seed", scene["music"])
+        self.assertTrue(all(sc.get("ambience") == ["rain"] for sc in scene["scenes"]))   # CUTs keep the sound
+        from studio.render import Sequence
+        seq = Sequence(scene, width=270, use_tts=False)
+        self.assertEqual(len(seq.ambience), 3)
+        cmd = " ".join(seq.ffmpeg_cmd("x.mp4"))
+        self.assertIn("-stream_loop -1", cmd)
+        self.assertIn("knock", cmd)
+
+    def test_rain_place_brings_rain_sound(self):
+        scene, _ = parse_script(JUNGLE.replace("jungle night fog", "street rain"))
+        p = compile_scene(split_scenes(scene)[0], use_tts=False)
+        self.assertEqual(len(p.ambience), 1)
+
+    def test_bad_ambience_warns(self):
+        _, warns = parse_script(ROOM.replace("SCENE: room night", "SCENE: room night\nAMBIENCE: disco"))
+        self.assertTrue(any("AMBIENCE" in w for w in warns))
+
+
 if __name__ == "__main__":
     unittest.main()

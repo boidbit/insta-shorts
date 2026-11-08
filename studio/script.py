@@ -63,6 +63,7 @@ Optional lines still work in that mode: `SECONDS: 60` (total length; default 3.2
 import argparse
 import os
 import re
+import zlib
 
 from . import actions, audio, objects, rides
 from .characters import (ACCESSORIES, EXPRESSIONS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE,
@@ -80,7 +81,8 @@ WEATHER = ("snow", "fog", "fireflies", "leaves")                    # SCENE: <pl
 from .characters import PROPS as _HELD   # noqa: E402
 
 PROPS = tuple(_HELD)
-SFX = ("pop", "boing", "whoosh", "ding", "thud", "clap", "beep", "laugh_track")
+SFX = audio.SFX_NAMES        # pop, boing, whoosh, ding, thud, clap, beep, laugh_track, slap, knock, doorbell, horn...
+MOOD_BPM = {"desi": 100, "soft": 96, "pop": 110, "comedy": 108, "suspense": 84, "sad": 72, "festive": 118, "lofi": 80}
 from .effects import ALL as _FX   # noqa: E402
 
 FX_ALIASES = {"stars": "dizzy", "sweating": "sweat", "pasina": "sweat", "gussa": "anger", "idea": "bulb",
@@ -164,6 +166,7 @@ def vocab():
         "times": sorted(TIMES + WEATHER),
         "sets": sorted(SET_TYPES), "set_words": sorted(set(SET_STATES) | set(SET_X) | {"big", "small", "back", "front", "flip"}),
         "seat_actions": sorted(SEAT_ACTIONS), "animals": sorted(ANIMAL_WORDS),
+        "moods": sorted(audio.MOODS), "ambience": sorted(audio.AMBIENCE),
         "shots": sorted(SHOTS), "depth": sorted(DEPTH_WORDS),
         "objects": sorted(set(objects.OBJECTS) | set(objects.ALIASES)),
         "object_words": ["center", "enter", "exit", "front", "go", "left", "right", "to"],
@@ -646,7 +649,7 @@ def parse_chat(meta, title, msgs):
 
 
 HEADER_WORDS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "OBJ", "NARRATOR",
-                "LIGHTS", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
+                "LIGHTS", "AMBIENCE", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
 
 
 def unflatten(text):
@@ -760,7 +763,10 @@ def parse_script(text):
             shot_no = cur.get("shot", 0) + 1
             prev_sets = {k: dict(v) for k, v in cur.get("sets", {}).items()}
             prev_lights = cur.get("lights", "on")
+            prev_amb = cur.get("ambience")
             cur = new_scene(dict(cur["background"]), None)
+            if prev_amb is not None:
+                cur["ambience"] = prev_amb              # same place: the same sound around
             cur["sets"] = prev_sets                 # same place: the door / sofa / fan are still there
             cur["lights"] = cur["lights_start"] = prev_lights     # ... and the lights stay as they were
             cur["cut_in"], cur["framing"], cur["shot"] = True, frame or None, shot_no
@@ -778,6 +784,16 @@ def parse_script(text):
                 warnings.append(warn)
             if spec:
                 cur["lines"].append(("ui", spec, hold))
+            continue
+        m = re.match(r"^AMBIENCE\s*:\s*(.*)$", line, re.I)
+        if m:
+            if cur is None:
+                cur = new_scene()
+            kinds = [w for w in _words(m.group(1)) if w != "none"]
+            bad = [w for w in kinds if w not in audio.AMBIENCE]
+            if bad:
+                warnings.append("AMBIENCE: %s nahi hai (%s)" % (", ".join(bad), ", ".join(audio.AMBIENCE)))
+            cur["ambience"] = [w for w in kinds if w in audio.AMBIENCE]
             continue
         m = re.match(r"^LIGHTS?\s*:\s*(on|off|dim)\s*$", line, re.I)
         if m:
@@ -966,6 +982,8 @@ def parse_script(text):
             item["sets"] = sc_sets
         if sc.get("lights_start", "on") != "on":
             item["lights"] = sc["lights_start"]
+        if sc.get("ambience") is not None:
+            item["ambience"] = sc["ambience"]
         if sc["title"]:
             item["title"] = sc["title"]
         if sc.get("framing"):
@@ -984,13 +1002,18 @@ def parse_script(text):
         warnings.append("no HOOK: line - the first second has no hook text")
     music = {"type": "beat", "bpm": 100, "volume": 0.2}
     mv = meta.get("MUSIC", "").strip()
+    mood = mv.split()[0].lower() if mv else ""
     if mv.lower() == "none":
         music = None
-    elif mv.lower().startswith("beat"):
+    elif mood == "beat" or mood in audio.MOODS:           # MUSIC: beat 110 / MUSIC: sad / MUSIC: suspense 90
         bpm = re.findall(r"\d+", mv)
-        music["bpm"] = int(bpm[0]) if bpm else 100
+        music["bpm"] = int(bpm[0]) if bpm else MOOD_BPM.get(mood, 100)
+        if mood in audio.MOODS:
+            music["style"] = mood
     elif mv:
         music = {"path": mv, "volume": 0.3}
+    if music and music.get("type") == "beat":            # every video gets its own tune
+        music["seed"] = zlib.crc32((hook or "reel").encode("utf-8")) % 997
     scene = {
         "hook": hook,
         "meta": {"fps": 30, "line_gap": 0.3},
