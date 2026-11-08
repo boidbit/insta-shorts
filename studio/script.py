@@ -163,7 +163,7 @@ def vocab():
         "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS), "fx": sorted(FX),
         "times": sorted(TIMES + WEATHER),
         "sets": sorted(SET_TYPES), "set_words": sorted(set(SET_STATES) | set(SET_X) | {"big", "small", "back", "front", "flip"}),
-        "seat_actions": sorted(SEAT_ACTIONS),
+        "seat_actions": sorted(SEAT_ACTIONS), "animals": sorted(ANIMAL_WORDS),
         "shots": sorted(SHOTS), "depth": sorted(DEPTH_WORDS),
         "objects": sorted(set(objects.OBJECTS) | set(objects.ALIASES)),
         "object_words": ["center", "enter", "exit", "front", "go", "left", "right", "to"],
@@ -182,13 +182,22 @@ def _words(s):
     return [w for w in words if w]
 
 
+ANIMAL_WORDS = {"dog": "dog", "kutta": "dog", "doggy": "dog", "cat": "cat", "billi": "cat", "cow": "cow",
+                "gaay": "cow", "gai": "cow", "crow": "crow", "kauwa": "crow", "kaua": "crow", "parrot": "parrot",
+                "tota": "parrot", "totaa": "parrot", "monkey": "monkey", "bandar": "monkey"}
+
+
 def cast_spec(words, index, unknown=None):
     """'aunty chubby glasses maroon female' -> character spec (with a voice).
     Words that mean nothing here are added to `unknown`."""
     spec, acc = {}, []
     female = None
     for w in words:
-        if w in LOOKS and "look" not in spec:
+        if w in ANIMAL_WORDS and "kind" not in spec:       # A = kutta brown: a dog (talks too)
+            spec["kind"] = ANIMAL_WORDS[w]
+        elif spec.get("kind") not in (None, "monkey") and w in PALETTE and "color" not in spec:
+            spec["color"] = w                          # kutta brown: the fur, not a skin tone
+        elif w in LOOKS and "look" not in spec:
             spec["look"] = w
         elif w in ROLE_LOOKS and "look" not in spec:
             spec["look"] = ROLE_LOOKS[w]
@@ -225,6 +234,10 @@ def cast_spec(words, index, unknown=None):
         voice.update(pitch="+30Hz", rate="+8%")
     elif spec["look"] in ("dada", "dadi"):
         voice.update(pitch="-10Hz", rate="-8%")
+    if spec.get("kind") in ANIMAL_WORDS.values() and spec["kind"] != "monkey":
+        if isinstance(spec.get("color"), str) and spec["color"] in PALETTE:
+            spec["color"] = list(PALETTE[spec["color"]])  # the animal rig takes an RGB colour
+        voice.update(pitch="+20Hz" if spec["kind"] in ("cat", "parrot", "crow") else "-6Hz")
     spec["voice"] = voice
     return spec
 
@@ -241,7 +254,7 @@ def vary_cast(cast):
     seen = {}                                   # look -> [(hair, skin), ...] already on screen
     colors = []                                 # shirt colours already on screen
     for name, spec in cast.items():
-        if spec.get("hidden"):
+        if spec.get("hidden") or spec.get("kind"):    # a voice / an animal: nothing to vary
             continue
         look = spec.get("look", "boy")
         base = LOOKS.get(look, {})

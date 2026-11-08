@@ -21,6 +21,7 @@ from . import actions, audio, objects, rides
 from .backgrounds import Background
 from .characters import DEFAULT_POSE, build_character, render_ops, skeleton
 from .scene import GROUND_Y, camera_at, compile_music, compile_scene, prepare_voice, split_scenes, static_overlays
+from .animals import ANIMALS, build_animal
 from .effects import Effects, Patch
 from .sets import Sets
 from .text import bubble_image, chat_image, styled_box
@@ -444,9 +445,16 @@ class Renderer(Output):
                 prop = None
             expr = pose.get("face") or st["expression"]      # some actions bring their own face (yawn, sneeze...)
             speaking = bool(st["talking"]) and st["talking"].get("bubble") != "thought"   # thoughts: lips shut
-            ops, an = build_character(spec, pose, expr, mouth_open, t, x, y, c.draw_scale(t),
-                                      blink=blink, prop=prop, talking=speaking or singing or chewing,
-                                      tear_phase=(t * 1.1) % 1.0)
+            if spec.get("kind") in ANIMALS:          # dog, cat, cow, crow, parrot: their own rig
+                running = bool(mv and len(mv) > 6 and mv[6])
+                dirn = -1 if st["facing"] == "left" else 1
+                k_an = c.draw_scale(t) * (0.82 if spec["kind"] in ("dog", "cat", "cow") else 1.0)   # next to these people
+                ops, an = build_animal(spec, action, t - a_t0, t, x, y, k_an, dirn, bool(mv), running,
+                                       mouth_open if speaking else 0.0, expr)
+            else:
+                ops, an = build_character(spec, pose, expr, mouth_open, t, x, y, c.draw_scale(t),
+                                          blink=blink, prop=prop, talking=speaking or singing or chewing,
+                                          tear_phase=(t * 1.1) % 1.0)
             r = render_ops(ops, s, self.W, self.H)
             if r:
                 layer, (ox, oy) = r

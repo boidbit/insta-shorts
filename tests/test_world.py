@@ -93,5 +93,31 @@ class WorldTests(unittest.TestCase):
         self.assertIn("question", kinds)
 
 
+ANIMALS = """HOOK: Kutte ne sach bol diya 🐶
+CAST: A = papa moustache, B = kutta brown, C = tota
+SCENE: kitchen
+A (angry, point): Samosa kisne khaya? | समोसा किसने खाया?
+B (wag, smile): Bhau! Tote ne! | भौ! तोते ने!
+C (fly, grin): Hehe | हेहे
+CTA: Tag karo 👇
+"""
+
+
+class AnimalTests(unittest.TestCase):
+    def test_animal_cast_words(self):
+        scene, warns = parse_script(ANIMALS)
+        self.assertEqual(warns, [])
+        self.assertEqual(scene["characters"]["B"]["kind"], "dog")
+        self.assertEqual(scene["characters"]["C"]["kind"], "parrot")
+        self.assertIsInstance(scene["characters"]["B"]["color"], list)     # brown -> RGB for the animal rig
+
+    def test_animals_render_and_talk(self):
+        scene, _ = parse_script(ANIMALS)
+        r = Renderer(split_scenes(scene)[0], width=270, use_tts=False)
+        sp = next(x for x in r.plan.speech if x["who"] == "B")
+        img = r.frame((sp["start"] + sp["end"]) / 2)
+        self.assertEqual(img.size, (270, 480))
+
+
 if __name__ == "__main__":
     unittest.main()

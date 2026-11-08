@@ -1294,6 +1294,8 @@ ACTIONS = {
     # sports / gym / dance
     "bat": bat, "bowl": bowl, "race_start": race_start, "jumping_jacks": jumping_jacks, "squat": squat,
     "pushup": pushup, "lift_weights": lift_weights, "garba": garba, "hookstep": hookstep, "floss": floss,
+    # animal words (studio/animals.py draws them for dogs, cats, cows and birds; a person just does the nearest thing)
+    "bark": talk, "meow": talk, "moo": talk, "caw": talk, "wag": sway, "fly": aeroplane, "peck": bow,
 }
 
 
