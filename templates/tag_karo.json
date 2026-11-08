@@ -1,0 +1,33 @@
+{
+  "name": "tag_karo",
+  "about": "Loop meme: pehle second me bada hook, phir 3 log kitchen me naachte hain + upar caption. vars.hook aur vars.caption badlo.",
+  "vars": {
+    "hook": "Har group me ek aisa dost hota hai 👀",
+    "caption": "Aapke group me bhi aisa dost hai? Tag karo! 😂",
+    "bg": "kitchen"
+  },
+  "meta": { "duration": 8, "fps": 30 },
+  "background": { "type": "{bg}" },
+  "music": { "type": "beat", "bpm": 108, "volume": 0.5 },
+  "characters": {
+    "A": { "look": "college_girl", "slot": "left" },
+    "B": { "look": "uncle", "slot": "center", "prop": "spoon" },
+    "C": { "look": "college_boy", "slot": "right" }
+  },
+  "caption": { "text": "{caption}", "style": "caption_box", "pos": "top", "from": 2.2 },
+  "timeline": [
+    { "t": 0.0, "sfx": "whoosh", "volume": 0.7, "camera": { "shake": 0.5 },
+      "overlay": { "text": "{hook}", "style": "hook", "pos": [540, 420], "to": 2.2 } },
+    { "t": 0.0, "who": "A", "action": "dance", "style": "pump",  "expression": "smug" },
+    { "t": 0.0, "who": "B", "action": "dance", "style": "swing", "expression": "shout" },
+    { "t": 0.0, "who": "C", "action": "dance", "style": "cheer", "expression": "sly" },
+    { "t": 2.2, "sfx": "pop", "volume": 0.5 },
+    { "t": 2.7, "who": "B", "expression": "laugh" },
+    { "t": 3.2, "who": "C", "expression": "grin" },
+    { "t": 4.0, "who": "A", "action": "dance", "style": "swing", "expression": "smile" },
+    { "t": 4.0, "who": "B", "action": "dance", "style": "pump",  "expression": "shout" },
+    { "t": 4.0, "who": "C", "action": "dance", "style": "swing", "expression": "sly" },
+    { "t": 6.2, "who": "A", "expression": "smug" },
+    { "t": 6.2, "who": "C", "action": "dance", "style": "cheer", "expression": "grin" }
+  ]
+}

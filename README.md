@@ -1,141 +1,309 @@
-# Stickman Studio
+# Desi Toons Studio
 
-`scene.json` likho → GitHub Action `.mp4` bana deta hai (1080x1920 reel). Hindi voice, lip-sync, beat music, captions. Video ke **2 style** hain, aur dono ek hi repo me alag-alag rehte hain:
+Idea ya script do → 1080x1920 Instagram reel ban jati hai: Indian cartoon log (kurta, saree, uncle, aunty, dadi...), Hindi awaaz + lip-sync, pehle second me hook, ek video me kai jagah (ghar → sadak → ghar), beat music, aur Instagram caption + hashtags.
 
-| Style | Kaisa dikhta hai | Kab use karo |
-|---|---|---|
-| `"style": "2d"` (default) | Classic desi stickman, flat backgrounds (kitchen/room/street/school/night road) | Roz ke meme reels: halka aur tez |
-| `"style": "2.5d"` | Layered parallax background, depth blur, kurta-pajama wale toon characters, asli camera, roshni, objects + effects | Tyohar ya special posts: zyada "3D type" feel |
-
-Scene file me `"style"` na likho to wo **2d** hai. Isliye purani saari scenes aur templates bina chhede pehle jaisi hi videos dete hain.
-
-## 1-minute start
+## Sabse aasaan: webpage
 
 ```bash
 pip install -r requirements.txt        # + ffmpeg system me chahiye
-python -m studio.render scenes/2d/tag_karo_demo.json -o out/tag_karo.mp4 --width 720
-python -m studio.render scenes/25d/gali_25d_demo.json -o out/gali.mp4 --width 720
-python -m studio.render scenes/2d/tag_karo_demo.json --frame 1.5 -o out/preview.png   # sirf ek frame (fast)
-python -m studio.render scenes/25d/gali_25d_demo.json --print-style                   # -> 2.5d
+python -m studio.web                   # browser me kholo: http://127.0.0.1:7860
 ```
 
-`--no-tts` laga do to voice skip hoti hai (testing ke liye).
+Page pe 3 tareeke hain:
 
-## Folder ka naksha
-
-```
-studio/            core: dono style isi ko share karte hain
-                   (scene format + timeline, Hindi TTS + lip-sync, music/sfx, captions/bubbles,
-                    actions, chehra/expressions, baal/accessories, props, ffmpeg, AI director)
-studio/styles.py   dono style ke niyam: kaunsa background/feature kis style ka hai
-studio/style2d/    sirf 2d: stickman body, flat backgrounds, purana crop-zoom camera
-studio/style25d/   sirf 2.5d: toon body, layered scenery, objects + fx, roshni, perspective
-templates/2d/      templates/25d/        scenes/2d/      scenes/25d/
-tests/golden.py    golden-frame tests (neeche dekho)
-```
-
-**Mix nahi hota:** 2d scene me 2.5d cheez (jaise `kitchen_25d`, `"body": "toon"`, `objects`, `fx`) likh doge to render saaf error ke saath ruk jaata hai, aur sahi style ka hint deta hai. Isi tarah 2.5d scene me flat `kitchen`/`street` nahi chalega.
-
-## Templates
-
-**2d** (`templates/2d/`):
-
-| Template | Kya hai | Kya badalna hai (`vars`) |
+| Tab | Kya karta hai | AI key chahiye? |
 |---|---|---|
-| `tag_karo` | Loop meme: 3 stickmen dance + upar caption | `caption`, `bg` |
-| `dost_types` | 3 dost, har ek ka label + line + Hindi voice | `label_a/b/c`, `line_a/b/c`, `speak_a/b/c`, `outro` |
-| `dialogue` | 2 stickmen ki 4-line baat-cheet | `l1..l4`, `s1..s4`, `caption`, `bg` |
-| `kaun_sahi` | Poll: sawal + 2 option cards | `question`, `option_a/b`, `cta` |
-| `song_reel` | Night road pe musafir + lyric lines | `l1..l4`, music (`music.path`) |
+| 💡 Idea do | "mummy ne doodh mangaya, beta cricket khelne chala gaya" → AI poori kahani, hook, acting, caption bana deta hai. Khali chhodo to AI khud topic chunta hai. | Haan (`GEMINI_API_KEY` free hai, ya `ANTHROPIC_API_KEY`) |
+| 📝 Apni script | Aapki likhi script, bilkul usi line-order me | Nahi |
+| ⚙️ JSON | Poora control (neeche schema) | Nahi |
 
-**2.5d** (`templates/25d/`):
+"Banao" dabao → progress bar → video, download button, caption copy button.
 
-| Template | Kya hai | Kya badalna hai (`vars`) |
+### 🎭 Builder: jagah aur characters chuno, dialogue saade text me
+
+"Idea do" tab me upar **"Jagah aur characters khud chuno"** kholo:
+
+- **Jagah** (kamra, rasoi, bazaar, office…) aur max 3 **characters**: naam, kaun (papa, mummy, dost… har ek ki chhoti photo), baal, rang, kapde, colour, body, extra (chashma, mooch, topi…). Na chuno to "auto". Ye choice browser me yaad rehti hai.
+- Neeche box me **idea** likho → AI inhi characters aur jagah ke saath script likhta hai.
+- Ya seedha **dialogue** likho, har line `Naam: baat`:
+  ```
+  Papa: Sarkari gaadi se aana!
+  Beta: Ji papa ji!
+  Papa (gussa): Aur time pe aana.
+  ```
+  Button "📝 Script banao (bina AI)" ban jata hai: page khud poori script banata hai (HOOK, CAST, SCENE, shots, CTA, caption) aur "Apni script" tab me dikhata hai → padho → Approve.
+- Emotion: box ke neeche chips (😠 gussa, 😲 hairan, 😏 akad, 😂 hasi…) jis line pe cursor hai usme jud jaate hain. Na do to `?!` = hairan, 😂 = hasi apne aap.
+- Shots: khali line = naya shot. Na do to har baar bolne wala badalne pe CUT, aur do logon ki baat me zyada tar `CUT ots` (face-off).
+- **Devanagari likhne ki zarurat nahi:** video banate waqt workflow saari Roman lines ek hi AI request me Devanagari me badal deta hai (`GEMINI_API_KEY`), taaki Hindi awaaz sahi padhe. Bubble me aapka Roman text hi dikhta hai. Key na ho to awaaz Roman padhegi.
+
+AI key ke saath chalana: `GEMINI_API_KEY=xxxx python -m studio.web` (key: aistudio.google.com → Get API key). Model badalna ho to `GEMINI_MODEL` / `DIRECTOR_MODEL`.
+
+## Script format (bina AI)
+
+```
+HOOK: Mummy ka ek kaam... aur hum 😭
+CAST: M = mummy, R = college_boy, D = dost cap
+SCENE: room
+M (think, point): Beta, jaldi se doodh le aana! | बेटा, जल्दी से दूध ले आना!
+R (grin): Haan mummy, bas 2 minute! | हाँ मम्मी, बस दो मिनट!
+R -> exit right
+SCENE: street | Raste me... 🚶
+R -> enter left
+D (wave, ball): Bhai! Ek match ho jaye? | भाई! एक मैच हो जाए?
+ALL -> jump laugh clap
+SCENE: room | 3 ghante baad... ⏰
+M (shout, point, boing, shake): Doodh kahan hai?! | दूध कहाँ है?!
+CTA: Tag karo us dost ko 👇
+CAPTION: Instagram caption (video me nahi dikhta)
+HASHTAGS: #desicomedy #mummy
+```
+
+- `NAAM (shabd): Roman line | देवनागरी line` = bolne wali line. `|` ke baad wala hissa awaaz padhti hai. Na do to awaaz Roman padhegi (uchcharan bigad sakta hai).
+- Bracket ke shabd: expression (`angry, shock, laugh, sly...`), action (`point, shrug, facepalm, dance, jump, fall...`), cheez (`phone, cup, ball, mic...`), sfx (`boing, thud, whoosh...`), `shake`.
+- `NAAM -> enter left | exit right | walk center | dance | facepalm ...` = bina bole action. `ALL ->` sab ke liye.
+- `SCENE: jagah | title`: kitchen, room, street, school, market, office, bus_stop, night_road, plain. street/bus_stop/school me badal, parinde aur peeche se gaadiyan apne aap chalte hain. Title ek card ki tarah 1.4s dikhta hai.
+- CAST me role likh sakte ho (mummy, papa, dadi, dada, dost, bhai, behen, teacher, boss, bachcha) ya look naam + extra: `chubby glasses beard bindi saree red ...`.
+- `wait 1.5` = ruko.
+
+Command line se: `python -m studio.script scripts/doodh_story.txt -o scenes/doodh.json` phir render.
+
+## Gaana / lyrics (bilkul bina format ke)
+
+Script ka format yaad nahi rakhna? Page ke **"📝 Apni script"** tab me (ya `scripts/x.txt` me) bas lyrics likho, har line ek lyric:
+
+```
+SECONDS: 60
+Raat lambi hai, raasta khamosh
+Chalta hu bina manzil ke
+Chaand bhi saath chal raha hai
+```
+
+Agar text me `CAST:` / `SCENE:` / `A -> ...` / `NAME: ...` wali koi line nahi hai, to ye lyrics mode hai: ek kurta wala akela musafir night road pe chalta hai aur lyrics ek-ek karke aate hain. Kuch aur nahi likhna.
+
+- `SECONDS: 60` = video kitne second ka (nahi likha to har lyric 3.2 sec). Lines jitni zyada, utni lambi; 17 lines = ~60 sec.
+- Optional: `HOOK:`, `CTA:`, `CAPTION:`, `HASHTAGS:`, `MUSIC: beat 76` / `MUSIC: none` / `MUSIC: <apni audio ka path>`.
+- **Awaaz nahi gaati.** Is mode me koi voice hai hi nahi: sirf lyrics + halka beat. Asli gaana: `MUSIC: none` rakho aur gaana Instagram me upar se daalo (copyright wahi sambhalta hai). Lyrics ki timing gaane se match nahi hogi, to `SECONDS` aur lines gaane ke hisaab se adjust karo.
+- Page ka checker ("HOOK/CTA nahi hai") lyrics pe dikkat dikha sakta hai: confirm me "Phir bhi banau" dabao.
+
+## Camera, objects aur naye formats
+
+- **Camera apne aap:** har bolne wali line par speaker pe cut-in + halka push-in, punchline pe sabse tight shot + shake, phir wide reaction. Band karna ho: JSON me `"meta": {"auto_camera": false}`. Apni marzi: line ke brackets me `wide`, `medium`, `close`, `two_shot` (jaise `A (shock, close): ...` ya `ALL -> wide`).
+- **Depth:** `B -> near` (character camera ki taraf aata hai, bada), `far` (peeche, chhota), `mid` (normal). `near` ke saath `close` mat milao: shot bahut tight ho jaata hai.
+- **Objects:** `OBJ: truck enter left to right` (gaadi aati hai aur right pe ruk jaati hai), `OBJ: dustbin left`, `OBJ: truck exit right`. Objects: truck (kachra gaadi), auto, car, scooter, cow, dustbin, bags, table; rang (`OBJ: car red ...`), `front` (characters ke aage), `big`/`small`. Apni PNG: `OBJ: assets/objects/x.png right`. Gaadi ke aane tak kahani ruki rehti hai. Jahan character khade hain wahan gaadi mat roko (wo chhup jaati hai), ya `front` lagao.
+- **Apni image se background:** 9:16 (1080x1920) image `assets/backgrounds/gali.png` me daalo, phir script me `SCENE: gali | title` (ya poora path `SCENE: assets/backgrounds/gali.jpg`). Character neeche ki taraf (zameen/sadak ~ neeche ke 35%) khade hote hain, to image me wahan khaali jagah rakho. Image main bana nahi sakta: kisi AI image tool se banwao ya free-licence image lo (flat cartoon style character ke saath mel khaati hai).
+- **Gaadi chalana / chadhna-utarna (rides):** `A -> ride bike` (bike, scooter, cycle, auto, car, truck; `B -> ride auto back` = doosri seat) character gaadi par hop karke baithta hai, `A -> getoff` (ya `getoff left|right`) se utarta hai. Gaadi chalane ke liye `OBJ: bike go right` (ya `enter left to center`), rider saath chalta hai; cycle me pedal ghoomte hain, mudne par rider mirror hota hai. Cycle/bike/scooter/auto me poora rider dikhta hai, car/truck me khidki me sirf sar dikhta hai (truck ka design wahi hai, khidki thodi badi). Rider ke haath handle tak pahunchne ke liye thode lambe hote hain. Jis gaadi par koi baitha ho wo sabke aage aati hai. Gaadi ka size character se hi nikalta hai (ek scale), isliye truck jaisi badi gaadi ke saath wala shot `CUT wide` hota hai (log chhote) ya `CUT inside` (cab bada). Example:
+  ```
+  A -> ride truck enter left to center     (gaadi bahar se aati hai, A pehle se andar)
+  A (smug, close): Le aaya sarkari gaadi! | ले आया सरकारी गाड़ी!
+  A -> getoff                                (utarta hai)
+  OBJ: truck exit right                      (khaali gaadi chali jaati hai)
+  ```
+  Pehle se khade vehicle par chadhna ho to `OBJ: bike left`, phir `A -> ride bike` (hop karke baithta hai).
+- **Naye props/looks:** prop `bag`, accessory `sunglasses`, action `salute`.
+- **Voice-over:** `NARRATOR: Ek din ki baat hai | एक दिन की बात है`. Koi character nahi dikhta, bas awaaz aur neeche subtitle. CAST me likhna nahi padta.
+- **"Expectation vs Reality" / comparison:** do `SCENE:` likho, title card me `Expectation 😎` aur `Reality 😭`, beech me `TRANSITION: whip`. Alag split-screen abhi nahi hai.
+- **Camera se baat karna (monologue):** ek hi character, ek ke baad ek lines. Auto camera use alag-alag close shots me kaat deta hai.
+
+## Aur shabd: jagah, set, jaanwar, screen cards, sound, slow-motion
+
+Ye sab script me seedhe chalte hain (page ka checker bhi inhe jaanta hai), aur AI writer (`SCRIPT_PROMPT.md`) ko bhi ye sab shabd pata hain. Ek test (`tests/test_prompt_words.py`) dhyan rakhta hai ki prompt me koi aisa shabd na ho jo studio na samjhe.
+
+- **Zyada acting:** ~140 actions (`run, sit, lie_down, eat, drink, phone_call, slap, hug, high_five, pushup, garba, hookstep, moonwalk...`), 38 expressions (`scared, nervous, cringe, confused, proud, dizzy, evil, blush...`) aur ~37 cheezein haath me (`chai, samosa, laptop, umbrella, chappal, belan, book...`). Poori list page ke word list me hai (`python -m studio.script --sync-page` usse code se banata hai).
+- **Bolte waqt haath feeling ke hisaab se:** gussa = ungli dikhana, khushi = khule haath, dukh = chhote neeche haath, dar = seene pe haath, smug = kamar pe haath, soch = thodi pe haath. Sunne wale bolne wale ko dekhte hain, sir hilate hain, gusse se peeche hat-te hain, sawaal pe sir tedha karte hain. Ek pose doosre me smooth badalta hai, aankhen random time pe jhapakti hain.
+- **Jagah + waqt + mausam:** 40 jagah (`bedroom, bathroom, balcony, terrace, classroom, exam_hall, hospital, bank, police_station, railway, jungle, beach, graveyard, haunted_house, mandap, gym, kirana, chai_tapri...`), phir waqt `day, night, evening, sunset, dawn, rain` aur mausam `fog, snow, fireflies, leaves`: `SCENE: jungle night fog`. Baarish wali jagah pe baarish ki awaaz apne aap.
+- **Set (cheezein jo jagah me rehti hain):** `OBJ: sofa left`, `OBJ: door right`, `OBJ: tv right on`, `OBJ: signboard center CHAI POINT`. Kahani ke beech: `OBJ: door open`, `OBJ: tv off`, `OBJ: fan on`. Baithna/letna: `A -> sit sofa`, `A -> lie_down bed`. CUT ke baad set waisa hi rehta hai. 28 cheezein: bed, bench, box, bucket, bush, chair, clock, cupboard, desk, door, fan, fence, fridge, lamp, painting, phone, plant, rock, signboard, sofa, stairs, stool, tree, tubelight, tv, window...
+- **Batti:** `LIGHTS: off` (kamra andhera, lamp/TV chamakte rehte hain), `LIGHTS: dim`, `LIGHTS: on`. Agle CUT me bhi waisa hi.
+- **Effects (line ke brackets me):** `sweat, question, exclaim, bulb, anger, hearts, dizzy, zzz, sparkle, steam, smoke, fire, lightning, confetti, tears_spray, pow, spotlight, glow_eyes...`: `A (scared, sweat): ...`
+- **Phenkna:** `A -> throw B` = chappal udti hai, THAK!, camera dono ko dikhata hai, agli line hit ke baad.
+- **Jaanwar:** `CAST: B = kutta brown` (billi, gaay, kauwa, tota, bandar bhi; English me dog, cat, cow, crow, parrot, monkey). Bolte bhi hain. Acting: `bark, meow, moo, caw, wag, fly, peck, sit, eat, jump`.
+- **Screen cards (apni line pe):** `NOTIFY: Bank | Salary credited | Balance: Rs 12` (phone notification upar se aata hai), `LOADING: Dimaag loading...`, `COUNTER: Balance | 50000 | 12`, `TIMECARD: 3 ghante baad...`, `CHAPTER: Chapter 2 | Exam ka din`, `ENDCARD: Follow karo | @page`.
+- **Music ka mood:** `MUSIC: sad`, `MUSIC: suspense 90`, `festive, lofi, comedy, pop, soft, desi` (har video ki dhun alag). `MUSIC: beat 110` aur `MUSIC: none` pehle jaise.
+- **Aas-paas ki awaaz:** `AMBIENCE: rain` (`street, office, night, jungle, crowd, wind, sea`).
+- **Naye sound:** `slap, punch, knock, doorbell, ring, vibrate, horn, footsteps, scream, heartbeat, record_scratch, sad_trombone, rooster, thunder, wind, crowd_cheer, bat_hit, crickets, drumroll, cash, whistle, tick, applause`.
+- **Slow-motion / freeze:** `A -> fall slowmo thud` (agla 1 second 0.4x speed me, camera peeche hat-ta hai). `A -> freeze` (tasveer grey me ruk jaati hai + record scratch); turant baad wali `NARRATOR:` line ruki hui tasveer pe bolti hai ("Haan, ye main hoon").
+- **Camera:** `(zoom)` = us chehre pe jhatke se zoom aur wapas, `(reveal)` = close se shuru, peeche hat ke poori jagah.
+- **Beech me kaatna:** `B (interrupt, angry): ...` = B, A ki baat poori hone se pehle bolta hai; A ki awaaz wahin ruk jaati hai.
+- **Awaaz tight:** har line ke aage-peeche ki khamoshi kat jaati hai; edge-tts me gusse wali line thodi tez, dukhi wali dheemi aur neechi.
+
+## Video options (page / command line)
+
+Page pe "Approve: Video banao" ke upar do options (page yaad rakhta hai):
+
+| Option | Kya karta hai | Command line |
 |---|---|---|
-| `diwali_bomb` | Diwali ki raat, chhat: bomb jalana → phuss → BOOM | `caption`, `l1..l6`, `s1..s6`, `cta` |
-| `kitchen_mummy` | Din ka kitchen: beta khana maange, mummy belan ke saath kaam pakda de | `caption`, `l1..l3`, `s1..s3`, `cta` |
-| `gali_udhaar` | Golden-hour gali: chai tapri par udhaar | `caption`, `l1..l4`, `s1..s4`, `cta` |
+| Dialogue text | `Bubble me` (pehle jaisa), `Neeche subtitle` (bubble nahi, shabd neeche, Instagram caption se upar), `Bubble + subtitle`, `Koi text nahi` (sirf awaaz) | `--dialogue bubble/subtitle/both/none` |
+| Hook card | `Pehli line ke saath` (pehle jaisa), `Pehle hook, phir baat` (hook card 1.7s akela, phir kahani), `Hook card nahi` | `--hook over/first/off` |
 
-Scene file chhoti hoti hai (style template se aata hai):
+GitHub Actions me ye `dialogue` aur `intro` inputs hain.
+
+## Chat video (alag, chhota format)
+
+Texting wale jokes ke liye. Story format se bilkul alag hai: koi character, voice ya CAST nahi. "Apni script" box me (ya `scripts/x.txt` me) bas ye likho:
+
+```
+HOOK: Mummy ka message 📱
+CHAT: Mummy ❤️
+< Beta khana kha liya?
+> Haan mummy 😅
+< Jhooth mat bol, ghar aa!
+> Abhi aaya, 5 minute!
+CTA: Tag karo 👇
+```
+
+- `<` = samne wala (left; message se pehle ~1 sec "typing..." ke teen dot aate hain, aur aane ki `ding` awaaz), `>` = aap (right, `pop` awaaz).
+- Optional: `HOOK:`, `CTA:`, `CAPTION:`, `HASHTAGS:`, `MUSIC: beat 90`. 12 se zyada messages ho to purane upar se nikal jaate hain.
+- Chat ko story ke andar mat milao: story script me `<` / `>` / `CHAT` lines ek warning ke saath ignore hoti hain.
+- Awaaz nahi hoti, to Gemini ka quota kharch nahi hota.
+
+## Shots (CUT): sab ek hi frame me nahi
+
+Ek film ki tarah likho: jab camera kisi aur par jaaye to `CUT` likho. Har shot me **sirf wahi characters** dikhte hain jo us shot me bolte ya kuch karte hain, aur cut seedha hota hai (fade/whip nahi).
+
+```
+SCENE: street
+S (angry): Sun ladke! Sarkari gaadi se aana! | ...      <- baap pehle bolta hai (baap + beti ek frame me)
+B (shock): Papa!? | ...
+CUT
+L (grin): Ji sasur ji! | ...                              <- ab sirf ladka
+L -> exit left
+CUT wide
+S (smug): Dekhte hain... | ...                            <- wide: sab chhote, poori gaadi dikhti hai
+L -> ride truck enter left to center
+CUT inside
+L -> ride truck                                           <- gaadi ke andar: driver bada, cab ke saath
+L (smug): Le aaya sarkari gaadi! | ...
+CUT
+S (shock): Yeh kya hai?? | ...
+```
+
+- `CUT wide` / `CUT inside` / `CUT medium` (default). `SCENE: jagah | title | wide` se bhi framing de sakte ho. Gaadi wala shot apne aap wide hota hai.
+- **Har CUT ek naya angle:** ek jagah ke andar har CUT par background alag hissa dikhata hai (paas se, ek side se, ya ulti taraf se = mirror), jaise camera ghooma ho. `CUT reverse` = jagah ko doosri taraf se dikhao.
+- **`CUT ots` (over the shoulder):** sunne wale ki peeth (sir + kandhe) bade size me aage kone me, bolne wala camera ki taraf. Peeche kaun dikhe: `CUT ots B`; na likho to shot ka doosra character, ya pichhle shot me jo bola tha. Do `CUT ots` aage-peeche = face-off (side apne aap badalti hai).
+- **Ek hi scale:** gaadi hamesha insaan ke anupaat me hoti hai (truck insaan se ~2 guna ooncha, car/auto lagbhag insaan jitni), aur rider khade character jitna hi bada hota hai. Wide shot me log chhote hote hain taaki poori gaadi frame me aaye; bade chehre ke liye `CUT inside` ya `CUT medium`.
+- Shot ek doosre ka state yaad nahi rakhte: jis shot me ladka gaadi me dikhna hai usme `L -> ride truck` dobara likho.
+- Auto camera sirf `medium` shots me zoom karta hai (wide aur inside "composed" shots hain).
+
+## Characters
+
+Ready looks: `boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, kid, kid_girl, office_guy, office_girl`. Har cheez badal sakte ho:
 
 ```json
-{ "extends": "tag_karo", "vars": { "caption": "Aapke group me bhi aisa dost hai? Tag karo! 😂" } }
-{ "extends": "gali_udhaar", "vars": { "caption": "Har gali me ek aisa dost 😂" } }
+"R": { "look": "uncle", "outfit": "kurta", "color": "saffron", "accessories": ["turban", "beard"], "build": "chubby" }
 ```
 
-Poora control chahiye to template ke upar kuch bhi override karo (`characters`, `timeline`, `background`...). `timeline` list override karne par poori replace hoti hai. Bina template ke 2.5d scene likhni ho to upar `"style": "2.5d"` likhna mat bhoolna.
+- `skin`: fair, wheatish, brown, dark · `hair`: short, side_part, spiky, curly, balding, bald, long, braid, bun, ponytail · `hair_color`: black, brown, grey, white, henna
+- `outfit`: tshirt, shirt, kurta, salwar (dupatta ke saath), saree, uniform, blazer, vest · `color` / `accent` (dupatta, blouse, tie) / `pants` / `shoes` (black, white, chappal)
+- **Chehra** (face): `face` oval, round, long, square · `eyes` dot, big, small · `nose` hook, button, long, big · `brows` normal, thick, thin. Script me CAST words: `round_face big_eyes button_nose thick_brows`. Na likho to studio har character ko apna alag chehra deta hai (pehla character classic chehra), aur ek jaise do characters (do `college_boy`) ko alag baal, rang (skin) aur shirt ka colour.
+- `build`: slim, normal, chubby · `scale` (bachche ~0.72) · `accessories`: glasses, cap, turban, moustache, beard, bindi, tilak, earrings
+- 17 expressions, 17 actions (walk, talk, dance, point, laugh, shock, jump, wave, clap, cry, fall, facepalm, shrug, sway, sleep...)
+- **Desi dance pack** (music ki beat pe chalta hai, `MUSIC: beat 110`): `naagin` (haath maathe pe phan), `bhangra`, `aeroplane` (uncle special), `thumka`, `dance_walk` (chalte-chalte dance, `night_road` pe best), `kamar_dard` (hero dance… phir kamar jawab de deti hai), `sing` (mic apne aap haath me, mooh gaata hai). Example: `scripts/shaadi_dance.txt`.
+- Asli gaana: video `MUSIC: none` se banao aur gaana Instagram ke andar "Add audio" se lagao (copyright safe, trending audio ki reach). Hindi voice gaa nahi sakti; gaane ke jokes ke liye `sing` + ek line + baaki logon ka "besura" reaction.
 
-## Voice (Hindi) ka ek zaroori rule
-
-Bubble me dikhne wala text Roman Hinglish me hota hai (`say`), lekin TTS ko **Devanagari** chahiye (`speak`), warna uchcharan galat aata hai:
+## Ek video me kai jagah (multi-scene)
 
 ```json
-{ "who": "A", "say": "Bhai chai pila de", "speak": "भाई चाय पिला दे" }
+{
+  "hook": "Mummy ka ek kaam... aur hum 😭",
+  "transition": "whip",
+  "characters": { "M": { "look": "aunty" }, "R": { "look": "college_boy" } },
+  "overlays": [ { "text": "Mummy ka ek kaam... aur hum 😭", "style": "hook", "pos": [540, 420], "to": 2.0 } ],
+  "scenes": [
+    { "background": { "type": "room" }, "cast": ["M", "R"], "timeline": [ ... ] },
+    { "title": "Raste me...", "background": { "type": "street" }, "cast": ["R"],
+      "characters": { "R": { "x": -140 } }, "timeline": [ { "t": 0, "who": "R", "move": { "x": 540, "dur": 1.2 } } ] }
+  ],
+  "post": { "caption": "...", "hashtags": ["#desicomedy"] }
+}
 ```
 
-Voices: `hi-IN-MadhurNeural` (male), `hi-IN-SwaraNeural` (female). Har character ko alag `pitch`/`rate` do (`"voice": {"name": "...", "pitch": "+20Hz", "rate": "+8%"}`) to alag-alag awaaz lagti hai. Mooh ka khulna-band hona awaaz ki loudness se sync hota hai.
+Poora example: `scenes/doodh_story_demo.json`. Poora schema: `DIRECTOR_PROMPT.md`. Music aur upar wale overlays (hook, caption) poori video pe chalte hain; transition `whip | fade | cut`.
 
-2.5d me har voice clip ke aage-peeche ka silence apne aap kat jaata hai, isliye dialogue tez chalta hai. 2d me purani timing hi rehti hai. Chaho to kisi bhi scene me `"meta": {"trim_voice": true}` (ya `false`) likh ke badal sakte ho.
+## Hook styles (pehla second)
+
+`pattern_interrupt` (Ruko!), `pov`, `relatable` (Agar tum bhi...), `curiosity` (end tak dekho), `list` (3 types ke...), `question` (kaun sahi?), `cold_open` (jhagde ke beech se), `expectation` (expectation vs reality). AI ko style do ya `auto`. Director check karta hai ki hook t=0 pe screen pe hai aur pehle second me kuch ho raha hai, warna khud sudharwata hai.
+
+## Tone: light, dark, satire, absurd (AI writer ke liye)
+
+Page ke "Idea do (AI)" tab me **Tone** dropdown hai (ya idea me ek line `TONE: dark` likho, ya command line me `--tone dark`):
+
+| Tone | Matlab |
+|---|---|
+| `auto` (default) | Idea dekh kar AI khud chunta hai (aur dark/ajeeb idea ko "light" nahi banata). Bina idea ke random mix. |
+| `light` | Family/relatable, halka-phulka. |
+| `dark` 💀 | Halat grim (maut, qarz, system, kismat), andaaz deadpan. Darkness implied: cut, awaaz, `dead` expression; kuch graphic nahi. |
+| `satire` | Aisi ajeeb cheez jo sab pehchaante hain (daftar, bill, rules), kaalpanik log aur sansthan. |
+| `absurd` | Ek namumkin cheez sach hai aur sab use normal maante hain. |
+| `twist` | Meetha shuru, aakhir me tez twist. |
+
+- Har tone ke saath AI ko ek chhota example (exact format me) milta hai, jisse style samajh aati hai.
+- Length: default 5-8 lines / 15-30 sec (setup wali kahani 10 lines / 40 sec tak); line itni lambi jitni baat saaf samjhane ke liye chahiye (~100 characters tak). AI flow lambi script ko rokta nahi.
+- **Kya chalta hai:** adult double-meaning / chhed-chhaad wale jokes (kuch explicit nahi, aur bachchon wale characters ke saath kabhi nahi), mashhoor logon ke public bayan / kaam par satire (jab saaf mazaak ho; jhoothe ilzaam sach bata ke nahi), maut, qarz, bhrasht daftar, bhoot, kismat. **Sirf do cheezein band:** kisi ko uske dharm, jaati, kshetra, gender, shareer ya disability ki wajah se mazaak banana; aur khud ko ya doosron ko nuksaan pahunchane ya jurm sikhane wali baat. Gemini/Claude aisi cheezein waise bhi mana kar dete hain, aur Instagram aise reel hata deta hai.
+
+## Templates (`templates/`)
+
+`tag_karo`, `dost_types`, `dialogue`, `kaun_sahi`, `song_reel`: chhoti scene file se `{ "extends": "dost_types", "vars": { "hook": "...", "line_a": "..." } }`.
+
+## Command line
+
+```bash
+python -m studio.render scenes/doodh_story_demo.json -o out/doodh.mp4 --width 720
+python -m studio.render scenes/doodh_story_demo.json --frame 8 -o out/preview.png     # ek frame (fast)
+python -m studio.director "dadi aur naya smartphone" --hook pov                        # AI -> scenes/generated/*.json + .post.txt
+python -m studio.director --count 3                                                   # AI khud 3 topic, 3 alag hooks
+python -m unittest discover -s tests                                                  # checks
+```
+
+`--no-tts` = awaaz skip (testing). `--dialogue subtitle` / `--hook first` = upar wale video options.
+
+### Gemini voice (realistic) - poori script ek hi request me
+
+Free Gemini key ka quota kam hota hai, isliye **poore video ki saari lines (saare scenes milake) ek hi API request me** bheji jaati hain, ek lambi audio aati hai, aur use lines ke beech ke pause pe kaat kar har line ka alag clip banta hai (lip-sync/timing waise hi chalte hain).
+
+```bash
+export GEMINI_API_KEY=...            # https://aistudio.google.com/apikey  (GitHub: Settings -> Secrets -> GEMINI_API_KEY)
+python -m studio.render scenes/dost_types_demo.json -o out/x.mp4 --tts gemini
+```
+
+- `--tts auto` (default): key set hai to Gemini, warna edge-tts. Auto me Gemini fail ho (quota/network) to edge-tts pe girta hai; `--tts gemini` me fail hone pe render ruk jata hai (awaaz chupke se nahi badalti).
+- Result `.cache/tts/gemini_*` me save hota hai: dobara render / preview frame / GitHub Action re-run = **0 extra requests** (jab tak script same hai). Script ka ek akshar badla to nayi request lagegi.
+- Gemini ek request me max **2 awaazein** deta hai. Do se zyada characters ho to wo in 2 awaazon ko share karte hain; `pitch`/`rate` (ffmpeg se) unhe alag banate hain.
+- Voice chunna ho: `"voice": {"gemini": "Kore"}` (female: Kore, Leda, Aoede...; male: Puck, Charon, Fenrir...). Na do to Swara -> Kore, baaki -> Puck.
+- Style badalna ho: scene `meta.tts` me `{"model": "...", "style": "..."}`.
+- Split pause pe tika hai: Gemini se lines ke beech ~1s ka pause maanga jaata hai. Agar ek line ke andar lamba pause aa gaya to split galat ho sakta hai; render log me har line ka `start-end` aur text print hota hai, wahan check kar lo. Same script dobara bhejna hai to `.cache/tts/gemini_*` delete karo.
+
+Tests: `python -m unittest discover -s tests` (network/key nahi chahiye).
 
 ## GitHub Actions
 
-1. Repo GitHub pe push karo.
-2. **Actions → Render stickman video → Run workflow**.
-   - `scene`: koi bhi `scenes/2d/*.json` / `scenes/25d/*.json` (ya `all`)
-   - `style`: `all` ke saath kaunsa style chahiye (`2d` / `2.5d` / `all`). AI director ke liye bhi yahi style use hota hai.
-   - `width`: 1080 (full) ya 720 (fast)
-   - `voice`: Hindi voice on/off
-3. Run ke baad **Artifacts → stickman-videos** me `out/2d/...` aur `out/25d/...` folders me `.mp4` aur preview `.png` milti hai.
-4. `scenes/**/*.json` push karne par bhi apne aap render hota hai.
+**Actions → Render video → Run workflow**: `instruction` (AI idea) + `hook` + `count`, ya `script` (scripts/*.txt), ya `scene`. Artifacts → `videos` me `.mp4`, preview `.png` aur `.post.txt` (caption + hashtags). `scenes/*.json` ya `scripts/*.txt` push karne par bhi apne aap render hota hai. AI ke liye secret `GEMINI_API_KEY` ya `ANTHROPIC_API_KEY` (Settings → Secrets → Actions). Voice engine: `tts` = `auto` (default: `GEMINI_API_KEY` hai to Gemini voice, warna edge-tts) / `gemini` / `edge`. Web page `tts` nahi bhejta, to wo `auto` pe chalta hai.
 
-### AI Director (optional)
+## GitHub Pages wala page (render GitHub pe)
 
-Secret `ANTHROPIC_API_KEY` add karo (Settings → Secrets → Actions). Phir Run workflow me `instruction` me idea likho aur `style` chuno, jaise:
+`index.html` (repo root) GitHub Pages pe chalta hai: https://boidbit.github.io/insta-shorts/
 
-> 3 dost, ek ko chai ka bill dena hai, baaki bahaane bana rahe hain
+1. Page pe "⚙️ GitHub connection" kholo → fine-grained token banao (sirf is repo ke liye, **Actions: Read and write**, **Contents: Read-only**) → paste → Save. Token sirf aapke browser me rehta hai.
+2. **Idea tab** → idea likho → **Script likho ✍️**. AI sirf script likhta hai (~1 min, workflow `stage=script`, pre-release `draft-…`), video nahi.
+3. Script **Apni script** tab me aa jati hai: padho, jo badalna ho badlo → **✅ Approve: Video banao 🎬** (`stage=video`, ~4-6 min). Apni likhi script bhi seedha yahin se approve kar sakte ho, ya "AI se sudharo" se pehle AI ka version dekh sakte ho.
+4. Video GitHub **Release** (`reel-…`) me publish hoti hai; page wahi chalata hai, download + caption copy deta hai. Approve hua draft apne aap hat jata hai. "Pichli reels" me sab purani videos.
 
-Har style ka apna prompt hai (`DIRECTOR_PROMPT.md` = 2d, `DIRECTOR_PROMPT_25D.md` = 2.5d), to AI ko sirf usi style ke options dikhte hain. Galti ho jaaye (galat action, ya dono style mix) to director khud sudharwata hai. Local me:
+**Doosre AI (ChatGPT, Claude, Gemini app) se script:** koi code nahi chahiye, script sirf simple text hai. Page pe "🤖 … prompt copy karo" dabao → us AI me paste karo (aakhri line me apna idea) → jo script mile wo "📝 Apni script" me paste karo. Page turant check karta hai (brackets me dialogue, anjaan shabd, Devanagari missing, CAST me naam nahi…) aur galti ho to Approve se pehle batata hai. Prompt file: `SCRIPT_PROMPT.md`.
 
-```bash
-python -m studio.director "idea" -o scenes/generated/x.json                 # 2d
-python -m studio.director --style 2.5d "idea" -o scenes/generated/y.json    # 2.5d
-```
+**AI key kahan daalni hai:** repo → Settings → Secrets and variables → Actions → **Repository secrets** → New repository secret → Name `GEMINI_API_KEY` (ya `ANTHROPIC_API_KEY`). `GOOGLE_API_KEY`, `GEMINI_KEY`, `AI_API_KEY` naam bhi chalte hain. *Environment* (`github-pages`), Codespaces ya Dependabot secrets workflow ko nahi dikhte.
 
-## Golden-frame tests (2d kabhi galti se na badle)
+Branch: page us branch pe workflow chalata hai jo settings me likha hai (default `desi-toons-studio`). Repo public hai to releases (videos) bhi public dikhte hain.
 
-```bash
-python -m tests.golden check                      # dono style ke frames tests/golden/ se compare
-python -m tests.golden compare-base --base ../main-checkout   # 2d frames: main ke code vs is code, pixel-identical?
-python -m tests.golden update                     # look jaan-boojh ke badla ho tabhi: golden PNG dobara banao
-```
+## Webpage ko apne server pe daalna
 
-GitHub par **Golden frames** workflow har push aur PR par `compare-base` chalata hai: 2d demo frames `main` ke code aur naye code dono se usi machine par render hote hain, aur ek bhi pixel alag hua to check fail ho jaata hai. Diff images **Artifacts → golden-diffs** me milti hain. `check` wala step sirf jaankari ke liye hai, kyunki alag machine par fonts thode alag ho sakte hain.
-
-## Scene schema (short)
-
-Poora schema `DIRECTOR_PROMPT.md` (2d) aur `DIRECTOR_PROMPT_25D.md` (2.5d) me hai. Yaad rakhne layak:
-
-- **Dono style me:** `characters` (`color`, `slot`/`x`, `accessories`: glasses, cap, tuft, moustache, beard, bindi, hair_short, hair_curly, hair_bun, earrings; `voice`), timeline (`t`, `who`, `action`, `expression`, `prop`, `label`, `say` + `speak`, `look`, `move`, `sfx`, `camera`, `overlay`, `hold`)
-- **actions**: idle, talk, dance (`style`: pump/swing/cheer/disco), point, laugh, shock, jump, wave, clap, cry, fall, walk, facepalm, shrug, sway, sleep, reach, cover_ears
-- **expressions**: neutral, smile, smug, sly, shock, shout, laugh, grin, cry, angry, surprised, think, wink, dead, love, sleepy, sad, nervous, scared, burnt
-- **props**: spoon, phone, mic, cup, ball, stick, agarbatti, phuljhadi, belan, kettle, chai_glass. **sfx**: pop, boing, whoosh, ding, thud, clap, beep, laugh_track, fizz, boom, whistle
-- **2d backgrounds**: kitchen, room, street, school, night_road (scrolling), plain, ya apna `image`
-- **2.5d backgrounds**: `diwali_rooftop` (raat, chhat, jhalar, patakhe), `kitchen_25d` (din, khidki ke bahar ka nazara, jaali wali dhoop, dhool, cooker ki bhaap), `gali_25d` (golden hour, kirana dukaan, khamba + taar, chai tapri), plain, apna `image`
-- **Sirf 2.5d:** character `y` = gehrai (peeche = chhota), `pants`/`skin`, `objects` (bomb, anaar, diya), `{"object": "bomb", "burn": 5}` / `stop` / `hide`, `{"fx": {"type": "sparks" | "boom" | "flash", "at": ...}}`, `light`. Camera me `"focus"` object par bhi, `"head"`, `"dx"`. Zoom 2x tak sharp rehta hai. Chai counter jaise set pieces ke aage ya peeche character khada ho sakta hai (chaiwala `x 990, y 1268`).
-- Camera me `"dur": 0` = seedha cut (dono style).
-
-Speed: 2.5d 1080p par lagbhag 0.25 sec/frame (17 sec ki reel ~2 minute). 2d isse kaafi tez hai.
+Repo me `Dockerfile` hai. Hugging Face Space (Docker, free CPU) ya Render/Railway pe deploy karo, Space settings me secret `GEMINI_API_KEY` aur `STUDIO_PASSWORD` daalo (password ke bina koi bhi aapke page se video bana sakta hai). Free CPU pe 20s ki 720p video ~1-2 min me banti hai.
 
 ## Apna asset daalna
 
-- Background: PNG/JPG `assets/backgrounds/` me rakho → `"background": {"type": "image", "path": "assets/backgrounds/mera.png"}` (9:16 best). Ye dono style me chalta hai, lekin ek single image hone ki wajah se isme parallax nahi hota.
-- Music: `"music": {"path": "assets/music/gaana.mp3", "volume": 0.4}` (generated beat bina copyright wala hai; kisi gaane ka use apni zimmedari pe).
-- Font: `assets/fonts/main.ttf` rakho to caption/bubble usi me banenge (Devanagari ke liye `assets/fonts/devanagari.ttf`).
+- Background: PNG/JPG `assets/backgrounds/` me → `"background": {"type": "image", "path": "assets/backgrounds/mera.png"}` (9:16 best).
+- Music: `"music": {"path": "assets/music/gaana.mp3", "volume": 0.4}` (generated beat copyright-free hai; kisi gaane ka use apni zimmedari pe).
+- Font: `assets/fonts/main.ttf` (Devanagari ke liye `assets/fonts/devanagari.ttf`).
 
 ## Limits (sach me)
 
-- Characters code se bane hain (stickman ya toon); haath se bane ya AI art jaisi detail nahi hogi. Naye look ke liye `studio/style2d/` / `studio/style25d/` badlo ya apni PNG backgrounds do.
-- 2.5d asli 3D nahi hai: camera zoom/pan/shake kar sakta hai, lekin character ke chaaron taraf ghoom nahi sakta.
-- 2.5d ke parallax backgrounds abhi code se bane 3 presets hain.
-- Bubble ke andar emoji ke liye `fonts-noto-color-emoji` chahiye (workflow khud install karta hai).
-- Hindi voice `edge-tts` (Microsoft online service) se aati hai, isliye internet chahiye; bina internet ke `--no-tts`.
+- Characters code se bane flat cartoon hain: AI-generated art jaisi detail nahi. Naye kapde/baal `studio/characters.py` me jodo.
+- Gaana: character gaa nahi sakta (TTS sirf bolta hai); lyrics + apna mp3 + jhoomna ho sakta hai (`song_reel`).
+- Hindi voice `edge-tts` (Microsoft online service) se aati hai, internet chahiye.

@@ -67,21 +67,28 @@ def _read_json(path):
 
 
 def resolve_template(name):
-    """A template is found by name in templates/, templates/2d/ or templates/25d/ (or by path)."""
     if os.path.isfile(name):
         return name
-    for folder in ("", "2d", "25d"):
-        for cand in (os.path.join(ROOT, "templates", folder, name),
-                     os.path.join(ROOT, "templates", folder, name + ".json")):
-            if os.path.isfile(cand):
-                return cand
+    for cand in (os.path.join(ROOT, "templates", name),
+                 os.path.join(ROOT, "templates", name + ".json")):
+        if os.path.isfile(cand):
+            return cand
     raise FileNotFoundError("template not found: %s" % name)
 
 
 def load_scene(path):
     """Load a scene file. If it has "extends", merge it over that template and
     substitute {vars} (template defaults < scene vars)."""
-    scene = _read_json(path)
+    return expand_scene(_read_json(path))
+
+
+def expand_scene(scene):
+    """Resolve "extends" + {vars} of a scene dict (also used for each part of a multi-scene file)."""
+    if "file" in scene and len(scene) <= 2:
+        sub = load_scene(asset_path(scene["file"]))
+        if "transition" in scene:
+            sub["transition"] = scene["transition"]
+        return sub
     if "extends" in scene:
         tpl = _read_json(resolve_template(scene["extends"]))
         variables = dict(tpl.get("vars", {}))

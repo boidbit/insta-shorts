@@ -1,0 +1,10 @@
+HOOK: Dadi ko mila naya smartphone 😂
+CAST: D = dadi, P = beta
+SCENE: room
+D (think, phone): Beta, ye WhatsApp me photo kaise bhejte hain? | बेटा, ये व्हाट्सऐप में फ़ोटो कैसे भेजते हैं?
+P (smile, point): Dadi, bas ye button dabao! | दादी, बस ये बटन दबाओ!
+D (shock, boing, shake): Arre! Ye to video call lag gaya! | अरे! ये तो वीडियो कॉल लग गया!
+P -> facepalm
+CTA: Apni dadi ko tag karo 👇
+CAPTION: Har ghar ki dadi aur naya phone 😂📱
+HASHTAGS: #dadi #desicomedy #relatable

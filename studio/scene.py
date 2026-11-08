@@ -2,8 +2,9 @@
 import math
 import sys
 
-from . import audio, styles
-from .util import LW, LH, asset_path, clamp, ease_in_out, lerp
+from . import audio, effects, gemini_tts, objects, rides
+from .characters import assign_faces, color_of, resolve_spec
+from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, lerp
 
 SLOTS = {
     1: {"center": 540},
@@ -11,8 +12,241 @@ SLOTS = {
     3: {"left": 190, "center": 540, "right": 890},
 }
 GROUND_Y = 1700
+SHOT_ZOOM = {"wide": 1.0, "medium": 1.3, "close": 1.7, "two_shot": 1.3}
+SHOT_ALIASES = {"closeup": "close", "close_up": "close", "twoshot": "two_shot", "2shot": "two_shot"}
+# Camera angle of a shot (CUT): the background is seen closer (a longer lens), from a side, or from the other side
+# (mirrored = the reverse shot). (zoom, centre x in logical px, mirror). Shot 0 of a place shows it all.
+ANGLES = [(1.0, 540.0, False), (1.25, 400.0, True), (1.25, 680.0, False), (1.4, 540.0, True)]
+
+
+def shot_angle(scene, framing):
+    """The background angle of a shot: {"zoom", "x", "mirror"}. scene["angle"] is a shot number (the script counts the
+    CUTs in one place) or a dict; scene["reverse"] = true asks for the view from the other side."""
+    a = scene.get("angle", 0)
+    if isinstance(a, dict):
+        out = dict(zoom=float(a.get("zoom", 1.0)), x=float(a.get("x", 540.0)), mirror=bool(a.get("mirror", False)))
+    else:
+        k = int(a or 0)
+        z, x, m = ANGLES[k if k < len(ANGLES) else 1 + (k - 1) % (len(ANGLES) - 1)]
+        out = dict(zoom=z, x=x, mirror=m)
+    if framing == "wide":                       # a wide shot shows the whole place
+        out.update(zoom=1.0, x=540.0)
+    if framing == "inside":
+        out = dict(zoom=1.0, x=540.0, mirror=False)
+    if scene.get("reverse"):
+        out["mirror"] = True
+    if (scene.get("background") or {}).get("type") == "image" and not scene.get("reverse"):
+        out["mirror"] = False                   # a photo may have writing on it: mirror only when asked
+    out["zoom"] = clamp(out["zoom"], 1.0, 1.6)
+    return out
+
+
+PEOPLE_SCALE_3 = 1.06        # ...three people side by side need the room
+PEOPLE_SCALE = 1.22          # medium shots: people this much bigger than the painted place (x sqrt of the angle zoom)
+FOCUS_H = {"dog": 170.0, "cat": 120.0, "cow": 260.0, "crow": 70.0, "parrot": 70.0}   # animals: camera looks lower
+
+OTS_BACK = dict(k=2.3, drop=1200.0, left=150.0, right=930.0)      # the near shoulder: big, cut off by the frame
+
+
+def place_over_shoulder(chars):
+    """Over-the-shoulder shot: whoever is seen from behind stands big in a near corner (only head and shoulders in
+    the frame); the others face them from the other half, a step further away."""
+    backs = [c for c in chars.values() if c.spec.get("view") == "back"]
+    if not backs:
+        return
+    side = backs[0].spec.get("slot") if backs[0].spec.get("slot") in ("left", "right") else "left"
+    for c in backs:
+        c.x, c.y = OTS_BACK[side], GROUND_Y + OTS_BACK["drop"]
+        c.scale *= OTS_BACK["k"]
+    fronts = [c for c in chars.values() if c.spec.get("view") != "back" and not c.spec.get("hidden")]
+    xs = {1: [720.0], 2: [580.0, 870.0]}.get(len(fronts), [480.0, 700.0, 920.0])
+    if side == "right":
+        xs = [1080.0 - x for x in reversed(xs)]
+    for c, x in zip(fronts, xs):
+        c.x, c.y = x, GROUND_Y + 90.0          # a step closer than in a medium shot
+        c.scale *= 1.12
+
+
+DEPTHS = {"near": (1.3, 110.0), "mid": (1.0, 0.0), "far": (0.75, -150.0)}   # (size multiplier, feet offset in px)
+# a big one-off move said with a line (jump, clap, shock, wave...) plays once, then the character settles into
+# talking with the same face: a person who jumps for 6 seconds while talking looks fake
+BURST_ACTIONS = {"jump": 0.95, "celebrate": 1.6, "fist_pump": 1.2, "jumping_jacks": 1.6, "spin": 1.2, "cartwheel": 1.4,
+                 "stomp": 1.0, "clap": 1.2, "wave": 1.2, "laugh": 1.4, "shock": 1.2, "scared": 1.4, "flex": 1.4,
+                 "salute": 1.2, "namaste": 1.2, "bow": 1.2, "nod": 1.0, "shake_head": 1.2, "high_five": 1.2,
+                 "thumbs_up": 1.4, "scratch_head": 1.4, "rub_hands": 1.4, "shrug": 1.2, "cringe": 1.2, "proud": 1.4,
+                 "shy": 1.4, "facepalm": 1.6, "dizzy": 1.6}
+
 CHAR_ATTRS = ("action", "expression", "prop", "label", "look", "facing", "style", "point", "dir",
-              "lean", "speed", "intensity", "hands", "tint")
+              "lean", "speed", "intensity", "hands", "tint", "on", "visible")
+
+
+OBJ_Y = {"truck": 1640.0, "auto": 1650.0, "car": 1640.0, "scooter": 1660.0, "cow": 1690.0, "dustbin": 1690.0,
+         "bags": 1700.0, "table": 1700.0}
+
+
+class SceneObj:
+    """A set object (vehicle, bin, bags...) that sits in the scene or drives in / out."""
+
+    def __init__(self, kind, color, scale, y, front, t_in, x):
+        self.kind, self.color, self.scale, self.y, self.front, self.t_in = kind, color, scale, y, front, t_in
+        self.t_out = None
+        self.no_fade = t_in < 0.35                      # created at the very start of a shot: it is just there
+        self.x0 = x
+        self.rest = x
+        self.moves = []             # (t0, t1, x0, x1)
+        self.flips = [(t_in, False)]
+
+    def x_at(self, t):
+        x = self.x0
+        for (t0, t1, xa, xb) in self.moves:
+            if t < t0:
+                break
+            x = lerp(xa, xb, ease_in_out((t - t0) / max(1e-6, t1 - t0)))
+        return x
+
+    def moving(self, t):
+        return any(t0 <= t < t1 for (t0, t1, _a, _b) in self.moves)
+
+    def bob_at(self, t):
+        """A vehicle shakes a little while it drives (logical px); its riders shake with it."""
+        return math.sin(t * 17.0) * 3.0 if (self.kind in objects.VEHICLES and self.moving(t)) else 0.0
+
+    def flip_at(self, t):
+        f = False
+        for (t0, fl) in self.flips:
+            if t >= t0:
+                f = fl
+        return f
+
+    def visible(self, t):
+        return t >= self.t_in and (self.t_out is None or t < self.t_out)
+
+
+CHAT_START, CHAT_GAP, CHAT_HOLD, TYPING = 0.6, 1.5, 1.4, 0.9
+
+
+def chat_length(n_messages, chat=None):
+    """Seconds a chat scene with n messages lasts (so a CTA can wait for the end)."""
+    chat = chat or {}
+    msgs = chat.get("messages", [])
+    typing = sum(TYPING for m in msgs if m.get("side") == "left") if msgs else 0.0
+    return (float(chat.get("start", CHAT_START)) + n_messages * float(chat.get("gap", CHAT_GAP)) + typing
+            + float(chat.get("hold", CHAT_HOLD)))
+
+
+def compile_chat(plan, chat):
+    """A phone-chat scene: messages appear one by one (with a pop sound). Returns the time it is all over."""
+    msgs = chat.get("messages", [])
+    gap = float(chat.get("gap", CHAT_GAP))
+    t = float(chat.get("start", CHAT_START))
+    for m in msgs:
+        if m.get("side") == "left" and "t" not in m:
+            t += TYPING                              # the other person "types" before their message arrives
+        m.setdefault("t", round(t, 2))
+        plan.sfx.append(dict(t=float(m["t"]), path=audio.sfx_path("ding" if m.get("side") == "left" else "pop"),
+                             volume=0.45 if m.get("side") == "left" else 0.6))
+        t = float(m["t"]) + gap
+    plan.overlays.insert(0, {"chat": chat, "from": 0.0, "pos": [540, 400], "anim": "none"})   # behind hook / CTA
+    return t + float(chat.get("hold", CHAT_HOLD))
+
+
+def compile_ride(plan, c, spec, t):
+    """`A -> ride bike [back]`: A hops on (the vehicle is created beside A if it is not in the scene yet)."""
+    kind = objects.resolve_kind(spec.get("kind", ""))
+    if not kind or not rides.rideable(kind):
+        plan.warnings.append("cannot ride %r" % spec.get("kind"))
+        return 0.0
+    if c.ride_at(t) is not None or any(r["t_off"] is None for r in c.rides):
+        plan.warnings.append("%s is already on a vehicle" % c.name)
+        return 0.0
+    instant, drive = False, 0.0
+    if kind not in plan.objects:                              # created together with its rider: no hop, it drives in with him
+        side = spec.get("enter")
+        if side in objects.OFFSCREEN:
+            drive = compile_obj(plan, {"kind": kind, "enter": side, "at": spec.get("at") or "center"}, t, plan.warnings)
+        else:
+            compile_obj(plan, {"kind": kind, "at": spec.get("at") or float(c.pos_at(t)[0])}, t, plan.warnings)
+        instant = True
+    seat = spec.get("seat", "driver")
+    taken = {r["seat"] for o_ in plan.world_chars for r in o_.rides
+             if r["obj"] == kind and (r["t_off"] is None or r["t_off"] > t)}
+    if seat in taken and seat != "back" and "back" in rides.RIDES[kind]:
+        seat = "back"
+    plan.objects[kind].front = True                           # a vehicle with riders is the star: in front of everybody
+    if plan.framing == "inside":                             # the shot is the cab: the driver sits in the middle of the frame
+        o_ = plan.objects[kind]
+        o_.x0 = o_.rest = 540.0 - rides.seat_for(kind, seat)["hip"][0] * o_.scale
+        o_.moves = []
+        o_.flips = [(o_.t_in, False)]
+    if instant:
+        plan.objects[kind].no_fade = True
+    c.rides.append({"t0": t, "obj": kind, "seat": seat, "t_off": None, "land_x": None, "land_y": None,
+                    "instant": instant})
+    return drive if drive else (0.1 if instant else rides.RIDE_HOP + 0.1)
+
+
+def compile_getoff(plan, c, spec, t):
+    """`A -> getoff [left|right]`: A hops off beside the vehicle (towards the screen centre unless told)."""
+    cur = [r for r in c.rides if r["t_off"] is None and r["t0"] <= t]
+    if not cur:
+        plan.warnings.append("%s is not on a vehicle" % c.name)
+        return 0.0
+    ride = cur[-1]
+    obj = plan.objects.get(ride["obj"])
+    ox = obj.x_at(t) if obj else c.pos_at(t)[0]
+    side = spec.get("side") if isinstance(spec, dict) else None
+    if side not in ("left", "right"):
+        side = "right" if ox < 540 else "left"
+    reach = rides.HALF_LENGTH.get(ride["obj"], 200) * (obj.scale if obj else 1.0) * 0.5 + 170
+    land_x = clamp(ox + (reach if side == "right" else -reach), 150.0, 930.0)
+    k, dy = c.depth_at(t)
+    ride.update(t_off=t, land_x=land_x, land_y=c.y + dy, land_k=k)
+    c.moves.append((t, t + rides.RIDE_HOP, land_x, c.y, land_x, c.y))       # afterwards it stands there
+    return rides.RIDE_HOP + 0.1
+
+
+def compile_obj(plan, spec, t, warnings=None):
+    """Apply one `obj` timeline event: {"kind", "at", "enter", "exit", "go", "color", "scale", "front", "dur"}."""
+    kind = objects.resolve_kind(spec.get("kind", ""))
+    if not kind:
+        if warnings is not None:
+            warnings.append("unknown object %r" % spec.get("kind"))
+        return 0.0
+    o = plan.objects.get(kind)
+    at = spec.get("at")
+    spot = objects.SPOTS.get(at) if isinstance(at, str) else (float(at) if at is not None else None)
+    dur = float(spec.get("dur", 1.8 if kind in objects.VEHICLES else 1.0))
+    vehicle = kind in objects.VEHICLES
+    if o is None:
+        rest = spot if spot is not None else objects.SPOTS["center"]
+        color = color_of(spec["color"]) if spec.get("color") else None
+        base = (objects.REF_SCALE * plan.world / objects.PERSON_R[kind]) if kind in objects.PERSON_R else plan.world
+        o = SceneObj(kind, color, base * float(spec.get("scale", 1.0)), float(spec.get("y", OBJ_Y.get(kind, 1680.0))),
+                     bool(spec.get("front")), t, rest)
+        plan.objects[kind] = o
+        side = spec.get("enter")
+        if side in objects.OFFSCREEN:
+            o.x0 = objects.OFFSCREEN[side]
+            o.moves.append((t, t + dur, o.x0, rest))
+            o.flips = [(t, side == "right")]
+        o.rest = rest
+        if spec.get("exit") not in objects.OFFSCREEN:
+            return dur if side in objects.OFFSCREEN else 0.0
+    cur = o.x_at(t)
+    if spec.get("go") or (spot is not None and not spec.get("enter") and not spec.get("exit")
+                          and o.t_in < t and abs(spot - cur) > 1):
+        tgt = spot if spot is not None else objects.SPOTS.get(spec.get("go"), cur)
+        o.moves.append((t, t + dur, cur, tgt))
+        o.flips.append((t, tgt < cur))
+        o.rest = tgt
+        return dur if vehicle else dur * 0.6
+    if spec.get("exit") in objects.OFFSCREEN:
+        side = spec["exit"]
+        o.moves.append((t, t + dur, cur, objects.OFFSCREEN[side]))
+        o.flips.append((t, side == "left"))
+        o.t_out = t + dur
+        return dur
+    return 0.0
 
 
 class Char:
@@ -21,27 +255,89 @@ class Char:
         self.spec = spec
         self.x = x
         self.y = ground_y
-        self.scale = float(spec.get("scale", 1.0))
+        self.scale = float(resolve_spec(spec).get("scale", 1.0))
         self.phase = float(spec.get("phase", index * 0.9))
         self.events = []        # sorted by t
         self.moves = []         # (t0, t1, x0, y0, x1, y1)
         self.speech = []        # dicts
+        self.depth = []         # (t, k0, dy0, k1, dy1): step towards / away from the camera
+        self.rides = []         # {"t0", "obj", "seat", "t_off", "land_x", "land_y"}: sitting on a vehicle
+        self.world = {}         # the scene's objects (set by compile_scene)
+        self._rf = (None, None)
         v = spec.get("voice", {})
         self.voice = v if isinstance(v, dict) else {"name": v}
 
     def pos_at(self, t):
         x, y = self.x, self.y
-        for (t0, t1, x0, y0, x1, y1) in self.moves:
+        for (t0, t1, x0, y0, x1, y1, *_r) in self.moves:
             if t < t0:
                 break
             e = ease_in_out((t - t0) / max(1e-6, t1 - t0))
             x, y = lerp(x0, x1, e), lerp(y0, y1, e)
         return x, y
 
+    def depth_at(self, t):
+        """(size multiplier, feet offset) - 1.0 / 0 on the normal ground line."""
+        k, dy = 1.0, 0.0
+        for (t0, k0, dy0, k1, dy1) in self.depth:
+            if t < t0:
+                break
+            e = ease_in_out((t - t0) / 0.5)
+            k, dy = lerp(k0, k1, e), lerp(dy0, dy1, e)
+        return k, dy
+
+    def ground_state(self, t):
+        """(x, feet y, size) of the character standing on the ground at time t."""
+        x, y = self.pos_at(t)
+        k, dy = self.depth_at(t)
+        return x, y + dy, self.scale * k
+
+    def ride_at(self, t):
+        """(ride, phase, p) while on a vehicle: phase "on" / "riding" / "off", p = progress of a hop (0..1)."""
+        for r in self.rides:
+            end = None if r["t_off"] is None else r["t_off"] + rides.RIDE_HOP
+            if t < r["t0"] or (end is not None and t >= end):
+                continue
+            if not r.get("instant") and t < r["t0"] + rides.RIDE_HOP:
+                return r, "on", (t - r["t0"]) / rides.RIDE_HOP
+            if r["t_off"] is not None and t >= r["t_off"]:
+                return r, "off", (t - r["t_off"]) / rides.RIDE_HOP
+            return r, "riding", 1.0
+        return None
+
+    def ride_frame(self, t):
+        if not self.rides:
+            return None
+        if self._rf[0] != t:
+            self._rf = (t, rides.frame(self, t))
+        return self._rf[1]
+
+    def draw_pos(self, t):
+        rf = self.ride_frame(t)
+        if rf:
+            return rf["x"], rf["y"]
+        x, y = self.pos_at(t)
+        return x, y + self.depth_at(t)[1]
+
+    def draw_scale(self, t):
+        rf = self.ride_frame(t)
+        if rf:
+            return rf["scale"]
+        return self.scale * self.depth_at(t)[0]
+
+    def focus_at(self, t):
+        """Where the camera looks when it follows this character (head / chest)."""
+        rf = self.ride_frame(t)
+        if rf:
+            return rf["hip"][0], rf["hip"][1] - 250 * rf["scale"]
+        x, y = self.draw_pos(t)
+        h = FOCUS_H.get(self.spec.get("kind"), 560.0)            # a dog's head is not where a person's is
+        return x, y - h * self.scale * self.depth_at(t)[0]
+
     def state_at(self, t):
         st = dict(action="idle", action_t0=0.0, expression=self.spec.get("expression", "neutral"),
                   prop=self.spec.get("prop"), label=None, look=self.spec.get("look"),
-                  facing=self.spec.get("facing", "front"),
+                  facing=self.spec.get("facing", "front"), visible=self.spec.get("visible", True), on=None,
                   speed=1.0, intensity=1.0, opts={}, talking=None)
         for ev in self.events:
             if ev["t"] > t + 1e-9:
@@ -51,7 +347,8 @@ class Char:
                 st["action_t0"] = ev["t"]
                 st["speed"], st["intensity"] = 1.0, 1.0
                 st["opts"] = {}
-            for key in ("expression", "prop", "label", "look", "facing"):
+                st["on"] = ev.get("on")
+            for key in ("expression", "prop", "label", "look", "facing", "visible"):
                 if key in ev:
                     st[key] = ev[key]
             for key in ("speed", "intensity"):
@@ -81,57 +378,244 @@ def _norm_who(who, names):
     return list(who)
 
 
-def compile_scene(scene, use_tts=True, fps=None):
+def collect_lines(scene):
+    """Every line of one scene that needs a voice, in speaking order, for the Gemini batch."""
+    cdefs = scene.get("characters", {})
+    names = list(cdefs.keys())
+    out = []
+    for ti, raw in enumerate(scene.get("timeline", [])):
+        if "say" not in raw or not raw.get("tts", True):
+            continue
+        who = [w for w in _norm_who(raw.get("who"), names) if w in cdefs]
+        text = str(raw.get("speak", raw["say"])).strip()
+        if not who or not text:
+            continue
+        v = cdefs[who[0]].get("voice", {})
+        v = dict(v) if isinstance(v, dict) else {"name": v}
+        v.update(raw.get("voice", {}) if isinstance(raw.get("voice"), dict) else {})
+        out.append(dict(ti=ti, text=text, voice=gemini_tts.voice_for(v), pitch=v.get("pitch"), rate=v.get("rate")))
+    return out
+
+
+def prepare_voice(scenes, use_tts=True, tts_provider=None):
+    """Voice for a whole VIDEO (all its scenes) with ONE Gemini request.
+
+    Returns one dict per scene: {"paths": {timeline index: wav}, "edge": bool}. `edge` means
+    "synthesize the lines one by one with edge-tts" (provider is edge, or Gemini failed in auto mode).
+    A failure with an explicitly requested gemini provider raises SystemExit instead.
+    """
+    silent = [{"paths": {}, "edge": False} for _ in scenes]
+    if not use_tts or not scenes:
+        return silent
+    cfg = (scenes[0].get("meta") or {}).get("tts") or {}
+    provider, explicit = audio.resolve_provider(tts_provider, cfg)
+    if provider != "gemini":
+        return [{"paths": {}, "edge": True} for _ in scenes]
+    per_scene = [collect_lines(sc) for sc in scenes]
+    flat = [it for lines in per_scene for it in lines]
+    if not flat:
+        return silent
+    try:
+        paths = gemini_tts.synth_script(flat, model=cfg.get("model", gemini_tts.DEFAULT_MODEL),
+                                        style=cfg.get("style", gemini_tts.DEFAULT_STYLE))
+    except Exception as e:
+        if explicit:
+            raise SystemExit("[tts] Gemini failed: %s" % e)
+        print("  [tts] Gemini failed (%s) -> falling back to edge-tts" % str(e)[:160], file=sys.stderr)
+        return [{"paths": {}, "edge": True} for _ in scenes]
+    out, k = [], 0
+    for lines in per_scene:
+        out.append({"paths": {it["ti"]: paths[k + j] for j, it in enumerate(lines)}, "edge": False})
+        k += len(lines)
+    return out
+
+
+SHOT_SIZES = (1.25, 1.5, 1.3, 1.6)       # zoom per spoken line, cycled, so neighbouring lines are different shots
+
+
+def shot_camera(name, t, chars, who, speaker=None, dur=0.16):
+    """Camera event for a shot word (wide / medium / close / two_shot) on the given character(s)."""
+    name = SHOT_ALIASES.get(name, name)
+    ev = dict(t=t, zoom=SHOT_ZOOM[name], dur=dur)
+    if name == "wide":
+        return ev
+    names = [w for w in (who or []) if w in chars]
+    if name == "two_shot" or len(names) > 1:
+        sp = speaker if speaker in chars else (names[0] if names else None)
+        others = [n for n in chars if n != sp and chars[n].spec.get("hidden") is not True]
+        if sp and others:                           # the speaker and whoever stands closest to them
+            sx = chars[sp].draw_pos(t)[0]
+            near = min(others, key=lambda n_: abs(chars[n_].draw_pos(t)[0] - sx))
+            pts = [chars[sp].draw_pos(t), chars[near].draw_pos(t)]
+        else:
+            pts = [chars[n].draw_pos(t) for n in names]
+        if pts:
+            ev["focus"] = [sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts) - 560]
+            return ev
+    focus = names[0] if names else speaker
+    if focus in chars:
+        ev["focus"] = focus
+    return ev
+
+
+def auto_camera(plan, chars, cam_events, shakes):
+    """Rule-based direction for scenes that have no camera moves of their own.
+
+    Every spoken line gets a quick cut-in on its speaker (size cycles through SHOT_SIZES) followed by a slow
+    push-in while the line is spoken; the last line (the punch line) is the tightest shot and ends with a shake;
+    after it the camera pulls back to a wide shot for the reaction. A shot word on the line (close, wide, ...)
+    replaces the automatic size of that line.
+    """
+    speech = sorted((sp for sp in plan.speech if sp.get("who") and not chars[sp["who"]].spec.get("hidden")),
+                    key=lambda sp: sp["start"])
+    n = len(speech)
+    for i, sp in enumerate(speech):
+        t0 = sp["start"]
+        d = max(0.6, sp["end"] - t0)
+        shot = SHOT_ALIASES.get(sp.get("shot"), sp.get("shot"))
+        if shot in SHOT_ZOOM:
+            cut = shot_camera(shot, max(0.0, t0 - 0.05), chars, [sp["who"]], sp["who"])
+            cam_events.append(cut)
+            size = cut["zoom"]
+            if size > 1.0 and d > 1.0:
+                cam_events.append(dict(cut, t=t0 + 0.2, zoom=round(size + 0.1, 2), dur=max(0.4, d - 0.2)))
+            if i == n - 1 and n > 1:
+                shakes.append((max(0.0, sp["end"] - 0.15), 0.5, 0.45))
+            continue
+        if i == 0:                                  # first line: ease in from the wide establishing shot
+            cam_events.append(dict(t=t0, zoom=1.2, focus=sp["who"], dur=min(0.6, d)))
+            size = 1.2
+        else:
+            size = 1.7 if (i == n - 1 and n > 2) else SHOT_SIZES[i % len(SHOT_SIZES)]
+            if chars[sp["who"]].spec.get("kind") in FOCUS_H:
+                size = min(1.8, size + 0.2)         # a small animal talking: come a bit closer
+            cam_events.append(dict(t=max(0.0, t0 - 0.05), zoom=size, focus=sp["who"], dur=0.16))
+        if d > 1.0:                                 # slow push-in while the line is spoken
+            cam_events.append(dict(t=t0 + 0.65 if i == 0 else t0 + 0.2, zoom=round(size + 0.12, 2),
+                                   focus=sp["who"], dur=max(0.4, d - (0.65 if i == 0 else 0.2))))
+        if i == n - 1 and n > 1:
+            shakes.append((max(0.0, sp["end"] - 0.15), 0.5, 0.45))
+    if speech and plan.duration - speech[-1]["end"] > 0.7:
+        cam_events.append(dict(t=speech[-1]["end"] + 0.2, zoom=1.0, dur=0.5))
+    for w in plan.warps:                            # slow motion: pull back to watch it happen
+        if w[0] == "slow":
+            cam_events.append(dict(t=w[1], zoom=1.0, dur=0.4))
+    for fx in plan.effects:                         # a throw: frame the thrower and the target together
+        if fx.get("type") == "projectile" and fx.get("src") in chars and fx.get("dst") in chars:
+            t0 = max(0.0, fx["from"] - 0.45)
+            (x1, y1), (x2, y2) = chars[fx["src"]].draw_pos(t0), chars[fx["dst"]].draw_pos(fx["to"])
+            zoom = round(max(1.0, min(1.3, 1080.0 / (abs(x2 - x1) + 420.0))), 2)
+            cam_events.append(dict(t=t0, zoom=zoom, focus=[(x1 + x2) / 2.0, (y1 + y2) / 2.0 - 560], dur=0.16))
+
+
+def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan = Plan()
-    plan.style = styles.check(scene)          # refuses scenes that mix 2d and 2.5d features
     meta = scene.get("meta", {})
-    # edge-tts pads clips with ~1 s of silence. 2.5d trims it (snappier); 2d keeps the original timing.
-    trim_voice = bool(meta.get("trim_voice", plan.style == "2.5d"))
     plan.fps = int(fps or meta.get("fps", 30))
     plan.fade_in = float(meta.get("fade_in", 0.0))
     plan.fade_out = float(meta.get("fade_out", 0.0))
     plan.background = scene.get("background", {"type": "plain"})
-    plan.light = dict(scene.get("light", {}))
-    plan.perspective = scene.get("perspective", meta.get("perspective", True))
-    # world objects (sutli bomb, anaar, diya...) that live on the floor with the characters
-    plan.objects = []
-    for i, o in enumerate(scene.get("objects", [])):
-        o = dict(o)
-        o.setdefault("id", "obj%d" % i)
-        o.setdefault("y", GROUND_Y)
-        plan.objects.append(o)
-    objs = {o["id"]: o for o in plan.objects}
-    plan.fx = []
+
+    # ---- one scale for the whole shot ----
+    # framing: "wide" = everybody small enough that the vehicles fit in the frame in proportion; "inside" = people big
+    # and the vehicle drawn huge around its driver; "medium" = people big (default when there is no vehicle).
+    kinds_ = set()
+    for raw_ in scene.get("timeline", []):
+        for key_ in ("obj", "ride"):
+            d_ = raw_.get(key_)
+            k_ = objects.resolve_kind(d_.get("kind", "")) if isinstance(d_, dict) else None
+            if k_ in objects.PERSON_R:
+                kinds_.add(k_)
+    framing = scene.get("framing") or meta.get("framing")
+    if framing not in ("wide", "medium", "inside", "ots"):
+        framing = "wide" if any(k_ in objects.VEHICLES for k_ in kinds_) else "medium"
+    world = 1.0
+    if framing == "wide" and kinds_:
+        widest = max(objects.SPRITE_LEN[k_] / objects.PERSON_R[k_] for k_ in kinds_) * objects.REF_SCALE
+        world = clamp(900.0 / widest, 0.22, 1.0)
+    plan.angle = shot_angle(scene, framing)
+    if framing == "medium":
+        # people (and their props / set pieces) a bit bigger than the painted place, and more so when the shot's
+        # angle shows the place closer: otherwise the room and its furniture dwarf the characters
+        n_vis = sum(1 for v in scene.get("characters", {}).values() if isinstance(v, dict) and not v.get("hidden"))
+        base_ = float(meta.get("people_scale", PEOPLE_SCALE if n_vis < 3 else PEOPLE_SCALE_3))   # 3 need room
+        world = base_ * plan.angle["zoom"] ** 0.5
+    plan.framing, plan.world = framing, world
+    plan.cut_in = bool(scene.get("cut_in"))
 
     # ---- characters ----
-    cdefs = scene.get("characters", {})
+    cdefs = assign_faces(scene.get("characters", {}))
     names = list(cdefs.keys())
-    n = len(names)
+    visible = [nm for nm in names if not cdefs[nm].get("hidden")]       # a hidden one is only a voice (narrator)
+    n = len(visible)
     slots = SLOTS.get(n, SLOTS[3])
     auto = ["left", "center", "right"] if n == 3 else (["left", "right"] if n == 2 else ["center"])
     chars = {}
     for i, name in enumerate(names):
         spec = dict(cdefs[name])
-        slot = spec.get("slot") or (auto[i] if i < len(auto) else "center")
+        vi = visible.index(name) if name in visible else 0
+        slot = spec.get("slot") or (auto[vi] if vi < len(auto) else "center")
         x = spec.get("x", slots.get(slot, 540))
         y = spec.get("y", GROUND_Y)
         chars[name] = Char(name, spec, float(x), float(y), i)
+        chars[name].scale *= world
+    if framing == "ots":
+        place_over_shoulder(chars)
+        for c_ in chars.values():               # the speaker facing us a bit bigger too (still well behind the back)
+            if c_.spec.get("view") != "back":
+                c_.scale *= 1.1
     plan.chars = chars
 
     # ---- timeline ----
-    cursor = 0.0
+    # ---- set pieces (door, bed, sofa, fan...) ----
+    plan.sets = []
+    for i, ob in enumerate(scene.get("sets", [])):
+        ob = dict(ob)
+        ob.setdefault("id", "%s%d" % (ob.get("type", "set"), i + 1))
+        if plan.world != 1.0:
+            ob["scale"] = float(ob.get("scale", 1.0)) * plan.world      # a sofa grows with the people sitting on it
+        plan.sets.append(ob)
+    set_by_id = {o["id"]: o for o in plan.sets}
+    plan.set_events = []
+    plan.lights = []
+    plan.warps = []                                 # slow motion / freeze frames (story time)
+    if scene.get("lights") not in (None, "on"):     # a shot that starts in the dark (lights went off earlier)
+        v = scene["lights"]
+        plan.lights.append((-1.0, float({"off": 0.32, "dim": 0.6}.get(v, v) if not isinstance(v, (int, float)) else v)))
+
+    lead = float(scene.get("lead_in", 0.0))        # "hook first": the story starts after the hook card
+    cursor = lead
     gap = float(meta.get("line_gap", 0.35))
+    dialogue = meta.get("dialogue", "bubble")       # bubble | subtitle | both | none: how the spoken words show
     plan.sfx = []
     plan.overlays = []
+    plan.effects = []
+    plan.objects = {}
+    plan.warnings = []
+    for c_ in chars.values():
+        c_.world = plan.objects
+    plan.world_chars = list(chars.values())
     cam_events = []
+    shot_events = []        # camera moves from shot words on action lines (do not switch the auto camera off)
+    cam_hold = []           # (t0, t1): a zoom / reveal is playing, the automatic camera keeps out
     shakes = []
     plan.speech = []
     warned = [False]
     plan_end = 0.0
 
-    for raw in scene.get("timeline", []):
+    # voice: precomputed for the whole video by prepare_voice(); a lone scene prepares its own
+    if voice is None:
+        voice = prepare_voice([scene], use_tts, tts_provider)[0]
+    batch, per_line_edge = voice["paths"], voice["edge"]
+
+    for ti, raw in enumerate(scene.get("timeline", [])):
         ev = dict(raw)
         t = float(ev["t"]) if "t" in ev and ev["t"] is not None else cursor
+        if lead and "t" in ev and ev["t"] is not None and not (float(ev["t"]) == 0.0 and "who" not in ev):
+            t += lead                               # (the sound / shake at 0 stays with the hook card)
+        if ev.get("interrupt") and "say" in ev and ev.get("t") is None and plan.speech:
+            ov = 0.35 if ev["interrupt"] is True else float(ev["interrupt"])
+            t = max(plan.speech[-1]["start"] + 0.3, cursor - gap - ov)   # cuts in before the other one finishes
         plan_end = max(plan_end, t)
         if "wait" in ev:
             cursor = t + float(ev["wait"])
@@ -150,11 +634,26 @@ def compile_scene(scene, use_tts=True, fps=None):
                 e["expression"] = ev["emotion"]
             if len(e) > 1:
                 c.events.append(e)
+            if ev.get("depth") in DEPTHS:
+                k0, dy0 = c.depth_at(t)
+                k1, dy1 = DEPTHS[ev["depth"]]
+                c.depth.append((t, k0, dy0, k1, dy1))
+            if ev.get("on") in set_by_id:            # sit / lie on a set piece: snap onto it
+                ob = set_by_id[ev["on"]]
+                x0, y0 = c.pos_at(t)
+                dx = float(ev.get("on_dx", 0))
+                if ob.get("type") == "bed" and ev.get("action", "") in ("lie_down", "lie", "sleep_lie", "rofl"):
+                    head = 1 if ob.get("flip") else -1           # head on the pillow end
+                    dx = dx or -head * 400 * float(ob.get("scale", 1.0))
+                    c.events.append({"t": t, "dir": head})
+                c.moves.append((t, t + 0.001, x0, y0, float(ob.get("x", 540)) + dx, float(ob.get("y", 1700)) + 1,
+                                False))
             if "move" in ev:
                 m = ev["move"]
                 x0, y0 = c.pos_at(t)
                 dur = float(m.get("dur", 0.8))
-                c.moves.append((t, t + dur, x0, y0, float(m.get("x", x0)), float(m.get("y", y0))))
+                c.moves.append((t, t + dur, x0, y0, float(m.get("x", x0)), float(m.get("y", y0)),
+                                bool(m.get("run") or ev.get("action") == "run")))
 
         if "say" in ev and who:
             c = chars[who[0]]
@@ -163,9 +662,18 @@ def compile_scene(scene, use_tts=True, fps=None):
             v = dict(c.voice)
             v.update(ev.get("voice", {}) if isinstance(ev.get("voice"), dict) else {})
             path, dur = None, None
-            if use_tts and ev.get("tts", True):
-                path = audio.synth_tts(speak, v.get("name"), v.get("rate", "+0%"), v.get("pitch", "+0Hz"),
-                                       trim=trim_voice)
+            if ti in batch:
+                path = audio.trim_silence(batch[ti]) if meta.get("trim_voice", True) else batch[ti]
+                dur = audio.audio_duration(path)
+            elif per_line_edge and ev.get("tts", True):
+                rate, pitch = v.get("rate", "+0%"), v.get("pitch", "+0Hz")
+                if meta.get("emotion_voice", True):  # an angry line comes faster, a sad one slower and lower...
+                    d_rate, d_pitch = audio.EMOTION_VOICE.get(ev.get("expression") or c.state_at(t)["expression"],
+                                                              (0, 0))
+                    rate, pitch = audio.shift_value(rate, d_rate, "%"), audio.shift_value(pitch, d_pitch, "Hz")
+                path = audio.synth_tts(speak, v.get("name"), rate, pitch)
+                if path and meta.get("trim_voice", True):
+                    path = audio.trim_silence(path)
                 if path:
                     dur = audio.audio_duration(path)
                 elif not warned[0]:
@@ -173,11 +681,40 @@ def compile_scene(scene, use_tts=True, fps=None):
                     warned[0] = True
             if dur is None:
                 dur = float(ev.get("duration", audio.estimate_duration(speak)))
-            sp = dict(who=c.name, text=text, start=t, end=t + dur + 0.12, audio=path, bubble=ev.get("bubble", True))
+            bubble = ev.get("bubble", True)
+            if dialogue == "none" or (dialogue == "subtitle" and bubble is True):
+                bubble = False                      # the studio page's "Dialogue text" option
+            subtitle = (ev.get("subtitle") or (dialogue in ("subtitle", "both") and ev.get("bubble", True) is True)) \
+                and dialogue != "none"
+            frz = next((i_ for i_, w_ in enumerate(plan.warps) if w_[0] == "freeze" and abs(w_[1] - t) < 0.02), None)
+            if frz is not None:                     # said over a freeze frame: the picture waits for the line
+                w_ = plan.warps[frz]
+                plan.warps[frz] = ("freeze", w_[1], max(w_[2], dur + 0.35), w_[3])
+                span, step = 0.05, 0.06             # (story time stands still while it is said)
+            else:
+                span, step = dur + 0.12, dur + gap
+            sp = dict(who=c.name, text=text, start=t, end=t + span, audio=path, bubble=bubble,
+                      shot=ev.get("shot"))
+            if frz is not None:
+                sp["frozen"] = True
             c.speech.append(sp)
             plan.speech.append(sp)
-            cursor = max(cursor, t + dur + gap)
-            plan_end = max(plan_end, t + dur + 0.12)
+            if ev.get("action") in BURST_ACTIONS and dur > BURST_ACTIONS[ev["action"]] + 0.4:
+                c.events.append({"t": t + BURST_ACTIONS[ev["action"]], "action": "idle", "_settle_from": t})
+            if ev.get("interrupt") and len(plan.speech) > 1:
+                prev = plan.speech[-2]
+                if prev["end"] > t and prev["who"] != sp["who"]:      # the other person gets cut off
+                    prev["end"] = t + 0.1
+                    prev["cut"] = t + 0.1 - prev["start"]
+            if subtitle:                            # voice-over / subtitle mode: the words at the bottom while spoken
+                plan.overlays.append({"text": text, "style": "subtitle", "from": t,
+                                      "pos": "bottom" if ev.get("subtitle") else          # (narrator)
+                                      "upper" if c.spec.get("kind") in FOCUS_H else "lower",  # not over a dog's body
+                                      "to": t + span})
+                if frz is not None:                 # story time stands still: no fade, just there
+                    plan.overlays[-1]["anim"] = "none"
+            cursor = max(cursor, t + step)
+            plan_end = max(plan_end, t + span)
         if "hold" in ev:
             cursor = max(cursor, t + float(ev["hold"]))
             plan_end = max(plan_end, t + float(ev["hold"]))
@@ -186,47 +723,102 @@ def compile_scene(scene, use_tts=True, fps=None):
             p = audio.sfx_path(ev["sfx"])
             if p:
                 plan.sfx.append(dict(t=t, path=p, volume=float(ev.get("volume", 0.8))))
-        if "fx" in ev:
-            for f in (ev["fx"] if isinstance(ev["fx"], list) else [ev["fx"]]):
-                f = dict(f)
-                f["t"] = t
-                f.setdefault("dur", 1e9 if f.get("type") == "sparks" else 3.0)
-                plan.fx.append(f)
-        if "fx_stop" in ev:
-            for f in plan.fx:
-                if f.get("id") == ev["fx_stop"] and f["t"] <= t:
-                    f["dur"] = min(f["dur"], t - f["t"])
-        if "object" in ev and ev["object"] in objs:
-            o = objs[ev["object"]]
-            if "burn" in ev:
-                o["_burn_t0"], o["_burn_dur"] = t, float(ev["burn"])
-            if ev.get("stop"):
-                o["_burn_stop"] = t
-            if ev.get("hide"):
-                o["to"] = t
-            if ev.get("show"):
-                o["from"] = t
         if "overlay" in ev:
             o = dict(ev["overlay"])
             o.setdefault("from", t)
             plan.overlays.append(o)
+        if "set" in ev:
+            for sid in (ev["set"] if isinstance(ev["set"], list) else [ev["set"]]):
+                plan.set_events.append({"t": t, "set": sid, "state": ev.get("state"), "move": ev.get("move")})
+        if "lights" in ev:
+            v = ev["lights"]
+            plan.lights.append((t, float({"on": 1.0, "off": 0.32, "dim": 0.6}.get(v, v)
+                                         if not isinstance(v, (int, float)) else v)))
+        if "fx" in ev:
+            for raw_fx in (ev["fx"] if isinstance(ev["fx"], list) else [ev["fx"]]):
+                fx = effects.normalize(raw_fx, t)
+                if "who" not in fx and who:
+                    fx["who"] = who[0]
+                plan.effects.append(fx)
+        if ev.get("action") == "throw" and ev.get("at") in chars and who:
+            # the held prop flies from the thrower's hand to the target, who reacts on impact
+            src, dst = who[0], ev["at"]
+            release, obj = t + 0.42, ev.get("throw_prop") or ev.get("prop") or "chappal"
+            arrive = release + float(ev.get("flight", 0.55))
+            plan.effects.append({"type": "projectile", "src": src, "dst": dst, "prop": obj, "from": release,
+                                 "to": arrive, "arc": ev.get("arc", 160)})
+            chars[src].events.append({"t": release, "prop": ""})
+            if ev.get("hit", True):
+                chars[dst].events.append({"t": arrive, "action": "hit_react"})
+                hp = audio.sfx_path(ev.get("hit_sfx", "thud"))
+                if hp:
+                    plan.sfx.append(dict(t=arrive, path=hp, volume=0.8))
+                plan.effects.append({"type": "pow", "who": dst, "text": ev.get("hit_text", "THAK!"),
+                                     "from": arrive, "to": arrive + 0.6})
+            plan_end = max(plan_end, arrive + 0.6)
+        if ev.get("ride") and who:
+            hold_ = 0.0
+            for w in who:
+                hold_ = max(hold_, compile_ride(plan, chars[w], ev["ride"], t))
+            plan_end = max(plan_end, t + hold_)
+            cursor = max(cursor, t + hold_)
+        if "getoff" in ev and who:
+            hold_ = 0.0
+            for w in who:
+                hold_ = max(hold_, compile_getoff(plan, chars[w], ev["getoff"], t))
+            plan_end = max(plan_end, t + hold_)
+            cursor = max(cursor, t + hold_)
+        if "obj" in ev:
+            ev_hold = compile_obj(plan, ev["obj"], t, plan.warnings)
+            plan_end = max(plan_end, t + ev_hold)
+            cursor = max(cursor, t + ev_hold)
+        if "shot" in ev and "say" not in ev and SHOT_ALIASES.get(ev["shot"], ev["shot"]) in SHOT_ZOOM:
+            shot_events.append(shot_camera(ev["shot"], t, chars, who, dur=0.3))
+        if "slowmo" in ev:                          # story time slows down here (the voice keeps its speed)
+            sm = ev["slowmo"] if isinstance(ev["slowmo"], dict) else {"rate": ev["slowmo"]}
+            rate = float(sm.get("rate", 0.35)) if not isinstance(sm.get("rate"), bool) else 0.35
+            plan.warps.append(("slow", t, max(0.05, min(1.0, rate)), float(sm.get("dur", 1.5))))
+        if "freeze" in ev:                          # the picture stops ("yup, that's me")
+            fr = ev["freeze"] if isinstance(ev["freeze"], dict) else {"dur": ev["freeze"]}
+            plan.warps.append(("freeze", t, float(fr.get("dur", 1.2)) if not isinstance(fr.get("dur"), bool) else 1.2,
+                               fr.get("style", "grey")))
         if "camera" in ev:
             cam = dict(ev["camera"])
             cam["t"] = t
             if "shake" in cam:
                 shakes.append((t, float(cam["shake"]), float(cam.get("shake_dur", 0.5))))
-            if "zoom" in cam or "focus" in cam:
+            if cam.get("punch"):                    # quick snap zoom onto a face (the automatic camera stays on)
+                shot_events.append({"t": t, "zoom": float(cam.get("zoom", 1.75)), "focus": cam["punch"],
+                                    "dur": float(cam.get("dur", 0.1))})
+                if cam.get("back"):
+                    shot_events.append({"t": t + float(cam["back"]), "zoom": 1.0, "dur": 0.3})
+                cam_hold.append((t - 0.01, t + float(cam.get("back") or 1.0) + 0.3))
+            elif cam.get("reveal"):                 # start close, pull back to the whole place
+                who_ = cam["reveal"] if isinstance(cam["reveal"], str) else None
+                shot_events.append({"t": t, "zoom": float(cam.get("from", 1.8)), "focus": who_, "dur": 0.001})
+                shot_events.append({"t": t + 0.002, "zoom": 1.0, "dur": float(cam.get("dur", 1.6))})
+                cam_hold.append((t - 0.06, t + float(cam.get("dur", 1.6)) + 0.1))
+            elif "zoom" in cam or "focus" in cam:
                 cam_events.append(cam)
 
-    plan.overlays += [dict(o) for o in scene.get("overlays", [])]
-    if "caption" in scene:     # shorthand
-        c = dict(scene["caption"]) if isinstance(scene["caption"], dict) else {"text": scene["caption"]}
-        c.setdefault("style", "caption_box")
-        c.setdefault("pos", "top")
-        plan.overlays.append(c)
+    plan.overlays += static_overlays(scene)
+    bgs = plan.background if isinstance(plan.background, dict) else {"type": plan.background}
+    weather = list(bgs.get("weather", []))
+    if bgs.get("time") == "rain":
+        weather.append("rain")
+    for w in weather:                                   # SCENE: <place> rain / fog / snow / fireflies / leaves
+        if not any(e.get("type") == w for e in plan.effects):
+            plan.effects.append(effects.normalize({"type": w}, 0.0))
+    for raw_fx in scene.get("effects", []):
+        plan.effects.append(effects.normalize(raw_fx, float(raw_fx.get("from", 0.0)) if isinstance(raw_fx, dict) else 0.0))
+    if scene.get("chat"):
+        plan_end = max(plan_end, compile_chat(plan, scene["chat"]))
 
     for c in chars.values():
         c.events.sort(key=lambda e: e["t"])
+        # a settle-into-talking is dropped when the script gives this character another action before it
+        c.events = [e for e in c.events if "_settle_from" not in e or not any(
+            e2 is not e and "action" in e2 and e["_settle_from"] < e2["t"] <= e["t"] for e2 in c.events)]
         c.speech.sort(key=lambda s_: s_["start"])
 
     # ---- duration ----
@@ -238,17 +830,17 @@ def compile_scene(scene, use_tts=True, fps=None):
     plan.n_frames = int(round(plan.duration * plan.fps))
 
     # ---- camera segments ----
+    if meta.get("auto_camera", True) and not cam_events and plan.framing == "medium":     # wide / inside are composed shots
+        auto_camera(plan, chars, cam_events, shakes)
+        cam_events[:] = [c_ for c_ in cam_events if not any(h0 <= c_["t"] <= h1 for h0, h1 in cam_hold)]
+    cam_events += shot_events
     segs = []
     z, cx, cy = 1.0, LW / 2.0, LH / 2.0
     for cam in sorted(cam_events, key=lambda c_: c_["t"]):
         tz = float(cam.get("zoom", z))
         f = cam.get("focus")
         if isinstance(f, str) and f in chars:
-            fx, fy = chars[f].pos_at(cam["t"])
-            head = float(cam.get("head", 560)) * (chars[f].scale if plan.style == "2.5d" else 1.0)
-            tc = (fx + float(cam.get("dx", 0)), fy - head)
-        elif isinstance(f, str) and f in objs:
-            tc = (float(objs[f]["x"]) + float(cam.get("dx", 0)), float(objs[f]["y"]) - float(cam.get("head", 120)))
+            tc = chars[f].focus_at(cam["t"])
         elif isinstance(f, (list, tuple)):
             tc = (float(f[0]), float(f[1]))
         elif tz == 1.0:
@@ -260,22 +852,120 @@ def compile_scene(scene, use_tts=True, fps=None):
         z, cx, cy = tz, tc[0], tc[1]
     plan.cam_segments = segs
     plan.shakes = shakes
-    plan.zmax = max([1.0] + [sg[3] for sg in segs] + ([1.05] if shakes else []))
 
     # ---- audio ----
-    plan.music = None
     m = scene.get("music") or meta.get("music")
-    if m:
-        if isinstance(m, str):
-            m = {"path": m}
-        vol = float(m.get("volume", 0.35))
-        if m.get("type") == "beat":
-            p = audio.beat_path(float(m.get("bpm", 104)), plan.duration, m.get("style", "desi"))
-        else:
-            p = asset_path(m.get("path"))
-        if p:
-            plan.music = dict(path=p, volume=vol, generated=m.get("type") == "beat")
+    plan.music = compile_music(m, plan.duration)
+    plan.bpm = float(meta.get("bpm") or music_bpm(m) or 96)     # dances move on this beat
+    # a sound bed around the scene (rain, street, office, night, jungle, crowd, wind, sea), looped under everything
+    plan.ambience = []
+    amb = scene.get("ambience")
+    bg = scene.get("background") if isinstance(scene.get("background"), dict) else {}
+    if amb is None and bg.get("time") == "rain":
+        amb = "rain"                                # it rains: you hear it
+    for a in (amb if isinstance(amb, list) else [amb] if amb else []):
+        a = {"type": a} if isinstance(a, str) else dict(a)
+        if a.get("type") in audio.AMBIENCE:
+            plan.ambience.append(dict(path=audio.ambience_path(a["type"]), volume=float(a.get("volume", 0.22)),
+                                      start=0.0, dur=plan.duration))
     return plan
+
+
+def music_bpm(m):
+    return m.get("bpm", 104) if isinstance(m, dict) and m.get("type") == "beat" else None
+
+
+def static_overlays(scene):
+    """The scene's `overlays` list plus the `caption` shorthand."""
+    out = [dict(o) for o in scene.get("overlays", [])]
+    if "caption" in scene:
+        c = dict(scene["caption"]) if isinstance(scene["caption"], dict) else {"text": scene["caption"]}
+        c.setdefault("style", "caption_box")
+        c.setdefault("pos", "top")
+        out.append(c)
+    return out
+
+
+def compile_music(m, duration):
+    if not m:
+        return None
+    if isinstance(m, str):
+        m = {"path": m}
+    vol = float(m.get("volume", 0.35))
+    if m.get("type") == "beat":
+        p = audio.beat_path(float(m.get("bpm", 104)), duration, m.get("style", "desi"), seed=m.get("seed"))
+    else:
+        p = asset_path(m.get("path"))
+    return dict(path=p, volume=vol, generated=m.get("type") == "beat") if p else None
+
+
+DIALOGUE_MODES = ("bubble", "subtitle", "both", "none")
+HOOK_MODES = ("over", "first", "off")
+HOOK_LEAD = 1.7                                     # seconds the hook card has the screen to itself ("first")
+
+
+def apply_options(scene, dialogue=None, hook=None):
+    """The studio page's video options, on a copy of the scene.
+    dialogue: bubble (speech bubbles) | subtitle (words at the bottom) | both | none (voice only).
+    hook: over (the hook card over the first line, the default) | first (hook card first, then the story) | off."""
+    import copy
+    scene = copy.deepcopy(scene)
+    if dialogue and dialogue != "bubble":
+        scene.setdefault("meta", {})["dialogue"] = dialogue
+    if hook == "off":
+        drop = lambda ovs: [o for o in ovs if o.get("style") != "hook"]      # noqa: E731
+        scene["overlays"] = drop(scene.get("overlays", []))
+        for sc in scene.get("scenes", []):
+            if sc.get("overlays"):
+                sc["overlays"] = drop(sc["overlays"])
+    elif hook == "first":
+        first = scene["scenes"][0] if scene.get("scenes") else scene
+        first["lead_in"] = HOOK_LEAD
+        for o in scene.get("overlays", []) + first.get("overlays", []):
+            if o.get("style") == "hook" and float(o.get("from", 0)) < 0.5:
+                o["to"] = HOOK_LEAD + 0.1           # gone as the first line starts
+    return scene
+
+
+# keys of a multi-scene file that belong to the whole video, not to one scene
+VIDEO_KEYS = ("scenes", "music", "caption", "overlays", "post", "hook", "vars", "name", "about", "transition")
+
+
+def split_scenes(scene):
+    """A multi-scene file ({"scenes": [...]}) -> list of ordinary single-scene dicts.
+
+    Every scene gets the shared `characters` (only those in its `cast`, if given,
+    with its own `characters` entries merged on top), the shared `meta`, and its own
+    background / timeline / overlays / caption. A scene `title` shows as a card for
+    its first 1.4 seconds ("Agle din...").
+    """
+    scene = dict(scene, characters=assign_faces(scene.get("characters", {})))   # one face per character, all video
+    if not scene.get("scenes"):
+        return [scene]
+    base = {k: v for k, v in scene.items() if k not in VIDEO_KEYS}
+    base_meta = {k: v for k, v in scene.get("meta", {}).items() if k != "duration"}
+    base_meta.setdefault("tail", 0.5)
+    if music_bpm(scene.get("music")) and "bpm" not in base_meta:     # scenes dance to the shared music
+        base_meta["bpm"] = music_bpm(scene.get("music"))
+    cast_all = scene.get("characters", {})
+    out = []
+    shot_no = 0
+    for sc in scene["scenes"]:
+        shot_no = shot_no + 1 if sc.get("cut_in") else 0           # CUTs in one place: each a new camera angle
+        sub = deep_merge(base, {k: v for k, v in sc.items() if k not in ("cast", "characters", "meta", "title")})
+        sub["meta"] = dict(base_meta, **sc.get("meta", {}))
+        cast = sc.get("cast", []) if sc.get("chat") else (sc.get("cast") or list(cast_all.keys()))
+        chars = {n: dict(cast_all.get(n, {})) for n in cast}
+        for n, spec in sc.get("characters", {}).items():
+            chars[n] = dict(chars.get(n, {}), **spec)
+        sub["characters"] = chars
+        if shot_no and "angle" not in sub:
+            sub["angle"] = shot_no
+        if sc.get("title"):
+            sub["overlays"] = list(sub.get("overlays", [])) + [
+                {"text": sc["title"], "style": "card", "pos": "upper", "from": 0.0, "to": 1.4, "color": [40, 40, 48]}]
+        out.append(sub)
+    return out
 
 
 def camera_at(plan, t):
@@ -284,7 +974,7 @@ def camera_at(plan, t):
     for (t0, t1, z0, z1, c0, c1) in plan.cam_segments:
         if t < t0:
             break
-        e = 1.0 if t1 - t0 < 1e-3 else ease_in_out((t - t0) / (t1 - t0))      # dur 0 = hard cut
+        e = ease_in_out((t - t0) / max(1e-6, t1 - t0))
         z, cx, cy = lerp(z0, z1, e), lerp(c0[0], c1[0], e), lerp(c0[1], c1[1], e)
     dx = dy = 0.0
     for (ts, amp, dur) in plan.shakes:

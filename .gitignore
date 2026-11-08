@@ -4,4 +4,3 @@ __pycache__/
 out/*
 !out/.gitkeep
 scenes/generated/
-tests/out/

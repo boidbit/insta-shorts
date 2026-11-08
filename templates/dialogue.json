@@ -1,0 +1,37 @@
+{
+  "name": "dialogue",
+  "about": "2 logon ki baat-cheet (4 lines), pehle second me hook. Display text Hinglish (Roman), voice ke liye Devanagari 'speak' do.",
+  "vars": {
+    "hook": "Party ka bill kaun dega? 😏",
+    "caption": "Dost vs Dost 😂",
+    "bg": "room",
+    "l1": "Bhai kal ki party yaad hai?",
+    "s1": "भाई कल की पार्टी याद है?",
+    "l2": "Haan haan, tune mera kaafi khana khaya tha!",
+    "s2": "हाँ हाँ, तूने मेरा काफ़ी खाना खाया था!",
+    "l3": "Arre wo to dosti ka hissa tha!",
+    "s3": "अरे वो तो दोस्ती का हिस्सा था!",
+    "l4": "To bill bhi dosti ka hissa hai, de de!",
+    "s4": "तो बिल भी दोस्ती का हिस्सा है, दे दे!"
+  },
+  "meta": { "line_gap": 0.12, "tail": 0.5 },
+  "background": { "type": "{bg}" },
+  "music": { "type": "beat", "bpm": 90, "volume": 0.16 },
+  "characters": {
+    "A": { "look": "boy", "slot": "left", "accessories": ["glasses"], "facing": "right", "voice": { "name": "hi-IN-MadhurNeural", "pitch": "+18Hz", "rate": "+6%" } },
+    "B": { "look": "college_boy", "slot": "right", "accessories": ["cap"], "facing": "left", "voice": { "name": "hi-IN-MadhurNeural", "pitch": "-8Hz" } }
+  },
+  "caption": { "text": "{caption}", "style": "caption_box", "pos": "top", "from": 2.0 },
+  "timeline": [
+    { "t": 0.0, "who": "all", "action": "idle", "expression": "smile" },
+    { "t": 0.0, "sfx": "whoosh", "volume": 0.7, "camera": { "shake": 0.5 },
+      "overlay": { "text": "{hook}", "style": "hook", "pos": [540, 420], "to": 2.0 } },
+    { "t": 0.4, "who": "A", "expression": "grin", "say": "{l1}", "speak": "{s1}", "look": "B" },
+    { "who": "B", "expression": "sly", "say": "{l2}", "speak": "{s2}", "look": "A" },
+    { "who": "A", "expression": "smug", "say": "{l3}", "speak": "{s3}", "action": "shrug" },
+    { "who": "B", "expression": "angry", "say": "{l4}", "speak": "{s4}", "action": "point", "point": "left", "sfx": "pop" },
+    { "who": "A", "expression": "shock", "action": "shock", "sfx": "boing", "volume": 0.6, "camera": { "shake": 0.6 } },
+    { "wait": 0.2 },
+    { "who": "B", "expression": "laugh", "action": "laugh" }
+  ]
+}

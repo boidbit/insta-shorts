@@ -1,0 +1,366 @@
+"""python -m unittest discover -s tests -v   (no network, no API key needed: the Gemini call is mocked)"""
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+from unittest import mock
+
+import numpy as np
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from studio import audio, gemini_tts as g   # noqa: E402
+from studio.scene import compile_scene      # noqa: E402
+
+SR = g.SR
+
+
+def fake_take(durations, gaps, intra_pause=0.14, seed=3, spans=None):
+    """Fake 'speech': each line = syllable bursts with short intra-line pauses; lines separated by `gaps`.
+    If `spans` is a list, the real (start, end) second of every line is appended to it."""
+    rng = np.random.RandomState(seed)
+    out = [np.zeros(int(0.2 * SR))]
+    pos = 0.2
+    for i, d in enumerate(durations):
+        t, line = 0.0, []
+        while t < d:
+            syl = min(0.22, d - t)
+            n = int(syl * SR)
+            line.append(rng.randn(n) * 0.2 * np.hanning(n))
+            t += syl
+            if t < d:
+                line.append(np.zeros(int(intra_pause * SR)))
+                t += intra_pause
+        out.append(np.concatenate(line))
+        n_line = sum(len(seg) for seg in line)
+        if spans is not None:
+            spans.append((pos, pos + n_line / SR))
+        pos += n_line / SR
+        if i < len(durations) - 1:
+            out.append(np.zeros(int(gaps[i] * SR)))
+            pos += gaps[i]
+    out.append(np.zeros(int(0.3 * SR)))
+    return np.concatenate(out).astype(np.float32)
+
+
+class SplitTests(unittest.TestCase):
+    def test_splits_at_the_long_pauses(self):
+        texts = ["a" * 40, "b" * 25, "c" * 55]
+        real = []
+        x = fake_take([2.8, 1.8, 3.8], [1.0, 0.8], spans=real)
+        spans, method = g.split_audio(x, texts)
+        self.assertEqual(method, "pauses")
+        self.assertEqual(len(spans), 3)
+        for (c0, c1), (r0, r1) in zip(spans, real):
+            # every clip fully contains its line (minus float noise) and stays well inside the gaps
+            self.assertLessEqual(c0, r0 + 0.01)
+            self.assertGreaterEqual(c1, r1 - 0.12)      # (hann-window tails are inaudible)
+            self.assertLess(r0 - c0, 0.2)
+            self.assertLess(c1 - r1, 0.2)
+        for (a0, a1), (b0, b1) in zip(spans, spans[1:]):
+            self.assertLessEqual(a1, b0 + 0.13)      # clips don't overlap (only the small padding)
+
+    def test_short_gaps_between_lines(self):
+        # gaps barely longer than the pauses inside lines still split correctly
+        texts = ["a" * 30, "b" * 30, "c" * 30]
+        x = fake_take([2.0, 2.0, 2.0], [0.45, 0.45], intra_pause=0.14)
+        spans, _ = g.split_audio(x, texts)
+        self.assertEqual(len(spans), 3)
+        self.assertTrue(all(b > a for a, b in spans))
+
+    def test_a_comma_pause_longer_than_the_line_break_does_not_cut_the_line(self):
+        """The bhoot video: the dog's line paused at its comma longer than the break before the boy spoke, the old
+        split cut there and the dog's second half played in the boy's shot. Line lengths must decide."""
+        rng = np.random.RandomState(5)
+
+        def speech(d):
+            n_ = int(d * SR)
+            return rng.randn(n_) * 0.2 * np.hanning(n_)
+
+        def sil(d):
+            return np.zeros(int(d * SR))
+
+        # line 1 (2.4 s) | 0.30 | line 2 = 2.2 s, COMMA 0.65 s, 2.6 s | 0.30 | line 3 (3.0 s) | 0.32 | line 4 (2.0 s)
+        parts = [sil(0.2), speech(2.4), sil(0.30), speech(2.2), sil(0.65), speech(2.6), sil(0.30), speech(3.0),
+                 sil(0.32), speech(2.0), sil(0.3)]
+        x = np.concatenate(parts).astype(np.float32)
+        texts = ["a" * 40, "b" * 80, "c" * 50, "d" * 33]
+        real_breaks = [0.2 + 2.4 + 0.15, 0.2 + 2.4 + 0.3 + 2.2 + 0.65 + 2.6 + 0.15,
+                       0.2 + 2.4 + 0.3 + 2.2 + 0.65 + 2.6 + 0.3 + 3.0 + 0.16]
+        spans, method = g.split_audio(x, texts)
+        self.assertEqual(method, "pauses")
+        cuts = [(spans[i][1] + spans[i + 1][0]) / 2 for i in range(3)]
+        for c, r in zip(cuts, real_breaks):
+            self.assertLess(abs(c - r), 0.25, (cuts, real_breaks))
+
+    def test_single_line(self):
+        spans, method = g.split_audio(fake_take([2.0], []), ["hello"])
+        self.assertEqual((len(spans), method), (1, "pauses"))
+
+    def test_silence_is_an_error(self):
+        with self.assertRaises(g.GeminiTTSError):
+            g.split_audio(np.zeros(SR, dtype=np.float32), ["x", "y"])
+
+
+class PayloadTests(unittest.TestCase):
+    def test_one_voice_is_single_speaker(self):
+        p = g.build_payload([{"voice": "Puck", "text": "ek"}, {"voice": "Puck", "text": "do"}])
+        sc = p["generationConfig"]["speechConfig"]
+        self.assertEqual(sc["voiceConfig"]["prebuiltVoiceConfig"]["voiceName"], "Puck")
+        self.assertIn("ek\n\ndo", p["contents"][0]["parts"][0]["text"])
+
+    def test_two_voices_is_multi_speaker(self):
+        p = g.build_payload([{"voice": "Kore", "text": "ek"}, {"voice": "Puck", "text": "do"}])
+        cfgs = p["generationConfig"]["speechConfig"]["multiSpeakerVoiceConfig"]["speakerVoiceConfigs"]
+        self.assertEqual([c["speaker"] for c in cfgs], ["Speaker1", "Speaker2"])
+        self.assertIn("Speaker2: do", p["contents"][0]["parts"][0]["text"])
+
+    def test_three_voices_rejected(self):
+        with self.assertRaises(ValueError):
+            g.build_payload([{"voice": v, "text": "x"} for v in ("Kore", "Puck", "Fenrir")])
+
+    def test_voice_mapping_and_pitch(self):
+        self.assertEqual(g.voice_for({"name": "hi-IN-SwaraNeural"}), "Kore")
+        self.assertEqual(g.voice_for({"name": "hi-IN-MadhurNeural"}), "Puck")
+        self.assertEqual(g.voice_for({"name": "hi-IN-MadhurNeural", "gemini": "Fenrir"}), "Fenrir")
+        self.assertGreater(g.semitones("+22Hz"), 0)
+        self.assertLess(g.semitones("-6Hz"), 0)
+        self.assertAlmostEqual(g.rate_factor("+8%"), 1.08)
+
+
+class GeminiMocked(unittest.TestCase):
+    """Runs in a temp cwd with GEMINI_API_KEY set and the Gemini HTTP call faked (self.calls records requests)."""
+
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.cwd = os.getcwd()
+        os.chdir(self.tmp)                      # synth_script caches under ./.cache/tts
+        self.scene = {
+            "characters": {"A": {"voice": {"name": "hi-IN-SwaraNeural"}},
+                           "B": {"voice": {"name": "hi-IN-MadhurNeural", "pitch": "+22Hz"}},
+                           "C": {"voice": {"name": "hi-IN-MadhurNeural", "pitch": "-6Hz"}}},
+            "timeline": [
+                {"t": 0.0, "who": "A", "say": "one", "speak": "पहली लाइन है ये"},
+                {"who": "B", "say": "two", "speak": "दूसरी लाइन थोड़ी लंबी है भाई"},
+                {"who": "C", "say": "three", "speak": "तीसरी"},
+                {"who": "C", "say": "muted", "speak": "ye nahi bolna", "tts": False},
+            ]}
+        self.calls = []
+
+        def fake_request(payload, model=g.DEFAULT_MODEL, **kw):
+            self.calls.append(payload)
+            return fake_take([2.2, 3.0, 0.9], [1.0, 1.0])
+
+        self.patch = mock.patch.object(g, "request_audio", fake_request)
+        self.patch.start()
+        self.env = mock.patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"})
+        self.env.start()
+
+    def tearDown(self):
+        self.patch.stop()
+        self.env.stop()
+        os.chdir(self.cwd)
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+
+
+class SceneTests(GeminiMocked):
+    def test_whole_script_is_one_request_and_every_line_gets_its_own_clip(self):
+        plan = compile_scene(self.scene)
+        self.assertEqual(len(self.calls), 1)
+        voiced = [s for s in plan.speech if s["audio"]]
+        self.assertEqual(len(voiced), 3)
+        self.assertEqual(len({s["audio"] for s in voiced}), 3)
+        self.assertIsNone(plan.speech[3]["audio"])                      # "tts": false line stays silent
+        self.assertEqual(len(self.calls[0]["generationConfig"]["speechConfig"]
+                             ["multiSpeakerVoiceConfig"]["speakerVoiceConfigs"]), 2)
+        # lines come out in order, one after another
+        starts = [s["start"] for s in plan.speech]
+        self.assertEqual(starts, sorted(starts))
+
+    def test_second_compile_uses_the_cache(self):
+        compile_scene(self.scene)
+        compile_scene(self.scene)
+        self.assertEqual(len(self.calls), 1)
+
+    def test_auto_mode_falls_back_to_edge_when_gemini_fails(self):
+        with mock.patch.object(g, "request_audio", side_effect=g.QuotaExceeded("daily")), \
+                mock.patch.object(audio, "synth_tts", return_value=None) as edge:
+            plan = compile_scene(self.scene)                            # provider=auto (key is set)
+        self.assertEqual(edge.call_count, 3)
+        self.assertTrue(all(s["audio"] is None for s in plan.speech))
+
+    def test_explicit_gemini_fails_loudly(self):
+        with mock.patch.object(g, "request_audio", side_effect=g.QuotaExceeded("daily")):
+            with self.assertRaises(SystemExit):
+                compile_scene(self.scene, tts_provider="gemini")
+
+    def test_no_key_means_edge(self):
+        with mock.patch.dict(os.environ, {"GEMINI_API_KEY": "", "GOOGLE_API_KEY": ""}), \
+                mock.patch.object(audio, "synth_tts", return_value=None) as edge:
+            compile_scene(self.scene)
+        self.assertEqual(self.calls, [])
+        self.assertEqual(edge.call_count, 3)
+
+
+class MultiSceneTests(GeminiMocked):
+    """A video with several scenes must still cost ONE Gemini request (the page builds such videos)."""
+
+    def test_three_scene_video_is_one_request(self):
+        from studio.render import make_video
+        from studio.util import load_scene
+        video = load_scene(os.path.join(os.path.dirname(__file__), "..", "scenes", "doodh_story_demo.json"))
+        calls = []
+
+        def fake_request(payload, model=g.DEFAULT_MODEL, **kw):
+            calls.append(payload)
+            return fake_take([1.8] * 6, [1.0] * 5)      # doodh_story_demo: 3 scenes x 2 lines
+
+        with mock.patch.object(g, "request_audio", fake_request):
+            v = make_video(video, 216)
+        self.assertEqual(len(calls), 1)
+        voiced = [sp for p in v.parts for sp in p.speech if sp["audio"]]
+        self.assertEqual(len(voiced), 6)
+        self.assertEqual(len({sp["audio"] for sp in voiced}), 6)           # every line has its own clip
+        self.assertEqual(len(v.parts), 3)
+        # scene 2's lines must come from the middle of the take, not scene 1's clips
+        self.assertTrue(set(sp["audio"] for sp in v.parts[0].speech).isdisjoint(
+            sp["audio"] for sp in v.parts[1].speech))
+
+    def test_gemini_failure_in_auto_mode_falls_back_for_every_scene(self):
+        from studio.scene import prepare_voice, split_scenes
+        from studio.util import load_scene
+        subs = split_scenes(load_scene(os.path.join(os.path.dirname(__file__), "..", "scenes",
+                                                    "doodh_story_demo.json")))
+        with mock.patch.object(g, "request_audio", side_effect=g.QuotaExceeded("daily")):
+            out = prepare_voice(subs)
+        self.assertEqual(len(out), 3)
+        self.assertTrue(all(o["edge"] and not o["paths"] for o in out))
+
+
+class QuotaErrorTests(unittest.TestCase):
+    """A 429 is only "the day's quota is gone" when the server gives no short retry time."""
+
+    def _http_error(self, body):
+        import io
+        import urllib.error
+        return urllib.error.HTTPError("https://x", 429, "Too Many Requests", {}, io.BytesIO(body.encode()))
+
+    def _ok_response(self):
+        import base64
+        import json as _json
+
+        class Resp:
+            def __enter__(self_):
+                return self_
+
+            def __exit__(self_, *a):
+                return False
+
+            def read(self_):
+                pcm = (np.zeros(2400, dtype="<i2")).tobytes()
+                return _json.dumps({"candidates": [{"content": {"parts": [{"inlineData": {
+                    "mimeType": "audio/L16;codec=pcm;rate=24000", "data": base64.b64encode(pcm).decode()}}]}}]}).encode()
+        return Resp()
+
+    def test_a_per_minute_limit_that_also_names_the_daily_metric_is_retried(self):
+        body = ('{"error": {"code": 429, "status": "RESOURCE_EXHAUSTED", "details": [{"violations": ['
+                '{"quotaMetric": "generate_requests_per_model_per_day", "quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"},'
+                '{"quotaId": "GenerateRequestsPerMinutePerProjectPerModel-FreeTier"}]}, {"retryDelay": "23s"}]}}')
+        calls = []
+
+        def fake_urlopen(req, timeout=0):
+            calls.append(1)
+            if len(calls) == 1:
+                raise self._http_error(body)
+            return self._ok_response()
+
+        sleeps = []
+        with mock.patch.object(g.urllib.request, "urlopen", fake_urlopen), mock.patch.object(g.time, "sleep", sleeps.append):
+            x = g.request_audio({"contents": []}, key="k")
+        self.assertEqual(len(calls), 2)                    # it waited and tried again
+        self.assertEqual(sleeps, [24.0])                   # the server said 23 s
+        self.assertEqual(len(x), 2400)
+
+    def test_no_short_retry_time_and_a_daily_metric_means_the_day_is_over(self):
+        body = '{"error": {"code": 429, "message": "You exceeded your current quota", "details": [{"quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}}'
+        with mock.patch.object(g.urllib.request, "urlopen", side_effect=self._http_error(body)), \
+                mock.patch.object(g.time, "sleep"):
+            with self.assertRaises(g.QuotaExceeded):
+                g.request_audio({"contents": []}, key="k")
+
+    def test_a_long_retry_time_with_a_daily_metric_is_also_the_day_being_over(self):
+        body = '{"error": {"code": 429, "details": [{"quotaId": "PerDay"}, {"retryDelay": "40000s"}]}}'
+        with mock.patch.object(g.urllib.request, "urlopen", side_effect=self._http_error(body)), \
+                mock.patch.object(g.time, "sleep"):
+            with self.assertRaises(g.QuotaExceeded):
+                g.request_audio({"contents": []}, key="k")
+
+    def test_a_429_with_nothing_to_go_on_is_retried_not_declared_daily(self):
+        calls = []
+
+        def fake_urlopen(req, timeout=0):
+            calls.append(1)
+            if len(calls) < 3:
+                raise self._http_error('{"error": {"code": 429}}')
+            return self._ok_response()
+
+        with mock.patch.object(g.urllib.request, "urlopen", fake_urlopen), mock.patch.object(g.time, "sleep"):
+            self.assertEqual(len(g.request_audio({"contents": []}, key="k")), 2400)
+        self.assertEqual(len(calls), 3)
+
+
+class HardSplitTests(unittest.TestCase):
+    """Eight lines, the first one long with pauses inside it, gaps between lines of only ~0.14 s (a real run looked like this)."""
+
+    TEXTS = ["सुन लड़के! बेटी का हाथ तभी, जब सरकारी गाड़ी से आएगा!", "पापा!?", "जी ससुर जी, ले आऊँगा!", "देखते हैं...",
+             "पापा, आप भी न...", "ले आया सरकारी गाड़ी!", "ये क्या है??", "पापा, ये कचरा गाड़ी है..."]
+    DURS = [5.05, 1.05, 0.95, 0.95, 1.2, 1.6, 0.95, 1.65]
+
+    def make(self, gap, intra):
+        rng = np.random.RandomState(1)
+        out, pos, truth = [np.zeros(int(0.1 * SR))], 0.1, []
+
+        def burst(d):
+            n = int(d * SR)
+            return rng.randn(n) * 0.2 * (0.55 + 0.45 * np.abs(np.sin(np.linspace(0, d * 9, n))))
+
+        for i, d in enumerate(self.DURS):
+            pauses = intra.get(i, [])
+            start, piece = pos, (d - sum(pauses)) / (len(pauses) + 1)
+            for k in range(len(pauses) + 1):
+                out.append(burst(piece))
+                pos += piece
+                if k < len(pauses):
+                    out.append(np.zeros(int(pauses[k] * SR)))
+                    pos += pauses[k]
+            truth.append((start, pos))
+            if i < len(self.DURS) - 1:
+                out.append(np.zeros(int(gap * SR)))
+                pos += gap
+        out.append(np.zeros(int(0.2 * SR)))
+        return np.concatenate(out).astype(np.float32), truth
+
+    def assert_cuts_in_the_real_gaps(self, gap, intra):
+        x, truth = self.make(gap, intra)
+        cuts, method = g.split_audio(x, self.TEXTS)
+        self.assertEqual(len(cuts), 8)
+        for i in range(7):
+            mid = (cuts[i][1] + cuts[i + 1][0]) / 2.0
+            self.assertTrue(truth[i][1] - 0.02 <= mid <= truth[i + 1][0] + 0.02, (method, i + 1, mid, truth[i]))
+        return method
+
+    def test_clear_pauses(self):
+        self.assertEqual(self.assert_cuts_in_the_real_gaps(0.9, {0: [0.15, 0.14]}), "pauses")
+
+    def test_short_pauses(self):
+        self.assertEqual(self.assert_cuts_in_the_real_gaps(0.25, {0: [0.15, 0.14]}), "pauses")
+
+    def test_tiny_pauses_fall_back_but_still_cut_in_the_gaps(self):
+        self.assert_cuts_in_the_real_gaps(0.14, {0: [0.15, 0.14], 4: [0.12], 7: [0.13]})
+
+
+if __name__ == "__main__":
+    unittest.main()

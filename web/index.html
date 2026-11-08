@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desi Toons Studio</title>
+<style>
+  :root {
+    --bg: #f6f1e7; --card: #ffffff; --ink: #1d1a17; --muted: #6b645b; --line: #e3dccf;
+    --accent: #ffd400; --accent-ink: #1d1a17; --brand: #e4572e; --ok: #2f9e44; --err: #c92a2a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #17140f; --card: #221e18; --ink: #f3ede3; --muted: #a79f93; --line: #3a342b; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { margin: 0 0 4px; font-size: 28px; }
+  .sub { margin: 0 0 20px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+  @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tab { border: 1px solid var(--line); background: transparent; color: var(--ink); padding: 8px 14px;
+         border-radius: 999px; cursor: pointer; font: inherit; }
+  .tab[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  textarea { width: 100%; min-height: 260px; resize: vertical; border: 1px solid var(--line); border-radius: 10px;
+             padding: 12px; font: 15px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+             background: var(--bg); color: var(--ink); }
+  .hint { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+  label { font-size: 14px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  select, input[type=password] { font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line);
+                                 background: var(--card); color: var(--ink); }
+  .go { margin-top: 16px; width: 100%; padding: 14px; font-family: inherit; font-size: 20px; font-weight: 700;
+        background: var(--accent); color: var(--accent-ink); border: 2px solid var(--ink); border-radius: 12px;
+        cursor: pointer; box-shadow: 0 4px 0 var(--ink); }
+  .go:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .go:disabled { opacity: .6; cursor: wait; }
+  .link { background: none; border: 0; color: var(--brand); cursor: pointer; padding: 0; font: inherit; }
+  .bar { height: 10px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 10px 0; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--brand); transition: width .4s; }
+  video { width: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: 12px; display: block; }
+  .placeholder { aspect-ratio: 9 / 16; border: 2px dashed var(--line); border-radius: 12px; display: grid;
+                 place-items: center; color: var(--muted); text-align: center; padding: 20px; }
+  .err { color: var(--err); white-space: pre-wrap; }
+  .ok { color: var(--ok); }
+  pre.log { max-height: 140px; overflow: auto; font-size: 12px; color: var(--muted); white-space: pre-wrap; margin: 8px 0 0; }
+  .post { min-height: 110px; font-family: inherit; }
+  .btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .btns a, .btns button { flex: 1; text-align: center; padding: 10px; border-radius: 10px; border: 1px solid var(--line);
+                          background: var(--card); color: var(--ink); text-decoration: none; font: inherit; cursor: pointer; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--muted); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🎬 Desi Toons Studio</h1>
+  <p class="sub">Idea ya script likho → "Banao" dabao → Instagram reel tayyar (1080×1920, Hindi awaaz ke saath).</p>
+
+  <div class="grid">
+    <section class="card">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" data-mode="idea" aria-selected="true">💡 Idea do (AI)</button>
+        <button class="tab" role="tab" data-mode="script" aria-selected="false">📝 Apni script</button>
+        <button class="tab" role="tab" data-mode="json" aria-selected="false">⚙️ JSON</button>
+      </div>
+
+      <textarea id="text" spellcheck="false"></textarea>
+      <p class="hint" id="hint"></p>
+
+      <div class="row">
+        <label id="hookWrap">Hook style
+          <select id="hook"><option value="auto">Auto (AI chune)</option></select>
+        </label>
+        <label>Quality
+          <select id="width"><option value="720">720p (jaldi)</option><option value="1080">1080p (HD)</option></select>
+        </label>
+        <label><input type="checkbox" id="voice" checked> Hindi awaaz</label>
+        <label id="aiWrap" class="hidden"><input type="checkbox" id="useAi"> AI se sudharo (Devanagari + acting)</label>
+        <label id="pwWrap" class="hidden">Password <input type="password" id="pw" size="10"></label>
+      </div>
+      <button class="go" id="go">Banao 🎬</button>
+      <p class="hint" id="aiNote"></p>
+    </section>
+
+    <aside class="card" id="side">
+      <div id="status" class="hidden">
+        <strong id="stage">…</strong>
+        <div class="bar"><i id="barFill"></i></div>
+        <div id="errBox" class="err"></div>
+        <pre class="log" id="log"></pre>
+      </div>
+      <div class="placeholder" id="ph">Yahan aapki reel aayegi 📱</div>
+      <video id="vid" controls playsinline class="hidden"></video>
+      <div id="result" class="hidden">
+        <div class="btns">
+          <a id="dl" href="#">⬇️ Video download</a>
+          <button id="copy">📋 Caption copy</button>
+        </div>
+        <details open>
+          <summary>Instagram caption + hashtags</summary>
+          <textarea class="post" id="post"></textarea>
+        </details>
+        <details>
+          <summary>Scene JSON (badal ke dobara banao)</summary>
+          <button class="link" id="editJson">JSON tab me kholo →</button>
+        </details>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const HINTS = {
+  idea: "Bas idea likho, jaise: \"mummy ne doodh mangaya aur beta cricket khelne chala gaya\". Khali chhodo to AI khud topic chunega.",
+  script: "Format: HOOK: ..., CAST: M = mummy, R = beta ..., SCENE: room | street | kitchen | school | night_road, " +
+          "phir lines: M (angry, point): Roman line | देवनागरी line.  R -> enter left / exit right / dance.",
+  json: "Advanced: poora scene JSON (repo ke scenes/*.json jaisa).",
+};
+const drafts = { idea: "", script: "", json: "" };
+let mode = "idea", info = {}, timer = null;
+
+function setMode(m) {
+  drafts[mode] = $("text").value;
+  mode = m;
+  document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", b.dataset.mode === m));
+  $("text").value = drafts[m];
+  $("hint").textContent = HINTS[m];
+  $("hookWrap").classList.toggle("hidden", m === "json");
+  $("aiWrap").classList.toggle("hidden", m !== "script" || !info.provider);
+  $("text").placeholder = m === "idea" ? "Idea yahan likho…" : m === "script" ? "Script yahan likho…" : "{ … }";
+}
+
+document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
+
+async function loadInfo() {
+  info = await (await fetch("/api/info")).json();
+  for (const h of info.hooks) $("hook").add(new Option(h.name, h.key));
+  drafts.script = info.example_script || "";
+  if (!info.provider) {
+    $("aiNote").textContent = "AI band hai (koi API key set nahi). 'Apni script' bina AI ke chalti hai. " +
+      "Idea mode ke liye GEMINI_API_KEY (free) ya ANTHROPIC_API_KEY set karke server dobara chalao.";
+    setMode("script");
+  } else {
+    $("aiNote").textContent = "AI: " + info.provider;
+    setMode("idea");
+  }
+  $("pwWrap").classList.toggle("hidden", !info.password);
+}
+
+async function make() {
+  const body = { mode, text: $("text").value, hook: $("hook").value, width: +$("width").value,
+                 voice: $("voice").checked, use_ai: $("useAi").checked };
+  $("go").disabled = true;
+  $("status").classList.remove("hidden");
+  $("errBox").textContent = ""; $("log").textContent = "";
+  $("stage").textContent = "Bhej raha hoon…"; $("barFill").style.width = "2%";
+  try {
+    const r = await fetch("/api/make", { method: "POST", headers: { "Content-Type": "application/json",
+                          "X-Studio-Password": $("pw").value }, body: JSON.stringify(body) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || "error");
+    poll(j.id);
+  } catch (e) {
+    $("errBox").textContent = e.message; $("stage").textContent = "Nahi ban paya"; $("go").disabled = false;
+  }
+}
+
+function poll(id) {
+  clearTimeout(timer);
+  timer = setTimeout(async () => {
+    const j = await (await fetch("/api/job?id=" + id)).json();
+    let stage = j.stage;
+    if (j.status === "queued" && j.queue > 1) stage += " (aage " + (j.queue - 1) + " video)";
+    if (j.status === "running" && j.progress) stage += " " + Math.round(j.progress * 100) + "%";
+    $("stage").textContent = stage;
+    $("barFill").style.width = Math.max(4, Math.round((j.progress || 0) * 100)) + "%";
+    $("log").textContent = (j.log || []).join("\n");
+    if (j.status === "done") return show(j);
+    if (j.status === "error") {
+      $("errBox").textContent = j.error; $("go").disabled = false; return;
+    }
+    poll(id);
+  }, 1200);
+}
+
+function show(j) {
+  $("go").disabled = false;
+  $("ph").classList.add("hidden");
+  $("vid").classList.remove("hidden");
+  $("vid").src = j.video; $("vid").poster = j.cover || "";
+  $("dl").href = j.video + "?download=1";
+  $("post").value = j.post || "";
+  drafts.json = JSON.stringify(j.scene, null, 2);
+  $("result").classList.remove("hidden");
+}
+
+$("go").addEventListener("click", make);
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("post").value); $("copy").textContent = "✅ Copy ho gaya"; }
+  catch { $("post").select(); }
+  setTimeout(() => ($("copy").textContent = "📋 Caption copy"), 1500);
+});
+$("editJson").addEventListener("click", () => setMode("json"));
+loadInfo();
+</script>
+</body>
+</html>

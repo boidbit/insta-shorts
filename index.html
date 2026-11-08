@@ -1,0 +1,980 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desi Toons Studio</title>
+<meta name="description" content="Idea ya script do, GitHub pe Hindi cartoon reel banti hai.">
+<style>
+  :root {
+    --bg: #f6f1e7; --card: #ffffff; --ink: #1d1a17; --muted: #6b645b; --line: #e3dccf;
+    --accent: #ffd400; --accent-ink: #1d1a17; --brand: #e4572e; --ok: #2f9e44; --err: #c92a2a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #17140f; --card: #221e18; --ink: #f3ede3; --muted: #a79f93; --line: #3a342b; }
+  }
+  :root[data-theme="dark"] { --bg: #17140f; --card: #221e18; --ink: #f3ede3; --muted: #a79f93; --line: #3a342b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 60px; }
+  header { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
+  h1 { margin: 0; font-size: 28px; }
+  h2 { font-size: 18px; margin: 0 0 10px; }
+  .sub { margin: 4px 0 20px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: 1fr 330px; gap: 20px; align-items: start; }
+  @media (max-width: 840px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 20px; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tab { border: 1px solid var(--line); background: transparent; color: var(--ink); padding: 8px 14px;
+         border-radius: 999px; cursor: pointer; font: inherit; }
+  .tab[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  textarea { width: 100%; min-height: 260px; resize: vertical; border: 1px solid var(--line); border-radius: 10px;
+             padding: 12px; font: 15px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
+             background: var(--bg); color: var(--ink); }
+  .hint { color: var(--muted); font-size: 14px; margin: 8px 0 0; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+  label { font-size: 14px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  select, input[type=password], input[type=text], input[type=number] {
+    font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); min-width: 0; }
+  .go { margin-top: 16px; width: 100%; padding: 14px; font-family: inherit; font-size: 20px; font-weight: 700;
+        background: var(--accent); color: var(--accent-ink); border: 2px solid var(--ink); border-radius: 12px;
+        cursor: pointer; box-shadow: 0 4px 0 var(--ink); }
+  .go:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .go:disabled { opacity: .6; cursor: wait; }
+  .small { padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
+           color: var(--ink); font: inherit; cursor: pointer; }
+  .small.wide { width: 100%; margin-top: 10px; padding: 11px; }
+  .small:disabled { opacity: .6; cursor: wait; }
+  .lint { margin: 10px 0 0; padding: 10px 12px 10px 30px; border-radius: 10px; font-size: 14px;
+          border: 1px solid var(--line); background: var(--bg); }
+  .lint.bad { border-color: var(--err); }
+  .lint li { margin: 2px 0; }
+  .lint.good { list-style: none; padding-left: 12px; color: var(--ok); }
+  .linkbtn { background: none; border: 0; padding: 0; margin-top: 8px; color: var(--brand); cursor: pointer;
+             font: inherit; font-size: 14px; text-align: left; text-decoration: underline; }
+  .banner { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--accent); color: var(--accent-ink);
+            font-size: 14px; }
+  .bar { height: 10px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 10px 0; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--brand); transition: width .4s; }
+  video { width: 100%; aspect-ratio: 9 / 16; background: #000; border-radius: 12px; display: block; }
+  .placeholder { aspect-ratio: 9 / 16; border: 2px dashed var(--line); border-radius: 12px; display: grid;
+                 place-items: center; color: var(--muted); text-align: center; padding: 20px; }
+  .err { color: var(--err); white-space: pre-wrap; }
+  .ok { color: var(--ok); }
+  ol.steps { margin: 6px 0 0; padding-left: 20px; font-size: 14px; color: var(--muted); }
+  ol.steps li.done { color: var(--ok); }
+  ol.steps li.now { color: var(--ink); font-weight: 600; }
+  .post { min-height: 110px; font-family: inherit; }
+  .btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .btns a, .btns button { flex: 1; text-align: center; padding: 10px; border-radius: 10px; border: 1px solid var(--line);
+                          background: var(--card); color: var(--ink); text-decoration: none; font: inherit; cursor: pointer; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+  .reel { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); cursor: pointer;
+          text-align: left; padding: 0; font: inherit; color: var(--ink); }
+  .reel img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; display: block; background: var(--line); }
+  .reel span { display: block; padding: 6px 8px; font-size: 13px; line-height: 1.3; }
+  details.setup summary { cursor: pointer; font-weight: 600; }
+  .setup ol { padding-left: 20px; margin: 8px 0; font-size: 14px; }
+  code { background: var(--bg); padding: 1px 5px; border-radius: 5px; }
+  a { color: var(--brand); }
+  details.builder { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  details.builder summary { cursor: pointer; font-weight: 600; }
+  .brow { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .crow { display: flex; gap: 8px; align-items: center; padding: 8px; margin-top: 8px; border-radius: 10px;
+          background: var(--bg); }
+  .crow img { width: 56px; height: 70px; flex: none; object-fit: contain; }
+  .crow .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; flex: 1;
+                  min-width: 0; }
+  .crow .fields > * { width: 100%; min-width: 0; }
+  .brow label.grow { flex: 1 1 220px; min-width: 0; }
+  .brow label.grow input { flex: 1; min-width: 0; width: 100%; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+  .chip { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px;
+          padding: 4px 10px; font: inherit; font-size: 14px; cursor: pointer; }
+  .setup label { max-width: 100%; }
+  #token { width: 100%; max-width: 330px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🎬 Desi Toons Studio</h1>
+    <span id="who" class="hint"></span>
+  </header>
+  <p class="sub">Idea ya script likho → "Banao" dabao → GitHub pe Hindi cartoon reel banti hai (1080×1920, awaaz ke saath).</p>
+
+  <details class="card setup" id="setup">
+    <summary>⚙️ GitHub connection (ek baar)</summary>
+    <ol>
+      <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Naya fine-grained token banao</a>:
+        Repository access → <b>Only select repositories</b> → <code id="repoName">insta-shorts</code>.</li>
+      <li>Permissions → Repository → <b>Actions: Read and write</b>, <b>Contents: Read-only</b>. Generate karke copy karo.</li>
+      <li>Neeche paste karke "Save" dabao. Token sirf <b>isi browser</b> me save hota hai, repo me kabhi nahi jata.</li>
+    </ol>
+    <div class="row">
+      <label>Token <input type="password" id="token" size="34" autocomplete="off" placeholder="github_pat_…"></label>
+      <label>Branch <input type="text" id="ref" size="18"></label>
+      <button class="small" id="save">Save</button>
+      <button class="small" id="forget">Token hatao</button>
+    </div>
+    <p class="hint" id="connMsg"></p>
+  </details>
+
+  <div class="grid">
+    <section class="card">
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" data-mode="idea" aria-selected="true">💡 Idea do (AI)</button>
+        <button class="tab" role="tab" data-mode="script" aria-selected="false">📝 Apni script</button>
+      </div>
+      <details class="builder" id="builder">
+        <summary>🎭 Jagah aur characters khud chuno <span class="hint">(optional)</span></summary>
+        <div class="brow">
+          <label>Jagah <select id="bPlace"></select></label>
+          <button class="small" id="bAdd" type="button">➕ Character jodo</button>
+          <button class="small" id="bClear" type="button">Sab hatao</button>
+        </div>
+        <div id="bCast"></div>
+        <div class="brow">
+          <label class="grow">Hook <input type="text" id="bHook" placeholder="Pehli second ka text (khali = pehli line)"></label>
+        </div>
+        <div class="brow">
+          <label class="grow">CTA <input type="text" id="bCta" placeholder="Aakhir me (khali = Apne dost ko tag karo 👇)"></label>
+        </div>
+        <p class="hint">Neeche ya to <b>idea</b> likho (AI inhi characters aur jagah ke saath script likhega), ya seedhe
+          <b>dialogue</b>: har line <code>Naam: baat</code>, jaise <code>Papa: Sarkari gaadi se aana!</code>.
+          Khali line = naya shot (na do to shot apne aap badalte hain). Devanagari likhne ki zarurat nahi.</p>
+      </details>
+      <textarea id="text" spellcheck="false"></textarea>
+      <div class="chips" id="chips"><span class="hint">Line me jodo:</span></div>
+      <ul class="lint hidden" id="lint" aria-live="polite"></ul>
+      <p class="hint" id="hint"></p>
+      <button class="linkbtn" id="copyPrompt">🤖 ChatGPT / Claude / Gemini app se script likhwani hai? Unke liye poora prompt copy karo</button>
+      <p class="hint hidden" id="promptNote">Prompt copy ho gaya. Us AI me paste karo (aakhri line me apna idea likho) → jo script mile wo "📝 Apni script" tab me paste karo → upar wala checker dekho → Approve.</p>
+      <div class="row">
+        <label id="hookWrap">Hook
+          <select id="hook">
+            <option value="auto">Auto (AI chune)</option>
+            <option value="pattern_interrupt">Ruko! (pattern interrupt)</option>
+            <option value="pov">POV</option>
+            <option value="relatable">Agar tum bhi...</option>
+            <option value="curiosity">Curiosity gap</option>
+            <option value="list">3 types ke...</option>
+            <option value="question">Sawal / poll</option>
+            <option value="cold_open">Cold open</option>
+            <option value="expectation">Expectation vs reality</option>
+          </select>
+        </label>
+        <label id="toneWrap">Tone
+          <select id="tone">
+            <option value="auto">Auto (idea ke hisaab se)</option>
+            <option value="light">Light (family, relatable)</option>
+            <option value="dark">Dark comedy 💀</option>
+            <option value="satire">Satire (system par vyang)</option>
+            <option value="absurd">Absurd / ajeeb</option>
+            <option value="twist">Meetha shuru, tez twist</option>
+          </select>
+        </label>
+        <label class="videoOpt">Quality
+          <select id="width"><option value="1080">1080p (HD)</option><option value="720">720p (jaldi)</option></select>
+        </label>
+        <label class="videoOpt"><input type="checkbox" id="voice" checked> Hindi awaaz</label>
+        <label class="videoOpt">Dialogue text
+          <select id="dialogue">
+            <option value="bubble">Bubble me 💬</option>
+            <option value="subtitle">Neeche subtitle</option>
+            <option value="both">Bubble + subtitle</option>
+            <option value="none">Koi text nahi (sirf awaaz)</option>
+          </select>
+        </label>
+        <label class="videoOpt">Hook card
+          <select id="intro">
+            <option value="over">Pehli line ke saath</option>
+            <option value="first">Pehle hook, phir baat</option>
+            <option value="off">Hook card nahi</option>
+          </select>
+        </label>
+      </div>
+      <p class="banner hidden" id="draftNote">✍️ AI ki script taiyar hai. Padho, jo badalna ho yahin badlo, phir <b>Approve</b> dabao. Pasand na aaye to idea badal ke dobara likhwao.</p>
+      <button class="go" id="go">Script likho ✍️</button>
+      <button class="small wide hidden" id="polish">✍️ AI se sudharo (pehle sirf script dikhayega)</button>
+      <p class="hint" id="timeHint"></p>
+    </section>
+
+    <aside class="card">
+      <div id="status" class="hidden">
+        <strong id="stage">…</strong>
+        <div class="bar"><i id="barFill"></i></div>
+        <ol class="steps" id="steps"></ol>
+        <div id="errBox" class="err"></div>
+        <a id="runLink" class="hint hidden" target="_blank" rel="noopener">GitHub pe run dekho ↗</a>
+      </div>
+      <div class="placeholder" id="ph">Yahan aapki reel aayegi 📱</div>
+      <div id="result" class="hidden">
+        <div id="videos"></div>
+        <details open>
+          <summary>Instagram caption + hashtags</summary>
+          <textarea class="post" id="post"></textarea>
+          <div class="btns"><button id="copy">📋 Caption copy</button></div>
+        </details>
+      </div>
+    </aside>
+  </div>
+
+  <section class="card">
+    <h2>📼 Pichli reels</h2>
+    <div class="gallery" id="gallery"><p class="hint">Load ho raha hai…</p></div>
+  </section>
+</main>
+
+<!-- words the script format understands: same as studio/script.py vocab() (a test keeps them equal) -->
+<script type="application/json" id="vocab">{"places":["balcony","bank","bathroom","beach","bedroom","bus_stop","canteen","chai_tapri","cinema","classroom","coaching","cricket_ground","desert","exam_hall","festival_street","graveyard","gully","gym","haunted_house","hospital","hostel","jungle","kirana","kitchen","library","living_room","mandap","market","meeting_room","mountain_road","night_road","office","party","plain","police_station","railway","room","school","street","terrace"],"looks":["aunty","boy","college_boy","college_girl","dada","dadi","girl","kid","kid_girl","office_girl","office_guy","uncle"],"roles":["aunty","bachcha","behen","beta","beti","bhai","boss","brother","chacha","chachi","dad","dada","dadi","didi","dost","father","friend","maa","mom","mother","mummy","nana","nani","padosan","padosi","papa","sister","student","teacher","uncle"],"extras":["aadmi","aurat","bald","balding","beard","big_eyes","big_nose","bindi","black","blazer","blue","braid","brown","bun","button_nose","cap","chubby","cream","curly","dark","denim","earrings","fair","female","glasses","gold","green","grey","henna","hook_nose","khaki","kurta","ladka","ladki","long","long_face","long_nose","magenta","male","man","maroon","moustache","mustard","navy","normal","normal_brows","olive","orange","oval_face","pink","ponytail","purple","red","round_face","saffron","salwar","saree","shirt","short","side_part","sky","slim","small_eyes","spiky","square_face","sunglasses","teal","thick_brows","thin_brows","tilak","tshirt","tuft","turban","uniform","vest","wheatish","white","woman","yellow"],"expressions":["angry","blush","bored","confused","cringe","cry","dead","determined","disgust","dizzy","eating","evil","excited","grin","hurt","kiss","laugh","lol","love","nervous","neutral","proud","relaxed","sad","scared","shh","shock","shout","shy","sleepy","sly","smile","smug","sneeze","surprised","think","wink","yawn"],"actions":["aeroplane","airplane","argue","arms_crossed","bark","bat","bhangra","bow","bowl","box","brush_teeth","call","carry","cartwheel","catch","caw","celebrate","clap","climb","cook","count_money","creep","cringe","crouch","cry","dance","dance2","dance3","dance_walk","disco","dizzy","dodge","drag","drink","drive","eat","facepalm","fail","faint","fall","fist_pump","flex","floss","fly","gaana","garba","get_hit","get_up","hands_on_hips","handshake","hide","high_five","hit_react","hookstep","hug","idle","jog","jump","jump_joy","jump_over","jumping_jacks","kamar_dard","kick","laugh","lie","lie_down","lift_weights","limp","listen","look_around","look_back","look_down","look_up","meow","moo","moonwalk","naagin","nagin","namaste","nod","none","pat_back","peck","peek","phone_call","point","point_self","pray","proud","punch","push","pushup","race_start","read","rofl","rub_hands","run","salute","scared","scratch_head","shake_head","shh","shiver","shock","shrug","shy","sing","sit","sit_floor","skid","slap","sleep","sleep_lie","slide","slip","sneak","sneeze","spin","squat","stand","stir","stomp","stretch","sulk","sway","sweep","talk","text","think","throw","thumbs_up","thumka","tiptoe","tremble","trip","tug","turn_around","type","wag","wake_up","walk","wash_hands","wave","whisper","write","yawn"],"props":["bag","ball","balloon","banana","bat","belan","book","bottle","box","broom","camera","chai","chappal","cup","dumbbell","flag","gift","glass","key","laptop","letter","mic","money","newspaper","notebook","pen","phone","pillow","plate","remote","samosa","spoon","stick","toothbrush","torch","trophy","umbrella"],"sfx":["applause","bat_hit","beep","boing","cash","clap","crickets","crowd_cheer","ding","doorbell","drumroll","footsteps","heartbeat","horn","knock","laugh_track","pop","punch","record_scratch","ring","rooster","sad_trombone","scream","slap","thud","thunder","tick","vibrate","whistle","whoosh","wind"],"moves":["beech_me","center","cheer","disco","down","drop","enter","exit","freeze","interrupt","left","noprop","pump","reveal","right","shake","slow_motion","slowmo","swing","up","up_left","up_right","walk","zoom"],"fx":["aag","anger","ankhen","baarish","barish","bulb","confetti","dhuan","dizzy","dust","exclaim","eyes","fire","fireflies","flash","flash_bang","focus_lines","fog","glow_eyes","gussa","heart","hearts","idea","leaves","lightbulb","lightning","pasina","pow","question","rain","smoke","snow","sparkle","speed","spotlight","stars","steam","sweat","sweating","tears_spray","zzz"],"times":["dawn","day","evening","fireflies","fog","leaves","night","rain","snow","sunset"],"sets":["bed","bench","box","bucket","bush","chair","clock","cupboard","desk","door","fan","fence","fridge","lamp","painting","phone","plant","rock","signboard","sofa","stairs","stool","tree","tubelight","tv","window"],"set_words":["back","big","center","closed","day","far_left","far_right","flip","front","idle","left","night","off","on","open","right","ringing","rustle","small"],"seat_actions":["lie","lie_down","rofl","sit","sleep_lie"],"animals":["bandar","billi","cat","cow","crow","dog","doggy","gaay","gai","kaua","kauwa","kutta","monkey","parrot","tota","totaa"],"moods":["comedy","desi","festive","lofi","pop","sad","soft","suspense"],"ambience":["crowd","jungle","night","office","rain","sea","street","wind"],"shots":["2shot","close","close_up","closeup","medium","two_shot","twoshot","wide"],"depth":["far","mid","near"],"objects":["auto","bags","bicycle","bike","bin","bullet","car","cow","cycle","dustbin","gaadi","gai","garbage_truck","kachra","kachra_gaadi","motorcycle","rickshaw","scooter","table","thaila","truck"],"object_words":["center","enter","exit","front","go","left","right","to"],"rides":["auto","bike","car","cycle","scooter","truck"],"ride_words":["back","dismount","driver","getoff","ride","utar"],"framings":["inside","medium","ots","wide"],"angle_words":["over","over_shoulder","reverse","shoulder"],"role_looks":[["aunty","aunty"],["bachcha","kid"],["behen","college_girl"],["beta","college_boy"],["beti","college_girl"],["bhai","college_boy"],["boss","office_guy"],["brother","college_boy"],["chacha","uncle"],["chachi","aunty"],["dad","uncle"],["dada","dada"],["dadi","dadi"],["didi","college_girl"],["dost","boy"],["father","uncle"],["friend","boy"],["maa","aunty"],["mom","aunty"],["mother","aunty"],["mummy","aunty"],["nana","dada"],["nani","dadi"],["padosan","aunty"],["padosi","uncle"],["papa","uncle"],["sister","college_girl"],["student","kid"],["teacher","office_guy"],["uncle","uncle"]],"hair":["short","side_part","spiky","curly","balding","bald","long","braid","bun","ponytail"],"skin":["fair","wheatish","brown","dark"],"outfits":["tshirt","shirt","kurta","salwar","saree","uniform","blazer","vest"],"colors":["black","blue","brown","cream","denim","gold","green","grey","khaki","magenta","maroon","mustard","navy","olive","orange","pink","purple","red","saffron","sky","teal","white","yellow"],"accessories":["glasses","sunglasses","cap","turban","moustache","beard","bindi","tilak","earrings","tuft"],"builds":["slim","normal","chubby"]}</script>
+<script>
+// ---------------------------------------------------------------- config
+// owner/repo come from the Pages address (<owner>.github.io/<repo>/); branch is saved per browser.
+const DEFAULTS = { owner: "boidbit", repo: "insta-shorts", ref: "desi-toons-studio", workflow: "render.yml" };
+const CONFIG = (() => {
+  const c = { ...DEFAULTS };
+  const m = location.hostname.match(/^([\w-]+)\.github\.io$/);
+  const seg = location.pathname.split("/").filter(Boolean)[0];
+  if (m) { c.owner = m[1]; if (seg && !seg.includes(".")) c.repo = seg; }
+  return c;
+})();
+const store = {
+  get(k, d = "") { try { return localStorage.getItem("dts_" + k) ?? d; } catch { return d; } },
+  set(k, v) { try { v ? localStorage.setItem("dts_" + k, v) : localStorage.removeItem("dts_" + k); } catch {} },
+};
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, kids = []) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+const REPO = () => `/repos/${CONFIG.owner}/${CONFIG.repo}`;
+
+const EXAMPLE_SCRIPT = `HOOK: Dadi ko mila naya smartphone 😂
+CAST: D = dadi, P = beta
+SCENE: room
+D (think, phone): Beta, ye WhatsApp me photo kaise bhejte hain? | बेटा, ये व्हाट्सऐप में फ़ोटो कैसे भेजते हैं?
+P (smile, point): Dadi, bas ye button dabao! | दादी, बस ये बटन दबाओ!
+D (shock, boing, shake): Arre! Ye to video call lag gaya! | अरे! ये तो वीडियो कॉल लग गया!
+P -> facepalm
+CTA: Apni dadi ko tag karo 👇
+CAPTION: Har ghar ki dadi aur naya phone 😂📱
+HASHTAGS: #dadi #desicomedy #relatable`;
+const HINTS = {
+  idea: "Bas idea likho, jaise: \"mummy ne doodh mangaya aur beta cricket khelne chala gaya\". Khali chhodo to AI khud topic chunega. (Repo me GEMINI_API_KEY ya ANTHROPIC_API_KEY secret chahiye.)",
+  script: "HOOK: …, CAST: M = mummy, R = beta …, SCENE: room | street | kitchen | school | night_road, phir lines: " +
+          "M (angry, point): Roman line | देवनागरी line.  R -> enter left / exit right / dance.  CTA: …  CAPTION: …  HASHTAGS: …",
+};
+const STEP_NAMES = {
+  "System packages (ffmpeg, fonts, emoji)": "Machine taiyar", "Python packages": "Tools install", "Tests": "Check",
+  "Write the story": "Kahani likhna", "Publish draft script": "Script bhejna", "Render": "Video banana",
+  "Upload videos": "Upload", "Publish as release (the web page plays it from here)": "Publish",
+};
+const drafts = { idea: "", script: EXAMPLE_SCRIPT };
+const DRAFT_NOTE = $("draftNote").innerHTML;
+let mode = "idea", timer = null, busy = false;
+
+// ---------------------------------------------------------------- GitHub API
+async function gh(path, opts = {}) {
+  const token = store.get("token");
+  const headers = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", ...(opts.headers || {}) };
+  if (token) headers.Authorization = "Bearer " + token;
+  const r = await fetch("https://api.github.com" + path, { ...opts, headers });
+  if (r.status === 204) return null;
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const e = new Error(j.message || ("GitHub error " + r.status));
+    e.status = r.status;
+    throw e;
+  }
+  return j;
+}
+
+async function checkConnection() {
+  const token = store.get("token");
+  $("ref").value = store.get("ref", CONFIG.ref);
+  $("repoName").textContent = CONFIG.owner + "/" + CONFIG.repo;
+  if (!token) {
+    $("setup").open = true;
+    $("who").textContent = "⚠ GitHub se connect nahi";
+    $("connMsg").textContent = "Video banane ke liye token chahiye (pichli reels bina token ke bhi dikhti hain).";
+    return false;
+  }
+  try {
+    const [user, repo] = await Promise.all([gh("/user"), gh(REPO())]);
+    $("who").textContent = "✅ " + user.login + " · " + CONFIG.owner + "/" + CONFIG.repo;
+    $("connMsg").className = "hint ok";
+    $("connMsg").textContent = "Connected. Branch: " + store.get("ref", CONFIG.ref);
+    if (repo.permissions && repo.permissions.push === false) {
+      $("connMsg").className = "hint err";
+      $("connMsg").textContent = "Token me is repo pe likhne ki permission nahi (Actions: Read and write chahiye).";
+    }
+    return true;
+  } catch (e) {
+    $("setup").open = true;
+    $("who").textContent = "⚠ Token kaam nahi kar raha";
+    $("connMsg").className = "hint err";
+    $("connMsg").textContent = "GitHub ne mana kiya: " + e.message;
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------- script checker (mirrors studio/script.py)
+const V = JSON.parse($("vocab").textContent);
+const SET = Object.fromEntries(Object.entries(V).map(([k, v]) => [k, new Set(v)]));
+const HEADERS = new Set(["HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "OBJ", "LIGHTS", "LIGHT", "AMBIENCE",
+  "NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD"]);
+const words = (s) => s.toLowerCase().split(/[\s,|]+/).map((w) => w.replace(/^[\[\](){}'"]+|[\[\](){}'"]+$/g, "")).filter(Boolean);
+const short = (s) => (s.length > 45 ? s.slice(0, 45) + "…" : s);
+
+function checkActing(tokens, cast) {
+  const unknown = [], acts = [], exprs = [];
+  const names = new Set([...(cast || [])].map((n) => n.toLowerCase()));
+  // words that are both an action and a face (think, shock, laugh...) are the face when the line already has a clear action
+  const actionOnly = tokens.some((w2) => w2 === "point" || (SET.actions.has(w2) && !SET.expressions.has(w2) && !SET.sfx.has(w2)));
+  for (let i = 0; i < tokens.length; i++) {
+    const w = tokens[i], nxt = tokens[i + 1];
+    if (SET.seat_actions.has(w) && SET.sets.has(nxt)) { acts.push(w); i++; continue; }      // sit sofa / lie_down bed
+    if (w === "throw" && names.has(nxt)) { acts.push(w); i++; continue; }                     // throw B (a chappal flies at B)
+    if (w === "ride") {                      // ride <vehicle> [back|driver]
+      if (SET.rides.has(nxt)) {
+        i++;
+        for (;;) {                       // back | driver | enter left|right | to left|center|right
+          const a = tokens[i + 1], b = tokens[i + 2];
+          if (a === "back" || a === "driver") i++;
+          else if ((a === "enter" && ["left", "right"].includes(b)) || (a === "to" && ["left", "center", "right"].includes(b))) i += 2;
+          else break;
+        }
+      }
+      else { unknown.push(`ride ${nxt || "?"} (${V.rides.join(", ")})`); if (nxt) i++; }
+      continue;
+    }
+    if (["getoff", "utar", "dismount"].includes(w)) { if (nxt === "left" || nxt === "right") i++; continue; }
+    if ((w === "enter" || w === "exit") && (nxt === "left" || nxt === "right")) { i++; continue; }
+    if (w === "walk" && ["left", "center", "right"].includes(nxt)) { i++; continue; }
+    if (w === "point") { acts.push(w); if (["left", "right", "up", "down", "up_left", "up_right"].includes(nxt)) i++; continue; }
+    // laugh / shock / cry are also expressions, clap is also a sound: after an action they mean those
+    if (SET.actions.has(w) && !((acts.length || actionOnly) && (SET.expressions.has(w) || SET.sfx.has(w)))) {
+      acts.push(w);
+      if (w === "dance" && ["pump", "swing", "cheer", "disco"].includes(nxt)) i++;
+      continue;
+    }
+    if (SET.expressions.has(w)) { exprs.push(w); continue; }
+    if (SET.props.has(w) || SET.sfx.has(w) || SET.fx.has(w) || SET.moves.has(w) || SET.shots.has(w) || SET.depth.has(w)) continue;
+    unknown.push(w);
+  }
+  return { unknown, lost: [...acts.slice(0, -1), ...exprs.slice(0, -1)] };
+}
+
+function isChatText(text) {          // a chat = only < / > lines (plus HOOK/CTA/CAPTION/HASHTAGS/MUSIC/CHAT:)
+  let msgs = 0;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("//")) continue;
+    if (/^(HOOK|CTA|CAPTION|HASHTAGS|MUSIC|SECONDS|CHAT)\s*:/i.test(line)) continue;
+    if (/^([<>]|CHAT\s+(left|right)\s*:)/i.test(line)) { msgs++; continue; }
+    return false;
+  }
+  return msgs > 0;
+}
+
+function lintChat(text) {
+  const out = [];
+  let n = 0;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    const m = line.match(/^([<>])\s*(.*)$/) || line.match(/^CHAT\s+(left|right)\s*:\s*(.*)$/i);
+    if (!m) continue;
+    n++;
+    if (!m[2].trim()) out.push(`"${short(line)}": message khali hai`);
+  }
+  if (n > 12) out.push(`${n} messages bahut zyada hain: purane messages upar se nikal jaayenge`);
+  return out;
+}
+
+function lintScript(text) {
+  if (isChatText(text)) return lintChat(text);          // chat: its own tiny format, no CAST / HOOK / CTA needed
+  const out = [], cast = new Set(), used = [];
+  let hook = false, cta = false, declared = false;
+  const acting = (s, line) => {
+    const { unknown, lost } = checkActing(words(s), cast);
+    if (unknown.length) out.push(`"${short(line)}": ${unknown.join(", ")} samajh nahi aaye`);
+    if (lost.length) out.push(`"${short(line)}": ek line me ek hi action + ek hi expression; ${lost.join(", ")} ignore honge`);
+  };
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("//")) continue;
+    let m = line.match(/^([A-Za-z_]+)\s*:\s*(.*)$/);
+    if (m && HEADERS.has(m[1].toUpperCase())) {
+      const key = m[1].toUpperCase(), val = m[2].trim();
+      if (key === "HOOK") hook = !!val;
+      if (key === "CTA") cta = !!val;
+      if (["NOTIFY", "NOTIFICATION", "LOADING", "TIMECARD", "CHAPTER", "ENDCARD"].includes(key)) {
+        if (!val) out.push(`${key}: ke baad text likho`);
+        continue;
+      }
+      if (key === "COUNTER") {
+        if (!/\|\s*-?\d+|\d+\s*(->|to|se)\s*-?\d+$/.test(val)) out.push(`COUNTER: "COUNTER: Rotiyan | 0 | 14" likho (label | shuru | aakhri number)`);
+        continue;
+      }
+      if (key === "AMBIENCE") {
+        const bad = words(val).filter((w) => w !== "none" && !SET.ambience.has(w));
+        if (bad.length) out.push(`AMBIENCE: ${bad.join(", ")} nahi hai (${V.ambience.join(", ")})`);
+        continue;
+      }
+      if (key === "MUSIC") {
+        const first = (val.split(/\s+/)[0] || "").toLowerCase();
+        if (first && first !== "beat" && first !== "none" && !SET.moods.has(first) && !/\.(mp3|wav|m4a|ogg)$/i.test(val))
+          out.push(`MUSIC: beat 110 / none / mood (${V.moods.join(", ")}) / assets/music/ ki file likho`);
+        continue;
+      }
+      if (key === "LIGHTS" || key === "LIGHT") {
+        if (!["on", "off", "dim"].includes(val.toLowerCase())) out.push(`LIGHTS: on / off / dim likho`);
+        continue;
+      }
+      if (key === "OBJ") {
+        const first = val.split(/\s+/)[0] || "";
+        if (SET.sets.has(first.toLowerCase())) {          // a set piece: sofa left / door open / signboard center CHAI
+          const bad = words(val).slice(1).filter((w) => !SET.set_words.has(w));
+          if (bad.length && first.toLowerCase() !== "signboard") out.push(`OBJ "${short(val)}": ${bad.join(", ")} samajh nahi aaye (left/center/right, open/closed, on/off, big/small, back/front)`);
+          continue;
+        }
+        if (!first) out.push("OBJ: ke baad object ka naam likho");
+        else if (!SET.objects.has(first.toLowerCase()) && !/\.(png|webp)$/i.test(first)) out.push(`OBJ "${first}": ye object nahi hai (${V.objects.join(", ")})`);
+        else if (words(val).slice(1).some((w) => !SET.object_words.has(w) && !SET.extras.has(w) && !["big", "small", "red", "blue", "green", "yellow", "orange", "pink", "purple", "teal", "white", "black", "brown"].includes(w))) out.push(`OBJ "${short(val)}": kuch shabd samajh nahi aaye (enter/exit/go left|right, to ..., front, rang)`);
+        continue;
+      }
+      if (key === "SCENE") {
+        const bg = val.split("|")[0].trim().toLowerCase().replace(/ /g, "_");
+        const rawBg = val.split("|")[0].trim();
+        if (/\.(png|jpe?g|webp)$/i.test(rawBg)) { /* your own picture: the renderer checks that the file exists */ }
+        else if (bg && !SET.places.has(bg) && !(SET.places.has(rawBg.toLowerCase().split(/\s+/)[0]) && rawBg.toLowerCase().split(/\s+/).slice(1).every((w) => SET.times.has(w)))) out.push(`SCENE "${bg}": ye jagah nahi hai (${V.places.join(", ")}; ya assets/backgrounds/ ki apni image ka path likho)`);
+      }
+      if (key === "CAST") {
+        declared = true;
+        for (const part of val.split(/,\s*(?=[A-Za-z_]\w*\s*=)/)) {
+          const i = part.indexOf("=");
+          if (i < 0) continue;
+          const name = part.slice(0, i).trim();
+          cast.add(name);
+          const bad = words(part.slice(i + 1)).filter((w) => !SET.looks.has(w) && !SET.roles.has(w) && !SET.extras.has(w) && !SET.animals.has(w));
+          if (bad.length) out.push(`CAST ${name}: ${bad.join(", ")} samajh nahi aaye`);
+        }
+      }
+      continue;
+    }
+    if ((m = line.match(/^(?:CUT|SHOT)\b\s*:?\s*([\w\s,]*)$/i))) {   // CUT [wide|medium|inside|ots] [reverse] [name]: a new shot, same place
+      const bad = m[1].split(/[\s,]+/).filter((w) => w && !SET.framings.has(w.toLowerCase()) && !SET.angle_words.has(w.toLowerCase()) && !cast.has(w) && !/^[A-Z]\w*$/.test(w));
+      if (bad.length) out.push(`"${short(line)}": CUT ke baad wide / medium / inside / ots (+ reverse) likho`);
+      continue;
+    }
+    if (/^(CHAT\b|[<>])/i.test(line)) { out.push(`"${short(line)}": chat alag format hai, story script me nahi chalta (chat ke liye alag text likho)`); continue; }
+    if ((m = line.match(/^([A-Za-z_]\w*)\s*=\s*(.+)$/))) { declared = true; cast.add(m[1]); continue; }
+    if (/^(wait\s*[\d.]+|\.\.\.+)$/i.test(line)) continue;
+    if ((m = line.match(/^([A-Za-z_]\w*)\s*->\s*(.+)$/))) { used.push(m[1]); acting(m[2], line); continue; }
+    if ((m = line.match(/^([A-Za-z_]\w*)\s*(?:\(([^)]*)\))?\s*:\s*(.+)$/))) {
+      if (!/^(narrator|vo|narration|voiceover|voice_over)$/i.test(m[1])) used.push(m[1]);   // a narrator needs no CAST entry
+      const br = m[2] || "";
+      if (/[?!]/.test(br) || words(br).length > 5) out.push(`"${short(line)}": brackets me dialogue hai; brackets me sirf acting words (shock, point…)`);
+      else acting(br, line);
+      const [roman, speak] = m[3].split("|");        // no "|" at all: the Devanagari is made when the video is made
+      if (speak !== undefined && !/[ऀ-ॿ]/.test(speak)) out.push(`"${short(line)}": "|" ke baad Devanagari nahi hai (awaaz galat padhegi)`);
+      continue;
+    }
+    out.push(`"${short(line)}": ye line samajh nahi aayi`);
+  }
+  if (!hook) out.push("HOOK: line nahi hai");
+  if (!cta) out.push("CTA: line nahi hai");
+  if (declared) for (const n of new Set(used)) if (n.toUpperCase() !== "ALL" && !cast.has(n)) out.push(`${n} CAST me nahi hai`);
+  return out;
+}
+
+function showLint() {
+  const box = $("lint");
+  if (mode === "script") {
+    const fixed = unflatten($("text").value);
+    if (fixed !== $("text").value) $("text").value = fixed;      // line breaks were lost: put them back
+  }
+  if (mode !== "script" || !$("text").value.trim()) { box.classList.add("hidden"); return []; }
+  const w = lintScript($("text").value);
+  box.classList.remove("hidden");
+  box.className = "lint " + (w.length ? "bad" : "good");
+  box.replaceChildren(...(w.length ? w.map((x) => el("li", { textContent: x }))
+                                   : [el("li", { textContent: "✅ Script ka format sahi hai" })]));
+  return w;
+}
+let lintTimer = null;
+$("text").addEventListener("input", () => { clearTimeout(lintTimer); lintTimer = setTimeout(showLint, 300); });
+
+// ---------------------------------------------------------------- builder (pure functions; tests run them in node)
+const ROLE_LOOK = Object.fromEntries(V.role_looks);
+const EMO = { gussa: "angry", ghussa: "angry", hairan: "surprised", shock: "shock", akad: "smug", smug: "smug",
+  hasi: "laugh", hans: "laugh", rona: "cry", ro: "cry", soch: "think", pyaar: "love", pyar: "love", chalak: "sly",
+  khush: "smile", dukhi: "sad", udaas: "sad", neend: "sleepy", mar: "dead", chilla: "shout", aankh: "wink" };
+const EMO_CHIPS = [["😠", "gussa"], ["😲", "hairan"], ["😱", "shock"], ["😏", "akad"], ["😂", "hasi"], ["😢", "rona"],
+  ["🤔", "soch"], ["😍", "pyaar"], ["😈", "chalak"], ["😄", "khush"], ["📢", "chilla"], ["💀", "mar"]];
+const HEADER_RE = /^(HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|OBJ|LIGHTS?|AMBIENCE|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)\s*:\s*(.*)$/i;
+const SAY_RE = /^([A-Za-z][\w ]{0,24}?)\s*(?:\(([^)]*)\))?\s*:\s*(\S.*)$/;
+const ACT_RE = /^([A-Za-z][\w ]{0,24}?)\s*->\s*(\S.*)$/;
+const DEFAULT_CTA = "Apne dost ko tag karo 👇";
+
+function isDialogue(text) {         // two or more "Naam: baat" lines = a ready dialogue, no AI needed
+  return text.split("\n").filter((l) => !HEADER_RE.test(l.trim()) && SAY_RE.test(l.trim())).length >= 2;
+}
+function ident(name) {              // "sharma ji" -> "SharmaJi" (a name the script format accepts)
+  return name.trim().split(/\s+/).map((w) => w[0].toUpperCase() + w.slice(1)).join("").replace(/\W/g, "") || "X";
+}
+function castWords(c) {
+  return [c.role || "boy", c.hair, c.skin, c.outfit, c.color, c.build, c.extra].filter((w) => w && w !== "auto").join(" ");
+}
+function autoEmotion(say) {
+  if (/\?/.test(say) && /!/.test(say)) return "surprised";
+  if (/😂|🤣|\bhaha/i.test(say)) return "laugh";
+  if (/😭|😢/.test(say)) return "cry";
+  if (/😡|😠/.test(say)) return "angry";
+  if (/😏/.test(say)) return "smug";
+  if (/😍|❤️/.test(say)) return "love";
+  if (/🤔/.test(say)) return "think";
+  return "";
+}
+function actingWords(words, say) {
+  const out = words.split(/[\s,]+/).filter(Boolean).map((w) => EMO[w.toLowerCase()] || w.toLowerCase());
+  if (!out.length && autoEmotion(say)) out.push(autoEmotion(say));
+  return out.join(", ");
+}
+function settingsLines(b, cast) {   // the builder's choices as script header lines
+  const out = [];
+  if (b.place && b.place !== "auto") out.push("SCENE: " + b.place);
+  if (cast.length) out.push("CAST: " + cast.map((c) => `${c.id} = ${c.words}`).join(", "));
+  if (b.hook) out.push("HOOK: " + b.hook);
+  if (b.cta) out.push("CTA: " + b.cta);
+  return out;
+}
+function builderCast(b) {
+  const out = [];
+  for (const c of (b.cast || [])) {
+    const base = ident(c.name || c.role || "dost");
+    let id = base, n = 2;
+    while (out.some((o) => o.id === id)) id = base + n++;
+    out.push({ key: (c.name || id).trim().toLowerCase(), id, words: castWords(c) });
+  }
+  return out;
+}
+// The idea goes to the AI with the builder's choices fixed.
+function ideaWithSettings(idea, b) {
+  const lines = settingsLines(b, builderCast(b));
+  if (!lines.length) return idea;
+  return (idea || "Koi idea nahi diya: in characters aur is jagah ke saath ek original desi comedy short khud socho.") +
+    "\n\nUse exactly these settings (do not change the place, the characters or their CAST words):\n" + lines.join("\n");
+}
+// "Naam: baat" lines (+ the builder's choices) -> a full script in the studio format. Returns {script, problems}.
+function buildScript(text, b) {
+  const cast = builderCast(b), used = [], meta = {}, rows = [], problems = [];
+  const who = (raw) => {
+    const key = raw.trim().toLowerCase();
+    if (/^(narrator|vo|narration|voiceover|voice_over)$/.test(key)) return "NARRATOR";
+    if (key === "all" || key === "sab") return "ALL";
+    let c = cast.find((x) => x.key === key || x.id.toLowerCase() === key.replace(/\s+/g, ""));
+    if (!c) {
+      const first = key.split(/\s+/)[0];
+      const role = ROLE_LOOK[first] || SET.looks.has(first) ? first
+        : (cast.filter((x) => x.auto).length % 2 ? "college_girl" : "college_boy");
+      c = { key, id: ident(raw), words: role, auto: true };
+      cast.push(c);
+    }
+    if (!used.includes(c)) used.push(c);
+    return c.id;
+  };
+  for (const raw of text.trim().split("\n")) {
+    const line = raw.trim();
+    let m;
+    if (!line) { rows.push({ cut: "CUT" }); continue; }
+    if (/^(CUT|SHOT)\b/i.test(line)) { rows.push({ cut: line, own: true }); continue; }
+    if ((m = line.match(HEADER_RE))) {
+      if (/^(OBJ|LIGHTS?|AMBIENCE|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)$/i.test(m[1])) rows.push({ raw: line });   // story lines: kept in place
+      else meta[m[1].toUpperCase()] = m[2].trim();
+      continue;
+    }
+    if ((m = line.match(ACT_RE))) { rows.push({ who: who(m[1]), act: m[2].trim() }); continue; }
+    if ((m = line.match(SAY_RE))) {
+      const [roman, dev] = m[3].split("|").map((x) => x.trim());
+      rows.push({ who: who(m[1]), say: roman, dev, acting: actingWords(m[2] || "", roman) });
+      continue;
+    }
+    problems.push(`"${short(line)}": samajh nahi aaya (Naam: baat likho)`);
+  }
+  // shots: the writer's own (blank lines / CUT) or automatic: the first two speakers share the first shot, after that
+  // every change of speaker is a CUT; with two or more speakers most cuts are over-the-shoulder (a face-off)
+  const own = rows.some((r) => r.cut);
+  const body = [];
+  const speakers = new Set(rows.filter((r) => r.say && r.who !== "NARRATOR" && r.who !== "ALL").map((r) => r.who));
+  let inShot = [], last = null, k = 0;
+  for (const r of rows) {
+    if (r.cut) {
+      if (body.length && !/^(CUT|SHOT)\b/i.test(body[body.length - 1])) body.push(r.cut);
+      continue;
+    }
+    if (r.raw) { body.push(r.raw); continue; }
+    const person = r.who !== "NARRATOR" && r.who !== "ALL";
+    if (!own && person && last && r.who !== last && !(k === 0 && inShot.length === 1)) {
+      k++;
+      body.push(speakers.size >= 2 && k % 3 !== 1 ? "CUT ots" : "CUT");
+      inShot = [];
+    }
+    if (person) { if (!inShot.includes(r.who)) inShot.push(r.who); last = r.who; }
+    if (r.act) body.push(`${r.who} -> ${r.act}`);
+    else body.push(`${r.who}${r.acting ? ` (${r.acting})` : ""}: ${r.say}${r.dev ? ` | ${r.dev}` : ""}`);
+  }
+  while (body.length && /^(CUT|SHOT)\b/i.test(body[body.length - 1])) body.pop();
+  const firstSay = (rows.find((r) => r.say) || {}).say || "";
+  const hook = meta.HOOK || b.hook || (firstSay.length > 60 ? firstSay.slice(0, 57) + "…" : firstSay);
+  const shown = used.filter((c) => c.id !== "NARRATOR");
+  const head = [
+    "HOOK: " + hook,
+    "CAST: " + shown.map((c) => `${c.id} = ${c.words}`).join(", "),
+    "SCENE: " + (meta.SCENE || (b.place && b.place !== "auto" ? b.place : "room")),
+  ];
+  if (meta.MUSIC) head.push("MUSIC: " + meta.MUSIC);
+  const tail = [
+    "CTA: " + (meta.CTA || b.cta || DEFAULT_CTA),
+    "CAPTION: " + (meta.CAPTION || hook),
+    "HASHTAGS: " + (meta.HASHTAGS || "#desicomedy #hindicomedy #relatable #funny"),
+  ];
+  return { script: [...head, ...body, ...tail].join("\n") + "\n", problems };
+}
+// A script whose line breaks were lost (pasted from GitHub's one-line box / some apps) -> its lines back.
+// Mirrors unflatten() in studio/script.py.
+function unflatten(text) {
+  if ((text.match(/\n/g) || []).length >= 3 || !/\b(HOOK|CAST|SCENE)\s*:/.test(text)) return text;
+  const heads = "HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|OBJ|NARRATOR|LIGHTS|AMBIENCE|NOTIFY|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD";
+  let t = text.trim().replace(new RegExp(`\\s+(?=(?:${heads})\\s*:)`, "g"), "\n");
+  t = t.replace(new RegExp(`\\s+(?=(?:CUT|SHOT)\\b(?:\\s+(?:${V.framings.join("|")}|reverse|over|[A-Z]\\w*))*\\s+[A-Z]\\w*\\s*[(:\\-])`, "g"), "\n");
+  const cast = (t.match(/^CAST\s*:\s*(.*)$/m) || [, ""])[1];
+  const names = [...new Set([...cast.matchAll(/([A-Za-z_]\w*)\s*=/g)].map((m) => m[1]).concat("ALL"))]
+    .sort((a, b) => b.length - a.length);
+  for (const n of names) {
+    t = t.split("\n").map((line) => line.replace(new RegExp(`(?<=\\S)[ \\t]+(?=${n}\\s*(?:\\([^)]*\\))?\\s*(?::|->))`, "g"), "\n")).join("\n");
+  }
+  t = t.replace(/[ \t]+((?:CUT|SHOT)\b[^\n]*?)[ \t]*$/gm, "\n$1");
+  return t;
+}
+// ---------------------------------------------------------------- builder end
+
+// ---------------------------------------------------------------- make a reel
+function setMode(m) {
+  drafts[mode] = $("text").value;
+  mode = m;
+  document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.mode === m)));
+  $("text").value = drafts[m];
+  $("text").placeholder = m === "idea" ? "Idea yahan likho… (khali = AI khud soche)" : "Script yahan likho…";
+  $("hint").textContent = HINTS[m];
+  $("builder").classList.toggle("hidden", m !== "idea");
+  $("chips").classList.toggle("hidden", m !== "idea");
+  $("polish").classList.toggle("hidden", m !== "script");
+  $("hookWrap").classList.toggle("hidden", m !== "idea");
+  $("toneWrap").classList.toggle("hidden", m !== "idea");
+  document.querySelectorAll(".videoOpt").forEach((x) => x.classList.toggle("hidden", m !== "script"));
+  $("timeHint").textContent = m === "idea"
+    ? "AI ko script likhne me ~1 minute lagta hai. Video tabhi banegi jab aap script approve karoge."
+    : "GitHub pe video banne me ~4-6 minute lagte hain. Page band kar ke wapas aao to bhi progress yahin milegi.";
+  if (m !== "script") $("draftNote").classList.add("hidden");
+  goLabel();
+  showLint();
+}
+
+function setBusy(b) {
+  busy = b;
+  $("go").disabled = b;
+  $("polish").disabled = b;
+}
+document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode)));
+
+function showStatus(stage, frac) {
+  $("status").classList.remove("hidden");
+  $("stage").textContent = stage;
+  $("barFill").style.width = Math.max(3, Math.round(frac * 100)) + "%";
+}
+
+// stage "script": AI writes a script (from the idea, or improves the script tab) -> shown for approval.
+// stage "video":  the (approved / own) script in the script tab -> video.
+async function start(stage) {
+  if (busy || !(await checkConnection())) return;
+  const text = $("text").value.trim();
+  if (stage === "video" && !text) { showStatus("Script khali hai 🙂", 0); return; }
+  if (stage === "video") {
+    const w = showLint();
+    if (w.length && !confirm("Script me " + w.length + " dikkat(ein) hain (neeche list dekho).\n\nPhir bhi video banau?")) return;
+  }
+  const rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const inputs = { stage, hook: $("hook").value, tone: $("tone").value, request_id: rid };
+  if (stage === "script") {
+    if (mode === "idea") inputs.instruction = ideaWithSettings(text, builder); else inputs.script_text = text;
+  } else {
+    Object.assign(inputs, { script_text: text, width: $("width").value, voice: String($("voice").checked),
+                            dialogue: $("dialogue").value, intro: $("intro").value, draft_id: store.get("draft") });
+  }
+  setBusy(true);
+  $("errBox").textContent = ""; $("steps").replaceChildren(); $("runLink").classList.add("hidden");
+  showStatus("GitHub ko bhej raha hoon…", 0.02);
+  try {
+    await gh(`${REPO()}/actions/workflows/${CONFIG.workflow}/dispatches`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ref: store.get("ref", CONFIG.ref), inputs }),
+    });
+    store.set("pending", JSON.stringify({ rid, stage, at: Date.now() }));
+    follow(rid, stage, Date.now());
+  } catch (e) {
+    setBusy(false);
+    showStatus("Shuru nahi ho paya", 0);
+    $("errBox").textContent = e.message + (e.status === 422 ? "\n(Branch ka naam sahi hai? Us branch pe naya render.yml hona chahiye.)" : "");
+  }
+}
+
+async function showDraft(rid) {
+  const rel = await gh(`${REPO()}/releases/tags/draft-${rid}`);
+  drafts.script = (rel.body || "").replace(/\r\n/g, "\n").trim() + "\n";
+  store.set("draft", rid);
+  setMode("script");
+  $("draftNote").innerHTML = DRAFT_NOTE;
+  $("draftNote").classList.remove("hidden");
+  $("text").focus();
+}
+
+function follow(rid, stage, startedAt) {
+  clearTimeout(timer);
+  setBusy(true);
+  let runId = null;
+  const tick = async () => {
+    try {
+      if (!runId) {
+        const runs = await gh(`${REPO()}/actions/workflows/${CONFIG.workflow}/runs?event=workflow_dispatch&per_page=20`);
+        const run = runs.workflow_runs.find((r) => r.display_title === `web-${stage}-${rid}`);
+        if (!run) {
+          if (Date.now() - startedAt > 3 * 60 * 1000) throw new Error("Run nahi mila. Actions tab me dekho.");
+          showStatus("Line me hai…", 0.03);
+          timer = setTimeout(tick, 4000);
+          return;
+        }
+        runId = run.id;
+        $("runLink").href = run.html_url;
+        $("runLink").classList.remove("hidden");
+      }
+      const [run, jobs] = await Promise.all([gh(`${REPO()}/actions/runs/${runId}`), gh(`${REPO()}/actions/runs/${runId}/jobs`)]);
+      const steps = (jobs.jobs[0] && jobs.jobs[0].steps || []).filter((s) => STEP_NAMES[s.name]);
+      const done = steps.filter((s) => s.status === "completed").length;
+      const now = steps.find((s) => s.status === "in_progress");
+      $("steps").replaceChildren(...steps.map((s) => el("li", {
+        className: s.status === "completed" ? "done" : (s === now ? "now" : ""),
+        textContent: (s.status === "completed" ? (s.conclusion === "success" ? "✓ " : "✗ ") : "") + STEP_NAMES[s.name],
+      })));
+      if (run.status !== "completed") {
+        showStatus((now ? STEP_NAMES[now.name] : "Shuru ho raha hai") + "…", steps.length ? (done + 0.5) / steps.length : 0.05);
+        timer = setTimeout(tick, 6000);
+        return;
+      }
+      store.set("pending", "");
+      setBusy(false);
+      if (run.conclusion !== "success") {
+        showStatus("Gadbad ho gayi ❌", 1);
+        $("errBox").textContent = "Run fail hua (" + run.conclusion + "). Upar wale link se log dekho" +
+          " (AI key wali galti ho to wahan likha hoga key kahan daalni hai).";
+        return;
+      }
+      if (stage === "script") {
+        showStatus("Script taiyar ✍️ — padho aur approve karo", 1);
+        await showDraft(rid);
+        return;
+      }
+      store.set("draft", "");
+      showStatus("Video taiyar ✅", 1);
+      const rel = await gh(`${REPO()}/releases/tags/reel-${rid}`);
+      showRelease(rel);
+      loadGallery();
+    } catch (e) {
+      setBusy(false);
+      $("errBox").textContent = e.message;
+    }
+  };
+  tick();
+}
+
+function showRelease(rel) {
+  const assets = rel.assets || [];
+  const pngs = Object.fromEntries(assets.filter((a) => a.name.endsWith(".png")).map((a) => [a.name.replace(/\.png$/, ""), a]));
+  const vids = assets.filter((a) => a.name.endsWith(".mp4"));
+  $("ph").classList.add("hidden");
+  $("result").classList.remove("hidden");
+  $("videos").replaceChildren(...vids.map((a) => {
+    const base = a.name.replace(/\.mp4$/, "");
+    const v = el("video", { controls: true, playsInline: true, preload: "metadata", src: a.browser_download_url });
+    if (pngs[base]) v.poster = pngs[base].browser_download_url;
+    const dl = el("a", { href: a.browser_download_url, textContent: "⬇️ " + a.name + " download" });
+    return el("div", { style: "margin-bottom:14px" }, [v, el("div", { className: "btns" }, [dl])]);
+  }));
+  $("post").value = (rel.body || "").trim();
+}
+
+// ---------------------------------------------------------------- gallery
+async function loadGallery() {
+  try {
+    const rels = (await gh(`${REPO()}/releases?per_page=30`)).filter((r) => r.tag_name.startsWith("reel-"));
+    if (!rels.length) { $("gallery").replaceChildren(el("p", { className: "hint", textContent: "Abhi koi reel nahi." })); return; }
+    $("gallery").replaceChildren(...rels.slice(0, 18).map((r) => {
+      const png = (r.assets || []).find((a) => a.name.endsWith(".png"));
+      const img = el("img", { alt: "", loading: "lazy" });
+      if (png) img.src = png.browser_download_url;
+      const date = new Date(r.created_at).toLocaleDateString("hi-IN", { day: "numeric", month: "short" });
+      const card = el("button", { className: "reel", title: r.name }, [img, el("span", { textContent: (r.name || r.tag_name) + " · " + date })]);
+      card.addEventListener("click", () => { showRelease(r); $("result").scrollIntoView({ behavior: "smooth" }); });
+      return card;
+    }));
+  } catch (e) {
+    $("gallery").replaceChildren(el("p", { className: "hint", textContent: "Gallery load nahi hui: " + e.message }));
+  }
+}
+
+// ---------------------------------------------------------------- wiring
+$("save").addEventListener("click", async () => {
+  const t = $("token").value.trim();
+  if (t) store.set("token", t);
+  store.set("ref", $("ref").value.trim() || CONFIG.ref);
+  $("token").value = "";
+  if (await checkConnection()) $("setup").open = false;
+});
+$("forget").addEventListener("click", () => { store.set("token", ""); checkConnection(); });
+$("go").addEventListener("click", () => {
+  if (mode === "idea" && isDialogue($("text").value)) return dialogueToScript();
+  start(mode === "idea" ? "script" : "video");
+});
+
+// ---------------------------------------------------------------- builder (page)
+const PLACE_NAMES = { auto: "AI chune / kamra", room: "Ghar ka kamra", kitchen: "Rasoi", street: "Gali / sadak",
+  school: "School", market: "Bazaar", office: "Office", bus_stop: "Bus stop", night_road: "Raat ki sadak",
+  plain: "Saada rang" };
+let builder = { place: "auto", cast: [], hook: "", cta: "" };
+try { builder = Object.assign(builder, JSON.parse(store.get("builder") || "{}")); } catch {}
+const saveBuilder = () => store.set("builder", JSON.stringify(builder));
+for (const id of ["dialogue", "intro"]) {            // the video options are remembered
+  const v = store.get(id);
+  if (v && [...$(id).options].some((o) => o.value === v)) $(id).value = v;
+  $(id).addEventListener("change", () => store.set(id, $(id).value));
+}
+const opt = (v, label) => el("option", { value: v, textContent: label || v });
+const pick = (list, value, first) => {
+  const s = el("select", {}, [opt("auto", first), ...list.map((x) => opt(x))]);
+  s.value = value || "auto";
+  return s;
+};
+function goLabel() {
+  if (mode !== "idea") { $("go").textContent = "✅ Approve: Video banao 🎬"; return; }
+  const dialogue = isDialogue($("text").value);
+  $("go").textContent = dialogue ? "📝 Script banao (bina AI)" : "Script likho ✍️";
+  $("hookWrap").classList.toggle("hidden", dialogue);         // the AI's hook / tone mean nothing for a ready dialogue
+  $("toneWrap").classList.toggle("hidden", dialogue);
+  $("timeHint").textContent = dialogue
+    ? "Script turant ban jayegi (AI nahi lagega). Phir padh ke Approve karo."
+    : "AI ko script likhne me ~1 minute lagta hai. Video tabhi banegi jab aap script approve karoge.";
+}
+function lookOf(role) { return ROLE_LOOK[role] || role || "boy"; }
+function renderBuilder() {
+  $("bPlace").replaceChildren(...["auto", ...V.places].map((p) => opt(p, PLACE_NAMES[p] || p)));
+  $("bPlace").value = builder.place || "auto";
+  $("bHook").value = builder.hook || "";
+  $("bCta").value = builder.cta || "";
+  $("bAdd").disabled = builder.cast.length >= 3;
+  $("bCast").replaceChildren(...builder.cast.map((c, i) => {
+    const img = el("img", { alt: c.role, src: `assets/looks/${lookOf(c.role)}.png` });
+    const name = el("input", { type: "text", value: c.name || "", placeholder: "Naam (jaise Papa)" });
+    const role = el("select", {}, [...[...V.roles, ...V.looks.filter((l) => !V.roles.includes(l))].map((r) => opt(r))]);
+    role.value = c.role || "boy";
+    const fields = [
+      ["hair", pick(V.hair, c.hair, "Baal: auto")], ["skin", pick(V.skin, c.skin, "Rang: auto")],
+      ["outfit", pick(V.outfits, c.outfit, "Kapde: auto")], ["color", pick(V.colors, c.color, "Colour: auto")],
+      ["build", pick(V.builds, c.build, "Body: auto")], ["extra", pick(V.accessories, c.extra, "Extra: kuch nahi")],
+    ];
+    const del = el("button", { type: "button", className: "small", textContent: "✕", title: "Hatao" });
+    name.addEventListener("input", () => { c.name = name.value.trim(); saveBuilder(); });
+    role.addEventListener("change", () => { c.role = role.value; img.src = `assets/looks/${lookOf(c.role)}.png`; saveBuilder(); });
+    for (const [k, sel] of fields) sel.addEventListener("change", () => { c[k] = sel.value; saveBuilder(); });
+    del.addEventListener("click", () => { builder.cast.splice(i, 1); saveBuilder(); renderBuilder(); });
+    return el("div", { className: "crow" }, [img, el("div", { className: "fields" },
+      [name, role, ...fields.map(([, sel]) => sel), del])]);
+  }));
+}
+$("bPlace").addEventListener("change", () => { builder.place = $("bPlace").value; saveBuilder(); });
+$("bHook").addEventListener("input", () => { builder.hook = $("bHook").value.trim(); saveBuilder(); });
+$("bCta").addEventListener("input", () => { builder.cta = $("bCta").value.trim(); saveBuilder(); });
+$("bAdd").addEventListener("click", () => {
+  const roles = ["papa", "beta", "mummy"];
+  builder.cast.push({ role: roles[builder.cast.length] || "dost" });
+  saveBuilder(); renderBuilder();
+});
+$("bClear").addEventListener("click", () => { builder = { place: "auto", cast: [], hook: "", cta: "" }; saveBuilder(); renderBuilder(); });
+$("chips").append(...EMO_CHIPS.map(([icon, word]) => {
+  const b = el("button", { type: "button", className: "chip", textContent: `${icon} ${word}` });
+  b.addEventListener("click", () => addEmotion(word));
+  return b;
+}), (() => {
+  const b = el("button", { type: "button", className: "chip", textContent: "✂️ naya shot" });
+  b.addEventListener("click", () => insertAtLineEnd("\n\n"));
+  return b;
+})());
+function insertAtLineEnd(str) {
+  const t = $("text"), v = t.value, end = v.indexOf("\n", t.selectionEnd);
+  const at = end < 0 ? v.length : end;
+  t.value = v.slice(0, at) + str + v.slice(at);
+  t.selectionStart = t.selectionEnd = at + str.length;
+  t.focus(); goLabel();
+}
+function addEmotion(word) {         // the line under the cursor: "Papa: ..." -> "Papa (gussa): ..."
+  const t = $("text"), v = t.value, pos = t.selectionStart;
+  const s0 = v.lastIndexOf("\n", pos - 1) + 1, e0 = v.indexOf("\n", pos), e = e0 < 0 ? v.length : e0;
+  const line = v.slice(s0, e), m = line.match(/^([^:(]+?)\s*(?:\(([^)]*)\))?\s*:/);
+  if (!m) { t.focus(); return; }
+  const words = (m[2] ? m[2] + ", " : "") + word;
+  const fixed = `${m[1].trim()} (${words}):` + line.slice(m[0].length);
+  t.value = v.slice(0, s0) + fixed + v.slice(e);
+  t.selectionStart = t.selectionEnd = s0 + fixed.length;
+  t.focus();
+}
+function dialogueToScript() {
+  const { script, problems } = buildScript($("text").value, builder);
+  drafts.idea = $("text").value;
+  drafts.script = script;
+  setMode("script");
+  $("draftNote").classList.remove("hidden");
+  $("draftNote").textContent = "📝 Aapke dialogue se script ban gayi (AI ke bina). Padho, chaho to badlo, phir Approve dabao. " +
+    "Devanagari video banate waqt apne aap ban jayegi." + (problems.length ? " Kuch lines chhoot gayi: " + problems.join("; ") : "");
+  store.set("draft", "");
+}
+$("text").addEventListener("input", goLabel);
+renderBuilder();
+$("polish").addEventListener("click", () => start("script"));
+$("copyPrompt").addEventListener("click", async () => {
+  try {
+    const rules = await (await fetch("SCRIPT_PROMPT.md", { cache: "no-store" })).text();
+    const idea = ideaWithSettings(mode === "idea" ? $("text").value.trim() : drafts.idea.trim(), builder);
+    await navigator.clipboard.writeText(rules.trim() + "\n\n# My idea\n" + (idea || "<yahan apna idea likho>") + "\n");
+    $("promptNote").classList.remove("hidden");
+  } catch (e) {
+    $("promptNote").classList.remove("hidden");
+    $("promptNote").textContent = "Copy nahi ho paya (" + e.message + "). Prompt yahan hai: " +
+      new URL("SCRIPT_PROMPT.md", location.href).href;
+  }
+});
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("post").value); $("copy").textContent = "✅ Copy ho gaya"; }
+  catch { $("post").select(); }
+  setTimeout(() => ($("copy").textContent = "📋 Caption copy"), 1500);
+});
+
+setMode("idea");
+checkConnection();
+loadGallery();
+try {
+  const p = JSON.parse(store.get("pending") || "null");
+  if (p && Date.now() - p.at < 60 * 60 * 1000 && store.get("token")) follow(p.rid, p.stage || "video", p.at);
+} catch {}
+</script>
+</body>
+</html>
