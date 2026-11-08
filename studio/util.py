@@ -79,7 +79,16 @@ def resolve_template(name):
 def load_scene(path):
     """Load a scene file. If it has "extends", merge it over that template and
     substitute {vars} (template defaults < scene vars)."""
-    scene = _read_json(path)
+    return expand_scene(_read_json(path))
+
+
+def expand_scene(scene):
+    """Resolve "extends" + {vars} of a scene dict (also used for each part of a multi-scene file)."""
+    if "file" in scene and len(scene) <= 2:
+        sub = load_scene(asset_path(scene["file"]))
+        if "transition" in scene:
+            sub["transition"] = scene["transition"]
+        return sub
     if "extends" in scene:
         tpl = _read_json(resolve_template(scene["extends"]))
         variables = dict(tpl.get("vars", {}))
