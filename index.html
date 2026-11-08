@@ -746,7 +746,8 @@ async function start(stage) {
     if (w.length && !confirm("Script me " + w.length + " dikkat(ein) hain (neeche list dekho).\n\nPhir bhi video banau?")) return;
   }
   const rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const inputs = { stage, hook: $("hook").value, tone: $("tone").value, style: currentStyle(), request_id: rid };
+  const inputs = { stage, hook: $("hook").value, tone: $("tone").value, request_id: rid };
+  if (currentStyle() === "2.5d") inputs.style = "2.5d";    // 2D sends nothing: works with older workflows too
   if (stage === "script") {
     if (mode === "idea") inputs.instruction = ideaWithSettings(text, builder); else inputs.script_text = text;
   } else {

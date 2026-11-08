@@ -129,7 +129,7 @@ class PageTests(unittest.TestCase):
     def test_page_sends_the_style_and_the_workflow_takes_it(self):
         with open(os.path.join(ROOT, ".github", "workflows", "render.yml"), encoding="utf-8") as f:
             flow = f.read()
-        self.assertIn("style: currentStyle()", PAGE)
+        self.assertIn('if (currentStyle() === "2.5d") inputs.style = "2.5d";', PAGE)
         self.assertIn("      style:\n", flow)
         self.assertIn("--style $STYLE", flow)
         self.assertIn('--style "$WRITER_STYLE"', flow)
