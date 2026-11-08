@@ -310,6 +310,21 @@ class Renderer(Output):
                 self._draw_crank(img, o, t)
 
     # ------------------------------------------------------------ one frame
+    def _act_dir(self, c, st, mv, x, t):
+        """Which way a character acts (+1 = screen right): an explicit dir, else where it is walking to,
+        else toward its look target, else its facing, else toward the middle of the screen."""
+        o = st["opts"]
+        if o.get("dir") in (1, -1, "left", "right"):
+            return -1 if o["dir"] in (-1, "left") else 1
+        if mv and abs(mv[4] - mv[2]) > 1:
+            return 1 if mv[4] > mv[2] else -1
+        look = st["look"]
+        if isinstance(look, str) and look in self.plan.chars and look != c.name:
+            return 1 if self.plan.chars[look].pos_at(t)[0] >= x else -1
+        if st["facing"] in ("left", "right"):
+            return -1 if st["facing"] == "left" else 1
+        return 1 if x <= LW / 2 else -1
+
     def frame(self, t):
         plan, s = self.plan, self.s
         img = self._background(t)
@@ -323,12 +338,15 @@ class Renderer(Output):
             states[c.name] = st
             x, y = c.draw_pos(t)
             action, a_t0 = st["action"], st["action_t0"]
-            moving = any(t0 <= t < t1 for (t0, t1, *_r) in c.moves)
-            if moving and action in ("idle", "none", "stand"):
-                action, a_t0 = "walk", 0.0
-            opts = dict(st["opts"], _x=x, _bpm=plan.bpm, _prop=st["prop"])
-            pose = actions.pose_for(action, t - a_t0 if action != "walk" else t, st["speed"], st["intensity"],
-                                    c.phase, opts)
+            mv = next((m for m in c.moves if m[0] <= t < m[1]), None)
+            if mv and action in ("idle", "none", "stand", "talk"):
+                action, a_t0 = ("run" if len(mv) > 6 and mv[6] else "walk"), 0.0
+            if mv and st["facing"] == "front" and abs(mv[4] - mv[2]) > 1:
+                st["facing"] = "right" if mv[4] > mv[2] else "left"          # face the way you walk
+            opts = dict(st["opts"], _x=x, _bpm=plan.bpm, _prop=st["prop"], _dir=self._act_dir(c, st, mv, x, t),
+                        _facing=st["facing"])
+            pose = actions.pose_for(action, t - a_t0 if action not in ("walk", "run") else t, st["speed"],
+                                    st["intensity"], c.phase, opts)
             rf = c.ride_frame(t)
             if rf:                                  # on a vehicle: the seat decides the pose
                 pose = dict(rf["pose"])
@@ -344,16 +362,22 @@ class Renderer(Output):
             elif isinstance(look, (int, float)):
                 pose["look_x"] = float(look)
             mouth_open = 0.0
+            chewing = False
             if st["talking"]:
                 mouth_open = self._lip_open(st["talking"], t)
             elif singing:                       # sings along to the music: believable mouth movement
                 mouth_open = self._lip_open({}, t)
+            elif pose.get("chew") is not None:  # eating
+                mouth_open, chewing = float(pose["chew"]), pose["chew"] > 0.1
             blink = ((t + c.phase * 1.7) % 3.6) < 0.12
             spec = dict(c.spec)
             spec["facing"] = st["facing"]
-            prop = st["prop"] or ("mic" if singing else None)
-            ops, an = build_character(spec, pose, st["expression"], mouth_open, t, x, y, c.draw_scale(t),
-                                      blink=blink, prop=prop, talking=bool(st["talking"]) or singing,
+            prop = st["prop"] or ("mic" if singing else None) or pose.get("prop")
+            if st["prop"] == "" or pose.get("hide_prop"):
+                prop = None
+            expr = pose.get("face") or st["expression"]      # some actions bring their own face (yawn, sneeze...)
+            ops, an = build_character(spec, pose, expr, mouth_open, t, x, y, c.draw_scale(t),
+                                      blink=blink, prop=prop, talking=bool(st["talking"]) or singing or chewing,
                                       tear_phase=(t * 1.1) % 1.0)
             r = render_ops(ops, s, self.W, self.H)
             if r:

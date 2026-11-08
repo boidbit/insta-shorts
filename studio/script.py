@@ -72,7 +72,9 @@ from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS, chat_length
 
 HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION")
 BACKGROUNDS = ("kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road", "plain")
-PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick", "bag")
+from .characters import PROPS as _HELD   # noqa: E402
+
+PROPS = tuple(_HELD)
 SFX = ("pop", "boing", "whoosh", "ding", "thud", "clap", "beep", "laugh_track")
 NARRATION_NAMES = ("narrator", "vo", "narration", "voiceover", "voice_over")   # a voice with no body
 NARRATOR_SPEC = {"hidden": True, "voice": {"name": "hi-IN-MadhurNeural", "pitch": "-12Hz", "rate": "-4%",
@@ -232,6 +234,10 @@ def _stage(tokens, ev, scene_cast, who):
     Returns (move request or None, unknown words, words that were overridden)."""
     move = None
     unknown, acts, exprs = [], [], []
+    # words that are both an action and a face (think, shock, laugh, scared...) are the face when the line
+    # already has a clear action ("think, point" = thinking face + pointing)
+    action_only = any(w2 == "point" or (w2 in actions.ACTIONS and w2 not in EXPRESSIONS and w2 not in SFX)
+                      for w2 in tokens)
     i = 0
     while i < len(tokens):
         w = tokens[i]
@@ -278,7 +284,7 @@ def _stage(tokens, ev, scene_cast, who):
                 i += 1
         # laugh / shock / cry are also expressions and clap is also a sound: once the line has
         # an action, such a word becomes the face (or the sound) instead
-        elif w in actions.ACTIONS and not (acts and (w in EXPRESSIONS or w in SFX)):
+        elif w in actions.ACTIONS and not ((acts or action_only) and (w in EXPRESSIONS or w in SFX)):
             ev["action"] = w
             acts.append(w)
             if w == "dance" and nxt in ("pump", "swing", "cheer", "disco"):
@@ -306,6 +312,8 @@ def _stage(tokens, ev, scene_cast, who):
     if ev.get("action") == "point" and "point" not in ev and who in scene_cast:
         ev["point"] = "right" if scene_cast.index(who) < len(scene_cast) / 2.0 else "left"
     lost = acts[:-1] + exprs[:-1]       # only the last action / expression of a line is used
+    if acts and not exprs and ev.get("action") in EXPRESSIONS:
+        ev["expression"] = ev["action"]        # "A (shock): ..." also gets the shocked face
     return move, unknown, lost
 
 
@@ -809,11 +817,28 @@ def parse_script(text):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Plain-text script -> scene.json (no AI)")
-    ap.add_argument("script")
+    ap.add_argument("script", nargs="?")
+    ap.add_argument("--sync-page", action="store_true",
+                    help="copy the current word list into index.html (the studio page's script checker)")
     ap.add_argument("-o", "--out", default=None)
     ap.add_argument("--no-hindi", action="store_true",
                     help="do not ask the AI for Devanagari of Roman-only lines (the voice reads them as they are)")
     args = ap.parse_args(argv)
+    if args.sync_page:
+        import json
+        page = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "index.html")
+        with open(page, encoding="utf-8") as f:
+            html = f.read()
+        new = json.dumps(vocab(), ensure_ascii=False, separators=(",", ":"))
+        html = re.sub(r'(<script type="application/json" id="vocab">).*?(</script>)',
+                      lambda m: m.group(1) + new + m.group(2), html, count=1, flags=re.S)
+        with open(page, "w", encoding="utf-8") as f:
+            f.write(html)
+        print("index.html word list updated")
+        if not args.script:
+            return
+    if not args.script:
+        ap.error("a script file is needed (or --sync-page)")
     with open(args.script, encoding="utf-8") as f:
         scene, warnings = parse_script(f.read())
     if not args.no_hindi:

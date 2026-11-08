@@ -143,9 +143,37 @@ EXPRESSIONS = {
     "love": ("heart", "smile", None),
     "sleepy": ("closed", "flat", None),
     "sad": ("dot", "frown", "sad"),
+    "relaxed": ("relaxed", "flat", None),
+    "yawn": ("closed", "yawn", None),
+    "scared": ("wide", "wavy", "sad"),
+    "nervous": ("dot", "wavy", "sad"),
+    "cringe": ("closed", "grin", "sad"),
+    "confused": ("dot", "flat", "think"),
+    "disgust": ("half", "frown", "angry"),
+    "proud": ("relaxed", "smile", None),
+    "dizzy": ("spiral", "wavy", None),
+    "sneeze": ("closed", "open", "up"),
+    "eating": ("happy", "flat", None),
+    "shy": ("dot", "smile", "sad"),
+    "lol": ("happy", "laugh", None),
+    "evil": ("half", "grin", "angry"),
+    "bored": ("half", "flat", None),
+    "determined": ("dot", "flat", "angry"),
+    "hurt": ("closed", "wavy", "sad"),
+    "shh": ("dot", "o", None),
+    "excited": ("wide", "laugh", "up"),
+    "blush": ("happy", "smile", None),
+    "kiss": ("closed", "o", None),
 }
+BLUSH = {"shy", "blush", "love", "kiss"}
+TEARS = {"cry", "lol"}
 # Eyes that should not be replaced by a "blink"
-NO_BLINK = {"happy", "relaxed", "closed", "x", "heart", "wink"}
+NO_BLINK = {"happy", "relaxed", "closed", "x", "heart", "wink", "spiral"}
+
+PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick", "bag", "chai", "glass", "plate", "samosa", "chappal",
+         "money", "newspaper", "book", "notebook", "pen", "laptop", "umbrella", "remote", "broom", "belan", "pillow",
+         "gift", "balloon", "trophy", "torch", "key", "bat", "flag", "camera", "banana", "bottle", "letter",
+         "toothbrush", "dumbbell", "box")
 
 
 def d2r(a):
@@ -274,17 +302,17 @@ def _capsule(p0, p1, r0, r1, n=10):
 class Sketch:
     """Collects drawing ops in global logical coordinates."""
 
-    def __init__(self, x0, ground_y, k, tilt_deg, shift, lift, fy):
+    def __init__(self, x0, ground_y, k, tilt_deg, shift, lift, fy, dx=0.0):
         self.x0, self.gy, self.k = x0, ground_y, k
         self.tilt = math.radians(tilt_deg)
-        self.shift, self.lift, self.fy = shift, lift, fy
+        self.shift, self.lift, self.fy, self.dx = shift, lift, fy, dx
         self.ops = []
 
     def T(self, p):
         x = p[0] + self.shift
         y = p[1] - self.fy
         x, y = rot((x, y), self.tilt)
-        return (self.x0 + x * self.k, self.gy + (y + self.lift) * self.k)
+        return (self.x0 + (x + self.dx) * self.k, self.gy + (y + self.lift) * self.k)
 
     def poly(self, pts, fill=None, outline=None, w=OUTLINE):
         self.ops.append(dict(t="poly", pts=[self.T(p) for p in pts], fill=fill,
@@ -312,10 +340,11 @@ class Sketch:
 
 def skeleton(p):
     hipL, hipR = (-32.0, 0.0), (32.0, 0.0)
-    kneeL = add(hipL, vec(p["ll1"], TH))
-    footL = add(kneeL, vec(p["ll2"], SH))
-    kneeR = add(hipR, vec(p["rl1"], TH))
-    footR = add(kneeR, vec(p["rl2"], SH))
+    th, sh = TH * p.get("th_k", 1.0), SH * p.get("sh_k", 1.0)     # < 1: foreshortened (sitting, front view)
+    kneeL = add(hipL, vec(p["ll1"], th))
+    footL = add(kneeL, vec(p["ll2"], sh))
+    kneeR = add(hipR, vec(p["rl1"], th))
+    footR = add(kneeR, vec(p["rl2"], sh))
     shL, shR = (-56.0, -TORSO_H + 22), (56.0, -TORSO_H + 22)
     ak = p.get("arm_k", 1.0)          # riders get longer arms so their hands reach the handlebar
     elbL = add(shL, vec(p["la1"], UA * ak * p.get("la_k1", 1.0)))     # *_k < 1: foreshortened segment (IK)
@@ -324,6 +353,7 @@ def skeleton(p):
     handR = add(elbR, vec(p["ra2"], LA * ak * p.get("ra_k2", 1.0)))
     neck = (0.0, -TORSO_H + 4)
     hc = add(neck, rot((0.0, -(NECK_H + HEAD_RY * 0.8 * HEAD_SCALE)), d2r(p["head_tilt"])))
+    hc = (hc[0] + p.get("head_dx", 0.0), hc[1] + p.get("head_dy", 0.0))
     fy = max(footL[1], footR[1]) + 12
     return dict(hipL=hipL, hipR=hipR, kneeL=kneeL, footL=footL, kneeR=kneeR, footR=footR,
                 shL=shL, shR=shR, elbL=elbL, handL=handL, elbR=elbR, handR=handR,
@@ -364,6 +394,143 @@ def _draw_prop(S, prop, hand, fore_angle, color_hint):
         S.poly([(top[0] + 30 * math.cos(a), top[1] + 46 + 52 * math.sin(a))
                 for a in [i * math.pi / 12 for i in range(24)]], (36, 36, 44), INK, 6)
         S.line([(top[0] - 14, top[1] + 30), (top[0] - 4, top[1] + 62)], 4, (74, 74, 84))
+    else:
+        _draw_prop2(S, prop, hand, d, n, pt)
+
+
+def _draw_prop2(S, prop, hand, d, n, pt):
+    """More props. pt(a, b) = along the forearm / across it; ab(x, y) = screen-upright offset from the hand."""
+    def ab(x, y):
+        return (hand[0] + x, hand[1] + y)
+
+    def rect(x0, y0, x1, y1, fill, w=5):
+        S.poly([ab(x0, y0), ab(x1, y0), ab(x1, y1), ab(x0, y1)], fill, INK, w)
+
+    def prect(a0, b0, a1, b1, fill, w=5):
+        S.poly([pt(a0, b0), pt(a1, b0), pt(a1, b1), pt(a0, b1)], fill, INK, w)
+
+    if prop in ("chai", "glass"):
+        S.poly([ab(-17, -44), ab(17, -44), ab(13, 8), ab(-13, 8)], (236, 240, 240), INK, 4)
+        S.poly([ab(-14, -28), ab(14, -28), ab(11, 5), ab(-11, 5)], (178, 112, 62), None)
+    elif prop == "plate":
+        S.poly(ellipse_pts(hand[0] + 4, hand[1] - 12, 34, 26, 14, 180, 360), (226, 150, 60), INK, 4)
+        S.poly(closed_ellipse(hand[0], hand[1] - 8, 64, 13, 32), (250, 250, 248), INK, 5)
+    elif prop == "samosa":
+        S.poly([ab(-28, 12), ab(28, 12), ab(0, -36)], (222, 168, 78), INK, 5)
+    elif prop == "chappal":
+        ang = math.degrees(math.atan2(d[1], d[0]))
+        c = pt(44, 0)
+        S.poly(closed_ellipse(c[0], c[1], 52, 20, 24, ang), (60, 110, 190), INK, 5)
+        S.line([pt(30, -16), pt(46, 0), pt(30, 16)], 6, (236, 236, 236))
+    elif prop == "money":
+        for i, (da, db) in enumerate(((0, -14), (8, 0), (16, 14))):
+            prect(da - 6, db - 20, da + 74, db + 20, (150, 204, 140), 4)
+        S.dot(pt(44, 14), 9, (110, 160, 100))
+    elif prop == "newspaper":
+        rect(-74, -120, 74, 40, (238, 236, 228))
+        rect(-60, -104, 60, -74, (60, 60, 60), 3)
+        for y in range(-60, 30, 16):
+            S.line([ab(-60, y), ab(-6, y)], 4, (150, 150, 150))
+            S.line([ab(8, y), ab(60, y)], 4, (150, 150, 150))
+    elif prop == "book":
+        S.poly([ab(0, -6), ab(-66, -18), ab(-66, -96), ab(0, -84)], (250, 248, 240), INK, 5)
+        S.poly([ab(0, -6), ab(66, -18), ab(66, -96), ab(0, -84)], (250, 248, 240), INK, 5)
+        for y in (-74, -60, -46, -32):
+            S.line([ab(-54, y - 4), ab(-12, y + 4)], 3, (160, 160, 160))
+            S.line([ab(12, y + 4), ab(54, y - 4)], 3, (160, 160, 160))
+        S.poly([ab(-70, -14), ab(0, -2), ab(70, -14), ab(70, -6), ab(0, 6), ab(-70, -6)], (70, 110, 170), INK, 4)
+    elif prop == "notebook":
+        rect(-40, -100, 40, 6, (232, 210, 120))
+        for y in range(-90, 0, 18):
+            S.dot(ab(-40, y), 5, INK)
+    elif prop == "pen":
+        S.line([pt(-8, 0), pt(56, 0)], 8, (50, 80, 170))
+        S.line([pt(56, 0), pt(66, 0)], 4, INK)
+    elif prop == "laptop":
+        S.poly([ab(-70, 0), ab(70, 0), ab(78, 14), ab(-78, 14)], (150, 152, 160), INK, 5)
+        S.poly([ab(-62, 0), ab(62, 0), ab(70, -92), ab(-54, -92)], (70, 74, 84), INK, 5)
+        S.poly([ab(-52, -8), ab(56, -8), ab(62, -82), ab(-46, -82)], (130, 190, 235), None)
+    elif prop == "umbrella":
+        S.line([ab(0, 30), ab(0, -230)], 8, (60, 60, 66))
+        S.line(ellipse_pts(hand[0] - 14, hand[1] + 30, 14, 14, 10, 0, 180), 7)
+        top = ellipse_pts(hand[0], hand[1] - 230, 160, 92, 28, 180, 360)
+        scal = []
+        for i in reversed(range(4)):          # right -> left so the outline closes without crossing
+            x0 = -160 + i * 80
+            scal += ellipse_pts(hand[0] + x0 + 40, hand[1] - 230, 40, 18, 8, 0, 180)
+        S.poly(top + scal, (54, 70, 150), INK, 6)
+    elif prop == "remote":
+        prect(-10, -12, 60, 12, (40, 40, 46), 4)
+        for a in (12, 28, 44):
+            S.dot(pt(a, 0), 4, (220, 80, 70))
+    elif prop == "broom":
+        S.line([pt(-30, 0), pt(300, 0)], 10, (150, 104, 70))
+        S.poly([pt(296, -18), pt(296, 18), pt(392, 44), pt(392, -44)], (222, 192, 112), INK, 5)
+        for b in (-24, 0, 24):
+            S.line([pt(320, b * 0.5), pt(386, b * 1.4)], 3, (170, 140, 70))
+    elif prop == "belan":
+        S.line([pt(-36, 0), pt(-4, 0)], 10, (150, 104, 70))
+        S.line([pt(4, 0), pt(120, 0)], 26, (214, 172, 112))
+        S.line([pt(128, 0), pt(160, 0)], 10, (150, 104, 70))
+    elif prop == "pillow":
+        S.poly(closed_ellipse(hand[0], hand[1] - 20, 80, 46, 30), (246, 246, 250), INK, 5)
+        S.line([ab(-40, -28), ab(40, -12)], 3, (200, 200, 210))
+    elif prop == "gift":
+        rect(-48, -86, 48, 6, (214, 64, 70))
+        S.poly([ab(-8, -86), ab(8, -86), ab(8, 6), ab(-8, 6)], (250, 210, 70), None)
+        S.poly(closed_ellipse(hand[0] - 18, hand[1] - 98, 18, 11, 14), (250, 210, 70), INK, 4)
+        S.poly(closed_ellipse(hand[0] + 18, hand[1] - 98, 18, 11, 14), (250, 210, 70), INK, 4)
+    elif prop == "balloon":
+        S.line([ab(0, 0), ab(-6, -90), ab(8, -180)], 3, (90, 90, 90))
+        S.poly(closed_ellipse(hand[0] + 8, hand[1] - 246, 48, 60, 32), (226, 70, 80), INK, 5)
+        S.poly([ab(0, -184), ab(16, -184), ab(8, -192)], (226, 70, 80), INK, 3)
+    elif prop == "trophy":
+        gold = (236, 190, 60)
+        S.line(ellipse_pts(hand[0] - 40, hand[1] - 92, 18, 22, 12, 90, 270), 6, gold)
+        S.line(ellipse_pts(hand[0] + 40, hand[1] - 92, 18, 22, 12, -90, 90), 6, gold)
+        S.poly([ab(-42, -126), ab(42, -126), ab(22, -56), ab(-22, -56)], gold, INK, 5)
+        rect(-8, -56, 8, -24, gold, 4)
+        rect(-34, -24, 34, 0, (120, 84, 50), 4)
+    elif prop == "torch":
+        S.poly([pt(64, 0), pt(420, -110), pt(420, 110)], (255, 244, 180, 110), None)
+        prect(-12, -13, 50, 13, (60, 62, 70), 4)
+        prect(50, -20, 70, 20, (230, 230, 220), 4)
+    elif prop == "key":
+        S.dot(pt(0, 0), 16, None, (220, 180, 60), 6)
+        S.line([pt(14, 0), pt(64, 0)], 7, (220, 180, 60))
+        S.line([pt(52, 0), pt(52, 12)], 6, (220, 180, 60))
+    elif prop == "bat":
+        S.line([pt(-24, 0), pt(64, 0)], 11, (60, 50, 44))
+        S.poly([pt(62, -17), pt(62, 17), pt(250, 22), pt(256, 0), pt(250, -22)], (232, 204, 146), INK, 5)
+    elif prop == "flag":
+        S.line([ab(0, 40), ab(0, -230)], 7, (110, 90, 70))
+        S.poly([ab(0, -228), ab(130, -196), ab(0, -150)], (236, 110, 60), INK, 4)
+    elif prop == "camera":
+        rect(-46, -64, 46, 4, (54, 56, 64))
+        rect(-30, -78, -4, -64, (54, 56, 64), 4)
+        S.dot(ab(4, -30), 22, (40, 40, 44), (190, 190, 200), 5)
+        S.dot(ab(4, -30), 9, (110, 160, 210))
+    elif prop == "banana":
+        S.line(bezier(pt(-6, -8), pt(36, 26), pt(84, -6)), 16, (240, 210, 70))
+        S.line(bezier(pt(-6, -8), pt(36, 26), pt(84, -6)), 3)
+    elif prop == "bottle":
+        rect(-18, -92, 18, 10, (150, 210, 230))
+        rect(-9, -116, 9, -92, (150, 210, 230), 4)
+        rect(-11, -128, 11, -116, (60, 120, 200), 4)
+    elif prop == "letter":
+        rect(-54, -40, 54, 30, (250, 248, 240))
+        S.line([ab(-54, -40), ab(0, -2), ab(54, -40)], 4)
+    elif prop == "toothbrush":
+        S.line([pt(-10, 0), pt(74, 0)], 8, (80, 140, 220))
+        prect(56, -16, 76, -4, (250, 250, 250), 3)
+    elif prop == "dumbbell":
+        S.line([pt(-40, 0), pt(40, 0)], 10, (130, 130, 136))
+        for a in (-40, 40):
+            S.line([pt(a, -28), pt(a, 28)], 24, (50, 50, 56))
+    elif prop == "box":
+        rect(-74, -116, 74, 18, (196, 150, 100))
+        S.line([ab(-74, -80), ab(74, -80)], 4, (150, 110, 70))
+        S.line([ab(-20, -116), ab(-20, -80)], 8, (230, 210, 160))
 
 
 def _eye_center(sgn, face_dx, ey=-4.0, ex=34.0):
@@ -619,7 +786,11 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     p = dict(DEFAULT_POSE)
     p.update({kk: vv for kk, vv in pose.items() if vv is not None or kk == "finger"})
     sk = skeleton(p)
-    S = Sketch(x0, ground_y, k, p["tilt"], p["shift"], p["lift"], sk["fy"])
+    S = Sketch(x0, ground_y, k, p["tilt"], p["shift"], p["lift"], sk["fy"], p.get("dx", 0.0))
+    if not pose.get("arms_front"):          # a hand in front of the face: draw the arms over the head
+        hcx, hcy = sk["hc"]
+        p["arms_front"] = any(math.hypot(sk[h][0] - hcx, sk[h][1] - hcy) < HEAD_RX * HEAD_SCALE + 14
+                              for h in ("handL", "handR"))
 
     outfit = o.get("outfit", "tshirt")
     build = o.get("build", "normal")
@@ -635,6 +806,9 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     acc = o.get("accessories", [])
     cap_col = color_of(o.get("cap_color", "red"), "red")
     facing = {"left": -1, "right": 1}.get(o.get("facing", "front"), 0)
+    if p.get("head_facing") is not None:            # glance over the shoulder / spin
+        facing = int(max(-1, min(1, round(p["head_facing"]))))
+    face_f = p.get("_facing_f") if p.get("head_facing") is None else None   # smoothed turn (renderer)
 
     hc = sk["hc"]
     ht = d2r(p["head_tilt"])
@@ -657,7 +831,7 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         S.poly([HF(q) for q in pts], fill, outline, w * FACE * HEAD_SCALE)
 
     covered = "turban" in acc or "cap" in acc
-    back = o.get("view") == "back"          # seen from behind (the near shoulder of an over-the-shoulder shot)
+    back = o.get("view") == "back" or bool(p.get("hide_face"))   # seen from behind (ots shot, turn_around...)
     if not ("turban" in acc) and not back:
         _back_hair(S, HH, hair, hcol)
 
@@ -681,10 +855,14 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
             S.limb([sh, elb, hand], [ARM_W, ARM_W - 3, ARM_W - 7], skin)
             _sleeve(S, outfit, sh, elb, hand, cols["main"])
             _hand(S, hand, a2, side, skin, finger=p.get("finger") == side)
+            if p.get("thumb") == side:
+                S.limb([hand, add(hand, (0.0, -34.0))], [12, 9], skin)
+        held = [(nm, hs) for nm, hs in (p.get("props") or [])]
         if prop:
-            side = o.get("prop_hand", "R")
+            held.append((prop, p.get("prop_hand") or o.get("prop_hand", "R")))
+        for nm, side in held:
             wrist, fore = (sk["handL"], p["la2"]) if side == "L" else (sk["handR"], p["ra2"])
-            _draw_prop(S, prop, add(wrist, vec(fore, 11)), fore, cols["main"])     # held in the palm
+            _draw_prop(S, nm, add(wrist, vec(fore, 11)), fore, cols["main"])     # held in the palm
 
     if not p.get("arms_front"):
         draw_arms()
@@ -712,7 +890,7 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     eyes, mouth, brows = EXPRESSIONS.get(expr, EXPRESSIONS["neutral"])
     if blink and eyes not in NO_BLINK:
         eyes = "closed"
-    fdx = facing * 14 + p["look_x"] * 5
+    fdx = (face_f if face_f is not None else facing) * 14 + p["look_x"] * 5
     lx, ly = p["look_x"] * 7, p["look_y"] * 5
 
     for sgn in (-1, 1):
@@ -749,6 +927,9 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
             hline([(cx - 15, cy + 15), (cx + 15, cy - 15)], 7)
         elif eyes == "heart":
             hpoly(heart_pts(cx, cy, 30), (214, 50, 70), INK, 4)
+        elif eyes == "spiral":
+            hline([(cx + (2 + i * 0.9) * math.cos(i * 0.45 + t * 9 * sgn), cy + (2 + i * 0.9) * math.sin(i * 0.45 + t * 9 * sgn))
+                   for i in range(22)], 4)
         elif eyes == "wink":
             if sgn < 0:
                 hline(ellipse_pts(cx, cy + 8, 20, 17, 16, 200, 340), 7)
@@ -784,8 +965,13 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     else:
         hline(bezier((fdx + 4, 0), (fdx - 12, 26), (fdx + 6, 30), 8), 5, ncol)
 
+    if expr in BLUSH:
+        for sgn in (-1, 1):
+            cx, cy = _eye_center(sgn, fdx)
+            hpoly(closed_ellipse(cx + sgn * 10, cy + 34, 20, 10, 18), (240, 150, 160), None)
+
     # tears
-    if expr == "cry":
+    if expr in TEARS:
         for sgn in (-1, 1):
             cx, cy = _eye_center(sgn, fdx)
             for j in range(2):
@@ -838,6 +1024,10 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         hline(ellipse_pts(fdx, 84, 28, 22, 16, 208, 332), 7)
     elif mouth == "o":
         hpoly(closed_ellipse(fdx, my + 12, 13, 15, 20), MOUTH_IN, INK, 6)
+    elif mouth == "yawn":
+        open_mouth(fdx, my + 14, 24, 34, teeth=False)
+    elif mouth == "wavy":
+        hline([(fdx - 30 + i * 7.5, my + 10 + (5 if i % 2 else -5)) for i in range(9)], 6)
     else:  # flat
         hline([(fdx - 22, my + 10), (fdx + 22, my + 10)], 7)
 
