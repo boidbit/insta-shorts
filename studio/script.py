@@ -151,7 +151,8 @@ PITCHES = ["+0Hz", "+14Hz", "-8Hz", "+24Hz", "-14Hz"]
 BUILDS = ("slim", "normal", "chubby")
 GENDER_WORDS = ("female", "woman", "ladki", "aurat", "male", "man", "ladka", "aadmi")
 MOVE_WORDS = ("enter", "exit", "walk", "left", "right", "center", "up", "down", "up_left", "up_right",
-              "pump", "swing", "cheer", "disco", "shake", "drop", "noprop", "interrupt", "beech_me")
+              "pump", "swing", "cheer", "disco", "shake", "drop", "noprop", "interrupt", "beech_me",
+              "freeze", "slowmo", "slow_motion", "zoom", "reveal")
 
 
 def vocab():
@@ -381,7 +382,17 @@ def _stage(tokens, ev, scene_cast, who):
             fxn = FX_ALIASES.get(w, w)
             ev.setdefault("fx", []).append(fxn if fxn != "glow_eyes" else {"type": "glow_eyes", "dur": 3.0})
         elif w == "shake":
-            ev["camera"] = {"shake": 0.6}
+            ev["camera"] = dict(ev.get("camera", {}), shake=0.6)
+        elif w == "freeze":                         # the picture stops (grey) with a record scratch
+            ev["freeze"] = {"dur": 1.2}
+            ev.setdefault("sfx", "record_scratch")
+            ev.setdefault("volume", 0.6)
+        elif w in ("slowmo", "slow_motion"):        # the next second of the story at 0.4x (2.5 s on screen)
+            ev["slowmo"] = {"rate": 0.4, "dur": 1.0}
+        elif w == "zoom":                           # snap zoom onto this face, back out after 1.2 s
+            ev["camera"] = dict(ev.get("camera", {}), punch=who if who in scene_cast else None, back=1.2)
+        elif w == "reveal":                         # start close on the face, pull back to the whole place
+            ev["camera"] = dict(ev.get("camera", {}), reveal=who if who in scene_cast else True)
         elif w in ("interrupt", "beech_me"):        # B (interrupt, angry): ... cuts A off mid-sentence
             ev["interrupt"] = True
         elif w in SHOTS:
@@ -942,6 +953,10 @@ def parse_script(text):
                         ev.pop(key, None)                       # a voice has no body to act with
                 elif len(order) == 2 and others:
                     ev.setdefault("look", others[0])
+            elif ev.get("slowmo"):
+                ev.setdefault("hold", 1.0)              # the slow-motion part plays out before the next line
+            elif ev.get("freeze"):
+                ev.setdefault("hold", 0.0)              # the next line (a narrator...) is said over the frozen picture
             elif ev.get("action") == "throw":
                 ev.setdefault("hold", 1.15)             # wind-up, flight and the hit before the next line
             elif ev.get("on"):

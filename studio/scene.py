@@ -482,6 +482,9 @@ def auto_camera(plan, chars, cam_events, shakes):
             shakes.append((max(0.0, sp["end"] - 0.15), 0.5, 0.45))
     if speech and plan.duration - speech[-1]["end"] > 0.7:
         cam_events.append(dict(t=speech[-1]["end"] + 0.2, zoom=1.0, dur=0.5))
+    for w in plan.warps:                            # slow motion: pull back to watch it happen
+        if w[0] == "slow":
+            cam_events.append(dict(t=w[1], zoom=1.0, dur=0.4))
     for fx in plan.effects:                         # a throw: frame the thrower and the target together
         if fx.get("type") == "projectile" and fx.get("src") in chars and fx.get("dst") in chars:
             t0 = max(0.0, fx["from"] - 0.45)
@@ -549,6 +552,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     set_by_id = {o["id"]: o for o in plan.sets}
     plan.set_events = []
     plan.lights = []
+    plan.warps = []                                 # slow motion / freeze frames (story time)
     if scene.get("lights") not in (None, "on"):     # a shot that starts in the dark (lights went off earlier)
         v = scene["lights"]
         plan.lights.append((-1.0, float({"off": 0.32, "dim": 0.6}.get(v, v) if not isinstance(v, (int, float)) else v)))
@@ -567,6 +571,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.world_chars = list(chars.values())
     cam_events = []
     shot_events = []        # camera moves from shot words on action lines (do not switch the auto camera off)
+    cam_hold = []           # (t0, t1): a zoom / reveal is playing, the automatic camera keeps out
     shakes = []
     plan.speech = []
     warned = [False]
@@ -655,8 +660,17 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 bubble = False                      # the studio page's "Dialogue text" option
             subtitle = (ev.get("subtitle") or (dialogue in ("subtitle", "both") and ev.get("bubble", True) is True)) \
                 and dialogue != "none"
-            sp = dict(who=c.name, text=text, start=t, end=t + dur + 0.12, audio=path, bubble=bubble,
+            frz = next((i_ for i_, w_ in enumerate(plan.warps) if w_[0] == "freeze" and abs(w_[1] - t) < 0.02), None)
+            if frz is not None:                     # said over a freeze frame: the picture waits for the line
+                w_ = plan.warps[frz]
+                plan.warps[frz] = ("freeze", w_[1], max(w_[2], dur + 0.35), w_[3])
+                span, step = 0.05, 0.06             # (story time stands still while it is said)
+            else:
+                span, step = dur + 0.12, dur + gap
+            sp = dict(who=c.name, text=text, start=t, end=t + span, audio=path, bubble=bubble,
                       shot=ev.get("shot"))
+            if frz is not None:
+                sp["frozen"] = True
             c.speech.append(sp)
             plan.speech.append(sp)
             if ev.get("interrupt") and len(plan.speech) > 1:
@@ -667,9 +681,11 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             if subtitle:                            # voice-over / subtitle mode: the words at the bottom while spoken
                 plan.overlays.append({"text": text, "style": "subtitle", "from": t,
                                       "pos": "bottom" if ev.get("subtitle") else "lower",   # above Instagram's caption
-                                      "to": t + dur + 0.12})
-            cursor = max(cursor, t + dur + gap)
-            plan_end = max(plan_end, t + dur + 0.12)
+                                      "to": t + span})
+                if frz is not None:                 # story time stands still: no fade, just there
+                    plan.overlays[-1]["anim"] = "none"
+            cursor = max(cursor, t + step)
+            plan_end = max(plan_end, t + span)
         if "hold" in ev:
             cursor = max(cursor, t + float(ev["hold"]))
             plan_end = max(plan_end, t + float(ev["hold"]))
@@ -729,12 +745,31 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             cursor = max(cursor, t + ev_hold)
         if "shot" in ev and "say" not in ev and SHOT_ALIASES.get(ev["shot"], ev["shot"]) in SHOT_ZOOM:
             shot_events.append(shot_camera(ev["shot"], t, chars, who, dur=0.3))
+        if "slowmo" in ev:                          # story time slows down here (the voice keeps its speed)
+            sm = ev["slowmo"] if isinstance(ev["slowmo"], dict) else {"rate": ev["slowmo"]}
+            rate = float(sm.get("rate", 0.35)) if not isinstance(sm.get("rate"), bool) else 0.35
+            plan.warps.append(("slow", t, max(0.05, min(1.0, rate)), float(sm.get("dur", 1.5))))
+        if "freeze" in ev:                          # the picture stops ("yup, that's me")
+            fr = ev["freeze"] if isinstance(ev["freeze"], dict) else {"dur": ev["freeze"]}
+            plan.warps.append(("freeze", t, float(fr.get("dur", 1.2)) if not isinstance(fr.get("dur"), bool) else 1.2,
+                               fr.get("style", "grey")))
         if "camera" in ev:
             cam = dict(ev["camera"])
             cam["t"] = t
             if "shake" in cam:
                 shakes.append((t, float(cam["shake"]), float(cam.get("shake_dur", 0.5))))
-            if "zoom" in cam or "focus" in cam:
+            if cam.get("punch"):                    # quick snap zoom onto a face (the automatic camera stays on)
+                shot_events.append({"t": t, "zoom": float(cam.get("zoom", 1.75)), "focus": cam["punch"],
+                                    "dur": float(cam.get("dur", 0.1))})
+                if cam.get("back"):
+                    shot_events.append({"t": t + float(cam["back"]), "zoom": 1.0, "dur": 0.3})
+                cam_hold.append((t - 0.01, t + float(cam.get("back") or 1.0) + 0.3))
+            elif cam.get("reveal"):                 # start close, pull back to the whole place
+                who_ = cam["reveal"] if isinstance(cam["reveal"], str) else None
+                shot_events.append({"t": t, "zoom": float(cam.get("from", 1.8)), "focus": who_, "dur": 0.001})
+                shot_events.append({"t": t + 0.002, "zoom": 1.0, "dur": float(cam.get("dur", 1.6))})
+                cam_hold.append((t - 0.06, t + float(cam.get("dur", 1.6)) + 0.1))
+            elif "zoom" in cam or "focus" in cam:
                 cam_events.append(cam)
 
     plan.overlays += static_overlays(scene)
@@ -765,6 +800,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     # ---- camera segments ----
     if meta.get("auto_camera", True) and not cam_events and plan.framing == "medium":     # wide / inside are composed shots
         auto_camera(plan, chars, cam_events, shakes)
+        cam_events[:] = [c_ for c_ in cam_events if not any(h0 <= c_["t"] <= h1 for h0, h1 in cam_hold)]
     cam_events += shot_events
     segs = []
     z, cx, cy = 1.0, LW / 2.0, LH / 2.0

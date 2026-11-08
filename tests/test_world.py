@@ -274,5 +274,54 @@ class VoiceTests(unittest.TestCase):
         self.assertEqual(audio.shift_value("-14Hz", audio.EMOTION_VOICE["sad"][1], "Hz"), "-22Hz")
 
 
+GYM = """HOOK: Gym ka pehla din 💪
+CAST: A = college_boy chubby, B = boy spiky
+SCENE: gym
+B (reveal, smug): Aaj se roz gym! | आज से रोज़ जिम!
+A (lift_weights, determined): Dekh mera form | देख मेरा फॉर्म
+A -> fall shock slowmo thud
+A -> freeze
+NARRATOR: Haan, ye main hoon | हाँ, ये मैं हूँ
+B (laugh, zoom): Pehla aur aakhri din | पहला और आखिरी दिन
+CTA: Tag karo 👇
+"""
+
+
+class TimeTests(unittest.TestCase):
+    def setUp(self):
+        scene, self.warns = parse_script(GYM)
+        self.r = Renderer(split_scenes(scene)[0], width=270, use_tts=False)
+
+    def test_slowmo_and_freeze_make_the_video_longer(self):
+        self.assertEqual(self.warns, [])
+        kinds = [w[0] for w in self.r.plan.warps]
+        self.assertEqual(kinds, ["slow", "freeze"])
+        self.assertGreater(self.r.duration, self.r.plan.duration + 2.5)
+
+    def test_narrator_speaks_over_the_freeze(self):
+        slow, frz = self.r.plan.warps
+        narr = next(sp for sp in self.r.speech if sp["who"] == "NARRATOR")
+        self.assertAlmostEqual(narr["start"], self.r.warp.real(frz[1]), places=3)       # when the picture stops
+        self.assertGreaterEqual(frz[2], 1.2)
+        b = next(sp for sp in self.r.speech if sp["who"] == "B" and sp["start"] > narr["start"])
+        self.assertGreater(b["start"], narr["start"] + frz[2] - 0.1)                   # B after the freeze
+        scratch = [fx for fx in self.r.sfx if fx["path"].endswith("record_scratch.wav")]
+        self.assertEqual(len(scratch), 1)
+
+    def test_freeze_frame_is_grey_and_shows_the_subtitle(self):
+        slow, frz = self.r.plan.warps
+        T = self.r.warp.real(frz[1]) + 0.5
+        ts, style = self.r.warp.at(T)
+        self.assertEqual(style, "grey")
+        img = self.r.frame(T)
+        px = img.convert("RGB").getpixel((5, 5))
+        self.assertLess(max(px) - min(px), 25)                                         # almost no colour
+
+    def test_zoom_and_reveal_keep_the_auto_camera(self):
+        zooms = [seg[3] for seg in self.r.plan.cam_segments]
+        self.assertIn(1.8, zooms)                                                       # reveal starts close
+        self.assertIn(1.75, zooms)                                                      # zoom on B
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -65,6 +65,51 @@ def _vignette(w, h, strength):
     return Image.fromarray(out, "RGB")
 
 
+INF = float("inf")
+
+
+class TimeWarp:
+    """Maps real (video) time <-> story (scene) time for slow motion and freeze frames."""
+
+    def __init__(self, warps, story_dur):
+        self.pieces = []                # (real_start, story_start, rate, real_len, style)
+        real = story = 0.0
+        for w in sorted(warps, key=lambda w_: w_[1]):
+            ts = w[1]
+            if ts < story:
+                continue
+            if ts > story:
+                self.pieces.append((real, story, 1.0, ts - story, None))
+                real, story = real + ts - story, ts
+            if w[0] == "slow":
+                rate, sdur = w[2], w[3]
+                self.pieces.append((real, story, rate, sdur / rate, None))
+                real, story = real + sdur / rate, story + sdur
+            else:
+                self.pieces.append((real, story, 0.0, w[2], w[3]))
+                real += w[2]
+        self.pieces.append((real, story, 1.0, INF, None))
+        self.duration = real + max(0.0, story_dur - story)
+
+    def at(self, T):
+        """(story time, freeze style or None) at real time T."""
+        for (r0, s0, rate, ln, style) in self.pieces:
+            if r0 <= T < r0 + ln:
+                return s0 + (T - r0) * rate, style
+        r0, s0, rate, _ln, _st = self.pieces[-1]
+        return s0 + (T - r0), None
+
+    def real(self, ts):
+        """Real time at which story time ts is shown (first time, if frozen)."""
+        for (r0, s0, rate, ln, _style) in self.pieces:
+            if rate == 0 and abs(ts - s0) < 1e-4:   # exactly at a freeze: when the freeze starts
+                return r0
+            if rate > 0 and s0 <= ts < s0 + rate * ln:
+                return r0 + (ts - s0) / rate
+        r0, s0, _r, _l, _s = self.pieces[-1]
+        return r0 + (ts - s0)
+
+
 class OverlayLayer:
     """Draws screen-fixed text overlays (captions, hook, cards) with their animations."""
 
@@ -147,7 +192,7 @@ class OverlayLayer:
             elif anim == "slide":
                 py += (1 - ease_out(lt / 0.35)) * 120
                 al = clamp(lt / 0.2)
-            if t1 < 1e8:
+            if t1 < 1e8 and anim != "none":
                 al *= clamp((t1 - t) / 0.2)
             if o.get("chat"):                       # anchored at the top, so the panel only grows downwards
                 paste_rgba(img, im, px * self.s, py * self.s, sc, al, anchor=(im.width / 2.0, 0.0))
@@ -287,9 +332,15 @@ class Renderer(Output):
         self._lip = {}
         self._blinks = {}
         self._label_cache = {}
-        self.fps, self.duration, self.n_frames = self.plan.fps, self.plan.duration, self.plan.n_frames
-        self.speech, self.sfx, self.music = self.plan.speech, self.plan.sfx, self.plan.music
-        self.ambience = self.plan.ambience
+        self.warp = TimeWarp(self.plan.warps, self.plan.duration)   # slow motion / freeze: real <-> story time
+        self.fps, self.duration = self.plan.fps, round(self.warp.duration, 3)
+        self.n_frames = int(round(self.duration * self.fps))
+        w = self.warp.real
+        self.speech = [dict(sp, start=w(sp["start"])) for sp in self.plan.speech] if self.plan.warps \
+            else self.plan.speech
+        self.sfx = [dict(fx, t=w(fx["t"])) for fx in self.plan.sfx] if self.plan.warps else self.plan.sfx
+        self.music = self.plan.music
+        self.ambience = [dict(a, dur=self.duration) for a in self.plan.ambience]
         meta = scene.get("meta", {})
         self.shadows = bool(meta.get("shadows", True))          # soft contact shadow under each character
         self._shadow = _shadow_sprite() if self.shadows else None
@@ -674,6 +725,16 @@ class Renderer(Output):
         return 1 if x <= LW / 2 else -1
 
     def frame(self, t):
+        """The picture at video time t (slow motion and freeze frames map it onto story time)."""
+        if not self.plan.warps:
+            return self.story_frame(t)
+        ts, style = self.warp.at(t)
+        img = self.story_frame(min(ts, self.plan.duration - 1e-3))
+        if style == "grey":                         # freeze frame: almost black and white
+            img = Image.blend(img, img.convert("L").convert("RGB"), 0.85)
+        return img
+
+    def story_frame(self, t):
         plan, s = self.plan, self.s
         img = self._background(t)
         self._draw_objects(img, t, False)
@@ -802,7 +863,7 @@ class Renderer(Output):
             if sp and sp.get("bubble") == "thought":
                 self.fx._thought(img, {"text": sp["text"], "_seed": 0}, t - sp["start"], 1.0, an)
             elif sp and sp.get("bubble", True):
-                lt = t - sp["start"]
+                lt = 1.0 if sp.get("frozen") else t - sp["start"]     # said over a freeze frame: already open
                 im0, _ = bubble_image(sp["text"], sb, 0)
                 left = clamp(hx * s - im0.width * 0.35, max(24 * s, vl + mar), min(self.W - im0.width - 24 * s,
                                                                                      vl + vw - im0.width - mar))
