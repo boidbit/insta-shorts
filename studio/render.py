@@ -363,6 +363,20 @@ class Renderer(Output):
         a = abs(math.sin(t * 9.1)) * (0.55 + 0.45 * abs(math.sin(t * 3.7 + 1.3)))
         return clamp(a * 1.25 - 0.1)
 
+    def _amp(self, sp, t):
+        """How loud a line is around time t (0..1), smoothed over ~0.4 s: gestures follow the phrase, not every
+        syllable (a hand that jumps on each syllable looks fake)."""
+        if sp.get("audio"):
+            if id(sp) not in self._lip:
+                self._lip[id(sp)] = audio.lip_envelope(sp["audio"], self.plan.fps)
+            env = self._lip[id(sp)]
+            if env is not None and len(env):
+                fps = self.plan.fps
+                i = int((t - sp["start"]) * fps)
+                seg = env[max(0, i - int(0.35 * fps)):max(1, i + 2)]
+                return float(sum(seg) / len(seg)) if len(seg) else 0.0
+        return 0.5 + 0.2 * math.sin(t * 2.1) * math.sin(t * 0.9 + 1.0)
+
     def _background(self, t):
         """The place, seen from this shot's angle: drawn bigger (crisp, not blown up), the part around angle x, with the
         ground line where the people stand kept in place; mirrored for a reverse shot."""
@@ -572,7 +586,7 @@ class Renderer(Output):
     def _build_pose(self, c, t, E):
         st, x, action, a_t0 = E["st"], E["x"], E["action"], E["a_t0"]
         opts = dict(st["opts"], _x=x, _bpm=self.plan.bpm, _prop=st["prop"], _dir=E["dr"], _facing=st["facing"],
-                    _expr=st["expression"], _amp=self._lip_open(st["talking"], t) if st["talking"] else 0.0)
+                    _expr=st["expression"], _amp=self._amp(st["talking"], t) if st["talking"] else 0.0)
         pose = actions.pose_for(action, t - a_t0 if action not in ("walk", "run") else t, st["speed"],
                                 st["intensity"], c.phase, opts)
         if E["rf"]:                                 # on a vehicle: the seat decides the pose

@@ -222,16 +222,11 @@ def split_audio(x, texts, sr=SR, pad=0.12):
     def usable(runs):
         return [(a * 0.01, b * 0.01) for (a, b) in runs if a > first and b <= last]
 
-    gaps = usable(_silence_runs(rms, thr, 18))                  # >= 0.18 s of quiet
-    if len(gaps) < n - 1:
-        gaps = usable(_silence_runs(rms, thr, 8))
-    if len(gaps) >= n - 1:
-        picked = sorted(sorted(gaps, key=lambda g: g[1] - g[0], reverse=True)[: n - 1])
-        clips = clips_from(picked)
-        ratio = np.array([(b - a) for a, b in clips]) / weights
-        med = float(np.median(ratio))
-        if med > 0 and np.all(ratio > med / 2.4) and np.all(ratio < med * 2.4):
-            return clips, "pauses"
+    cands = usable(_silence_runs(rms, thr, 8))                  # every pause >= 0.08 s is a possible cut
+    if len(cands) >= n - 1:
+        picked = _align(cands, weights, first * 0.01, last * 0.01, n)
+        if picked is not None:
+            return clips_from(picked), "pauses"
 
     # fallback: where would the boundaries be if speaking speed were constant? then snap to quiet spots
     total = (last - first) * 0.01
@@ -251,6 +246,45 @@ def split_audio(x, texts, sr=SR, pad=0.12):
         chosen.append(g)
         lo = g[1]
     return clips_from(chosen), "proportional"
+
+
+def _align(gaps, weights, t_first, t_last, n):
+    """Choose n-1 of the pauses as the cuts between lines. The longest pauses are not always the line breaks: a
+    comma inside a long line can pause longer than the break before the next speaker (the dog's line was cut at
+    its comma and its second half played in the boy's shot). So every choice is scored on both: how long its pauses
+    are, and how well every line's length matches its text (speaking speed is about constant in one take).
+    Dynamic programming over the pauses in order; returns the chosen gaps or None."""
+    m = len(gaps)
+    a = np.array([g[0] for g in gaps])
+    b = np.array([g[1] for g in gaps])
+    glen = np.maximum(b - a, 0.01)
+    speech = (t_last - t_first) - 0.0                          # (pauses inside lines are part of a line's length)
+    expect = speech * weights / weights.sum()
+    gap_bonus = 0.6 * np.log(glen / 0.15)                      # a long pause is likely a line break
+    INF = 1e18
+    # cost[k][i]: best cost with the k-th cut (0-based) at gap i
+    cost = np.full((n - 1, m), INF)
+    back = np.zeros((n - 1, m), dtype=int)
+    d0 = a - t_first                                           # line 0 runs from the first voice to gap i
+    cost[0] = np.log(np.maximum(d0, 0.05) / expect[0]) ** 2 - gap_bonus
+    for k in range(1, n - 1):
+        for i in range(k, m):
+            prev = np.arange(k - 1, i)
+            d = a[i] - b[prev]                                 # line k runs from gap prev to gap i
+            c = cost[k - 1][prev] + np.log(np.maximum(d, 0.05) / expect[k]) ** 2
+            j = int(np.argmin(c))
+            cost[k][i] = c[j] - gap_bonus[i]
+            back[k][i] = prev[j]
+    d_last = t_last - b                                        # the last line runs from the last cut to the end
+    final = cost[n - 2] + np.log(np.maximum(d_last, 0.05) / expect[n - 1]) ** 2
+    i = int(np.argmin(final))
+    if final[i] >= INF / 2:
+        return None
+    chosen = [i]
+    for k in range(n - 2, 0, -1):
+        i = int(back[k][i])
+        chosen.append(i)
+    return [gaps[j] for j in reversed(chosen)]
 
 
 # ------------------------------------------------------------------ public: one call for the whole script

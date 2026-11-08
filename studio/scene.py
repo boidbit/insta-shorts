@@ -41,6 +41,10 @@ def shot_angle(scene, framing):
     return out
 
 
+PEOPLE_SCALE_3 = 1.06        # ...three people side by side need the room
+PEOPLE_SCALE = 1.22          # medium shots: people this much bigger than the painted place (x sqrt of the angle zoom)
+FOCUS_H = {"dog": 170.0, "cat": 120.0, "cow": 260.0, "crow": 70.0, "parrot": 70.0}   # animals: camera looks lower
+
 OTS_BACK = dict(k=2.3, drop=1200.0, left=150.0, right=930.0)      # the near shoulder: big, cut off by the frame
 
 
@@ -64,6 +68,14 @@ def place_over_shoulder(chars):
 
 
 DEPTHS = {"near": (1.3, 110.0), "mid": (1.0, 0.0), "far": (0.75, -150.0)}   # (size multiplier, feet offset in px)
+# a big one-off move said with a line (jump, clap, shock, wave...) plays once, then the character settles into
+# talking with the same face: a person who jumps for 6 seconds while talking looks fake
+BURST_ACTIONS = {"jump": 0.95, "celebrate": 1.6, "fist_pump": 1.2, "jumping_jacks": 1.6, "spin": 1.2, "cartwheel": 1.4,
+                 "stomp": 1.0, "clap": 1.2, "wave": 1.2, "laugh": 1.4, "shock": 1.2, "scared": 1.4, "flex": 1.4,
+                 "salute": 1.2, "namaste": 1.2, "bow": 1.2, "nod": 1.0, "shake_head": 1.2, "high_five": 1.2,
+                 "thumbs_up": 1.4, "scratch_head": 1.4, "rub_hands": 1.4, "shrug": 1.2, "cringe": 1.2, "proud": 1.4,
+                 "shy": 1.4, "facepalm": 1.6, "dizzy": 1.6}
+
 CHAR_ATTRS = ("action", "expression", "prop", "label", "look", "facing", "style", "point", "dir",
               "lean", "speed", "intensity", "hands", "tint", "on", "visible")
 
@@ -319,7 +331,8 @@ class Char:
         if rf:
             return rf["hip"][0], rf["hip"][1] - 250 * rf["scale"]
         x, y = self.draw_pos(t)
-        return x, y - 560 * self.depth_at(t)[0]
+        h = FOCUS_H.get(self.spec.get("kind"), 560.0)            # a dog's head is not where a person's is
+        return x, y - h * self.scale * self.depth_at(t)[0]
 
     def state_at(self, t):
         st = dict(action="idle", action_t0=0.0, expression=self.spec.get("expression", "neutral"),
@@ -474,6 +487,8 @@ def auto_camera(plan, chars, cam_events, shakes):
             size = 1.2
         else:
             size = 1.7 if (i == n - 1 and n > 2) else SHOT_SIZES[i % len(SHOT_SIZES)]
+            if chars[sp["who"]].spec.get("kind") in FOCUS_H:
+                size = min(1.8, size + 0.2)         # a small animal talking: come a bit closer
             cam_events.append(dict(t=max(0.0, t0 - 0.05), zoom=size, focus=sp["who"], dur=0.16))
         if d > 1.0:                                 # slow push-in while the line is spoken
             cam_events.append(dict(t=t0 + 0.65 if i == 0 else t0 + 0.2, zoom=round(size + 0.12, 2),
@@ -518,8 +533,14 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     if framing == "wide" and kinds_:
         widest = max(objects.SPRITE_LEN[k_] / objects.PERSON_R[k_] for k_ in kinds_) * objects.REF_SCALE
         world = clamp(900.0 / widest, 0.22, 1.0)
-    plan.framing, plan.world = framing, world
     plan.angle = shot_angle(scene, framing)
+    if framing == "medium":
+        # people (and their props / set pieces) a bit bigger than the painted place, and more so when the shot's
+        # angle shows the place closer: otherwise the room and its furniture dwarf the characters
+        n_vis = sum(1 for v in scene.get("characters", {}).values() if isinstance(v, dict) and not v.get("hidden"))
+        base_ = float(meta.get("people_scale", PEOPLE_SCALE if n_vis < 3 else PEOPLE_SCALE_3))   # 3 need room
+        world = base_ * plan.angle["zoom"] ** 0.5
+    plan.framing, plan.world = framing, world
     plan.cut_in = bool(scene.get("cut_in"))
 
     # ---- characters ----
@@ -540,6 +561,9 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         chars[name].scale *= world
     if framing == "ots":
         place_over_shoulder(chars)
+        for c_ in chars.values():               # the speaker facing us a bit bigger too (still well behind the back)
+            if c_.spec.get("view") != "back":
+                c_.scale *= 1.1
     plan.chars = chars
 
     # ---- timeline ----
@@ -548,6 +572,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     for i, ob in enumerate(scene.get("sets", [])):
         ob = dict(ob)
         ob.setdefault("id", "%s%d" % (ob.get("type", "set"), i + 1))
+        if plan.world != 1.0:
+            ob["scale"] = float(ob.get("scale", 1.0)) * plan.world      # a sofa grows with the people sitting on it
         plan.sets.append(ob)
     set_by_id = {o["id"]: o for o in plan.sets}
     plan.set_events = []
@@ -673,6 +699,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 sp["frozen"] = True
             c.speech.append(sp)
             plan.speech.append(sp)
+            if ev.get("action") in BURST_ACTIONS and dur > BURST_ACTIONS[ev["action"]] + 0.4:
+                c.events.append({"t": t + BURST_ACTIONS[ev["action"]], "action": "idle", "_settle_from": t})
             if ev.get("interrupt") and len(plan.speech) > 1:
                 prev = plan.speech[-2]
                 if prev["end"] > t and prev["who"] != sp["who"]:      # the other person gets cut off
@@ -680,7 +708,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                     prev["cut"] = t + 0.1 - prev["start"]
             if subtitle:                            # voice-over / subtitle mode: the words at the bottom while spoken
                 plan.overlays.append({"text": text, "style": "subtitle", "from": t,
-                                      "pos": "bottom" if ev.get("subtitle") else "lower",   # above Instagram's caption
+                                      "pos": "bottom" if ev.get("subtitle") else          # (narrator)
+                                      "upper" if c.spec.get("kind") in FOCUS_H else "lower",  # not over a dog's body
                                       "to": t + span})
                 if frz is not None:                 # story time stands still: no fade, just there
                     plan.overlays[-1]["anim"] = "none"
@@ -787,6 +816,9 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
 
     for c in chars.values():
         c.events.sort(key=lambda e: e["t"])
+        # a settle-into-talking is dropped when the script gives this character another action before it
+        c.events = [e for e in c.events if "_settle_from" not in e or not any(
+            e2 is not e and "action" in e2 and e["_settle_from"] < e2["t"] <= e["t"] for e2 in c.events)]
         c.speech.sort(key=lambda s_: s_["start"])
 
     # ---- duration ----

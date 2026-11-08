@@ -69,6 +69,31 @@ class SplitTests(unittest.TestCase):
         self.assertEqual(len(spans), 3)
         self.assertTrue(all(b > a for a, b in spans))
 
+    def test_a_comma_pause_longer_than_the_line_break_does_not_cut_the_line(self):
+        """The bhoot video: the dog's line paused at its comma longer than the break before the boy spoke, the old
+        split cut there and the dog's second half played in the boy's shot. Line lengths must decide."""
+        rng = np.random.RandomState(5)
+
+        def speech(d):
+            n_ = int(d * SR)
+            return rng.randn(n_) * 0.2 * np.hanning(n_)
+
+        def sil(d):
+            return np.zeros(int(d * SR))
+
+        # line 1 (2.4 s) | 0.30 | line 2 = 2.2 s, COMMA 0.65 s, 2.6 s | 0.30 | line 3 (3.0 s) | 0.32 | line 4 (2.0 s)
+        parts = [sil(0.2), speech(2.4), sil(0.30), speech(2.2), sil(0.65), speech(2.6), sil(0.30), speech(3.0),
+                 sil(0.32), speech(2.0), sil(0.3)]
+        x = np.concatenate(parts).astype(np.float32)
+        texts = ["a" * 40, "b" * 80, "c" * 50, "d" * 33]
+        real_breaks = [0.2 + 2.4 + 0.15, 0.2 + 2.4 + 0.3 + 2.2 + 0.65 + 2.6 + 0.15,
+                       0.2 + 2.4 + 0.3 + 2.2 + 0.65 + 2.6 + 0.3 + 3.0 + 0.16]
+        spans, method = g.split_audio(x, texts)
+        self.assertEqual(method, "pauses")
+        cuts = [(spans[i][1] + spans[i + 1][0]) / 2 for i in range(3)]
+        for c, r in zip(cuts, real_breaks):
+            self.assertLess(abs(c - r), 0.25, (cuts, real_breaks))
+
     def test_single_line(self):
         spans, method = g.split_audio(fake_take([2.0], []), ["hello"])
         self.assertEqual((len(spans), method), (1, "pauses"))

@@ -1269,24 +1269,24 @@ def talk_emotion(t, sp, I, ph, o):
     n1, n2 = _n(t * 1.6, ph), _n(t * 1.3, ph + 2)
     if e in ANGRY:                                  # jabbing finger, leaning in
         jab = (0.3 + 0.7 * amp)
-        pose = _P(hand("R", (120 + 110 * jab, -330 - 20 * n1), (0, 1)), hand("L", (-90, -70), (-1, 0.2)),
-                  dict(ll1=-14, rl1=14), finger="R", tilt=5 + 4 * amp, head_dx=5 + 4 * amp,
-                  head_tilt=3 * n2, lift=-4 * amp)
+        pose = _P(hand("R", (120 + 70 * jab, -330 - 12 * n1), (0, 1)), hand("L", (-90, -70), (-1, 0.2)),
+                  dict(ll1=-14, rl1=14), finger="R", tilt=4 + 2 * amp, head_dx=4 + 3 * amp,
+                  head_tilt=2 * n2)
     elif e in HAPPY:                                # open arms, bouncy
-        op = 0.4 + 0.6 * amp
-        pose = _P(hand("R", (110 + 70 * op, -240 - 70 * op + 10 * n1), (1, 0.6)),
-                  hand("L", (-110 - 70 * op, -240 - 70 * op + 10 * n2), (-1, 0.6)),
-                  dict(ll1=-11, rl1=11), lift=-7 * amp * abs(sin(w * 2 * t)), head_tilt=5 * n1, tilt=2 * n2)
+        op = 0.4 + 0.6 * amp                       # open hands; no bouncing (it looked like jumping)
+        pose = _P(hand("R", (105 + 45 * op, -230 - 45 * op + 6 * n1), (1, 0.6)),
+                  hand("L", (-105 - 45 * op, -230 - 45 * op + 6 * n2), (-1, 0.6)),
+                  dict(ll1=-11, rl1=11), head_tilt=4 * n1, tilt=1.5 * n2)
     elif e in SAD:                                  # small low gestures, head down
         pose = _P(hand("R", (70 + 25 * amp, -130 - 30 * amp), (1, 1)), hand("L", (-62, -110), (-1, 1)),
                   dict(ll1=-7, rl1=7), head_dy=7, look_y=0.5, head_tilt=-3 + 2 * n1, tilt=-1)
     elif e in SCARED:                               # hands up at the chest, fidgety
-        tr = 2.5 * sin(2 * pi * 9 * t)
+        tr = 0.8 * sin(2 * pi * 7 * t)
         pose = _P(hand("R", (46 + 12 * amp, -262 - 20 * amp), (1, 1)), hand("L", (-40, -256), (-1, 1)),
                   dict(ll1=-4, rl1=4), shift=tr, tilt=-3, look_x=0.4 * n1, head_dy=-2 * amp)
     elif e in COOL:                                 # hand on the hip, lazy gesture
-        pose = _P(hand("L", (-72, -92), (-1, -0.3)), hand("R", (120 + 40 * amp, -210 - 50 * amp + 8 * n1), (1, 0.5)),
-                  dict(ll1=-12, rl1=12), head_tilt=6 + 3 * n2, tilt=-2)
+        pose = _P(hand("L", (-72, -92), (-1, -0.3)), hand("R", (115 + 25 * amp, -205 - 30 * amp + 5 * n1), (1, 0.5)),
+                  dict(ll1=-12, rl1=12), head_tilt=5 + 2 * n2, tilt=-2)
     else:                                           # thinking: a hand near the chin
         pose = _P(hand("R", (26 + 10 * amp, -320 + 6 * n1), (1, 1)), hand("L", (46, -214), (-0.3, 1)),
                   dict(ll1=-9, rl1=9), look_y=-0.4, head_tilt=4 * n2)

@@ -60,7 +60,7 @@ class SceneTests(unittest.TestCase):
     def test_dance_line_is_held_long_enough_to_see(self):
         scene, warnings = script.parse_script("HOOK: x\nCAST: A = aunty\nA -> naagin sly\nCTA: y\n")
         self.assertEqual(warnings, [])
-        ev = scene["scenes"][0]["timeline"][2]
+        ev = next(e for e in scene["scenes"][0]["timeline"] if e.get("who") == "A")
         self.assertEqual((ev["action"], ev["expression"], ev["hold"]), ("naagin", "sly", 1.6))
 
     def test_multi_scene_timing(self):
@@ -113,7 +113,7 @@ class ScriptTests(unittest.TestCase):
     def test_roman_only_line_warns(self):
         scene, warnings = script.parse_script("HOOK: Test\nA (smile): Bhai chai pila de\n")
         self.assertTrue(any("Devanagari" in w for w in warnings))
-        self.assertEqual(scene["scenes"][0]["timeline"][2]["speak"], "Bhai chai pila de")
+        self.assertEqual(next(e for e in scene["scenes"][0]["timeline"] if "say" in e)["speak"], "Bhai chai pila de")
 
 
 class DirectorTests(unittest.TestCase):

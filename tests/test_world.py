@@ -357,5 +357,39 @@ class NightRoadTests(unittest.TestCase):
         self.assertEqual(len(Background({"type": "kitchen", "foreground": ["table"]}, 270, 480).foreground(0.0)), 1)
 
 
+class NaturalActingTests(unittest.TestCase):
+    """The user's notes on the first videos: people jumped through whole lines, were small next to the furniture,
+    a talking dog sat at the bottom of the screen, a `wait` before a line did nothing."""
+
+    def test_a_jump_said_with_a_line_happens_once_then_talks(self):
+        scene, _ = parse_script("HOOK: h\nCAST: A = boy, B = girl\nSCENE: office\n"
+                                "A (jump, excited): Sach me sir? Teen saal se ek bhi chhutti nahi li, nabbe pending "
+                                "hain! | सच में सर? तीन साल से एक भी छुट्टी नहीं ली, नब्बे पेंडिंग हैं!\nCTA: c\n")
+        p = compile_scene(split_scenes(scene)[0], use_tts=False)
+        a = p.chars["A"]
+        sp = a.speech[0]
+        self.assertEqual(a.state_at(sp["start"] + 0.3)["action"], "jump")
+        self.assertEqual(a.state_at(sp["start"] + 2.0)["action"], "talk")        # settled, same excited face
+        self.assertEqual(a.state_at(sp["start"] + 2.0)["expression"], "excited")
+
+    def test_people_are_bigger_than_the_painted_place_in_medium_shots(self):
+        scene, _ = parse_script(ROOM)
+        p = compile_scene(split_scenes(scene)[0], use_tts=False)
+        self.assertGreaterEqual(p.chars["A"].scale, 1.2)
+        self.assertTrue(all(o.get("scale", 1.0) >= 1.2 for o in p.sets))          # the sofa grows with them
+
+    def test_camera_looks_at_a_dog_lower_than_at_a_person(self):
+        scene, _ = parse_script(ANIMALS)
+        p = compile_scene(split_scenes(scene)[0], use_tts=False)
+        dog, papa = p.chars["B"], p.chars["A"]
+        self.assertGreater(dog.focus_at(1.0)[1], papa.focus_at(1.0)[1] + 300)
+
+    def test_a_wait_before_the_first_line_is_kept(self):
+        base = "HOOK: h\nCAST: A = boy\nSCENE: room\n%sA (smile): Haan | हाँ\nCTA: c\n"
+        p0 = compile_scene(split_scenes(parse_script(base % "")[0])[0], use_tts=False)
+        p1 = compile_scene(split_scenes(parse_script(base % "wait 1\n")[0])[0], use_tts=False)
+        self.assertAlmostEqual(p1.speech[0]["start"] - p0.speech[0]["start"], 1.0, places=2)
+
+
 if __name__ == "__main__":
     unittest.main()

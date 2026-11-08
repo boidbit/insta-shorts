@@ -389,8 +389,8 @@ def _stage(tokens, ev, scene_cast, who):
             ev.setdefault("volume", 0.6)
         elif w in ("slowmo", "slow_motion"):        # the next second of the story at 0.4x (2.5 s on screen)
             ev["slowmo"] = {"rate": 0.4, "dur": 1.0}
-        elif w == "zoom":                           # snap zoom onto this face, back out after 1.2 s
-            ev["camera"] = dict(ev.get("camera", {}), punch=who if who in scene_cast else None, back=1.2)
+        elif w == "zoom":                           # snap zoom onto this face for the line
+            ev["camera"] = dict(ev.get("camera", {}), punch=who if who in scene_cast else None)   # stays close
         elif w == "reveal":                         # start close on the face, pull back to the whole place
             ev["camera"] = dict(ev.get("camera", {}), reveal=who if who in scene_cast else True)
         elif w in ("interrupt", "beech_me"):        # B (interrupt, angry): ... cuts A off mid-sentence
@@ -894,6 +894,9 @@ def parse_script(text):
         tl = [{"t": 0.0, "who": "all", "action": "idle", "expression": "smile"}]
         if si == 0:
             tl.append({"t": 0.0, "sfx": "whoosh", "volume": 0.7, "camera": {"shake": 0.5}})
+        # the story starts a moment in; a `wait`, a screen card or a set change before the first line now really
+        # comes first (they used to be skipped because the first line had a fixed start time)
+        tl.append({"wait": 0.3 if si == 0 else 0.2})
         first = True
         for ln in sc["lines"]:
             if ln[0] == "wait":
@@ -910,15 +913,11 @@ def parse_script(text):
                 continue
             if ln[0] == "obj":
                 oev = {"obj": ln[1]}
-                if first:
-                    oev["t"] = 0.1
-                    first = False
+                first = False
                 tl.append(oev)
                 continue
             who = "all" if ln[1].upper() == "ALL" else ln[1]
             ev = {"who": who}
-            if first:
-                ev["t"] = 0.3 if si == 0 else 0.2
             move, unknown, lost = _stage(ln[2], ev, order, who)
             if unknown:
                 warnings.append("line %r: %s samajh nahi aaye (acting words ki list dekho)"
