@@ -279,7 +279,7 @@ def camera_at(plan, t):
     for (t0, t1, z0, z1, c0, c1) in plan.cam_segments:
         if t < t0:
             break
-        e = ease_in_out((t - t0) / max(1e-6, t1 - t0))
+        e = 1.0 if t1 - t0 < 1e-3 else ease_in_out((t - t0) / (t1 - t0))      # dur 0 = hard cut
         z, cx, cy = lerp(z0, z1, e), lerp(c0[0], c1[0], e), lerp(c0[1], c1[1], e)
     dx = dy = 0.0
     for (ts, amp, dur) in plan.shakes:

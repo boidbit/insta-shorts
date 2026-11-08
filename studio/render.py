@@ -45,6 +45,7 @@ class Renderer:
         self._glow = self._make_glow()
         self._vig = self._make_vignette(float(self.light.get("vignette", 0.0)))
         self._objs = {o["id"]: o for o in self.plan.objects}
+        self._sprite_cache, self._sprite_key = {}, {}
 
     # ------------------------------------------------------------ helpers
     def _lip_open(self, sp, t):
@@ -177,6 +178,17 @@ class Renderer:
             layer.putalpha(layer.getchannel("A").point(lambda v: int(v * alpha)))
         img.paste(layer, (ox, oy), layer)
 
+    def _draw_sprite(self, img, sp, view):
+        z, L, T = view
+        sc = z * self.s / sp.k
+        key = (id(sp), round(sc, 4))
+        if self._sprite_key.get(id(sp)) != key:
+            w, h = max(1, int(round(sp.im.width * sc))), max(1, int(round(sp.im.height * sc)))
+            self._sprite_cache[id(sp)] = sp.im.resize((w, h), Image.BILINEAR) if sc != 1.0 else sp.im
+            self._sprite_key[id(sp)] = key
+        im = self._sprite_cache[id(sp)]
+        img.paste(im, (int(round((sp.x0 - L) * z * self.s)), int(round((sp.y0 - T) * z * self.s))), im)
+
     def _draw_shadow(self, img, x, ground_y, lift, k, view):
         z = view[0]
         sx, sy = self._xf((x, ground_y), view)
@@ -284,12 +296,18 @@ class Renderer:
             anchors[o["id"]] = an          # anchors stay valid after the object is hidden (e.g. a blast)
             if fx.visible(o, t):
                 items.append((float(o["y"]), float(o["x"]), ops, 0.0, k * 0.45))
+        for sp in self.bg.sprites:          # set pieces that people can stand behind / in front of
+            items.append((sp.ground_y, sp.x0, sp, None, None))
         items.sort(key=lambda it: (it[0], it[1]))
 
         for (y, x, ops, lift, k) in items:
-            self._draw_shadow(img, x, y, lift, k, view)
+            if lift is not None:
+                self._draw_shadow(img, x, y, lift, k, view)
         for (y, x, ops, lift, k) in items:
-            self._draw_ops(img, ops, view)
+            if lift is None:
+                self._draw_sprite(img, ops, view)
+            else:
+                self._draw_ops(img, ops, view)
 
         # ---- effects (sparks, blasts, smoke) ----
         flash = 0.0

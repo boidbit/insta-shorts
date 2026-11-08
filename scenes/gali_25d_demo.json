@@ -1,0 +1,36 @@
+{
+  "about": "2.5D gali demo at golden hour: lane in perspective, parallax dolly, chai stall counter the chaiwala stands behind.",
+  "meta": { "fps": 30, "line_gap": 0.3, "tail": 0.5, "fade_out": 0.4 },
+  "background": { "type": "gali_25d" },
+  "music": { "type": "beat", "bpm": 96, "volume": 0.12 },
+  "characters": {
+    "A": { "body": "toon", "color": [70, 120, 190], "x": -180, "y": 1660, "accessories": ["hair_short"],
+           "expression": "grin", "voice": { "name": "hi-IN-MadhurNeural", "pitch": "+18Hz", "rate": "+8%" } },
+    "B": { "body": "toon", "color": [236, 232, 220], "pants": [196, 186, 166], "x": 990, "y": 1268,
+           "accessories": ["moustache", "tuft"], "prop": "kettle", "expression": "neutral",
+           "voice": { "name": "hi-IN-MadhurNeural", "pitch": "-12Hz", "rate": "+4%" } }
+  },
+  "caption": { "text": "Har gali me ek aisa dost 😂", "style": "caption_box", "pos": "top" },
+  "timeline": [
+    { "t": 0.0, "who": "all", "action": "idle" },
+    { "t": 0.0, "camera": { "zoom": 1.22, "focus": [560, 1020], "dur": 0 } },
+    { "t": 0.15, "camera": { "zoom": 1.0, "dur": 2.6 } },
+    { "t": 0.2, "who": "A", "move": { "x": 520, "y": 1640, "dur": 1.6 } },
+    { "t": 1.9, "who": "A", "action": "wave", "look": "B",
+      "say": "Chotu, ek cutting chai, udhaar pe!", "speak": "छोटू, एक कटिंग चाय, उधार पे!" },
+    { "who": "B", "expression": "sly", "look": "A",
+      "camera": { "zoom": 1.7, "focus": [930, 1080], "dur": 0.5 },
+      "say": "Pichhla udhaar kab dega?", "speak": "पिछला उधार कब देगा?" },
+    { "who": "A", "action": "shrug", "expression": "smug",
+      "camera": { "zoom": 1.3, "focus": [600, 1130], "dur": 0.5 },
+      "say": "Wo bhi agle mahine de dunga!", "speak": "वो भी अगले महीने दे दूँगा!" },
+    { "who": "B", "action": "point", "point": "left", "expression": "angry", "prop": "",
+      "camera": { "zoom": 1.7, "focus": [930, 1080], "dur": 0.4 },
+      "say": "Chal nikal!", "speak": "चल निकल!" },
+    { "who": "A", "action": "idle", "expression": "shock", "move": { "x": -260, "y": 1700, "dur": 0.9 },
+      "speed": 2.2, "sfx": "whoosh", "camera": { "zoom": 1.0, "dur": 0.6 } },
+    { "who": "B", "action": "idle", "expression": "smug",
+      "overlay": { "text": "Tag karo udhaar wale dost ko 👇", "style": "caption_box", "pos": "bottom", "anim": "pop" },
+      "hold": 2.0 }
+  ]
+}

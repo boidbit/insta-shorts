@@ -368,6 +368,10 @@ class Background:
         return self.layered.light if self.layered else {}
 
     @property
+    def sprites(self):
+        return self.layered.sprites if self.layered else []
+
+    @property
     def horizon(self):
         return self.layered.horizon if self.layered else None
 

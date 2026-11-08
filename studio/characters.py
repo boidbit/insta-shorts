@@ -229,6 +229,21 @@ def _draw_prop(S, prop, hand, fore_angle, color_hint):
     elif prop == "stick":
         S.line([pt(-30, 0), pt(150, 0)], 10, (150, 104, 70))
         return pt(150, 0)
+    elif prop == "belan":           # rolling pin
+        S.line([pt(-38, 0), pt(-14, 0)], 14, (150, 96, 56))
+        S.line([pt(-12, 0), pt(118, 0)], 26 + 8, INK)
+        S.line([pt(-12, 0), pt(118, 0)], 26, (214, 164, 104))
+        S.line([pt(120, 0), pt(144, 0)], 14, (150, 96, 56))
+        return pt(146, 0)
+    elif prop == "kettle":          # steel chai kettle held by the handle
+        S.poly([pt(10, -36), pt(10, 36), pt(78, 30), pt(78, -30)], (196, 198, 206), INK, 5)
+        S.line([pt(78, -18), pt(112, -40)], 9, (176, 178, 186))
+        S.line([pt(-6, -30), pt(-6, 30)], 7, (60, 60, 64))
+        return pt(114, -42)
+    elif prop == "chai_glass":      # cutting chai
+        S.poly([pt(-6, -18), pt(-6, 18), pt(44, 14), pt(44, -14)], (236, 236, 240), INK, 4)
+        S.poly([pt(4, -16), pt(4, 16), pt(42, 13), pt(42, -13)], (176, 110, 58), None)
+        return pt(46, 0)
     elif prop == "agarbatti":       # long incense stick with a glowing tip (to light crackers)
         S.line([pt(-24, 0), pt(176, 0)], 7, (118, 72, 44))
         S.line([pt(150, 0), pt(176, 0)], 8, (70, 66, 64))
@@ -470,6 +485,16 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
                 hpoly(closed_ellipse((HEAD_R - 4) * math.cos(a_), (HEAD_R - 6) * math.sin(a_), 27, 25, 18),
                       HAIR, INK, 5)
             hpoly(ellipse_pts(0, -8, HEAD_R - 2, HEAD_R - 14, 20, 196, 344), HAIR, None)
+        elif acc == "hair_bun":         # long hair pulled back into a juda, centre parting
+            cap = ellipse_pts(0, 0, HEAD_R + 5, HEAD_R + 5, 30, 180, 360)
+            hpoly(closed_ellipse(0, -HEAD_R - 14, 40, 34, 24), HAIR, INK, 5)
+            hpoly(cap + [(HEAD_R + 5, 20), (HEAD_R - 14, 10), (40, -50), (0, -66), (-40, -50), (-HEAD_R + 14, 10),
+                         (-HEAD_R - 5, 20)], HAIR, INK, 5)
+            hline([(0, -HEAD_R - 2), (0, -64)], 4, (90, 70, 66))
+            hpoly(closed_ellipse(0, -HEAD_R - 14, 18, 12, 14), (230, 70, 90), None)       # a little gajra/clip
+        elif acc == "earrings":
+            for sgn in (-1, 1):
+                hpoly(closed_ellipse(sgn * (HEAD_R - 2), 44, 9, 11, 14), (236, 190, 60), INK, 3)
         elif acc == "hair_frizz":       # blown-up hair after a blast
             for i in range(9):
                 a_ = math.radians(198 + i * 18)

@@ -69,6 +69,10 @@ class Cv:
         wd = max(1, int(round(w * self.k)))
         self._draw(lambda d, q: d.line(q, fill=color, width=wd, joint="curve"), self.P(pts), color, wd)
 
+    def erase(self, pts):
+        """Punch a fully transparent hole (e.g. a window you can see the far layer through)."""
+        self.d.polygon(self.P(pts), fill=(0, 0, 0, 0))
+
     def blur(self, r):
         if r > 0:
             self.im = self.im.filter(ImageFilter.GaussianBlur(r * self.k))
@@ -145,6 +149,156 @@ def along(pts, step):
     return out
 
 
+def toward(p, vp, f):
+    """Move point p a fraction f of the way to the vanishing point (= push it back in depth)."""
+    return (p[0] + (vp[0] - p[0]) * f, p[1] + (vp[1] - p[1]) * f)
+
+
+def lerp2(a, b, u):
+    return (a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u)
+
+
+def quad_pt(q, u, v):
+    """Point inside quad q = (tl, tr, br, bl) at u (left->right), v (top->bottom)."""
+    top = lerp2(q[0], q[1], u)
+    bot = lerp2(q[3], q[2], u)
+    return lerp2(top, bot, v)
+
+
+def sub_quad(q, u0, v0, u1, v1):
+    return [quad_pt(q, u0, v0), quad_pt(q, u1, v0), quad_pt(q, u1, v1), quad_pt(q, u0, v1)]
+
+
+def fill_tex(cv, pts, stops, seed=1, cell=24, lo=0.9, hi=1.07, axis="y"):
+    """Fill a polygon with a gradient (stops along y or x, logical units) times a mottled texture."""
+    k = cv.k
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    x0, y0 = max(0, int(min(xs) * k)), max(0, int(min(ys) * k))
+    x1, y1 = min(cv.im.width, int(max(xs) * k) + 1), min(cv.im.height, int(max(ys) * k) + 1)
+    if x1 <= x0 or y1 <= y0:
+        return
+    W, H = x1 - x0, y1 - y0
+    if isinstance(stops, tuple):
+        stops = [(-1e5, stops), (1e5, stops)]
+    if axis == "y":
+        pos = (np.arange(H) + y0) / k
+    else:
+        pos = (np.arange(W) + x0) / k
+    cols = np.stack([np.interp(pos, [p for p, _ in stops], [c[i] for _, c in stops]) for i in range(3)], -1)
+    arr = np.repeat(cols[:, None, :], W, axis=1) if axis == "y" else np.repeat(cols[None, :, :], H, axis=0)
+    if hi != lo:
+        arr = arr * noise_tex((W, H), max(3, int(cell * k)), seed, lo, hi)[..., None]
+    im = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGB")
+    mask = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(mask).polygon([(x * k - x0, y * k - y0) for x, y in pts], fill=255)
+    cv.im.paste(im, (x0, y0), mask)
+    cv.d = ImageDraw.Draw(cv.im)
+
+
+def quad_image(cv, img, quad):
+    """Warp an RGBA image (a signboard, a poster...) onto quad = (tl, tr, br, bl) in logical units."""
+    k = cv.k
+    dst = [(x * k, y * k) for x, y in quad]
+    xs, ys = [p[0] for p in dst], [p[1] for p in dst]
+    x0, y0 = int(math.floor(min(xs))), int(math.floor(min(ys)))
+    w, h = int(math.ceil(max(xs))) - x0 + 1, int(math.ceil(max(ys))) - y0 + 1
+    src = [(0, 0), (img.width, 0), (img.width, img.height), (0, img.height)]
+    A, B = [], []
+    for (X, Y), (u, v) in zip([(x - x0, y - y0) for x, y in dst], src):
+        A.append([X, Y, 1, 0, 0, 0, -u * X, -u * Y])
+        B.append(u)
+        A.append([0, 0, 0, X, Y, 1, -v * X, -v * Y])
+        B.append(v)
+    coeffs = np.linalg.solve(np.array(A, float), np.array(B, float))
+    warped = img.transform((w, h), Image.PERSPECTIVE, tuple(coeffs), Image.BICUBIC)
+    cx0, cy0 = max(0, -x0), max(0, -y0)
+    warped = warped.crop((cx0, cy0, min(w, cv.im.width - x0), min(h, cv.im.height - y0)))
+    if warped.width > 0 and warped.height > 0:
+        cv.im.alpha_composite(warped, dest=(x0 + cx0, y0 + cy0))
+    cv.d = ImageDraw.Draw(cv.im)
+
+
+def sign_image(text, bg, fg, w=900, h=180, border=(40, 30, 30)):
+    """Flat signboard image (to be warped with quad_image)."""
+    from .text import font
+    im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle([0, 0, w - 1, h - 1], radius=int(h * 0.12), fill=bg + (255,), outline=border + (255,),
+                        width=max(3, h // 20))
+    size = int(h * 0.56)
+    f = font(size)
+    while f.getlength(text) > w * 0.9 and size > 10:
+        size -= 2
+        f = font(size)
+    tw = f.getlength(text)
+    d.text(((w - tw) / 2, (h - size * 1.15) / 2), text, font=f, fill=fg + (255,))
+    return im
+
+
+def steam(sources, k, n=7, color=(250, 250, 250)):
+    """fn for a dynamic layer: puffs of steam rising from sources [(x, y, size, speed), ...]."""
+    def fn(_im, t):
+        cv = Cv(k, fill=color + (0,))
+        for (x, y, sz, sp) in sources:
+            for i in range(n):
+                ph = (t * sp + i / float(n)) % 1.0
+                px = x + math.sin(t * 1.7 + i * 2.1) * 10 * sz * ph
+                py = y - ph * 150 * sz
+                r = (7 + 26 * ph) * sz
+                cv.ell(px, py, r, r * 0.9, color + (int(130 * (1 - ph) * min(1.0, ph * 6)),))
+        cv.blur(5)
+        return cv.im
+    return fn
+
+
+def motes(region, k, n=46, seed=3):
+    """fn for a dynamic (screen) layer: dust specks floating in a light beam. region = (p_from, p_to, width)."""
+    rnd = random.Random(seed)
+    parts = [(rnd.random(), rnd.uniform(-0.5, 0.5), rnd.uniform(0, 6.28), rnd.uniform(0.6, 1.6)) for _ in range(n)]
+    (ax, ay), (bx, by), wid = region
+
+    def fn(_im, t):
+        cv = Cv(k, fill=(255, 240, 200, 0))
+        for (u, v, ph, sz) in parts:
+            uu = (u + t * 0.012 * sz) % 1.0
+            x = ax + (bx - ax) * uu + v * wid + math.sin(t * 0.7 + ph) * 12
+            y = ay + (by - ay) * uu + math.cos(t * 0.5 + ph) * 10
+            a = int(170 * (0.5 + 0.5 * math.sin(t * 1.3 + ph * 3)))
+            cv.ell(x, y, 2.2 * sz, 2.2 * sz, (255, 246, 214, a))
+        cv.blur(0.6)
+        return cv.im
+    return fn
+
+
+def birds(k, n=6, seed=8, y0=420, y1=760):
+    """fn for a dynamic sky layer: a few birds gliding/flapping across."""
+    rnd = random.Random(seed)
+    fl = [(rnd.uniform(0, 1), rnd.uniform(y0, y1), rnd.uniform(18, 32), rnd.uniform(0.6, 1.2), rnd.uniform(0, 6.28))
+          for _ in range(n)]
+
+    def fn(im, t):
+        out = im.copy()
+        cv = Cv(k, fill=(40, 30, 40, 0))
+        for (u, y, w, sp, ph) in fl:
+            x = ((u + t * 0.018 * sp) % 1.2) * LW * 1.0 - 60
+            flap = math.sin(t * 7 * sp + ph)
+            yy = y + math.sin(t * 0.8 + ph) * 8
+            cv.line([(x - w, yy - 6 * flap), (x - w * 0.4, yy - 2 - 4 * flap), (x, yy + 2),
+                     (x + w * 0.4, yy - 2 - 4 * flap), (x + w, yy - 6 * flap)], (46, 34, 44, 230), 3.2)
+        out.alpha_composite(cv.im)
+        return out
+    return fn
+
+
+class Sprite:
+    """A piece of the set that must be depth-sorted with the characters (e.g. a tea stall counter a
+    character can stand behind). im covers the logical rect starting at (x0, y0) at k px per unit."""
+
+    def __init__(self, im, k, x0, y0, ground_y, name=""):
+        self.im, self.k, self.x0, self.y0, self.ground_y, self.name = im, k, x0, y0, ground_y, name
+
+
 # ------------------------------------------------------------------ layer stack
 class Layer:
     def __init__(self, im, k, d, fn=None, name="", mode="normal"):
@@ -159,11 +313,12 @@ class Layer:
 class Layered:
     """Holds back layers (behind characters) and front layers (d > 1, in front of characters)."""
 
-    def __init__(self, back, front, light=None, horizon=None, ground=None):
+    def __init__(self, back, front, light=None, horizon=None, ground=None, sprites=None):
         self.back, self.front = back, front
         self.light = light or {}
         self.horizon = horizon
         self.ground = ground
+        self.sprites = sprites or []
 
     @staticmethod
     def _part(ly, t, view, W, H):
@@ -619,4 +774,15 @@ def diwali_rooftop(s, zmax=1.0):
     return Layered(back, front, light=light, horizon=760, ground=1218)
 
 
-PRESETS = {"diwali_rooftop": diwali_rooftop}
+def _lazy(module, fn_name):
+    def build(s, zmax=1.0):
+        import importlib
+        return getattr(importlib.import_module("." + module, __package__), fn_name)(s, zmax)
+    return build
+
+
+PRESETS = {
+    "diwali_rooftop": diwali_rooftop,
+    "kitchen_25d": _lazy("scenery_kitchen", "kitchen_25d"),
+    "gali_25d": _lazy("scenery_gali", "gali_25d"),
+}

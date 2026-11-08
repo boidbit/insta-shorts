@@ -173,6 +173,14 @@ def _gen_sfx(name):
         y = 0.9 * thump + 1.4 * crack + mid + lp * _env(t, 0.004, 1.8) * 0.9
         y = np.tanh(1.6 * y / (np.max(np.abs(y)) + 1e-9))                                  # saturate = louder
         return np.clip(0.95 * y / (np.max(np.abs(y)) + 1e-9), -1, 1)
+    if name == "whistle":       # pressure-cooker seeti: rising hiss + shrill tone (1.6 s)
+        t = _t(1.6)
+        n = rng.randn(t.size)
+        hiss = (n - np.convolve(n, np.ones(4) / 4, mode="same")) * 0.35
+        env = np.minimum(1, t / 0.25) * np.minimum(1, (1.6 - t) / 0.35)
+        f = 2300 + 260 * np.minimum(1, t / 0.4) + 40 * np.sin(2 * np.pi * 7 * t)
+        tone = 0.45 * np.sin(2 * np.pi * np.cumsum(f) / SR) * np.clip((t - 0.15) / 0.3, 0, 1)
+        return np.clip((hiss + tone) * env, -1, 1)
     if name == "laugh_track":
         t = _t(1.2)
         y = np.zeros_like(t)

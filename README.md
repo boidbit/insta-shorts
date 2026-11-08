@@ -73,9 +73,11 @@ Poora schema `DIRECTOR_PROMPT.md` me hai. Yaad rakhne layak:
 `scenes/diwali_3d_demo.json` dekho. Ye asli 3D nahi hai: 2D cartoon ko teen cheezon se depth milti hai:
 
 - **Layered background** (`"background": {"type": "diwali_rooftop"}`): aasmaan, door ka shehar, beech ki buildings, chhat aur saamne ki cheezein alag-alag parton me hain. Camera hilta hai to har parat alag speed se khiskti hai (parallax). Door wali parton par blur (depth of field) hai, jhalar ki lights tim-timaati hain aur aasmaan me patakhe phat-te hain. Naya preset `studio/scenery.py` me banta hai (`PRESETS`).
-- **Toon body** (`"body": "toon"`): moti outline wale haath-pair, kurta-pajama, chappal, light/shadow shading, bada sir. `"pants"`, `"skin"`, `"hair_short"` / `"hair_curly"` bhi de sakte ho. Saare purane actions isme bhi chalte hain.
+- **3 preset:** `diwali_rooftop` (raat, chhat), `kitchen_25d` (din, khidki ke bahar ka nazara alag parat me, jaali wali dhoop, dhool ke kann, cooker ki bhaap), `gali_25d` (golden hour, kirana dukaan, khamba aur uljhe taar, chai tapri). Demo: `scenes/kitchen_25d_demo.json`, `scenes/gali_25d_demo.json`. Purane flat `kitchen` / `street` waise hi hain.
+- **Depth-sorted set pieces:** background me aisi cheezein ho sakti hain jinke aage ya peeche character khada ho (jaise chai ka counter: chaiwala `x 990, y 1268` par counter ke peeche, customer aage).
+- **Toon body** (`"body": "toon"`): moti outline wale haath-pair, kurta-pajama, chappal, light/shadow shading, bada sir. `"pants"`, `"skin"`, `"hair_short"` / `"hair_curly"` / `"hair_bun"` / `"earrings"` bhi de sakte ho. Naye props: `belan`, `kettle`, `chai_glass`, `agarbatti`, `phuljhadi`. Saare purane actions isme bhi chalte hain.
 - **Asli camera**: zoom (2x tak) par bhi character sharp rehta hai, kyunki wo zoom ke hisaab se dobara draw hota hai, image ko stretch nahi kiya jaata. Har character ke neeche parchhaai, scene ki roshni ka rang aur vignette bhi lagte hain. Jo character peeche khada hai (`"y": 1330`), wo apne aap chhota dikhta hai.
-- **Objects + effects**: `"objects"` (bomb, anaar, diya), timeline me `{"object": "bomb", "burn": 5}`, `{"fx": {"type": "sparks", "at": "bomb"}}`, `{"fx": {"type": "boom", "at": "bomb"}}`, sfx `fizz` / `boom`.
+- **Objects + effects**: `"objects"` (bomb, anaar, diya), timeline me `{"object": "bomb", "burn": 5}`, `{"fx": {"type": "sparks", "at": "bomb"}}`, `{"fx": {"type": "boom", "at": "bomb"}}`, sfx `fizz` / `boom` / `whistle` (cooker ki seeti). Camera me `"dur": 0` = seedha cut.
 - Hindi voice clips ke aage-peeche ka silence ab apne aap kat jaata hai, isliye dialogue tez chalta hai.
 
 Speed: 1080p par lagbhag 0.25 sec/frame, yaani 17 sec ki reel ~2 minute me.
@@ -90,5 +92,6 @@ Speed: 1080p par lagbhag 0.25 sec/frame, yaani 17 sec ki reel ~2 minute me.
 
 - Characters code se bane hain (stickman ya `toon`); hath se bane / AI art jaisi detail nahi hogi. Naye look ke liye `studio/characters.py` / `studio/scenery.py` badlo ya apni PNG backgrounds do.
 - 2.5D hai, asli 3D nahi: camera zoom/pan/shake kar sakta hai, lekin character ke chaaron taraf ghoom nahi sakta.
+- 2.5D backgrounds abhi code se bane presets hain (3); apni AI/PNG image wale background me abhi parallax nahi hai.
 - Bubble ke andar emoji ke liye `fonts-noto-color-emoji` chahiye (workflow khud install karta hai).
 - Hindi voice `edge-tts` (Microsoft online service) se aati hai, isliye internet chahiye; bina internet ke `--no-tts`.
