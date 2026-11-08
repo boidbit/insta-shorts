@@ -7,6 +7,93 @@ from .util import clamp, ease_in, ease_out, ease_out_back
 
 sin, cos, pi = math.sin, math.cos, math.pi
 
+# ------------------------------------------------------------------ rig geometry + IK helpers
+# Body coordinates: hips at y=0, up is negative. Many poses are written in a reference body
+# (shoulders (+-52, -275), head centre (0, -414), feet at +330) and _remap() converts those
+# targets to this rig, so hand-to-mouth / hands-on-hips land on the real character.
+from .characters import HEAD_RY, HEAD_SCALE, LA, NECK_H, SH, TH, TORSO_H, UA   # noqa: E402
+
+SHOULDER = {"L": (-56.0, -TORSO_H + 22.0), "R": (56.0, -TORSO_H + 22.0)}
+HIP = {"L": (-32.0, 0.0), "R": (32.0, 0.0)}
+_HC = -(TORSO_H - 4.0) - (NECK_H + HEAD_RY * 0.8 * HEAD_SCALE)     # head centre y
+_HTOP = _HC - HEAD_RY * HEAD_SCALE
+TH_, SH_ = TH, SH
+
+
+def _remap(p):
+    """Reference-body point -> this rig's body coordinates."""
+    x, y = p
+    sy = SHOULDER["R"][1]
+    if y >= 0:
+        y2 = y * (TH + SH) / 330.0
+    elif y >= -275:
+        y2 = y * (-sy) / 275.0
+    elif y >= -414:
+        y2 = sy + (y + 275) / -139.0 * (_HC - sy)
+    else:
+        y2 = _HC + (y + 414) / -100.0 * (_HTOP - _HC)
+    x2 = x * (0.9 if y < -300 else 1.06)
+    return (x2, y2)
+
+
+def _ik(base, target, l1, l2, prefer):
+    """Two-bone IK in the picture plane -> (upper angle, lower angle, upper scale, lower scale).
+    The elbow/knee bulges toward `prefer`; when that becomes ambiguous the limb straightens and
+    foreshortens instead of snapping to the other side, and near the shoulder the elbow keeps to
+    its preferred direction, so motion stays continuous and the hand still reaches the target."""
+    dx, dy = target[0] - base[0], target[1] - base[1]
+    dist = math.hypot(dx, dy)
+    if dist < 1e-6:
+        dx, dy, dist = 0.0, 1.0, 1.0
+    ux, uy = dx / dist, dy / dist
+    nx, ny = -uy, ux
+    D = max(abs(l1 - l2) + 1e-3, min(l1 + l2 - 1e-3, dist))
+    a = (l1 * l1 - l2 * l2 + D * D) / (2 * D)
+    h = math.sqrt(max(0.0, l1 * l1 - a * a))
+    pl = math.hypot(prefer[0], prefer[1]) or 1.0
+    sgn = (prefer[0] * nx + prefer[1] * ny) / pl
+    f = clamp(abs(sgn) / 0.35)
+    f = f * f * (3 - 2 * f)
+    he = h * f * (1 if sgn >= 0 else -1)
+    ex, ey = base[0] + ux * a + nx * he, base[1] + uy * a + ny * he
+    hx, hy = base[0] + ux * D, base[1] + uy * D
+    near = clamp((0.62 * (l1 + l2) - D) / (0.62 * (l1 + l2)))
+    if near > 0:
+        ex += (base[0] + prefer[0] / pl * l1 * 0.9 - ex) * near
+        ey += (base[1] + prefer[1] / pl * l1 * 0.9 - ey) * near
+    a1 = math.degrees(math.atan2(ex - base[0], ey - base[1]))
+    a2 = math.degrees(math.atan2(hx - ex, hy - ey))
+    return a1, a2, math.hypot(ex - base[0], ey - base[1]) / l1, math.hypot(hx - ex, hy - ey) / l2
+
+
+def hand(side, target, prefer=None, k=1.0):
+    """Arm angles that put the hand at `target` (reference-body coords). k = arm stretch (= arm_k)."""
+    if prefer is None:
+        prefer = (1.0 if side == "R" else -1.0, 0.5)
+    a1, a2, k1, k2 = _ik(SHOULDER[side], _remap(target), UA * k, LA * k, prefer)
+    p_ = "ra" if side == "R" else "la"
+    return {p_ + "1": a1, p_ + "2": a2, p_ + "_k1": k1, p_ + "_k2": k2}
+
+
+def foot(side, target, prefer=None):
+    if prefer is None:
+        prefer = (1.0 if side == "R" else -1.0, 0.0)
+    a1, a2, _k1, _k2 = _ik(HIP[side], _remap(target), TH, SH, prefer)
+    k_ = "rl" if side == "R" else "ll"
+    return {k_ + "1": a1, k_ + "2": a2}
+
+
+def _lerp2(p, q, e):
+    return (p[0] + (q[0] - p[0]) * e, p[1] + (q[1] - p[1]) * e)
+
+
+def _P(*parts, **kw):
+    out = {}
+    for p_ in parts:
+        out.update(p_)
+    out.update(kw)
+    return out
+
 
 def _stance(spread=1.0):
     return dict(ll1=-9 * spread, ll2=-3 * spread, rl1=9 * spread, rl2=3 * spread)
@@ -118,15 +205,24 @@ def laugh(t, sp, I, ph, o):
 
 
 def shock(t, sp, I, ph, o):
-    jump = sin(pi * clamp(t / 0.32)) * 130 * I if t < 0.32 else 0.0
-    lean = o.get("lean", -1) * 10 * ease_out(t / 0.25)
-    shake = sin(2 * pi * 14 * t) * 3 * I * math.exp(-(t - 0.3) * 4) if t > 0.3 else 0
-    down = ease_out((t - 1.0) / 0.6) if t > 1.0 else 0.0    # arms come down to a stunned pose
-    d = _stance(1.6)
-    d.update(lift=-jump, tilt=lean * (1 - 0.6 * down), shift=shake,
-             la1=(-120 - 20 * ease_out(t / 0.25)) * (1 - down) - 34 * down, la2=-165 * (1 - down) - 18 * down,
-             ra1=(120 + 20 * ease_out(t / 0.25)) * (1 - down) + 34 * down, ra2=165 * (1 - down) + 18 * down,
-             head_tilt=-lean * 0.6 * (1 - 0.6 * down))
+    """Startled: a small hop and a jolt back, hands fly to the cheeks and tremble. A held prop
+    (phone...) stays in its hand at chest height, as if the character is staring at it."""
+    jolt = sin(pi * clamp(t / 0.28)) if t < 0.28 else 0.0
+    up = ease_out(clamp(t / 0.16))
+    lean = o.get("lean", -1)
+    trem = 2.5 * I * sin(2 * pi * 13 * t) * math.exp(-max(0.0, t - 0.3) * 1.2) if t > 0.25 else 0.0
+    held = bool(o.get("_prop"))
+    cheek = 70 + 3 * sin(2 * pi * 9 * t) * (1 if t > 0.25 else 0)
+    L = hand("L", _lerp2((-80, -110), (-cheek, -358), up), (-1, 0.8))
+    if held:
+        R = hand("R", _lerp2((80, -110), (70, -236), up), (1, 1))
+    else:
+        R = hand("R", _lerp2((80, -110), (cheek, -358), up), (1, 0.8))
+    d = _stance(1.25)
+    d.update(L)
+    d.update(R)
+    d.update(lift=-38 * jolt * I, tilt=lean * 7 * ease_out(t / 0.2), shift=trem, head_tilt=-lean * 4 * up,
+             look_y=0.45 if held else -0.1, arms_front=up > 0.5)
     return d
 
 

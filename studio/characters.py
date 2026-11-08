@@ -318,10 +318,10 @@ def skeleton(p):
     footR = add(kneeR, vec(p["rl2"], SH))
     shL, shR = (-56.0, -TORSO_H + 22), (56.0, -TORSO_H + 22)
     ak = p.get("arm_k", 1.0)          # riders get longer arms so their hands reach the handlebar
-    elbL = add(shL, vec(p["la1"], UA * ak))
-    handL = add(elbL, vec(p["la2"], LA * ak))
-    elbR = add(shR, vec(p["ra1"], UA * ak))
-    handR = add(elbR, vec(p["ra2"], LA * ak))
+    elbL = add(shL, vec(p["la1"], UA * ak * p.get("la_k1", 1.0)))     # *_k < 1: foreshortened segment (IK)
+    handL = add(elbL, vec(p["la2"], LA * ak * p.get("la_k2", 1.0)))
+    elbR = add(shR, vec(p["ra1"], UA * ak * p.get("ra_k1", 1.0)))
+    handR = add(elbR, vec(p["ra2"], LA * ak * p.get("ra_k2", 1.0)))
     neck = (0.0, -TORSO_H + 4)
     hc = add(neck, rot((0.0, -(NECK_H + HEAD_RY * 0.8 * HEAD_SCALE)), d2r(p["head_tilt"])))
     fy = max(footL[1], footR[1]) + 12

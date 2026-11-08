@@ -326,7 +326,7 @@ class Renderer(Output):
             moving = any(t0 <= t < t1 for (t0, t1, *_r) in c.moves)
             if moving and action in ("idle", "none", "stand"):
                 action, a_t0 = "walk", 0.0
-            opts = dict(st["opts"], _x=x, _bpm=plan.bpm)
+            opts = dict(st["opts"], _x=x, _bpm=plan.bpm, _prop=st["prop"])
             pose = actions.pose_for(action, t - a_t0 if action != "walk" else t, st["speed"], st["intensity"],
                                     c.phase, opts)
             rf = c.ride_frame(t)
