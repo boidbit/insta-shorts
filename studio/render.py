@@ -21,7 +21,8 @@ from PIL import Image, ImageChops, ImageOps
 from . import actions, audio, objects, rides, ui
 from .backgrounds import Background
 from .characters import DEFAULT_POSE, build_character, render_ops, skeleton
-from .scene import GROUND_Y, camera_at, compile_music, compile_scene, prepare_voice, split_scenes, static_overlays
+from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_at, compile_music, compile_scene,
+                    prepare_voice, split_scenes, static_overlays)
 from .animals import ANIMALS, build_animal
 from .effects import Effects, Patch
 from .sets import Sets
@@ -720,7 +721,9 @@ class Sequence(Output):
         return img
 
 
-def make_video(scene, width=1080, use_tts=True, fps=None, tts_provider=None):
+def make_video(scene, width=1080, use_tts=True, fps=None, tts_provider=None, dialogue=None, hook=None):
+    if dialogue or hook:
+        scene = apply_options(scene, dialogue, hook)
     if scene.get("scenes"):
         return Sequence(scene, width, use_tts, fps, tts_provider)
     return Renderer(scene, width, use_tts, fps, tts_provider)
@@ -737,11 +740,16 @@ def main(argv=None):
                     help="voice engine: gemini = the WHOLE video's script in ONE Gemini request, then split per line "
                          "(needs GEMINI_API_KEY); edge = edge-tts per line; auto (default) = gemini if a key is set")
     ap.add_argument("--frame", type=float, default=None, help="render one PNG frame at this time (seconds)")
+    ap.add_argument("--dialogue", choices=DIALOGUE_MODES, default=None,
+                    help="spoken words: bubble (default) | subtitle (at the bottom) | both | none (voice only)")
+    ap.add_argument("--hook", choices=HOOK_MODES, default=None, dest="hook_mode",
+                    help="hook card: over (over the first line, default) | first (hook card, then the story) | off")
     args = ap.parse_args(argv)
 
     scene = load_scene(args.scene)
     name = os.path.splitext(os.path.basename(args.scene))[0]
-    r = make_video(scene, args.width, use_tts=not args.no_tts, fps=args.fps, tts_provider=args.tts)
+    r = make_video(scene, args.width, use_tts=not args.no_tts, fps=args.fps, tts_provider=args.tts,
+                   dialogue=args.dialogue, hook=args.hook_mode)
     if args.frame is not None:
         out = args.out or os.path.join("out", name + ".png")
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)

@@ -181,6 +181,21 @@
           <select id="width"><option value="1080">1080p (HD)</option><option value="720">720p (jaldi)</option></select>
         </label>
         <label class="videoOpt"><input type="checkbox" id="voice" checked> Hindi awaaz</label>
+        <label class="videoOpt">Dialogue text
+          <select id="dialogue">
+            <option value="bubble">Bubble me 💬</option>
+            <option value="subtitle">Neeche subtitle</option>
+            <option value="both">Bubble + subtitle</option>
+            <option value="none">Koi text nahi (sirf awaaz)</option>
+          </select>
+        </label>
+        <label class="videoOpt">Hook card
+          <select id="intro">
+            <option value="over">Pehli line ke saath</option>
+            <option value="first">Pehle hook, phir baat</option>
+            <option value="off">Hook card nahi</option>
+          </select>
+        </label>
       </div>
       <p class="banner hidden" id="draftNote">✍️ AI ki script taiyar hai. Padho, jo badalna ho yahin badlo, phir <b>Approve</b> dabao. Pasand na aaye to idea badal ke dobara likhwao.</p>
       <button class="go" id="go">Script likho ✍️</button>
@@ -696,7 +711,7 @@ async function start(stage) {
     if (mode === "idea") inputs.instruction = ideaWithSettings(text, builder); else inputs.script_text = text;
   } else {
     Object.assign(inputs, { script_text: text, width: $("width").value, voice: String($("voice").checked),
-                            draft_id: store.get("draft") });
+                            dialogue: $("dialogue").value, intro: $("intro").value, draft_id: store.get("draft") });
   }
   setBusy(true);
   $("errBox").textContent = ""; $("steps").replaceChildren(); $("runLink").classList.add("hidden");
@@ -839,6 +854,11 @@ const PLACE_NAMES = { auto: "AI chune / kamra", room: "Ghar ka kamra", kitchen: 
 let builder = { place: "auto", cast: [], hook: "", cta: "" };
 try { builder = Object.assign(builder, JSON.parse(store.get("builder") || "{}")); } catch {}
 const saveBuilder = () => store.set("builder", JSON.stringify(builder));
+for (const id of ["dialogue", "intro"]) {            // the video options are remembered
+  const v = store.get(id);
+  if (v && [...$(id).options].some((o) => o.value === v)) $(id).value = v;
+  $(id).addEventListener("change", () => store.set(id, $(id).value));
+}
 const opt = (v, label) => el("option", { value: v, textContent: label || v });
 const pick = (list, value, first) => {
   const s = el("select", {}, [opt("auto", first), ...list.map((x) => opt(x))]);

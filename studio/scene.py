@@ -553,8 +553,10 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         v = scene["lights"]
         plan.lights.append((-1.0, float({"off": 0.32, "dim": 0.6}.get(v, v) if not isinstance(v, (int, float)) else v)))
 
-    cursor = 0.0
+    lead = float(scene.get("lead_in", 0.0))        # "hook first": the story starts after the hook card
+    cursor = lead
     gap = float(meta.get("line_gap", 0.35))
+    dialogue = meta.get("dialogue", "bubble")       # bubble | subtitle | both | none: how the spoken words show
     plan.sfx = []
     plan.overlays = []
     plan.effects = []
@@ -578,6 +580,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     for ti, raw in enumerate(scene.get("timeline", [])):
         ev = dict(raw)
         t = float(ev["t"]) if "t" in ev and ev["t"] is not None else cursor
+        if lead and "t" in ev and ev["t"] is not None and not (float(ev["t"]) == 0.0 and "who" not in ev):
+            t += lead                               # (the sound / shake at 0 stays with the hook card)
         plan_end = max(plan_end, t)
         if "wait" in ev:
             cursor = t + float(ev["wait"])
@@ -636,12 +640,18 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                     warned[0] = True
             if dur is None:
                 dur = float(ev.get("duration", audio.estimate_duration(speak)))
-            sp = dict(who=c.name, text=text, start=t, end=t + dur + 0.12, audio=path, bubble=ev.get("bubble", True),
+            bubble = ev.get("bubble", True)
+            if dialogue == "none" or (dialogue == "subtitle" and bubble is True):
+                bubble = False                      # the studio page's "Dialogue text" option
+            subtitle = (ev.get("subtitle") or (dialogue in ("subtitle", "both") and ev.get("bubble", True) is True)) \
+                and dialogue != "none"
+            sp = dict(who=c.name, text=text, start=t, end=t + dur + 0.12, audio=path, bubble=bubble,
                       shot=ev.get("shot"))
             c.speech.append(sp)
             plan.speech.append(sp)
-            if ev.get("subtitle"):                  # voice-over: the words are shown at the bottom while spoken
-                plan.overlays.append({"text": text, "style": "subtitle", "pos": "bottom", "from": t,
+            if subtitle:                            # voice-over / subtitle mode: the words at the bottom while spoken
+                plan.overlays.append({"text": text, "style": "subtitle", "from": t,
+                                      "pos": "bottom" if ev.get("subtitle") else "lower",   # above Instagram's caption
                                       "to": t + dur + 0.12})
             cursor = max(cursor, t + dur + gap)
             plan_end = max(plan_end, t + dur + 0.12)
@@ -804,6 +814,34 @@ def compile_music(m, duration):
     else:
         p = asset_path(m.get("path"))
     return dict(path=p, volume=vol, generated=m.get("type") == "beat") if p else None
+
+
+DIALOGUE_MODES = ("bubble", "subtitle", "both", "none")
+HOOK_MODES = ("over", "first", "off")
+HOOK_LEAD = 1.7                                     # seconds the hook card has the screen to itself ("first")
+
+
+def apply_options(scene, dialogue=None, hook=None):
+    """The studio page's video options, on a copy of the scene.
+    dialogue: bubble (speech bubbles) | subtitle (words at the bottom) | both | none (voice only).
+    hook: over (the hook card over the first line, the default) | first (hook card first, then the story) | off."""
+    import copy
+    scene = copy.deepcopy(scene)
+    if dialogue and dialogue != "bubble":
+        scene.setdefault("meta", {})["dialogue"] = dialogue
+    if hook == "off":
+        drop = lambda ovs: [o for o in ovs if o.get("style") != "hook"]      # noqa: E731
+        scene["overlays"] = drop(scene.get("overlays", []))
+        for sc in scene.get("scenes", []):
+            if sc.get("overlays"):
+                sc["overlays"] = drop(sc["overlays"])
+    elif hook == "first":
+        first = scene["scenes"][0] if scene.get("scenes") else scene
+        first["lead_in"] = HOOK_LEAD
+        for o in scene.get("overlays", []) + first.get("overlays", []):
+            if o.get("style") == "hook" and float(o.get("from", 0)) < 0.5:
+                o["to"] = HOOK_LEAD + 0.1           # gone as the first line starts
+    return scene
 
 
 # keys of a multi-scene file that belong to the whole video, not to one scene

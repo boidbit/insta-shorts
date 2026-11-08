@@ -55,6 +55,18 @@ on:
         options: [auto, gemini, edge]
         required: false
         default: auto
+      dialogue:
+        description: "Spoken words: bubble | subtitle (at the bottom) | both | none (voice only)"
+        type: choice
+        options: [bubble, subtitle, both, none]
+        required: false
+        default: bubble
+      intro:
+        description: "Hook card: over (with the first line) | first (hook card, then the story) | off"
+        type: choice
+        options: [over, first, off]
+        required: false
+        default: over
       request_id:
         description: "Set by the web page to find this run (leave empty)"
         required: false
@@ -191,10 +203,13 @@ jobs:
           WIDTH: ${{ inputs.width || '1080' }}
           VOICE: ${{ inputs.voice }}
           TTS: ${{ inputs.tts || 'auto' }}      # GEMINI_API_KEY comes from the workflow-level env
+          DIALOGUE: ${{ inputs.dialogue || 'bubble' }}
+          INTRO: ${{ inputs.intro || 'over' }}
         run: |
           mkdir -p out
           FLAGS="--tts $TTS"
           [ "$VOICE" = "false" ] && FLAGS="--no-tts"
+          FLAGS="$FLAGS --dialogue $DIALOGUE --hook $INTRO"
           for f in $LIST; do
             name=$(basename "$f" .json)
             python -m studio.render "$f" -o "out/$name.mp4" --width "$WIDTH" $FLAGS

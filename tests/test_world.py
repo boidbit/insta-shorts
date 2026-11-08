@@ -184,5 +184,57 @@ class SoundTests(unittest.TestCase):
         self.assertTrue(any("AMBIENCE" in w for w in warns))
 
 
+class VideoOptionTests(unittest.TestCase):
+    """The studio page's "Dialogue text" and "Hook card" options."""
+
+    def plan(self, **opt):
+        from studio.scene import apply_options
+        scene, _ = parse_script(JUNGLE)
+        return scene, [compile_scene(s, use_tts=False) for s in split_scenes(apply_options(scene, **opt))]
+
+    def test_default_is_bubbles(self):
+        _, ps = self.plan()
+        self.assertTrue(all(sp["bubble"] for sp in ps[0].speech))
+        self.assertFalse(any(o.get("style") == "subtitle" for o in ps[0].overlays))
+
+    def test_subtitle_both_none(self):
+        _, ps = self.plan(dialogue="subtitle")
+        self.assertFalse(any(sp["bubble"] for sp in ps[0].speech))
+        subs = [o for o in ps[0].overlays if o.get("style") == "subtitle"]
+        self.assertEqual(len(subs), len(ps[0].speech))
+        self.assertEqual(subs[0]["pos"], "lower")               # above Instagram's caption area
+        _, ps = self.plan(dialogue="both")
+        self.assertTrue(all(sp["bubble"] for sp in ps[0].speech))
+        self.assertEqual(len([o for o in ps[0].overlays if o.get("style") == "subtitle"]), len(ps[0].speech))
+        _, ps = self.plan(dialogue="none")
+        self.assertFalse(any(sp["bubble"] for sp in ps[0].speech))
+        self.assertFalse(any(o.get("style") == "subtitle" for o in ps[0].overlays))
+
+    def test_hook_first_delays_the_story(self):
+        from studio.scene import HOOK_LEAD, apply_options
+        _, base = self.plan()
+        scene, ps = self.plan(hook="first")
+        self.assertAlmostEqual(ps[0].speech[0]["start"], base[0].speech[0]["start"] + HOOK_LEAD, places=2)
+        hook = next(o for o in apply_options(scene, hook="first")["overlays"] if o["style"] == "hook")
+        self.assertLessEqual(hook["to"], ps[0].speech[0]["start"])
+        self.assertTrue(any(fx["t"] == 0.0 for fx in ps[0].sfx))      # the whoosh still comes with the hook card
+
+    def test_hook_off(self):
+        from studio.scene import apply_options
+        scene, _ = parse_script(JUNGLE)
+        self.assertFalse(any(o.get("style") == "hook" for o in apply_options(scene, hook="off")["overlays"]))
+        self.assertTrue(any(o.get("style") == "hook" for o in scene["overlays"]))     # the original is untouched
+
+    def test_page_and_workflow_send_the_options(self):
+        root = os.path.join(os.path.dirname(__file__), "..")
+        page = open(os.path.join(root, "index.html"), encoding="utf-8").read()
+        flow = open(os.path.join(root, ".github", "workflows", "render.yml"), encoding="utf-8").read()
+        for opt in ("dialogue", "intro"):
+            self.assertIn('id="%s"' % opt, page)
+            self.assertIn("%s: $(\"%s\").value" % (opt, opt), page)
+            self.assertIn("      %s:\n" % opt, flow)
+        self.assertIn("--dialogue $DIALOGUE --hook $INTRO", flow)
+
+
 if __name__ == "__main__":
     unittest.main()
