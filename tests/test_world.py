@@ -323,5 +323,20 @@ class TimeTests(unittest.TestCase):
         self.assertIn(1.75, zooms)                                                      # zoom on B
 
 
+class NightRoadTests(unittest.TestCase):
+    def test_parallax_layers_and_front_poles(self):
+        from studio.backgrounds import Background, NIGHT_LAYER_SPEEDS
+        bg = Background({"type": "night_road", "scroll": 220}, 270, 480)
+        self.assertEqual(len(bg.layers), len(NIGHT_LAYER_SPEEDS))
+        self.assertTrue(bg.foreground(0.0))                       # street poles in front of the people
+        a, b = bg.frame(0.0), bg.frame(1.0)
+        self.assertNotEqual(a.tobytes(), b.tobytes())             # it scrolls
+
+    def test_foreground_props_on_request(self):
+        from studio.backgrounds import Background
+        self.assertEqual(Background({"type": "kitchen"}, 270, 480).foreground(0.0), [])
+        self.assertEqual(len(Background({"type": "kitchen", "foreground": ["table"]}, 270, 480).foreground(0.0)), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -378,6 +378,25 @@ class Renderer(Output):
             img = ImageOps.mirror(img)
         return img
 
+    def _foreground(self, t):
+        """The place's foreground props, placed like the background of this shot (angle zoom / mirror)."""
+        items = self.bg.foreground(t)
+        ang = self.plan.angle
+        z = ang["zoom"]
+        if not items or (z <= 1.001 and not ang["mirror"]):
+            return items
+        sz = self.s * z
+        left = clamp(ang["x"] * sz - self.W / 2.0, 0, self.bg.out_w - self.W) if z > 1.001 else 0
+        top = clamp(GROUND_Y * (sz - self.s), 0, self.bg.out_h - self.H) if z > 1.001 else 0
+        out = []
+        for d, im, x, y in items:
+            x2, y2 = x - left, y - top
+            if ang["mirror"]:
+                im = ImageOps.mirror(im)
+                x2 = self.W - x2 - im.width
+            out.append((d, im, int(x2), int(y2)))
+        return out
+
     def _front_rider(self, c, t):
         rf = c.ride_frame(t)
         return bool(rf and rf["inside"] and rf["obj"].front)
@@ -807,7 +826,8 @@ class Renderer(Output):
 
         # everybody except the riders of a vehicle that is in front; then front objects; then those vehicles with their riders
         in_front = [c for c in order if self._front_rider(c, t)]
-        floor = self.sets.floor(t)                  # set pieces (bed, sofa, tree...) depth-sorted with the people
+        floor = sorted(self.sets.floor(t) + self._foreground(t), key=lambda f: f[0])   # set pieces and the place's
+        # own front props (bed, sofa, tree, street poles...) depth-sorted with the people
         fi = 0
         for c in order:
             while fi < len(floor) and floor[fi][0] <= c.draw_pos(t)[1]:

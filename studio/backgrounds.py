@@ -3,6 +3,8 @@ plus support for your own PNG/JPG backgrounds."""
 import math
 import random
 
+import numpy as np
+
 from PIL import Image, ImageDraw
 
 from .util import LW, LH, asset_path
@@ -405,45 +407,163 @@ def plain(s, colors=None):
 
 
 # ------------------------------------------------------------------ night road (scrolling)
-def night_road(s, world_w=LW):
-    """Returns (static sky, scrolling ground wide image). Ground repeats every 1080."""
+# Layers back-to-front with their speed relative to `scroll` (the ground speed). Distant things move
+# slower, which is what sells the depth. `background.parallax` scales this: 1 = full (default),
+# 0 = every layer scrolls with the ground (the old flat look).
+NIGHT_LAYER_SPEEDS = (0.04, 0.2, 0.45, 1.0)     # stars+moon, far hills, near hills, ground
+
+
+def _wide_layer(s, tint):
+    """Transparent 2-tile-wide canvas. `tint` is the RGB of the (invisible) background pixels so the
+    supersample reduce does not leave dark fringes on the edges of bright things."""
+    return G(s, w=LW * 2, color=tuple(tint) + (0,), mode="RGBA")
+
+
+def night_road(s):
+    """Returns (static sky gradient, [wide RGBA layer, ...]) back-to-front, one per NIGHT_LAYER_SPEEDS.
+    Every wide layer repeats every 1080 logical px; each tile is also drawn one tile to the left and
+    to the right of the canvas so shapes that overhang a tile edge continue into the neighbour and
+    nothing pops when the scroll wraps."""
     sky = G(s)
     sky.vgrad(0, 1300, (10, 12, 38), (42, 36, 86))
-    rnd = random.Random(3)
-    for _ in range(90):
-        x, y, r = rnd.randint(0, LW), rnd.randint(0, 900), rnd.choice((2, 2, 3, 4))
-        sky.circle(x, y, r, (255, 250, 220))
-    sky.circle(820, 330, 110, (252, 244, 214))
-    sky.circle(782, 304, 110, (17, 18, 49))      # crescent bite
-    sky.circle(820, 330, 112, None, (252, 244, 214), 3)
     sky_img = sky.done()
+    tiles = (-LW, 0, LW, 2 * LW)
 
-    gr = G(s, w=LW * 2, color=(0, 0, 0, 0), mode="RGBA")
-    for ox in (0, LW):
+    # stars + crescent moon (slowest)
+    st = _wide_layer(s, (252, 244, 214))
+    rnd = random.Random(3)
+    stars = [(rnd.randint(0, LW), rnd.randint(0, 900), rnd.choice((2, 2, 3, 4))) for _ in range(90)]
+    for ox in tiles:
+        for (x, y, r) in stars:
+            st.circle(ox + x, y, r, (255, 250, 220))
+        st.circle(ox + 820, 330, 110, (252, 244, 214))
+        st.circle(ox + 782, 304, 110, (252, 244, 214, 0))      # crescent bite: punch a hole, not paint over
+        st.circle(ox + 820, 330, 112, None, (252, 244, 214), 3)
+
+    # far hills: lighter, bluer, with a few tiny distant lights
+    far = _wide_layer(s, (32, 34, 76))
+    for ox in tiles:
+        for (hx, hy, hr) in [(60, 1090, 300), (470, 1060, 340), (880, 1100, 300)]:
+            far.ellipse(ox + hx - hr, hy - hr * 0.5, ox + hx + hr, hy + hr * 0.9, (32, 34, 76))
+        for (wx, wy) in [(200, 1010), (330, 1030), (700, 990), (760, 1015), (1010, 1030)]:
+            far.rect(ox + wx, wy, ox + wx + 8, wy + 8, (214, 190, 120))
+
+    # near hills + lit windows
+    near = _wide_layer(s, (20, 22, 52))
+    for ox in tiles:
         for (hx, hy, hr) in [(120, 1120, 260), (520, 1160, 320), (900, 1110, 240)]:
-            gr.ellipse(ox + hx - hr, hy - hr * 0.55, ox + hx + hr, hy + hr * 0.9, (20, 22, 52))
+            near.ellipse(ox + hx - hr, hy - hr * 0.55, ox + hx + hr, hy + hr * 0.9, (20, 22, 52))
         for (wx, wy) in [(80, 1090), (150, 1120), (610, 1080), (680, 1120), (940, 1090)]:
-            gr.rect(ox + wx, wy, ox + wx + 22, wy + 28, (255, 214, 120))
+            near.rect(ox + wx, wy, ox + wx + 22, wy + 28, (255, 214, 120))
+
+    # ground: footpath, road, lane marks, lamp post (moves at the full scroll speed)
+    gr = _wide_layer(s, (30, 32, 50))
     gr.rect(0, 1240, LW * 2, 1380, (30, 32, 50))           # footpath
     gr.rect(0, 1380, LW * 2, LH, (26, 26, 36))               # road
     gr.line([(0, 1380), (LW * 2, 1380)], (60, 62, 90), 6)
+    # lamp glow: smooth radial falloff (a patch per lamp, not stacked flat discs)
+    R = 190
+    n = int(2 * R * gr.k)
+    yy, xx = np.mgrid[0:n, 0:n].astype("float32")
+    dist = np.sqrt((xx - n / 2) ** 2 + (yy - n / 2) ** 2) / (n / 2)
+    patch = np.zeros((n, n, 4), dtype="uint8")
+    patch[..., 0], patch[..., 1], patch[..., 2] = 255, 220, 140
+    patch[..., 3] = (np.clip(1 - dist, 0, 1) ** 2 * 48).astype("uint8")
+    patch = Image.fromarray(patch, "RGBA")
     for ox in (0, LW):
-        for xx in (20, 380, 740):
-            gr.rect(ox + xx, 1700, ox + xx + 190, 1722, (214, 196, 120))
+        for xx_ in (20, 380, 740):
+            gr.rect(ox + xx_, 1700, ox + xx_ + 190, 1722, (214, 196, 120))
         lx = ox + 300
         gr.line([(lx, 1260), (lx, 780)], (14, 14, 22), 16)
         gr.line([(lx, 790), (lx + 90, 790)], (14, 14, 22), 12)
         gr.ellipse(lx + 60, 790, lx + 130, 822, (255, 226, 150))
-        glow = Image.new("RGBA", gr.im.size, (0, 0, 0, 0))
-        gd = ImageDraw.Draw(glow)
-        for i in range(12):
-            a = 9
-            r = (170 - i * 13) * gr.k
-            gd.ellipse([(lx + 95) * gr.k - r, 806 * gr.k - r, (lx + 95) * gr.k + r, 806 * gr.k + r],
-                       fill=(255, 220, 140, a))
-        gr.im.alpha_composite(glow)
-        gr.d = ImageDraw.Draw(gr.im)
-    return sky_img, gr.done()
+        gr.im.alpha_composite(patch, (int((lx + 95 - R) * gr.k), int((806 - R) * gr.k)))
+
+    return sky_img, [l.done() for l in (st, far, near, gr)]
+
+
+# ------------------------------------------------------------------ foreground props
+# Pieces drawn AFTER the characters. Each has a depth y: it is drawn in front of characters standing
+# above that y (further back) and behind characters standing below it. So with a table at depth 1620,
+# a character at the default ground line (1700) stands in front of it, while one that `move`s back to
+# y=1450 stands behind it.
+FG_FRONT = 2000          # in front of every character
+WOOD, WOOD_D = (176, 124, 78), (140, 96, 58)
+
+
+def _fg_canvas(s):
+    return G(s, color=(0, 0, 0, 0), mode="RGBA")
+
+
+def _table_like(s, x0, x1, top, floor, top_col, leg_col, front_col=None, deco=None):
+    """A low table / counter seen from the front: soft floor shadow, legs or a solid front panel, a top slab."""
+    g = _fg_canvas(s)
+    g.ellipse(x0 - 30, floor - 16, x1 + 30, floor + 24, (0, 0, 0, 60))
+    if front_col:
+        g.rect(x0 + 10, top + 40, x1 - 10, floor - 4, front_col, INK, 5)
+        g.line([((x0 + x1) // 2, top + 50), ((x0 + x1) // 2, floor - 10)], INK, 4)
+    else:
+        for lx in (x0 + 22, x1 - 52):
+            g.rect(lx, top + 36, lx + 30, floor, leg_col, INK, 5)
+    g.rrect(x0, top, x1, top + 44, 10, top_col, INK, 6)
+    if deco:
+        deco(g)
+    return g
+
+
+def fg_table(s):
+    def deco(g):       # mug + two books
+        g.rect(430, 1448, 500, 1478, (190, 70, 64), INK, 4)
+        g.rect(440, 1428, 490, 1450, (232, 226, 206), INK, 4)
+        g.rrect(540, 1440, 660, 1480, 4, (110, 160, 130), INK, 4)
+    return _table_like(s, 380, 700, 1480, 1620, WOOD, WOOD_D, deco=deco)
+
+
+def fg_island(s):
+    def deco(g):       # pot on the counter
+        g.rrect(480, 1424, 570, 1480, 8, (170, 172, 172), INK, 5)
+        g.line([(468, 1440), (484, 1440)], INK, 8)
+    return _table_like(s, 330, 750, 1480, 1620, (214, 208, 190), WOOD_D, front_col=(182, 174, 100), deco=deco)
+
+
+def fg_desk(s):
+    def deco(g):       # book + pencil cup
+        g.rrect(450, 1442, 580, 1480, 4, (70, 110, 170), INK, 4)
+        g.rect(630, 1432, 668, 1480, (232, 226, 206), INK, 4)
+        g.line([(642, 1432), (638, 1400)], (230, 190, 60), 6)
+    return _table_like(s, 380, 700, 1480, 1620, (160, 110, 68), (110, 110, 116), deco=deco)
+
+
+def fg_bench(s):
+    g = _fg_canvas(s)
+    g.ellipse(330, 1604, 770, 1644, (0, 0, 0, 60))
+    for lx in (380, 700):
+        g.rect(lx, 1500, lx + 24, 1620, (96, 100, 108), INK, 5)
+    for y in (1390, 1430, 1470):                       # backrest slats
+        g.rrect(360, y, 740, y + 28, 6, WOOD, INK, 5)
+    g.rrect(350, 1510, 750, 1544, 8, WOOD_D, INK, 6)    # seat
+    return g
+
+
+def fg_poles(s):
+    """Dark tree trunks that sweep past in front of everything (scrolls faster than the ground)."""
+    g = _wide_layer(s, (7, 8, 16))
+    for ox in (0, LW):
+        g.rect(ox + 700, -20, ox + 756, LH + 20, (7, 8, 16))
+        g.poly([(ox + 700, 640), (ox + 700, 690), (ox + 560, 560), (ox + 540, 520)], (7, 8, 16))
+        g.poly([(ox + 756, 880), (ox + 756, 930), (ox + 880, 810), (ox + 900, 770)], (7, 8, 16))
+    return g
+
+
+# name -> (draw fn, depth y, scroll speed multiplier or None for a fixed prop)
+FG_PROPS = {
+    "table": (fg_table, 1620, None),
+    "island": (fg_island, 1620, None),
+    "desk": (fg_desk, 1620, None),
+    "bench": (fg_bench, 1620, None),
+    "poles": (fg_poles, FG_FRONT, 1.6),
+}
+DEFAULT_FG = {"night_road": ["poles"]}      # everything else: none unless the scene asks
 
 
 # ------------------------------------------------------------------ public API
@@ -477,7 +597,9 @@ class Background:
         self.ambient = AMBIENT.get(self.kind, []) if spec.get("ambient", True) else []
         self._clouds = {}
         self.static = None
-        self.wide = None
+        self.parallax = float(spec.get("parallax", 1.0))   # 0 = all layers move with the ground
+        self.layers = []       # scrolling layers, back-to-front: (RGBA strip, y offset, speed multiplier)
+        self.fg = []           # foreground props: (depth y, RGBA strip, x, y, speed multiplier or None)
         if self.kind == "image":
             im = Image.open(asset_path(spec["path"])).convert("RGB")
             r = max(out_w / im.width, out_h / im.height)
@@ -485,9 +607,14 @@ class Background:
             l, t = (im.width - out_w) // 2, (im.height - out_h) // 2
             self.static = im.crop((l, t, l + out_w, t + out_h))
         elif self.kind == "night_road":
-            sky, wide = night_road(s)
+            sky, wides = night_road(s)
             self.static = sky
-            self.wide = wide
+            for im, mult in zip(wides, NIGHT_LAYER_SPEEDS):      # parallax: far layers crawl, the road runs
+                if im.size != (out_w * 2, out_h):
+                    im = im.resize((out_w * 2, out_h), Image.LANCZOS)
+                bb = im.getchannel("A").getbbox()      # keep only the rows that have content (faster)
+                if bb:
+                    self.layers.append((im.crop((0, bb[1], im.width, bb[3])), bb[1], mult))
         else:
             from .locations import LOCATIONS
             self.kind = {"living_room": "room", "classroom": "school"}.get(self.kind, self.kind)
@@ -499,22 +626,56 @@ class Background:
                 self.static = plain(s, spec.get("colors"))
             if self.static.size != (out_w, out_h):
                 self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
-        if self.wide is not None:
-            self.wide = self.wide.resize((out_w * 2, out_h), Image.LANCZOS) if self.wide.size != (out_w * 2, out_h) else self.wide
-            if self.static.size != (out_w, out_h):
-                self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
+        if self.layers and self.static.size != (out_w, out_h):
+            self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
         if spec.get("time"):                      # night / evening / sunset / dawn / rain re-lighting
             from .locations import grade
             self.static = grade(self.static, spec["time"])
 
+        names = spec.get("foreground", DEFAULT_FG.get(self.kind, []))       # props in front of the people
+        names = [names] if isinstance(names, str) else (names if isinstance(names, (list, tuple)) else [])
+        for name in names:
+            if name not in FG_PROPS:
+                continue
+            fn, depth, mult = FG_PROPS[name]
+            im = fn(s).done()
+            want = (out_w * 2 if mult else out_w, out_h)
+            if im.size != want:
+                im = im.resize(want, Image.LANCZOS)
+            bb = im.getchannel("A").getbbox()
+            if not bb:
+                continue
+            if mult:        # scrolling: keep full width, trim rows only
+                self.fg.append((depth, im.crop((0, bb[1], im.width, bb[3])), 0, bb[1], mult))
+            else:           # fixed: trim to the content box
+                self.fg.append((depth, im.crop(bb), bb[0], bb[1], None))
+        self.fg.sort(key=lambda f: f[0])
+
+    def foreground(self, t):
+        """[(depth y, image, x, y), ...] sorted back-to-front, ready to paste at time t."""
+        out = []
+        for depth, strip, x, y, mult in self.fg:
+            if mult:
+                speed = 1.0 + self.parallax * (mult - 1.0)      # parallax 0 -> same speed as the ground
+                o = int((t * self.scroll * speed * self.out_w / LW) % self.out_w)
+                out.append((depth, strip.crop((o, 0, o + self.out_w, strip.height)), x, y))
+            else:
+                out.append((depth, strip, x, y))
+        return out
+
     def frame(self, t):
-        if self.wide is None:
-            base = self.static.copy()
-        else:
-            off = int((t * self.scroll * self.out_w / LW) % self.out_w)
-            base = self.static.copy()
-            part = self.wide.crop((off, 0, off + self.out_w, self.out_h))
-            base.paste(part, (0, 0), part)
+        base = self.static.copy()
+        for strip, y0, mult in self.layers:
+            speed = 1.0 - self.parallax * (1.0 - mult)
+            off = (t * self.scroll * speed * self.out_w / LW) % self.out_w
+            o = int(off)
+            part = strip.crop((o, 0, o + self.out_w, strip.height))
+            if speed < 0.99:
+                # distant layers crawl a fraction of a pixel per frame: blend with the next column
+                # so they glide instead of stepping (the ground stays crisp)
+                nxt = strip.crop((o + 1, 0, o + 1 + self.out_w, strip.height))
+                part = Image.blend(part, nxt, off - o)
+            base.paste(part, (0, y0), part)
         if self.ambient:
             self._draw_ambient(base, t)
         return base
