@@ -104,6 +104,38 @@ Agar text me `CAST:` / `SCENE:` / `A -> ...` / `NAME: ...` wali koi line nahi ha
 - **"Expectation vs Reality" / comparison:** do `SCENE:` likho, title card me `Expectation 😎` aur `Reality 😭`, beech me `TRANSITION: whip`. Alag split-screen abhi nahi hai.
 - **Camera se baat karna (monologue):** ek hi character, ek ke baad ek lines. Auto camera use alag-alag close shots me kaat deta hai.
 
+## Aur shabd: jagah, set, jaanwar, screen cards, sound, slow-motion
+
+Ye sab script me seedhe chalte hain (page ka checker bhi inhe jaanta hai). AI writer (`SCRIPT_PROMPT.md`) ko abhi ye shabd nahi bataye gaye: naye prompt me daaloge tabhi AI inhe use karega.
+
+- **Zyada acting:** ~140 actions (`run, sit, lie_down, eat, drink, phone_call, slap, hug, high_five, pushup, garba, hookstep, moonwalk...`), 38 expressions (`scared, nervous, cringe, confused, proud, dizzy, evil, blush...`) aur ~37 cheezein haath me (`chai, samosa, laptop, umbrella, chappal, belan, book...`). Poori list page ke word list me hai (`python -m studio.script --sync-page` usse code se banata hai).
+- **Bolte waqt haath feeling ke hisaab se:** gussa = ungli dikhana, khushi = khule haath, dukh = chhote neeche haath, dar = seene pe haath, smug = kamar pe haath, soch = thodi pe haath. Sunne wale bolne wale ko dekhte hain, sir hilate hain, gusse se peeche hat-te hain, sawaal pe sir tedha karte hain. Ek pose doosre me smooth badalta hai, aankhen random time pe jhapakti hain.
+- **Jagah + waqt + mausam:** 40 jagah (`bedroom, bathroom, balcony, terrace, classroom, exam_hall, hospital, bank, police_station, railway, jungle, beach, graveyard, haunted_house, mandap, gym, kirana, chai_tapri...`), phir waqt `day, night, evening, sunset, dawn, rain` aur mausam `fog, snow, fireflies, leaves`: `SCENE: jungle night fog`. Baarish wali jagah pe baarish ki awaaz apne aap.
+- **Set (cheezein jo jagah me rehti hain):** `OBJ: sofa left`, `OBJ: door right`, `OBJ: tv right on`, `OBJ: signboard center CHAI POINT`. Kahani ke beech: `OBJ: door open`, `OBJ: tv off`, `OBJ: fan on`. Baithna/letna: `A -> sit sofa`, `A -> lie_down bed`. CUT ke baad set waisa hi rehta hai. 28 cheezein: bed, bench, box, bucket, bush, chair, clock, cupboard, desk, door, fan, fence, fridge, lamp, painting, phone, plant, rock, signboard, sofa, stairs, stool, tree, tubelight, tv, window...
+- **Batti:** `LIGHTS: off` (kamra andhera, lamp/TV chamakte rehte hain), `LIGHTS: dim`, `LIGHTS: on`. Agle CUT me bhi waisa hi.
+- **Effects (line ke brackets me):** `sweat, question, exclaim, bulb, anger, hearts, dizzy, zzz, sparkle, steam, smoke, fire, lightning, confetti, tears_spray, pow, spotlight, glow_eyes...`: `A (scared, sweat): ...`
+- **Phenkna:** `A -> throw B` = chappal udti hai, THAK!, camera dono ko dikhata hai, agli line hit ke baad.
+- **Jaanwar:** `CAST: B = kutta brown` (billi, gaay, kauwa, tota, bandar bhi; English me dog, cat, cow, crow, parrot, monkey). Bolte bhi hain. Acting: `bark, meow, moo, caw, wag, fly, peck, sit, eat, jump`.
+- **Screen cards (apni line pe):** `NOTIFY: Bank | Salary credited | Balance: Rs 12` (phone notification upar se aata hai), `LOADING: Dimaag loading...`, `COUNTER: Balance | 50000 | 12`, `TIMECARD: 3 ghante baad...`, `CHAPTER: Chapter 2 | Exam ka din`, `ENDCARD: Follow karo | @page`.
+- **Music ka mood:** `MUSIC: sad`, `MUSIC: suspense 90`, `festive, lofi, comedy, pop, soft, desi` (har video ki dhun alag). `MUSIC: beat 110` aur `MUSIC: none` pehle jaise.
+- **Aas-paas ki awaaz:** `AMBIENCE: rain` (`street, office, night, jungle, crowd, wind, sea`).
+- **Naye sound:** `slap, punch, knock, doorbell, ring, vibrate, horn, footsteps, scream, heartbeat, record_scratch, sad_trombone, rooster, thunder, wind, crowd_cheer, bat_hit, crickets, drumroll, cash, whistle, tick, applause`.
+- **Slow-motion / freeze:** `A -> fall slowmo thud` (agla 1 second 0.4x speed me, camera peeche hat-ta hai). `A -> freeze` (tasveer grey me ruk jaati hai + record scratch); turant baad wali `NARRATOR:` line ruki hui tasveer pe bolti hai ("Haan, ye main hoon").
+- **Camera:** `(zoom)` = us chehre pe jhatke se zoom aur wapas, `(reveal)` = close se shuru, peeche hat ke poori jagah.
+- **Beech me kaatna:** `B (interrupt, angry): ...` = B, A ki baat poori hone se pehle bolta hai; A ki awaaz wahin ruk jaati hai.
+- **Awaaz tight:** har line ke aage-peeche ki khamoshi kat jaati hai; edge-tts me gusse wali line thodi tez, dukhi wali dheemi aur neechi.
+
+## Video options (page / command line)
+
+Page pe "Approve: Video banao" ke upar do options (page yaad rakhta hai):
+
+| Option | Kya karta hai | Command line |
+|---|---|---|
+| Dialogue text | `Bubble me` (pehle jaisa), `Neeche subtitle` (bubble nahi, shabd neeche, Instagram caption se upar), `Bubble + subtitle`, `Koi text nahi` (sirf awaaz) | `--dialogue bubble/subtitle/both/none` |
+| Hook card | `Pehli line ke saath` (pehle jaisa), `Pehle hook, phir baat` (hook card 1.7s akela, phir kahani), `Hook card nahi` | `--hook over/first/off` |
+
+GitHub Actions me ye `dialogue` aur `intro` inputs hain.
+
 ## Chat video (alag, chhota format)
 
 Texting wale jokes ke liye. Story format se bilkul alag hai: koi character, voice ya CAST nahi. "Apni script" box me (ya `scripts/x.txt` me) bas ye likho:
@@ -221,7 +253,7 @@ python -m studio.director --count 3                                             
 python -m unittest discover -s tests                                                  # checks
 ```
 
-`--no-tts` = awaaz skip (testing).
+`--no-tts` = awaaz skip (testing). `--dialogue subtitle` / `--hook first` = upar wale video options.
 
 ### Gemini voice (realistic) - poori script ek hi request me
 
