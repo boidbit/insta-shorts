@@ -62,16 +62,17 @@ class ToneTableTests(unittest.TestCase):
 
 
 class PromptTests(unittest.TestCase):
-    def test_the_light_only_rule_is_gone_and_the_three_limits_stay(self):
+    def test_the_light_only_rule_is_gone_and_the_two_limits_stay(self):
         for name in ("SCRIPT_PROMPT.md", "DIRECTOR_PROMPT.md"):
             text = read(name)
             self.assertNotIn("Keep it light", text, name)
             self.assertIn("never water", text.lower().replace("do not water", "never water"), name)
-            for must in ("religion, caste, region, gender, body, disability", "real, named person", "sexual"):
+            for must in ("religion, caste, region, gender, body or disability", "committing a crime", "nothing explicit",
+                         "never target a private person"):
                 self.assertIn(must, text, (name, must))
         s = read("SCRIPT_PROMPT.md")
         self.assertIn("Dark comedy craft", s)
-        self.assertIn("no fixed time limit", s)                       # the length is open (user's choice)
+        self.assertIn("up to 10 spoken lines and 40 seconds", s)
         self.assertIn("three different premises", s)
         self.assertIn("Story facts first", s)                        # the logic rule (who owes whom stays the same)
         self.assertIn("contradict an earlier one", s)                # ...and the logic check before answering

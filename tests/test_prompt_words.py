@@ -133,9 +133,9 @@ CTA: Tag karo 👇
         _, warns = parse_script(text)
         self.assertEqual(warns, [])
 
-    def test_no_fixed_length_limit(self):
-        self.assertIn("no fixed time limit", PROMPT)
-        self.assertNotIn("15-30 seconds", PROMPT)
+    def test_adult_humour_open_two_limits_stay(self):
+        self.assertIn("Adult humour is allowed", PROMPT)
+        self.assertIn("Only two things stay off", PROMPT)
 
 
 if __name__ == "__main__":

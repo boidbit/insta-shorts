@@ -236,8 +236,8 @@ Page ke "Idea do (AI)" tab me **Tone** dropdown hai (ya idea me ek line `TONE: d
 | `twist` | Meetha shuru, aakhir me tez twist. |
 
 - Har tone ke saath AI ko ek chhota example (exact format me) milta hai, jisse style samajh aati hai.
-- Length: koi fixed limit nahi. Aam taur pe 5-10 lines; line itni lambi jitni baat saaf samjhane ke liye chahiye (~100 characters tak). AI flow lambi script ko ab rokta nahi.
-- **Teen cheezein kabhi nahi:** kisi group (dharm, jaati, kshetra, gender, shareer, disability) ya asli, naam wale insaan ko nishana banane wala mazaak; sexual content; khud ko ya doosron ko nuksaan pahunchane ya jurm sikhane wali baat. Baaki sab (maut, qarz, bhrasht daftar, bhoot, kismat) allowed hai. Ye seema isliye bhi hai ki Instagram aise content ki reach daba deta hai, aur Gemini/Claude jaise AI use khud refuse karte hain.
+- Length: default 5-8 lines / 15-30 sec (setup wali kahani 10 lines / 40 sec tak); line itni lambi jitni baat saaf samjhane ke liye chahiye (~100 characters tak). AI flow lambi script ko rokta nahi.
+- **Kya chalta hai:** adult double-meaning / chhed-chhaad wale jokes (kuch explicit nahi, aur bachchon wale characters ke saath kabhi nahi), mashhoor logon ke public bayan / kaam par satire (jab saaf mazaak ho; jhoothe ilzaam sach bata ke nahi), maut, qarz, bhrasht daftar, bhoot, kismat. **Sirf do cheezein band:** kisi ko uske dharm, jaati, kshetra, gender, shareer ya disability ki wajah se mazaak banana; aur khud ko ya doosron ko nuksaan pahunchane ya jurm sikhane wali baat. Gemini/Claude aisi cheezein waise bhi mana kar dete hain, aur Instagram aise reel hata deta hai.
 
 ## Templates (`templates/`)
 
