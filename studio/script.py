@@ -71,11 +71,61 @@ from .util import asset_path
 from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS, chat_length
 
 HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION")
-BACKGROUNDS = ("kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road", "plain")
+from .locations import LOCATIONS as _LOC   # noqa: E402
+
+BACKGROUNDS = tuple(dict.fromkeys(("kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road",
+                                   "plain", "living_room", "classroom") + tuple(_LOC)))
+TIMES = ("day", "night", "evening", "sunset", "dawn", "rain")      # SCENE: <place> night
+WEATHER = ("snow", "fog", "fireflies", "leaves")                    # SCENE: <place> fog
 from .characters import PROPS as _HELD   # noqa: E402
 
 PROPS = tuple(_HELD)
 SFX = ("pop", "boing", "whoosh", "ding", "thud", "clap", "beep", "laugh_track")
+from .effects import ALL as _FX   # noqa: E402
+
+FX_ALIASES = {"stars": "dizzy", "sweating": "sweat", "pasina": "sweat", "gussa": "anger", "idea": "bulb",
+              "lightbulb": "bulb", "heart": "hearts", "dhuan": "smoke", "aag": "fire", "baarish": "rain",
+              "barish": "rain", "ankhen": "glow_eyes", "eyes": "glow_eyes", "flash_bang": "flash"}
+FX = tuple(sorted(set(_FX) - {"projectile", "thought"})) + tuple(FX_ALIASES)
+from . import sets as _sets   # noqa: E402
+
+# set pieces for OBJ: lines (table / dustbin stay the OBJ objects they already were)
+SET_TYPES = tuple(sorted(k for k in _sets.SPEC if k not in ("table", "dustbin")))
+SET_STATES = ("open", "closed", "on", "off", "ringing", "idle", "rustle", "night", "day")
+SET_X = {"far_left": 120, "left": 230, "center": 540, "right": 850, "far_right": 960}
+SEAT_ACTIONS = ("sit", "lie_down", "lie", "sleep_lie", "rofl")
+
+
+def parse_set(raw, placed):
+    """`door right` / `sofa left big` / `tv right on` / `signboard center CHAI POINT` / `door open`.
+    Returns (kind, spec, problems): kind "place" (new piece) or "state" (a piece already in this place)."""
+    words = raw.split()
+    typ = words[0].lower()
+    rest = words[1:]
+    state = next((w.lower() for w in rest if w.lower() in SET_STATES), None)
+    pos = next((w.lower() for w in rest if w.lower() in SET_X), None)
+    flags = {w.lower() for w in rest}
+    if typ in placed and pos is None and state is not None:
+        return "state", {"set": typ if placed.get(typ) else typ, "state": state}, []
+    spec = {"type": typ, "x": SET_X.get(pos, 540 if typ in ("fan", "tubelight", "clock") else 760)}
+    if state:
+        spec["state"] = state
+    if "big" in flags:
+        spec["scale"] = 1.25
+    if "small" in flags:
+        spec["scale"] = 0.75
+    spec["y"] = 1560 if "back" in flags else 1820 if "front" in flags else 1700
+    if "flip" in flags:
+        spec["flip"] = True
+    known = set(SET_STATES) | set(SET_X) | {"big", "small", "back", "front", "flip"}
+    text = [w for w in rest if w.lower() not in known]
+    if typ == "signboard" and text:
+        spec["text"] = " ".join(text)
+    elif text:
+        return "place", spec, ["OBJ %s: %s samajh nahi aaye" % (typ, ", ".join(repr(w) for w in text))]
+    sid = typ if typ not in placed else "%s%d" % (typ, sum(1 for k in placed if k.startswith(typ)) + 1)
+    spec["id"] = sid
+    return "place", spec, []
 NARRATION_NAMES = ("narrator", "vo", "narration", "voiceover", "voice_over")   # a voice with no body
 NARRATOR_SPEC = {"hidden": True, "voice": {"name": "hi-IN-MadhurNeural", "pitch": "-12Hz", "rate": "-4%",
                                            "gemini": "Charon"}}
@@ -110,7 +160,10 @@ def vocab():
         "extras": sorted(set(ACCESSORIES) | set(HAIR_STYLES) | set(OUTFITS) | set(SKIN_TONES) | set(BUILDS)
                          | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS) | set(FACE_WORDS)),
         "expressions": sorted(EXPRESSIONS), "actions": sorted(actions.ACTIONS),
-        "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS),
+        "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS), "fx": sorted(FX),
+        "times": sorted(TIMES + WEATHER),
+        "sets": sorted(SET_TYPES), "set_words": sorted(set(SET_STATES) | set(SET_X) | {"big", "small", "back", "front", "flip"}),
+        "seat_actions": sorted(SEAT_ACTIONS),
         "shots": sorted(SHOTS), "depth": sorted(DEPTH_WORDS),
         "objects": sorted(set(objects.OBJECTS) | set(objects.ALIASES)),
         "object_words": ["center", "enter", "exit", "front", "go", "left", "right", "to"],
@@ -264,6 +317,16 @@ def _stage(tokens, ev, scene_cast, who):
             else:
                 unknown.append("ride %s (%s)" % (nxt or "?", ", ".join(sorted(rides.RIDES))))
                 i += 1 if nxt else 0
+        elif w in SEAT_ACTIONS and nxt in SET_TYPES:                 # A -> sit sofa / sleep_lie bed
+            ev["action"] = w
+            ev["on"] = nxt
+            acts.append(w)
+            i += 1
+        elif w == "throw" and nxt and any(c.lower() == nxt and c != who for c in scene_cast):   # A -> throw B
+            ev["action"] = "throw"
+            ev["at"] = next(c for c in scene_cast if c.lower() == nxt)
+            acts.append(w)
+            i += 1
         elif w in GETOFF_WORDS:
             spec = {}
             if nxt in ("left", "right"):
@@ -298,6 +361,9 @@ def _stage(tokens, ev, scene_cast, who):
         elif w in SFX:
             ev["sfx"] = w
             ev["volume"] = 0.6
+        elif w in FX and not (w in actions.ACTIONS or w in EXPRESSIONS):
+            fxn = FX_ALIASES.get(w, w)
+            ev.setdefault("fx", []).append(fxn if fxn != "glow_eyes" else {"type": "glow_eyes", "dur": 3.0})
         elif w == "shake":
             ev["camera"] = {"shake": 0.6}
         elif w in SHOTS:
@@ -408,6 +474,15 @@ def resolve_background(raw):
     low = name.lower().replace(" ", "_")
     if low in BACKGROUNDS:
         return {"type": low}, None
+    words = name.lower().split()
+    if len(words) > 1 and all(w in TIMES or w in WEATHER for w in words[1:]):   # "gully night fog"
+        bg, warn = resolve_background(words[0])
+        for w in words[1:]:
+            if w in TIMES:
+                bg["time"] = w
+            else:
+                bg.setdefault("weather", []).append(w)
+        return bg, warn
     is_path = name.lower().endswith(IMAGE_EXT)
     stems = [name, name.replace(" ", "_"), low]
     tries = [name] if is_path else [os.path.join("assets", "backgrounds", st + ext) for st in dict.fromkeys(stems)
@@ -630,12 +705,37 @@ def parse_script(text):
                 else:
                     warnings.append("CUT %r: framing wide / medium / inside / ots (+ reverse) likho" % w)
             shot_no = cur.get("shot", 0) + 1
+            prev_sets = {k: dict(v) for k, v in cur.get("sets", {}).items()}
+            prev_lights = cur.get("lights", "on")
             cur = new_scene(dict(cur["background"]), None)
+            cur["sets"] = prev_sets                 # same place: the door / sofa / fan are still there
+            cur["lights"] = cur["lights_start"] = prev_lights     # ... and the lights stay as they were
             cur["cut_in"], cur["framing"], cur["shot"] = True, frame or None, shot_no
             if reverse:
                 cur["reverse"] = True
             if frame == "ots":
                 cur["back"] = back
+            continue
+        m = re.match(r"^LIGHTS?\s*:\s*(on|off|dim)\s*$", line, re.I)
+        if m:
+            if cur is None:
+                cur = new_scene()
+            cur["lines"].append(("lights", m.group(1).lower()))
+            cur["lights"] = m.group(1).lower()
+            continue
+        m = re.match(r"^OBJ\s*:\s*(\S+)(.*)$", line, re.I)
+        if m and m.group(1).lower() in SET_TYPES:
+            if cur is None:
+                cur = new_scene()
+            placed = cur.setdefault("sets", {})
+            kind, spec, probs = parse_set(m.group(1) + m.group(2), placed)
+            warnings += probs
+            if kind == "place":
+                placed[spec["id"]] = spec
+            else:
+                spec["prev"] = placed[spec["set"]].get("state")
+                placed[spec["set"]]["state"] = spec["state"]
+                cur["lines"].append(("set", spec))
             continue
         m = re.match(r"^OBJ\s*:\s*(.*)$", line, re.I)
         if m:
@@ -707,6 +807,12 @@ def parse_script(text):
             if ln[0] == "wait":
                 tl.append({"wait": ln[1]})
                 continue
+            if ln[0] == "set":
+                tl.append({"set": ln[1]["set"], "state": ln[1]["state"]})
+                continue
+            if ln[0] == "lights":
+                tl.append({"lights": ln[1]})
+                continue
             if ln[0] == "obj":
                 oev = {"obj": ln[1]}
                 if first:
@@ -752,6 +858,10 @@ def parse_script(text):
                         ev.pop(key, None)                       # a voice has no body to act with
                 elif len(order) == 2 and others:
                     ev.setdefault("look", others[0])
+            elif ev.get("action") == "throw":
+                ev.setdefault("hold", 1.15)             # wind-up, flight and the hit before the next line
+            elif ev.get("on"):
+                ev.setdefault("hold", 0.8)              # sits down / lies down
             elif ev.get("action") in actions.DANCES:
                 ev.setdefault("hold", 2.0 if ev["action"] in ("kamar_dard", "fail") else 1.6)
             elif "action" not in ev and "move" not in ev and "expression" not in ev:
@@ -764,12 +874,30 @@ def parse_script(text):
                     "overlay": {"text": meta["CTA"], "style": "card",
                                 "pos": [540, 640], "color": [236, 90, 70]}}
         tl.append(last)
+        sc_sets = []
+        if sc.get("sets"):
+            start = {}                              # the state each piece had when this shot started
+            for ln in sc["lines"]:
+                if ln[0] == "set" and ln[1]["set"] not in start:
+                    start[ln[1]["set"]] = ln[1].get("prev")
+            for sid, spec in sc["sets"].items():
+                spec = dict(spec)
+                if sid in start:
+                    if start[sid] is None:
+                        spec.pop("state", None)
+                    else:
+                        spec["state"] = start[sid]
+                sc_sets.append(spec)
         item = {"background": sc["background"], "cast": order + (["NARRATOR"] if narrated else []),
                 "characters": chars, "timeline": tl}
         if narrated:
             item["characters"]["NARRATOR"] = {}
             cast.setdefault("NARRATOR", dict(NARRATOR_SPEC))
 
+        if sc_sets:
+            item["sets"] = sc_sets
+        if sc.get("lights_start", "on") != "on":
+            item["lights"] = sc["lights_start"]
         if sc["title"]:
             item["title"] = sc["title"]
         if sc.get("framing"):

@@ -19,8 +19,10 @@ from PIL import Image, ImageOps
 
 from . import actions, audio, objects, rides
 from .backgrounds import Background
-from .characters import build_character, render_ops
+from .characters import DEFAULT_POSE, build_character, render_ops, skeleton
 from .scene import GROUND_Y, camera_at, compile_music, compile_scene, prepare_voice, split_scenes, static_overlays
+from .effects import Effects, Patch
+from .sets import Sets
 from .text import bubble_image, chat_image, styled_box
 from .util import LH, LW, clamp, ease_in_out, ease_out, ease_out_back, load_scene
 
@@ -217,6 +219,8 @@ class Renderer(Output):
         ang = self.plan.angle
         self.bg = Background(self.plan.background, int(self.W * ang["zoom"] + 0.5), int(self.H * ang["zoom"] + 0.5))
         self.overlay_layer = OverlayLayer(self.s)
+        self.fx = Effects(self.plan.effects, self.s, self.W, self.H, self.plan.fps)
+        self.sets = Sets(self.plan.sets, self.plan.set_events, self.s, self.W, self.H)
         self._lip = {}
         self._label_cache = {}
         self.fps, self.duration, self.n_frames = self.plan.fps, self.plan.duration, self.plan.n_frames
@@ -310,6 +314,64 @@ class Renderer(Output):
                 self._draw_crank(img, o, t)
 
     # ------------------------------------------------------------ one frame
+    def _seated(self, c, t, st, action, pose, opts):
+        """On a set piece: hips on the seat (sit), body on the mattress (lie). Any other action done
+        while seated keeps the sitting legs, so a character can drink or talk on the sofa."""
+        seat = self.sets.seat_height(st["on"])
+        if seat is None:
+            return pose
+        k = c.draw_scale(t)
+        lying = action in ("lie_down", "lie", "sleep_lie", "rofl")
+        if not lying and action != "sit":
+            legs = actions.pose_for("sit", 0.0, 1.0, 1.0, c.phase, opts)
+            pose = dict(pose)
+            for kk in ("ll1", "ll2", "rl1", "rl2", "th_k"):
+                if kk in legs:
+                    pose[kk] = legs[kk]
+            for kk in ("tilt", "lift", "shift", "dx"):
+                pose.pop(kk, None)
+        else:
+            pose = dict(pose)
+        if lying:
+            pose["lift"] = pose.get("lift", 0.0) - seat / k
+        else:
+            p_ = dict(DEFAULT_POSE)
+            p_.update({kk: vv for kk, vv in pose.items() if vv is not None})
+            fy = skeleton(p_)["fy"]                 # hips sit this high above the feet
+            pose["lift"] = pose.get("lift", 0.0) + fy - (seat / k + 14.0)
+        return pose
+
+    def _light_level(self, t):
+        lvl, prev, prev_t = 1.0, 1.0, 0.0
+        for (t0, v) in sorted(self.plan.lights):
+            if t < t0:
+                break
+            prev, lvl, prev_t = lvl, v, t0
+        if t - prev_t < 0.18:                       # quick fade between levels
+            lvl = prev + (lvl - prev) * (t - prev_t) / 0.18
+        return lvl
+
+    def _darken(self, img, level, t):
+        """Lights off: the room goes dark blue; lamps, TVs and tubelights that are on keep glowing."""
+        from PIL import ImageChops
+        k = clamp(level)
+        img = ImageChops.multiply(img, Image.new("RGB", img.size, (int(255 * k * 0.85), int(255 * k * 0.9),
+                                                                   int(255 * min(1.0, k * 1.35)))))
+        for (x, y, typ, sc) in self.sets.lights_on(t):
+            if typ == "tubelight" and level < 0.5:
+                continue
+            cy = {"lamp": y - 650 * sc, "tv": y - 460 * sc, "tubelight": y - 1150 * sc}[typ]
+            r = {"lamp": 420, "tv": 380, "tubelight": 600}[typ] * sc
+            col = (255, 226, 150) if typ != "tv" else (170, 200, 255)
+            p = Patch(x, cy, r, r, self.s, 1)
+            for i in range(10):
+                rr = r * (1 - i / 10.0)
+                p.ellipse(x, cy, rr, rr, col + (int(16 + i * 2),), None)
+            base = img.convert("RGBA")
+            base.alpha_composite(p.im, (int(round(p.ox * self.s)), int(round(p.oy * self.s))))
+            img = base.convert("RGB")
+        return img
+
     def _act_dir(self, c, st, mv, x, t):
         """Which way a character acts (+1 = screen right): an explicit dir, else where it is walking to,
         else toward its look target, else its facing, else toward the middle of the screen."""
@@ -329,6 +391,9 @@ class Renderer(Output):
         plan, s = self.plan, self.s
         img = self._background(t)
         self._draw_objects(img, t, False)
+        light = self._light_level(t)
+        for im_, (px_, py_) in self.sets.wall(t, power=light >= 0.5):     # doors, windows, clocks, fans...
+            img.paste(im_, (px_, py_), im_)
         order = sorted((c for c in plan.chars.values() if not c.spec.get("hidden")),
                        key=lambda c: (c.draw_pos(t)[1], c.draw_pos(t)[0]))
         anchors = {}
@@ -350,6 +415,8 @@ class Renderer(Output):
             rf = c.ride_frame(t)
             if rf:                                  # on a vehicle: the seat decides the pose
                 pose = dict(rf["pose"])
+            elif st.get("on"):
+                pose = self._seated(c, t, st, action, pose, opts)
             singing = action in actions.SING_ACTIONS and not st["talking"]
             look = st["look"]
             if isinstance(look, str) and look in plan.chars:
@@ -376,8 +443,9 @@ class Renderer(Output):
             if st["prop"] == "" or pose.get("hide_prop"):
                 prop = None
             expr = pose.get("face") or st["expression"]      # some actions bring their own face (yawn, sneeze...)
+            speaking = bool(st["talking"]) and st["talking"].get("bubble") != "thought"   # thoughts: lips shut
             ops, an = build_character(spec, pose, expr, mouth_open, t, x, y, c.draw_scale(t),
-                                      blink=blink, prop=prop, talking=bool(st["talking"]) or singing or chewing,
+                                      blink=blink, prop=prop, talking=speaking or singing or chewing,
                                       tear_phase=(t * 1.1) % 1.0)
             r = render_ops(ops, s, self.W, self.H)
             if r:
@@ -389,9 +457,16 @@ class Renderer(Output):
 
         # everybody except the riders of a vehicle that is in front; then front objects; then those vehicles with their riders
         in_front = [c for c in order if self._front_rider(c, t)]
+        floor = self.sets.floor(t)                  # set pieces (bed, sofa, tree...) depth-sorted with the people
+        fi = 0
         for c in order:
-            if c not in in_front:
+            while fi < len(floor) and floor[fi][0] <= c.draw_pos(t)[1]:
+                img.paste(floor[fi][1], (floor[fi][2], floor[fi][3]), floor[fi][1])
+                fi += 1
+            if c not in in_front and c.state_at(t).get("visible", True):
                 draw_char(c)
+        for _d, im_, px_, py_ in floor[fi:]:
+            img.paste(im_, (px_, py_), im_)
         self._draw_objects(img, t, True)
         for o in plan.objects.values():
             riders = [c for c in in_front if c.ride_frame(t)["obj"] is o]
@@ -401,6 +476,13 @@ class Renderer(Output):
                     self._draw_crank(img, o, t)
                 for c in riders:
                     draw_char(c)
+
+        self.fx.draw_world(img, t, anchors, plan.chars)     # sweat, ?, POW, glowing eyes, thrown objects...
+        if light < 0.995:
+            img = self._darken(img, light, t)
+        # rain, fog, lightning, spotlight...: over the whole scene but under bubbles and captions
+        img = self.fx.draw_screen(img, t, {n: (a["head_center"][0] * s, a["head_center"][1] * s)
+                                           for n, a in anchors.items()})
 
         # camera first, so the speech bubbles can be kept inside the visible part of the frame
         z, cx, cy, dx, dy = camera_at(plan, t)
@@ -415,6 +497,8 @@ class Renderer(Output):
 
         # labels + bubbles
         for c in order:
+            if c.name not in anchors:
+                continue
             st, an = states[c.name], anchors[c.name]
             hx, hy = an["head_top"]
             top = hy
@@ -426,7 +510,9 @@ class Renderer(Output):
                 paste_rgba(img, lab, hx * s, hy * s - lab.height / 2 - 18 * s)
                 top = hy - (lab.height / s) - 30
             sp = st["talking"]
-            if sp and sp.get("bubble", True):
+            if sp and sp.get("bubble") == "thought":
+                self.fx._thought(img, {"text": sp["text"], "_seed": 0}, t - sp["start"], 1.0, an)
+            elif sp and sp.get("bubble", True):
                 lt = t - sp["start"]
                 im0, _ = bubble_image(sp["text"], sb, 0)
                 left = clamp(hx * s - im0.width * 0.35, max(24 * s, vl + mar), min(self.W - im0.width - 24 * s,

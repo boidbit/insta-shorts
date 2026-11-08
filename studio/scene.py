@@ -2,7 +2,7 @@
 import math
 import sys
 
-from . import audio, gemini_tts, objects, rides
+from . import audio, effects, gemini_tts, objects, rides
 from .characters import assign_faces, color_of, resolve_spec
 from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, lerp
 
@@ -65,7 +65,7 @@ def place_over_shoulder(chars):
 
 DEPTHS = {"near": (1.3, 110.0), "mid": (1.0, 0.0), "far": (0.75, -150.0)}   # (size multiplier, feet offset in px)
 CHAR_ATTRS = ("action", "expression", "prop", "label", "look", "facing", "style", "point", "dir",
-              "lean", "speed", "intensity", "hands", "tint")
+              "lean", "speed", "intensity", "hands", "tint", "on", "visible")
 
 
 OBJ_Y = {"truck": 1640.0, "auto": 1650.0, "car": 1640.0, "scooter": 1660.0, "cow": 1690.0, "dustbin": 1690.0,
@@ -324,7 +324,7 @@ class Char:
     def state_at(self, t):
         st = dict(action="idle", action_t0=0.0, expression=self.spec.get("expression", "neutral"),
                   prop=self.spec.get("prop"), label=None, look=self.spec.get("look"),
-                  facing=self.spec.get("facing", "front"),
+                  facing=self.spec.get("facing", "front"), visible=self.spec.get("visible", True), on=None,
                   speed=1.0, intensity=1.0, opts={}, talking=None)
         for ev in self.events:
             if ev["t"] > t + 1e-9:
@@ -334,7 +334,8 @@ class Char:
                 st["action_t0"] = ev["t"]
                 st["speed"], st["intensity"] = 1.0, 1.0
                 st["opts"] = {}
-            for key in ("expression", "prop", "label", "look", "facing"):
+                st["on"] = ev.get("on")
+            for key in ("expression", "prop", "label", "look", "facing", "visible"):
                 if key in ev:
                     st[key] = ev[key]
             for key in ("speed", "intensity"):
@@ -481,6 +482,12 @@ def auto_camera(plan, chars, cam_events, shakes):
             shakes.append((max(0.0, sp["end"] - 0.15), 0.5, 0.45))
     if speech and plan.duration - speech[-1]["end"] > 0.7:
         cam_events.append(dict(t=speech[-1]["end"] + 0.2, zoom=1.0, dur=0.5))
+    for fx in plan.effects:                         # a throw: frame the thrower and the target together
+        if fx.get("type") == "projectile" and fx.get("src") in chars and fx.get("dst") in chars:
+            t0 = max(0.0, fx["from"] - 0.45)
+            (x1, y1), (x2, y2) = chars[fx["src"]].draw_pos(t0), chars[fx["dst"]].draw_pos(fx["to"])
+            zoom = round(max(1.0, min(1.3, 1080.0 / (abs(x2 - x1) + 420.0))), 2)
+            cam_events.append(dict(t=t0, zoom=zoom, focus=[(x1 + x2) / 2.0, (y1 + y2) / 2.0 - 560], dur=0.16))
 
 
 def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
@@ -533,10 +540,24 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.chars = chars
 
     # ---- timeline ----
+    # ---- set pieces (door, bed, sofa, fan...) ----
+    plan.sets = []
+    for i, ob in enumerate(scene.get("sets", [])):
+        ob = dict(ob)
+        ob.setdefault("id", "%s%d" % (ob.get("type", "set"), i + 1))
+        plan.sets.append(ob)
+    set_by_id = {o["id"]: o for o in plan.sets}
+    plan.set_events = []
+    plan.lights = []
+    if scene.get("lights") not in (None, "on"):     # a shot that starts in the dark (lights went off earlier)
+        v = scene["lights"]
+        plan.lights.append((-1.0, float({"off": 0.32, "dim": 0.6}.get(v, v) if not isinstance(v, (int, float)) else v)))
+
     cursor = 0.0
     gap = float(meta.get("line_gap", 0.35))
     plan.sfx = []
     plan.overlays = []
+    plan.effects = []
     plan.objects = {}
     plan.warnings = []
     for c_ in chars.values():
@@ -579,6 +600,16 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 k0, dy0 = c.depth_at(t)
                 k1, dy1 = DEPTHS[ev["depth"]]
                 c.depth.append((t, k0, dy0, k1, dy1))
+            if ev.get("on") in set_by_id:            # sit / lie on a set piece: snap onto it
+                ob = set_by_id[ev["on"]]
+                x0, y0 = c.pos_at(t)
+                dx = float(ev.get("on_dx", 0))
+                if ob.get("type") == "bed" and ev.get("action", "") in ("lie_down", "lie", "sleep_lie", "rofl"):
+                    head = 1 if ob.get("flip") else -1           # head on the pillow end
+                    dx = dx or -head * 400 * float(ob.get("scale", 1.0))
+                    c.events.append({"t": t, "dir": head})
+                c.moves.append((t, t + 0.001, x0, y0, float(ob.get("x", 540)) + dx, float(ob.get("y", 1700)) + 1,
+                                False))
             if "move" in ev:
                 m = ev["move"]
                 x0, y0 = c.pos_at(t)
@@ -626,6 +657,35 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             o = dict(ev["overlay"])
             o.setdefault("from", t)
             plan.overlays.append(o)
+        if "set" in ev:
+            for sid in (ev["set"] if isinstance(ev["set"], list) else [ev["set"]]):
+                plan.set_events.append({"t": t, "set": sid, "state": ev.get("state"), "move": ev.get("move")})
+        if "lights" in ev:
+            v = ev["lights"]
+            plan.lights.append((t, float({"on": 1.0, "off": 0.32, "dim": 0.6}.get(v, v)
+                                         if not isinstance(v, (int, float)) else v)))
+        if "fx" in ev:
+            for raw_fx in (ev["fx"] if isinstance(ev["fx"], list) else [ev["fx"]]):
+                fx = effects.normalize(raw_fx, t)
+                if "who" not in fx and who:
+                    fx["who"] = who[0]
+                plan.effects.append(fx)
+        if ev.get("action") == "throw" and ev.get("at") in chars and who:
+            # the held prop flies from the thrower's hand to the target, who reacts on impact
+            src, dst = who[0], ev["at"]
+            release, obj = t + 0.42, ev.get("throw_prop") or ev.get("prop") or "chappal"
+            arrive = release + float(ev.get("flight", 0.55))
+            plan.effects.append({"type": "projectile", "src": src, "dst": dst, "prop": obj, "from": release,
+                                 "to": arrive, "arc": ev.get("arc", 160)})
+            chars[src].events.append({"t": release, "prop": ""})
+            if ev.get("hit", True):
+                chars[dst].events.append({"t": arrive, "action": "hit_react"})
+                hp = audio.sfx_path(ev.get("hit_sfx", "thud"))
+                if hp:
+                    plan.sfx.append(dict(t=arrive, path=hp, volume=0.8))
+                plan.effects.append({"type": "pow", "who": dst, "text": ev.get("hit_text", "THAK!"),
+                                     "from": arrive, "to": arrive + 0.6})
+            plan_end = max(plan_end, arrive + 0.6)
         if ev.get("ride") and who:
             hold_ = 0.0
             for w in who:
@@ -653,6 +713,15 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 cam_events.append(cam)
 
     plan.overlays += static_overlays(scene)
+    bgs = plan.background if isinstance(plan.background, dict) else {"type": plan.background}
+    weather = list(bgs.get("weather", []))
+    if bgs.get("time") == "rain":
+        weather.append("rain")
+    for w in weather:                                   # SCENE: <place> rain / fog / snow / fireflies / leaves
+        if not any(e.get("type") == w for e in plan.effects):
+            plan.effects.append(effects.normalize({"type": w}, 0.0))
+    for raw_fx in scene.get("effects", []):
+        plan.effects.append(effects.normalize(raw_fx, float(raw_fx.get("from", 0.0)) if isinstance(raw_fx, dict) else 0.0))
     if scene.get("chat"):
         plan_end = max(plan_end, compile_chat(plan, scene["chat"]))
 

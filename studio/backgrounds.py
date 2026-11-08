@@ -72,6 +72,16 @@ def _floor_perspective(g, y_top, c_floor, c_line, vp=(540, 700)):
 
 
 # ------------------------------------------------------------------ kitchen
+def _light_patch(g, pts, color=(255, 236, 170), alpha=52, blur=22):
+    """Soft translucent light shape (sunlight through a window, a lamp pool) blended onto the canvas."""
+    from PIL import ImageFilter
+    layer = Image.new("RGBA", g.im.size, color + (0,))
+    ImageDraw.Draw(layer).polygon(g._p(pts), fill=color + (alpha,))
+    layer = layer.filter(ImageFilter.GaussianBlur(blur * g.k))
+    g.im = Image.alpha_composite(g.im.convert("RGBA"), layer).convert("RGB")
+    g.d = ImageDraw.Draw(g.im)
+
+
 def kitchen(s):
     g = G(s, color=(216, 210, 168))
     wall, olive, olive_d = (216, 210, 168), (182, 174, 100), (150, 142, 78)
@@ -479,8 +489,10 @@ class Background:
             self.static = sky
             self.wide = wide
         else:
-            fn = {"kitchen": kitchen, "room": room, "street": street, "school": school,
-                  "market": market, "office": office, "bus_stop": bus_stop}.get(self.kind)
+            from .locations import LOCATIONS
+            self.kind = {"living_room": "room", "classroom": "school"}.get(self.kind, self.kind)
+            fn = dict(LOCATIONS, **{"kitchen": kitchen, "room": room, "street": street, "school": school,
+                                    "market": market, "office": office, "bus_stop": bus_stop}).get(self.kind)
             if fn:
                 self.static = fn(s)
             else:
@@ -491,6 +503,9 @@ class Background:
             self.wide = self.wide.resize((out_w * 2, out_h), Image.LANCZOS) if self.wide.size != (out_w * 2, out_h) else self.wide
             if self.static.size != (out_w, out_h):
                 self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
+        if spec.get("time"):                      # night / evening / sunset / dawn / rain re-lighting
+            from .locations import grade
+            self.static = grade(self.static, spec["time"])
 
     def frame(self, t):
         if self.wide is None:
