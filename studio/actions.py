@@ -109,13 +109,18 @@ def idle(t, sp, I, ph, o):
 
 
 def talk(t, sp, I, ph, o):
-    # calm speaking: small head nods and one hand gesturing, the body stays planted
+    # calm speaking: small head nods and one hand gesturing, the body stays planted. With a feeling on the face
+    # (angry, happy, sad, scared, smug, thinking) the hands talk the way that feeling does: talk_emotion
+    if o.get("_expr") in EMOTIONAL:
+        return talk_emotion(t, sp, I, ph, o)
     w = 2 * pi * 0.9 * sp
+    amp = min(1.0, max(0.0, o.get("_amp", 0.5)))     # loud syllables get a slightly bigger gesture
     d = _stance()
     d.update(
         tilt=0.4 * sin(w * 0.4 * t + ph) * I,
         head_tilt=2.2 * sin(w * t + ph) * I,
-        ra1=30 + 10 * sin(w * 0.6 * t + ph) * I, ra2=58 + 16 * sin(w * 0.6 * t + 1.2 + ph) * I,
+        ra1=30 + 10 * sin(w * 0.6 * t + ph) * I + 8 * (amp - 0.5), ra2=58 + 16 * sin(w * 0.6 * t + 1.2 + ph) * I
+        + 14 * (amp - 0.5),
         la1=-15,
     )
     return d
@@ -1250,6 +1255,42 @@ def floss(t, sp, I, ph, o):
     s_ = sin(w * t + ph)
     a = 10 + 36 * s_
     return dict(ra1=a, ra2=a, la1=a - 20, la2=a - 20, shift=-20 * s_, tilt=-4 * s_, ll1=-9, rl1=9, face="grin")
+
+
+EMOTIONAL = ANGRY | HAPPY | SAD | SCARED | COOL | THINK
+
+
+def talk_emotion(t, sp, I, ph, o):
+    """Talking with a feeling: the gesture style follows the expression; big moves land on loud syllables."""
+    d = _d(o)
+    e = o.get("_expr", "neutral")
+    amp = clamp(o.get("_amp", 0.5)) * I
+    w = 2 * pi * 1.1 * sp
+    n1, n2 = _n(t * 1.6, ph), _n(t * 1.3, ph + 2)
+    if e in ANGRY:                                  # jabbing finger, leaning in
+        jab = (0.3 + 0.7 * amp)
+        pose = _P(hand("R", (120 + 110 * jab, -330 - 20 * n1), (0, 1)), hand("L", (-90, -70), (-1, 0.2)),
+                  dict(ll1=-14, rl1=14), finger="R", tilt=5 + 4 * amp, head_dx=5 + 4 * amp,
+                  head_tilt=3 * n2, lift=-4 * amp)
+    elif e in HAPPY:                                # open arms, bouncy
+        op = 0.4 + 0.6 * amp
+        pose = _P(hand("R", (110 + 70 * op, -240 - 70 * op + 10 * n1), (1, 0.6)),
+                  hand("L", (-110 - 70 * op, -240 - 70 * op + 10 * n2), (-1, 0.6)),
+                  dict(ll1=-11, rl1=11), lift=-7 * amp * abs(sin(w * 2 * t)), head_tilt=5 * n1, tilt=2 * n2)
+    elif e in SAD:                                  # small low gestures, head down
+        pose = _P(hand("R", (70 + 25 * amp, -130 - 30 * amp), (1, 1)), hand("L", (-62, -110), (-1, 1)),
+                  dict(ll1=-7, rl1=7), head_dy=7, look_y=0.5, head_tilt=-3 + 2 * n1, tilt=-1)
+    elif e in SCARED:                               # hands up at the chest, fidgety
+        tr = 2.5 * sin(2 * pi * 9 * t)
+        pose = _P(hand("R", (46 + 12 * amp, -262 - 20 * amp), (1, 1)), hand("L", (-40, -256), (-1, 1)),
+                  dict(ll1=-4, rl1=4), shift=tr, tilt=-3, look_x=0.4 * n1, head_dy=-2 * amp)
+    elif e in COOL:                                 # hand on the hip, lazy gesture
+        pose = _P(hand("L", (-72, -92), (-1, -0.3)), hand("R", (120 + 40 * amp, -210 - 50 * amp + 8 * n1), (1, 0.5)),
+                  dict(ll1=-12, rl1=12), head_tilt=6 + 3 * n2, tilt=-2)
+    else:                                           # thinking: a hand near the chin
+        pose = _P(hand("R", (26 + 10 * amp, -320 + 6 * n1), (1, 1)), hand("L", (46, -214), (-0.3, 1)),
+                  dict(ll1=-9, rl1=9), look_y=-0.4, head_tilt=4 * n2)
+    return _side(d, pose)
 
 
 SING_ACTIONS = {"sing", "gaana"}

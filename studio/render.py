@@ -20,7 +20,7 @@ from PIL import Image, ImageChops, ImageOps
 
 from . import actions, audio, objects, rides, ui
 from .backgrounds import Background
-from .characters import DEFAULT_POSE, build_character, render_ops, skeleton
+from .characters import LA, UA, DEFAULT_POSE, build_character, render_ops, skeleton
 from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_at, compile_music, compile_scene,
                     prepare_voice, split_scenes, static_overlays)
 from .animals import ANIMALS, build_animal
@@ -283,6 +283,7 @@ class Renderer(Output):
         self.fx = Effects(self.plan.effects, self.s, self.W, self.H, self.plan.fps)
         self.sets = Sets(self.plan.sets, self.plan.set_events, self.s, self.W, self.H)
         self._lip = {}
+        self._blinks = {}
         self._label_cache = {}
         self.fps, self.duration, self.n_frames = self.plan.fps, self.plan.duration, self.plan.n_frames
         self.speech, self.sfx, self.music = self.plan.speech, self.plan.sfx, self.plan.music
@@ -459,6 +460,202 @@ class Renderer(Output):
             img = base.convert("RGB")
         return img
 
+    # ------------------------------------------------------------ character state -> pose (smooth, alive)
+    BLEND = 0.3           # seconds to cross-fade from one action's pose to the next
+
+    def _speaker_at(self, t, name):
+        """The line someone else is saying at time t (latest started), or None."""
+        best = None
+        for sp in self.plan.speech:
+            if sp["who"] != name and sp["start"] <= t < sp["end"] and sp.get("bubble") != "thought":
+                if best is None or sp["start"] > best["start"]:
+                    best = sp
+        return best
+
+    def _eff(self, c, t):
+        """Everything that decides a character's pose at time t (no drawing)."""
+        st = c.state_at(t)
+        x, y = c.draw_pos(t)
+        action, a_t0 = st["action"], st["action_t0"]
+        mv = next((m for m in c.moves if m[0] <= t < m[1]), None)
+        if mv and action in ("idle", "none", "stand", "talk"):
+            action, a_t0 = ("run" if len(mv) > 6 and mv[6] else "walk"), 0.0
+        if mv and st["facing"] == "front" and abs(mv[4] - mv[2]) > 1:
+            st["facing"] = "right" if mv[4] > mv[2] else "left"          # face the way you walk
+        rf = c.ride_frame(t)
+        listen = None
+        if (not st["talking"] and not mv and not rf and action in ("idle", "none", "stand") and not st.get("on")
+                and st.get("visible", True) and not c.spec.get("kind") and c.spec.get("view") != "back"):
+            listen = self._speaker_at(t, c.name)
+            if listen and st["look"] is None and listen["who"] in self.plan.chars \
+                    and not self.plan.chars[listen["who"]].spec.get("hidden"):
+                st["look"] = listen["who"]                            # listeners look at whoever is talking
+        return dict(st=st, x=x, y=y, action=action, a_t0=a_t0, mv=mv, rf=rf, listen=listen,
+                    dr=self._act_dir(c, st, mv, x, t))
+
+    @staticmethod
+    def _key(E):
+        return (E["action"], round(E["a_t0"], 4), E["dr"], E["st"].get("on"), bool(E["rf"]))
+
+    def _build_pose(self, c, t, E):
+        st, x, action, a_t0 = E["st"], E["x"], E["action"], E["a_t0"]
+        opts = dict(st["opts"], _x=x, _bpm=self.plan.bpm, _prop=st["prop"], _dir=E["dr"], _facing=st["facing"],
+                    _expr=st["expression"], _amp=self._lip_open(st["talking"], t) if st["talking"] else 0.0)
+        pose = actions.pose_for(action, t - a_t0 if action not in ("walk", "run") else t, st["speed"],
+                                st["intensity"], c.phase, opts)
+        if E["rf"]:                                 # on a vehicle: the seat decides the pose
+            pose = dict(E["rf"]["pose"])
+        elif st.get("on"):
+            pose = self._seated(c, t, st, action, pose, opts)
+        elif E["listen"]:
+            self._react(c, t, E, pose)
+        return pose
+
+    def _react(self, c, t, E, pose):
+        """A listener reacts to whoever is talking: nods, leans back from anger, tilts the head at questions."""
+        sp = E["listen"]
+        spk = self.plan.chars.get(sp["who"])
+        if spk is None or spk.spec.get("hidden"):
+            return
+        ramp = clamp((t - sp["start"]) / 0.35) * clamp((sp["end"] - t) / 0.3)
+        toward = 1 if spk.pos_at(t)[0] >= E["x"] else -1
+        sx = spk.state_at(t)["expression"]
+        if sx in actions.ANGRY:                                     # flinch / lean away
+            pose["tilt"] = pose.get("tilt", 0.0) - 5 * toward * ramp
+            pose["head_dy"] = pose.get("head_dy", 0.0) + 3 * ramp
+        elif str(sp.get("text", "")).rstrip().endswith("?"):        # curious head tilt
+            pose["head_tilt"] = pose.get("head_tilt", 0.0) + 8 * toward * ramp
+        else:                                                       # nods every now and then
+            q = (t - sp["start"] + c.phase * 0.7) % 1.7
+            nod = math.sin(math.pi * q / 0.5) if q < 0.5 else 0.0
+            pose["head_dy"] = pose.get("head_dy", 0.0) + 7 * nod * ramp
+            pose["look_y"] = pose.get("look_y", 0.0) + 0.3 * nod * ramp
+        if sx in actions.HAPPY:                                     # laughing along a little
+            pose["lift"] = pose.get("lift", 0.0) - 3 * abs(math.sin(2 * math.pi * 2.6 * t)) * ramp
+
+    _ANGLES = ("la1", "la2", "ra1", "ra2", "ll1", "ll2", "rl1", "rl2", "tilt", "head_tilt")
+    _NUM_DEFAULTS = {"dx": 0.0, "head_dx": 0.0, "head_dy": 0.0, "th_k": 1.0, "sh_k": 1.0, "arm_k": 1.0,
+                     "la_k1": 1.0, "la_k2": 1.0, "ra_k1": 1.0, "ra_k2": 1.0,
+                     "lift": 0.0, "shift": 0.0, "tilt": 0.0, "head_tilt": 0.0, "look_x": 0.0, "look_y": 0.0}
+
+    def _blend_from_previous(self, c, t, E, pose, end=None, depth=0):
+        """If the action (or its direction) changed less than BLEND seconds ago, cross-fade from the previous
+        action's pose (still moving) to the new one. Back-to-back changes chain: a new blend starts from the
+        half-finished blend that was on screen, not from the raw previous pose."""
+        B = self.BLEND
+        end = t if end is None else end
+        t0 = max(0.0, t - B)
+        if end <= t0 + 1e-6:
+            return pose
+        key = self._key(E)
+        if self._key(self._eff(c, t0)) == key:
+            return pose
+        lo, hi = t0, end
+        for _ in range(7):                       # find when the switch happened
+            mid = (lo + hi) / 2
+            if self._key(self._eff(c, mid)) == key:
+                hi = mid
+            else:
+                lo = mid
+        Eo = self._eff(c, lo)
+        if Eo["rf"]:
+            return pose
+        Eo["x"], Eo["y"] = E["x"], E["y"]
+        old = self._build_pose(c, t, Eo)
+        if depth < 2:
+            old = self._blend_from_previous(c, t, Eo, old, end=lo, depth=depth + 1)
+        w = clamp((t - hi) / B)
+        w = w * w * (3 - 2 * w)
+        out = dict(pose)
+        for kk in set(old) | set(pose):
+            if kk.startswith("_"):
+                continue
+            va = old.get(kk, DEFAULT_POSE.get(kk, self._NUM_DEFAULTS.get(kk)))
+            vb = pose.get(kk, DEFAULT_POSE.get(kk, self._NUM_DEFAULTS.get(kk)))
+            num = (isinstance(va, (int, float)) and isinstance(vb, (int, float)) and not isinstance(va, bool)
+                   and not isinstance(vb, bool))
+            if num:
+                if kk in self._ANGLES:
+                    dlt = ((vb - va + 180.0) % 360.0) - 180.0
+                    out[kk] = va + dlt * w
+                else:
+                    out[kk] = va + (vb - va) * w
+            elif w < 0.5:
+                out[kk] = va
+        # arms: move the elbow and hand along straight lines (angle blending can flip direction near 180 deg)
+        sy = skeleton(DEFAULT_POSE)["shR"][1]       # shoulder height of the rig
+        for side, shx in (("la", -56.0), ("ra", 56.0)):
+            pts = []
+            for src in (old, pose):
+                a1 = src.get(side + "1", DEFAULT_POSE[side + "1"])
+                a2 = src.get(side + "2", DEFAULT_POSE[side + "2"])
+                k_ = src.get("arm_k", 1.0)
+                l1 = UA * k_ * src.get(side + "_k1", 1.0)
+                l2 = LA * k_ * src.get(side + "_k2", 1.0)
+                ex, ey = shx + l1 * math.sin(math.radians(a1)), sy + l1 * math.cos(math.radians(a1))
+                pts.append((ex, ey, ex + l2 * math.sin(math.radians(a2)), ey + l2 * math.cos(math.radians(a2))))
+            (e0x, e0y, h0x, h0y), (e1x, e1y, h1x, h1y) = pts
+            ex, ey = e0x + (e1x - e0x) * w, e0y + (e1y - e0y) * w
+            hx, hy = h0x + (h1x - h0x) * w, h0y + (h1y - h0y) * w
+            ak = out.get("arm_k", 1.0)
+            out[side + "1"] = math.degrees(math.atan2(ex - shx, ey - sy))
+            out[side + "2"] = math.degrees(math.atan2(hx - ex, hy - ey))
+            out[side + "_k1"] = math.hypot(ex - shx, ey - sy) / (UA * ak)
+            out[side + "_k2"] = math.hypot(hx - ex, hy - ey) / (LA * ak)
+        return out
+
+    def _look_value(self, c, t, E):
+        look = E["st"]["look"]
+        if isinstance(look, str) and look in self.plan.chars and look != c.name:
+            ox, _oy = self.plan.chars[look].pos_at(t)
+            return clamp((ox - E["x"]) / 350.0, -1, 1)
+        if look == "left":
+            return -1.0
+        if look == "right":
+            return 1.0
+        if isinstance(look, (int, float)):
+            return float(look)
+        return None
+
+    def _smooth_gaze(self, c, t, E, pose):
+        """Eyes, gaze and the side the face points to glide over ~0.2 s instead of jumping;
+        an expression change is hidden behind a blink."""
+        samples = [(t, 0.5, E), (t - 0.08, 0.3, None), (t - 0.16, 0.2, None)]
+        fv = {"left": -1.0, "right": 1.0}
+        look_sum = face_sum = 0.0
+        any_look = False
+        own = pose.get("look_x", 0.0)
+        prev_expr = None
+        for ts, wgt, Es in samples:
+            if Es is None:
+                Es = self._eff(c, max(0.0, ts))
+            lv = self._look_value(c, ts, Es)
+            any_look = any_look or lv is not None
+            look_sum += wgt * (lv if lv is not None else own)
+            face_sum += wgt * fv.get(Es["st"]["facing"], 0.0)
+            if ts != t and prev_expr is None:
+                prev_expr = Es["st"]["expression"]
+        if any_look:
+            pose["look_x"] = look_sum
+        pose["_facing_f"] = face_sum
+        if prev_expr is not None and prev_expr != E["st"]["expression"]:
+            pose["_face_change"] = True
+
+    def _blinking(self, c, t):
+        """Natural blinks: random 2-5.5 s apart, sometimes a double blink."""
+        bl = self._blinks.get(c.name)
+        if bl is None:
+            import random as _r
+            rnd = _r.Random(sum(map(ord, c.name)) * 7919 + 13)
+            bl, tt = [], rnd.uniform(0.3, 2.0)
+            while tt < self.plan.duration + 5:
+                bl.append(tt)
+                if rnd.random() < 0.15:
+                    bl.append(tt + 0.24)
+                tt += rnd.uniform(2.0, 5.5)
+            self._blinks[c.name] = bl
+        return any(b0 <= t < b0 + 0.11 for b0 in bl)
+
     def _act_dir(self, c, st, mv, x, t):
         """Which way a character acts (+1 = screen right): an explicit dir, else where it is walking to,
         else toward its look target, else its facing, else toward the middle of the screen."""
@@ -487,35 +684,14 @@ class Renderer(Output):
         states = {}
         def prep_char(c):
             """Everything about this character at time t (pose, drawing ops, anchors); painted by draw_char."""
-            st = c.state_at(t)
+            E = self._eff(c, t)
+            st, x, y, action, a_t0, mv, rf = E["st"], E["x"], E["y"], E["action"], E["a_t0"], E["mv"], E["rf"]
             states[c.name] = st
-            x, y = c.draw_pos(t)
-            action, a_t0 = st["action"], st["action_t0"]
-            mv = next((m for m in c.moves if m[0] <= t < m[1]), None)
-            if mv and action in ("idle", "none", "stand", "talk"):
-                action, a_t0 = ("run" if len(mv) > 6 and mv[6] else "walk"), 0.0
-            if mv and st["facing"] == "front" and abs(mv[4] - mv[2]) > 1:
-                st["facing"] = "right" if mv[4] > mv[2] else "left"          # face the way you walk
-            opts = dict(st["opts"], _x=x, _bpm=plan.bpm, _prop=st["prop"], _dir=self._act_dir(c, st, mv, x, t),
-                        _facing=st["facing"])
-            pose = actions.pose_for(action, t - a_t0 if action not in ("walk", "run") else t, st["speed"],
-                                    st["intensity"], c.phase, opts)
-            rf = c.ride_frame(t)
-            if rf:                                  # on a vehicle: the seat decides the pose
-                pose = dict(rf["pose"])
-            elif st.get("on"):
-                pose = self._seated(c, t, st, action, pose, opts)
+            pose = self._build_pose(c, t, E)
+            if not rf and not c.spec.get("kind"):
+                pose = self._blend_from_previous(c, t, E, pose)     # one action flows into the next
             singing = action in actions.SING_ACTIONS and not st["talking"]
-            look = st["look"]
-            if isinstance(look, str) and look in plan.chars:
-                ox, _oy = plan.chars[look].pos_at(t)
-                pose["look_x"] = clamp((ox - x) / 350.0, -1, 1)
-            elif look == "left":
-                pose["look_x"] = -1
-            elif look == "right":
-                pose["look_x"] = 1
-            elif isinstance(look, (int, float)):
-                pose["look_x"] = float(look)
+            self._smooth_gaze(c, t, E, pose)        # eyes and face glide to a new target; a new face hides in a blink
             mouth_open = 0.0
             chewing = False
             if st["talking"]:
@@ -524,7 +700,7 @@ class Renderer(Output):
                 mouth_open = self._lip_open({}, t)
             elif pose.get("chew") is not None:  # eating
                 mouth_open, chewing = float(pose["chew"]), pose["chew"] > 0.1
-            blink = ((t + c.phase * 1.7) % 3.6) < 0.12
+            blink = self._blinking(c, t) or pose.pop("_face_change", False)
             spec = dict(c.spec)
             spec["facing"] = st["facing"]
             prop = st["prop"] or ("mic" if singing else None) or pose.get("prop")
