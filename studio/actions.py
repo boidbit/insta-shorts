@@ -205,12 +205,40 @@ def sleep(t, sp, I, ph, o):
     return d
 
 
+def reach(t, sp, I, ph, o):
+    """Wide, scared crouch-lean, one arm stretched toward `point` (left|right) - e.g. lighting a cracker
+    with an agarbatti from as far away as possible. Other hand on the hip."""
+    dr = -1 if o.get("point", o.get("dir", "right")) in ("left", -1) else 1
+    e = ease_out(t / 0.45)
+    tr = sin(2 * pi * 7.5 * t * sp) * 2.2 * I          # nervous tremble
+    d = dict(ll1=-30 * e - 9 * (1 - e), ll2=-4, rl1=30 * e + 9 * (1 - e), rl2=4,
+             tilt=dr * 13 * e + tr * 0.3, head_tilt=-dr * 6 * e, look_x=dr * 0.9, look_y=0.5,
+             lift=0.0)
+    arm = dict(a1=dr * (14 + 52 * e), a2=dr * (8 + 62 * e + tr))
+    knee = dict(a1=-dr * (14 + 26 * e), a2=-dr * (8 - 28 * e))
+    if dr > 0:
+        d.update(ra1=arm["a1"], ra2=arm["a2"], la1=knee["a1"], la2=knee["a2"])
+    else:
+        d.update(la1=arm["a1"], la2=arm["a2"], ra1=knee["a1"], ra2=knee["a2"])
+    return d
+
+
+def cover_ears(t, sp, I, ph, o):
+    """Hands over the ears, flinching (waiting for the bang)."""
+    e = ease_out(t / 0.25)
+    sh = sin(2 * pi * 9 * t) * 2.0 * I
+    d = _stance(1.1)
+    d.update(la1=-14 - 86 * e, la2=-8 + 162 * e + sh, ra1=14 + 86 * e, ra2=8 - 162 * e - sh,
+             head_tilt=sh * 0.8, tilt=sh * 0.3, lift=4 * e)
+    return d
+
+
 ACTIONS = {
     "idle": idle, "none": idle, "stand": idle,
     "talk": talk, "dance": dance, "dance2": dance2, "dance3": dance3, "disco": disco,
     "point": point, "laugh": laugh, "shock": shock, "jump": jump, "wave": wave, "clap": clap,
     "cry": cry, "fall": fall, "walk": walk, "facepalm": facepalm, "shrug": shrug, "sway": sway,
-    "sleep": sleep,
+    "sleep": sleep, "reach": reach, "cover_ears": cover_ears,
 }
 
 

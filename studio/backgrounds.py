@@ -5,6 +5,7 @@ import random
 
 from PIL import Image, ImageDraw
 
+from . import scenery
 from .util import LW, LH, asset_path
 
 INK = (18, 18, 18)
@@ -324,9 +325,10 @@ def night_road(s, world_w=LW):
 
 # ------------------------------------------------------------------ public API
 class Background:
-    def __init__(self, spec, out_w, out_h):
+    def __init__(self, spec, out_w, out_h, zmax=1.0):
         self.out_w, self.out_h = out_w, out_h
         s = out_w / float(LW)
+        self.s = s
         spec = spec or {"type": "plain"}
         if isinstance(spec, str):
             spec = {"type": spec}
@@ -334,6 +336,10 @@ class Background:
         self.scroll = float(spec.get("scroll", 0.0))   # logical px per second
         self.static = None
         self.wide = None
+        self.layered = None
+        if self.kind in scenery.PRESETS:              # layered 2.5D scene (parallax + depth of field)
+            self.layered = scenery.PRESETS[self.kind](s, zmax)
+            return
         if self.kind == "image":
             im = Image.open(asset_path(spec["path"])).convert("RGB")
             r = max(out_w / im.width, out_h / im.height)
@@ -356,6 +362,33 @@ class Background:
             self.wide = self.wide.resize((out_w * 2, out_h), Image.LANCZOS) if self.wide.size != (out_w * 2, out_h) else self.wide
             if self.static.size != (out_w, out_h):
                 self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
+
+    @property
+    def light(self):
+        return self.layered.light if self.layered else {}
+
+    @property
+    def horizon(self):
+        return self.layered.horizon if self.layered else None
+
+    def frame_cam(self, t, view):
+        """Background as seen through the camera view (zoom, left, top in logical units). RGB."""
+        if self.layered:
+            return self.layered.compose(t, view, self.out_w, self.out_h).convert("RGB")
+        img = self.frame(t)
+        z, L, T = view
+        if z > 1.001:
+            s = self.s
+            img = img.resize((self.out_w, self.out_h), Image.BILINEAR,
+                             box=(L * s, T * s, (L + LW / z) * s, (T + LH / z) * s))
+        return img
+
+    def front(self, img, t, view):
+        """Paste foreground layers (in front of the characters) onto img."""
+        if self.layered and self.layered.front:
+            part = self.layered.compose(t, view, self.out_w, self.out_h, layers=self.layered.front)
+            img.paste(part, (0, 0), part)
+        return img
 
     def frame(self, t):
         if self.wide is None:

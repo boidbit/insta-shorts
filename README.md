@@ -68,6 +68,18 @@ Poora schema `DIRECTOR_PROMPT.md` me hai. Yaad rakhne layak:
 - **expressions**: neutral, smile, smug, sly, shock, shout, laugh, grin, cry, angry, surprised, think, wink, dead, love, sleepy, sad
 - **backgrounds**: kitchen, room, street, school, night_road (scrolling), plain, ya apna `image`
 
+## 2.5D / "3D type" look (naya)
+
+`scenes/diwali_3d_demo.json` dekho. Ye asli 3D nahi hai: 2D cartoon ko teen cheezon se depth milti hai:
+
+- **Layered background** (`"background": {"type": "diwali_rooftop"}`): aasmaan, door ka shehar, beech ki buildings, chhat aur saamne ki cheezein alag-alag parton me hain. Camera hilta hai to har parat alag speed se khiskti hai (parallax). Door wali parton par blur (depth of field) hai, jhalar ki lights tim-timaati hain aur aasmaan me patakhe phat-te hain. Naya preset `studio/scenery.py` me banta hai (`PRESETS`).
+- **Toon body** (`"body": "toon"`): moti outline wale haath-pair, kurta-pajama, chappal, light/shadow shading, bada sir. `"pants"`, `"skin"`, `"hair_short"` / `"hair_curly"` bhi de sakte ho. Saare purane actions isme bhi chalte hain.
+- **Asli camera**: zoom (2x tak) par bhi character sharp rehta hai, kyunki wo zoom ke hisaab se dobara draw hota hai, image ko stretch nahi kiya jaata. Har character ke neeche parchhaai, scene ki roshni ka rang aur vignette bhi lagte hain. Jo character peeche khada hai (`"y": 1330`), wo apne aap chhota dikhta hai.
+- **Objects + effects**: `"objects"` (bomb, anaar, diya), timeline me `{"object": "bomb", "burn": 5}`, `{"fx": {"type": "sparks", "at": "bomb"}}`, `{"fx": {"type": "boom", "at": "bomb"}}`, sfx `fizz` / `boom`.
+- Hindi voice clips ke aage-peeche ka silence ab apne aap kat jaata hai, isliye dialogue tez chalta hai.
+
+Speed: 1080p par lagbhag 0.25 sec/frame, yaani 17 sec ki reel ~2 minute me.
+
 ## Apna asset daalna
 
 - Background: PNG/JPG `assets/backgrounds/` me rakho → `"background": {"type": "image", "path": "assets/backgrounds/mera.png"}` (9:16 best).
@@ -76,6 +88,7 @@ Poora schema `DIRECTOR_PROMPT.md` me hai. Yaad rakhne layak:
 
 ## Limits (sach me)
 
-- Characters code se bane flat stickmen hain; AI-generated art jaisi detail nahi hogi. Naye look ke liye `studio/characters.py` / `studio/backgrounds.py` badlo ya apni PNG backgrounds do.
+- Characters code se bane hain (stickman ya `toon`); hath se bane / AI art jaisi detail nahi hogi. Naye look ke liye `studio/characters.py` / `studio/scenery.py` badlo ya apni PNG backgrounds do.
+- 2.5D hai, asli 3D nahi: camera zoom/pan/shake kar sakta hai, lekin character ke chaaron taraf ghoom nahi sakta.
 - Bubble ke andar emoji ke liye `fonts-noto-color-emoji` chahiye (workflow khud install karta hai).
 - Hindi voice `edge-tts` (Microsoft online service) se aati hai, isliye internet chahiye; bina internet ke `--no-tts`.

@@ -33,24 +33,36 @@ def have_tts():
 
 
 def synth_tts(text, voice=None, rate="+0%", pitch="+0Hz"):
-    """Return path of an mp3 or None if synthesis is unavailable."""
+    """Return path of the voice clip (leading/trailing silence trimmed) or None if synthesis is unavailable."""
     voice = voice or DEFAULT_VOICE
     key = hashlib.sha1(("%s|%s|%s|%s" % (text, voice, rate, pitch)).encode("utf-8")).hexdigest()[:16]
-    out = os.path.join(_cache("tts"), key + ".mp3")
+    raw = os.path.join(_cache("tts"), key + ".mp3")
+    out = os.path.join(_cache("tts"), key + "_trim.wav")
     if os.path.isfile(out) and os.path.getsize(out) > 1000:
         return out
-    if not have_tts():
-        return None
-    cmd = [sys.executable, "-m", "edge_tts", "--voice", voice, "--text", text,
-           "--rate=%s" % rate, "--pitch=%s" % pitch, "--write-media", out]
+    if not (os.path.isfile(raw) and os.path.getsize(raw) > 1000):
+        if not have_tts():
+            return None
+        cmd = [sys.executable, "-m", "edge_tts", "--voice", voice, "--text", text,
+               "--rate=%s" % rate, "--pitch=%s" % pitch, "--write-media", raw]
+        try:
+            subprocess.run(cmd, check=True, timeout=90, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        except Exception as e:  # network blocked, bad voice, timeout...
+            print("  [tts] failed for %r: %s" % (text[:40], str(e)[:120]), file=sys.stderr)
+            if os.path.isfile(raw):
+                os.remove(raw)
+            return None
+        if not (os.path.isfile(raw) and os.path.getsize(raw) > 1000):
+            return None
+    # edge-tts pads every clip with ~1 s of silence: cut it so dialogue feels snappy
+    trim = ("silenceremove=start_periods=1:start_threshold=-45dB,areverse,"
+            "silenceremove=start_periods=1:start_threshold=-45dB,areverse,apad=pad_dur=0.06")
     try:
-        subprocess.run(cmd, check=True, timeout=90, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-    except Exception as e:  # network blocked, bad voice, timeout...
-        print("  [tts] failed for %r: %s" % (text[:40], str(e)[:120]), file=sys.stderr)
-        if os.path.isfile(out):
-            os.remove(out)
-        return None
-    return out if os.path.isfile(out) and os.path.getsize(out) > 1000 else None
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-i", raw, "-af", trim, "-ac", "1", "-ar", "24000", out],
+                       check=True, timeout=60)
+    except Exception:
+        return raw
+    return out if os.path.isfile(out) and os.path.getsize(out) > 1000 else raw
 
 
 def audio_duration(path):
@@ -138,6 +150,29 @@ def _gen_sfx(name):
     if name == "beep":
         t = _t(0.45)
         return 0.35 * np.sin(2 * np.pi * 1000 * t) * np.minimum(1, (0.45 - t) / 0.01)
+    if name == "fizz":          # burning fuse / sparkler hiss with crackles (2.5 s)
+        t = _t(2.5)
+        n = rng.randn(t.size)
+        hiss = n - np.convolve(n, np.ones(6) / 6, mode="same")          # bright noise
+        am = 0.55 + 0.45 * np.abs(np.sin(2 * np.pi * 7.3 * t) * np.sin(2 * np.pi * 3.1 * t + 1))
+        y = 0.22 * hiss * am
+        for c in rng.randint(0, t.size - 600, 46):
+            k = np.arange(600)
+            y[c:c + 600] += 0.5 * rng.randn(600) * np.exp(-k / 70.0)
+        y *= np.minimum(1, t / 0.05) * np.minimum(1, (2.5 - t) / 0.2)
+        return np.clip(y, -1, 1)
+    if name == "boom":          # big cracker blast: sharp crack + thump + rumble tail (2.2 s), audible on phones
+        t = _t(2.2)
+        f = 120 * np.exp(-5 * t) + 55
+        thump = np.sin(2 * np.pi * np.cumsum(f) / SR) * _env(t, 0.002, 3.0)
+        n = rng.randn(t.size)
+        crack = (n - np.convolve(n, np.ones(3) / 3, mode="same")) * _env(t, 0.0005, 22)   # bright snap
+        mid = np.convolve(n, np.ones(12) / 12, mode="same") * 3.0 * _env(t, 0.002, 5.5)    # body of the bang
+        lp = np.convolve(n, np.exp(-np.arange(400) / 90.0), mode="same")
+        lp /= np.max(np.abs(lp)) + 1e-9
+        y = 0.9 * thump + 1.4 * crack + mid + lp * _env(t, 0.004, 1.8) * 0.9
+        y = np.tanh(1.6 * y / (np.max(np.abs(y)) + 1e-9))                                  # saturate = louder
+        return np.clip(0.95 * y / (np.max(np.abs(y)) + 1e-9), -1, 1)
     if name == "laugh_track":
         t = _t(1.2)
         y = np.zeros_like(t)

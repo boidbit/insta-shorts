@@ -88,6 +88,17 @@ def compile_scene(scene, use_tts=True, fps=None):
     plan.fade_in = float(meta.get("fade_in", 0.0))
     plan.fade_out = float(meta.get("fade_out", 0.0))
     plan.background = scene.get("background", {"type": "plain"})
+    plan.light = dict(scene.get("light", {}))
+    plan.perspective = scene.get("perspective", meta.get("perspective", True))
+    # world objects (sutli bomb, anaar, diya...) that live on the floor with the characters
+    plan.objects = []
+    for i, o in enumerate(scene.get("objects", [])):
+        o = dict(o)
+        o.setdefault("id", "obj%d" % i)
+        o.setdefault("y", GROUND_Y)
+        plan.objects.append(o)
+    objs = {o["id"]: o for o in plan.objects}
+    plan.fx = []
 
     # ---- characters ----
     cdefs = scene.get("characters", {})
@@ -171,6 +182,26 @@ def compile_scene(scene, use_tts=True, fps=None):
             p = audio.sfx_path(ev["sfx"])
             if p:
                 plan.sfx.append(dict(t=t, path=p, volume=float(ev.get("volume", 0.8))))
+        if "fx" in ev:
+            for f in (ev["fx"] if isinstance(ev["fx"], list) else [ev["fx"]]):
+                f = dict(f)
+                f["t"] = t
+                f.setdefault("dur", 1e9 if f.get("type") == "sparks" else 3.0)
+                plan.fx.append(f)
+        if "fx_stop" in ev:
+            for f in plan.fx:
+                if f.get("id") == ev["fx_stop"] and f["t"] <= t:
+                    f["dur"] = min(f["dur"], t - f["t"])
+        if "object" in ev and ev["object"] in objs:
+            o = objs[ev["object"]]
+            if "burn" in ev:
+                o["_burn_t0"], o["_burn_dur"] = t, float(ev["burn"])
+            if ev.get("stop"):
+                o["_burn_stop"] = t
+            if ev.get("hide"):
+                o["to"] = t
+            if ev.get("show"):
+                o["from"] = t
         if "overlay" in ev:
             o = dict(ev["overlay"])
             o.setdefault("from", t)
@@ -210,7 +241,9 @@ def compile_scene(scene, use_tts=True, fps=None):
         f = cam.get("focus")
         if isinstance(f, str) and f in chars:
             fx, fy = chars[f].pos_at(cam["t"])
-            tc = (fx, fy - 560)
+            tc = (fx + float(cam.get("dx", 0)), fy - float(cam.get("head", 560)) * chars[f].scale)
+        elif isinstance(f, str) and f in objs:
+            tc = (float(objs[f]["x"]) + float(cam.get("dx", 0)), float(objs[f]["y"]) - float(cam.get("head", 120)))
         elif isinstance(f, (list, tuple)):
             tc = (float(f[0]), float(f[1]))
         elif tz == 1.0:
@@ -222,6 +255,7 @@ def compile_scene(scene, use_tts=True, fps=None):
         z, cx, cy = tz, tc[0], tc[1]
     plan.cam_segments = segs
     plan.shakes = shakes
+    plan.zmax = max([1.0] + [sg[3] for sg in segs] + ([1.05] if shakes else []))
 
     # ---- audio ----
     plan.music = None
