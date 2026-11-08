@@ -58,13 +58,13 @@ on:
       dialogue:
         description: "Spoken words: bubble | subtitle (at the bottom) | both | none (voice only)"
         type: choice
-        options: [bubble, subtitle, both, none]
+        options: ["bubble", "subtitle", "both", "none"]
         required: false
         default: bubble
       intro:
         description: "Hook card: over (with the first line) | first (hook card, then the story) | off"
         type: choice
-        options: [over, first, off]
+        options: ["over", "first", "off"]     # quoted: bare off / on / yes / no are true / false in YAML
         required: false
         default: over
       request_id:

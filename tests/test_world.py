@@ -235,6 +235,25 @@ class VideoOptionTests(unittest.TestCase):
             self.assertIn("      %s:\n" % opt, flow)
         self.assertIn("--dialogue $DIALOGUE --hook $INTRO", flow)
 
+    @unittest.skipUnless(__import__("importlib").util.find_spec("yaml"), "needs PyYAML")
+    def test_workflow_accepts_every_value_the_page_sends(self):
+        """A bare `off` in YAML is the boolean false, so GitHub refused intro=off. Every choice must be a string,
+        and every <option> of the page's selects must be one of the workflow's choices."""
+        import re
+        import yaml
+        root = os.path.join(os.path.dirname(__file__), "..")
+        page = open(os.path.join(root, "index.html"), encoding="utf-8").read()
+        flow = yaml.safe_load(open(os.path.join(root, ".github", "workflows", "render.yml"), encoding="utf-8"))
+        inputs = (flow.get("on") or flow.get(True))["workflow_dispatch"]["inputs"]
+        for name, spec in inputs.items():
+            for o in spec.get("options", []):
+                self.assertIsInstance(o, str, (name, o))
+        for sel in ("dialogue", "intro", "hook", "tone"):
+            m = re.search(r'<select id="%s">(.*?)</select>' % sel, page, re.S)
+            self.assertTrue(m, sel)
+            for v in re.findall(r'<option value="([^"]+)"', m.group(1)):
+                self.assertIn(v, inputs[sel]["options"], (sel, v))
+
 
 class VoiceTests(unittest.TestCase):
     def test_interrupt_cuts_the_other_line(self):
