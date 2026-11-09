@@ -442,8 +442,8 @@ function lintScript(text) {
       }
       if (key === "MUSIC") {
         const first = (val.split(/\s+/)[0] || "").toLowerCase();
-        if (first && first !== "beat" && first !== "none" && !SET.moods.has(first) && !/\.(mp3|wav|m4a|ogg)$/i.test(val))
-          out.push(`MUSIC: beat 110 / none / mood (${V.moods.join(", ")}) / assets/music/ ki file likho`);
+        if (first && first !== "beat" && first !== "none" && first !== "gemini" && !SET.moods.has(first) && !/\.(mp3|wav|m4a|ogg)$/i.test(val))
+          out.push(`MUSIC: beat 110 / none / gemini <style> / mood (${V.moods.join(", ")}) / assets/music/ ki file likho`);
         continue;
       }
       if (key === "LIGHTS" || key === "LIGHT") {

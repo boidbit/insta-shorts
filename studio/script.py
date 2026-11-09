@@ -67,7 +67,7 @@ import os
 import re
 import zlib
 
-from . import actions, audio, objects, rides, styles
+from . import actions, audio, gemini_music, objects, rides, styles
 from .characters import (ACCESSORIES, EXPRESSIONS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE,
                          SKIN_TONES)
 from .util import asset_path
@@ -429,10 +429,13 @@ LYRIC_STEP = 3.2          # seconds each lyric stays on screen when SECONDS is n
 
 def _split_lyrics(text):
     """(meta, lyric lines) if `text` is just lyrics, else None (it is a structured script)."""
-    meta, lyrics = {}, []
+    meta, lyrics, sung = {}, [], []
     for raw in text.splitlines():
         line = raw.strip()
         if not line or line.startswith("//"):
+            continue
+        if gemini_music.is_section(line):               # [Verse] / [Chorus]: for the singer, not for the screen
+            sung.append(line)
             continue
         m = re.match(r"^([A-Za-z_]+)\s*:\s*(.*)$", line)
         if m and m.group(1).upper() in LYRIC_META:
@@ -444,6 +447,8 @@ def _split_lyrics(text):
                 or re.match(r"^[A-Za-z_]\w*\s*(?:\([^)]*\))?\s*:\s*\S", line):
             return None
         lyrics.append(line.partition("|")[0].strip() or line)     # `Roman | देवनागरी`: show the first part
+        sung.append(line.partition("|")[2].strip() or lyrics[-1])   # ...and sing the Devanagari part (like the voice)
+    meta["_sung"] = sung
     return (meta, lyrics) if lyrics else None
 
 
@@ -476,6 +481,12 @@ def parse_lyrics(meta, lyrics):
     mv = meta.get("MUSIC", "").strip()
     if mv.lower() == "none":
         music = None
+    elif mv.lower().startswith("gemini"):                # MUSIC: gemini <style>: your lyrics, sung as a full song
+        music = gemini_music.music_spec(mv, meta.get("_sung") or lyrics)
+        music["lyrics_lines"] = list(lyrics)
+        music["lyrics_meta"] = {k: v for k, v in meta.items() if not k.startswith("_") and k not in ("SECONDS", "MUSIC")}
+        if meta.get("SECONDS"):
+            warnings.append("SECONDS: gaana ban jaane par video gaane jitni lambi hoti hai, SECONDS use nahi hota")
     elif mv and not mv.lower().startswith("beat"):
         music = {"path": mv, "volume": 0.55}
     else:
@@ -1025,6 +1036,8 @@ def parse_script(text):
     mood = mv.split()[0].lower() if mv else ""
     if mv.lower() == "none":
         music = None
+    elif mood == "gemini":                                # MUSIC: gemini <style>: instrumental music from Gemini
+        music = gemini_music.music_spec(mv)
     elif mood == "beat" or mood in audio.MOODS:           # MUSIC: beat 110 / MUSIC: sad / MUSIC: suspense 90
         bpm = re.findall(r"\d+", mv)
         music["bpm"] = int(bpm[0]) if bpm else MOOD_BPM.get(mood, 100)
@@ -1034,6 +1047,8 @@ def parse_script(text):
         music = {"path": mv, "volume": 0.3}
     if music and music.get("type") == "beat":            # every video gets its own tune
         music["seed"] = zlib.crc32((hook or "reel").encode("utf-8")) % 997
+    if music and music.get("type") == "gemini":
+        music["fallback"]["seed"] = zlib.crc32((hook or "reel").encode("utf-8")) % 997
     scene = {
         "hook": hook,
         "meta": {"fps": 30, "line_gap": 0.3},

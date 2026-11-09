@@ -18,7 +18,7 @@ import time
 import numpy as np
 from PIL import Image, ImageChops, ImageOps
 
-from . import actions, audio, objects, rides, styles, ui
+from . import actions, audio, gemini_music, objects, rides, styles, ui
 from .backgrounds import Background
 from .characters import LA, UA, DEFAULT_POSE, build_character, render_ops, skeleton
 from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_at, compile_music, compile_scene,
@@ -1070,6 +1070,7 @@ class Sequence(Output):
 
 
 def make_video(scene, width=1080, use_tts=True, fps=None, tts_provider=None, dialogue=None, hook=None, style=None):
+    scene = gemini_music.prepare(scene, use_tts)        # `MUSIC: gemini ...`: the song (or the beat if Gemini cannot)
     if dialogue or hook:
         scene = apply_options(scene, dialogue, hook)
     if style:                                       # "2d" / "2.5d" from the command line / web page wins

@@ -100,6 +100,27 @@ Agar text me `CAST:` / `SCENE:` / `A -> ...` / `NAME: ...` wali koi line nahi ha
 - **Awaaz nahi gaati.** Is mode me koi voice hai hi nahi: sirf lyrics + halka beat. Asli gaana: `MUSIC: none` rakho aur gaana Instagram me upar se daalo (copyright wahi sambhalta hai). Lyrics ki timing gaane se match nahi hogi, to `SECONDS` aur lines gaane ke hisaab se adjust karo.
 - Page ka checker ("HOOK/CTA nahi hai") lyrics pe dikkat dikha sakta hai: confirm me "Phir bhi banau" dabao.
 
+#### 🎵 Apni lyrics se poora gaana (Gemini, `MUSIC: gemini`)
+
+Lyrics likho, Gemini (Lyria) **music + gaane wali awaaz** ke saath gaana bana deta hai, wahi `GEMINI_API_KEY` se jo voice ke liye lagi hai.
+
+```
+HOOK: Mummy ka gussa 🎤
+MUSIC: gemini funny bollywood item song, dhol, male and female vocals
+[Verse]
+Mummy naraaz hui, maine kaha kal karunga | मम्मी नाराज़ हुई, मैंने कहा कल करूँगा
+Kal kal karte karte, sink bhar gaya beta | कल कल करते करते, सिंक भर गया बेटा
+[Chorus]
+Mummy naraaz hui re, ab main bhaaga re | मम्मी नाराज़ हुई रे, अब मैं भागा रे
+```
+
+- `MUSIC: gemini <style ke shabd>` = 30 second ka gaana (`lyria-3-clip-preview`). `MUSIC: gemini full <style>` = poora lamba gaana (`lyria-3.5`, kuch minute; key ko is model ka access chahiye).
+- **Gaaya wahi jaata hai jo `|` ke baad Devanagari me likha hai** (na likho to Roman wali line). Screen pe Roman wali line dikhti hai. `[Verse]`, `[Chorus]`, `[Bridge]` wali line gaane ko structure deti hai, screen pe nahi dikhti.
+- Video **gaane jitni lambi** ho jaati hai aur lyrics uspe barabar failti hain (`SECONDS` kaam nahi karta). Gemini line-wise time nahi batata, isliye lyrics ka sync andaaza hai: kabhi ek-do second aage-peeche ho sakta hai.
+- **Kahani wali script** (`CAST` / `SCENE`) me `MUSIC: gemini lofi` sirf background music (bina awaaz) banata hai.
+- **Kuch na ban paye** (free plan me access nahi, quota khatam, key nahi, network) **to studio ka apna beat lag jata hai aur video phir bhi banti hai.** Log me `[music] Gemini could not make the song (...)` likha aata hai, wahi wajah hai.
+- Wahi lyrics + style dobara ho to gaana cache se aata hai (API dobara nahi lagti). Har gaane me Google ka SynthID watermark hota hai (sunai nahi deta). Free key me ye chalega ya nahi, Google ne docs me nahi likha: pehli baar chalake dekho.
+
 ## Camera, objects aur naye formats
 
 - **Camera apne aap:** har bolne wali line par speaker pe cut-in + halka push-in, punchline pe sabse tight shot + shake, phir wide reaction. Band karna ho: JSON me `"meta": {"auto_camera": false}`. Apni marzi: line ke brackets me `wide`, `medium`, `close`, `two_shot` (jaise `A (shock, close): ...` ya `ALL -> wide`).

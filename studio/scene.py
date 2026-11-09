@@ -891,6 +891,8 @@ def compile_music(m, duration):
         return None
     if isinstance(m, str):
         m = {"path": m}
+    if m.get("type") == "gemini":                       # no song was made (frame preview, no network): the beat
+        return compile_music(m.get("fallback"), duration)
     vol = float(m.get("volume", 0.35))
     if m.get("type") == "beat":
         p = audio.beat_path(float(m.get("bpm", 104)), duration, m.get("style", "desi"), seed=m.get("seed"))
