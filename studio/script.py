@@ -1050,10 +1050,11 @@ def parse_script(text):
         except ValueError:
             warnings.append("STYLE %r: 2d ya 2.5d likho" % meta["STYLE"])
     if scene.get("style") == "2.5d":
-        flat = sorted({sc["background"].get("type") for sc in scenes} - set(styles.PLACES_25D))
+        flat = sorted({str(sc["background"].get("type")) for sc in scenes
+                       if not styles.has_depth(sc["background"].get("type"))})
         if flat:
-            warnings.append("STYLE 2.5d: %s 2.5D me flat dikhegi (2.5D jagahein: %s)"
-                            % (", ".join(map(str, flat)), ", ".join(sorted(styles.PLACES_25D))))
+            warnings.append("STYLE 2.5d: %s 2.5D me flat dikhegi (baaki har jagah 2.5D me gehraai ke saath banti hai)"
+                            % ", ".join(flat))
     if len([n for n in cast if n != "NARRATOR"]) > 3:
         warnings.append("more than 3 characters: the screen gets crowded")
     return scene, warnings

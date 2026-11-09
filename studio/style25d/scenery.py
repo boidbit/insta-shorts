@@ -799,11 +799,18 @@ class StudioBackdrop:
     (zoom za, left/top in logical units) and the in-shot camera (zoom zc, crop window left/top in px).
     """
 
-    def __init__(self, preset, out_w, out_h, zmax=1.0, time=None, grade=None):
+    def __init__(self, preset, out_w, out_h, zmax=1.0, time=None, grade=None, extra=None):
         self.preset = preset
         self.W, self.H = out_w, out_h
         self.s = out_w / float(LW)
-        self.layered = PRESETS[preset](self.s, zmax)
+        if preset.startswith("auto:"):              # any studio place, split into depth layers automatically
+            from .autoset import build_auto
+            self.layered = build_auto(preset[5:], self.s, zmax, time)
+        else:
+            self.layered = PRESETS[preset](self.s, zmax)
+        for ly in extra or []:                      # e.g. the place's moving clouds / birds (far) and traffic (near)
+            back = self.layered.back
+            back.insert(next((i for i, b in enumerate(back) if b.d > ly.d), len(back)), ly)
         self._cache = {}
         self._sprite_cache = {}
         if time and grade:

@@ -45,26 +45,30 @@ def _wall_floor(g, wall, floor, y_floor, kind="wood", line=None, skirting=None):
 
 
 def _sky(g, top, bottom, y1=1300):
-    g.vgrad(0, y1, top, bottom)
+    with g.on("sky"):
+        g.vgrad(0, y1, top, bottom)
 
 
 def _window(g, x0, y0, x1, y1, view="day"):
     g.rect(x0, y0, x1, y1, (250, 250, 248), INK, 8)
-    sky = {"day": (170, 214, 238), "night": (28, 32, 66), "city": (160, 200, 230)}[view]
-    g.rect(x0 + 16, y0 + 16, x1 - 16, y1 - 16, sky)
-    if view == "city":
-        rnd = random.Random(int(x0))
-        x = x0 + 16
-        while x < x1 - 20:
-            w = rnd.randint(40, 80)
-            h = rnd.randint(int((y1 - y0) * 0.3), int((y1 - y0) * 0.75))
-            g.rect(x, y1 - 16 - h, min(x + w, x1 - 16), y1 - 16, (120, 140, 170))
-            x += w + 4
-    elif view == "day":
-        g.poly([(x0 + 16, y1 - 80), ((x0 + x1) / 2, y1 - 160), (x1 - 16, y1 - 90), (x1 - 16, y1 - 16),
-                (x0 + 16, y1 - 16)], (150, 200, 150))
-    else:
-        g.circle(x1 - 70, y0 + 80, 26, (250, 244, 210))
+    g.punch(x0 + 16, y0 + 16, x1 - 16, y1 - 16)        # 2.5D: the view outside is its own (far) layer
+    with g.on("window"):
+        sky = {"day": (170, 214, 238), "night": (28, 32, 66), "city": (160, 200, 230)}[view]
+        g.rect(x0 + 16, y0 + 16, x1 - 16, y1 - 16, sky)
+        if view == "city":
+            rnd = random.Random(int(x0))
+            x = x0 + 16
+            while x < x1 - 20:
+                w = rnd.randint(40, 80)
+                h = rnd.randint(int((y1 - y0) * 0.3), int((y1 - y0) * 0.75))
+                g.rect(x, y1 - 16 - h, min(x + w, x1 - 16), y1 - 16, (120, 140, 170))
+                x += w + 4
+        elif view == "day":
+            g.poly([(x0 + 16, y1 - 80), ((x0 + x1) / 2, y1 - 160), (x1 - 16, y1 - 90), (x1 - 16, y1 - 16),
+                    (x0 + 16, y1 - 16)], (150, 200, 150))
+        else:
+            g.circle(x1 - 70, y0 + 80, 26, (250, 244, 210))
+    g.note_window(x0 + 16, y0 + 16, x1 - 16, y1 - 16)
     g.line([((x0 + x1) / 2, y0 + 16), ((x0 + x1) / 2, y1 - 16)], INK, 6)
     g.line([(x0 + 16, (y0 + y1) / 2), (x1 - 16, (y0 + y1) / 2)], INK, 6)
 
@@ -113,7 +117,9 @@ def _string_lights(g, x0, x1, y, sag=60, n=14, seed=4):
         u = (i + 0.5) / n
         x = x0 + (x1 - x0) * u
         yy = y + sag * math.sin(math.pi * u)
-        g.circle(x, yy + 12, 10, cols[rnd.randint(0, 4)], INK, 2)
+        c = cols[rnd.randint(0, 4)]
+        g.circle(x, yy + 12, 10, c, INK, 2)
+        g.note_light(x, yy + 12, 10, c)
 
 
 def _garland(g, x0, x1, y, sag=50, col=(246, 150, 40)):
@@ -125,6 +131,11 @@ def _garland(g, x0, x1, y, sag=50, col=(246, 150, 40)):
 
 
 def _buildings(g, y_base, seed=7, h=(400, 800), cols=None, windows=True, night=False):
+    with g.on("far"):                               # 2.5D: the skyline is a far layer (moves slower than the ground)
+        _buildings_draw(g, y_base, seed, h, cols, windows, night)
+
+
+def _buildings_draw(g, y_base, seed, h, cols, windows, night):
     rnd = random.Random(seed)
     cols = cols or [(210, 150, 120), (170, 190, 200), (222, 190, 120), (170, 150, 190), (150, 190, 160)]
     x = -20
@@ -584,15 +595,18 @@ def gym(s):
 # ------------------------------------------------------------------ mood scenes
 def jungle(s):
     g = G(s)
-    g.vgrad(0, 1300, (90, 150, 120), (150, 190, 140))
+    with g.on("sky"):
+        g.vgrad(0, 1300, (90, 150, 120), (150, 190, 140))
     rnd = random.Random(12)
     for layer, (col, tr) in enumerate((((60, 110, 80), (70, 60, 50)), ((44, 94, 60), (60, 50, 40)), ((30, 76, 46), (50, 40, 34)))):
-        for i in range(7):
-            x = rnd.randint(-60, LW + 60)
-            w = 26 + layer * 14
-            g.rect(x - w / 2, 200 + layer * 80, x + w / 2, 1320, tr)
-            for j in range(3):
-                g.circle(x + rnd.randint(-120, 120), 180 + layer * 90 + rnd.randint(-60, 160), 120 + layer * 20, col)
+        with g.on(("far", "mid", "set")[layer]):          # 2.5D: three rows of trees at three depths
+            for i in range(7):
+                x = rnd.randint(-60, LW + 60)
+                w = 26 + layer * 14
+                g.rect(x - w / 2, 200 + layer * 80, x + w / 2, 1320, tr)
+                for j in range(3):
+                    g.circle(x + rnd.randint(-120, 120), 180 + layer * 90 + rnd.randint(-60, 160), 120 + layer * 20,
+                             col)
     for x in range(0, LW, 90):                            # vines
         g.line([(x, 0), (x + 20, 200 + (x * 37) % 300)], (40, 100, 50), 5)
     g.rect(0, 1300, LW, LH, (70, 90, 50))
@@ -604,17 +618,19 @@ def jungle(s):
     for x in (260, 620, 880):                             # light rays
         d.polygon([(x * g.k, 0), ((x + 60) * g.k, 0), ((x + 260) * g.k, 1300 * g.k), ((x + 120) * g.k, 1300 * g.k)],
                   fill=(255, 250, 200, 36))
-    g.im = Image.alpha_composite(g.im.convert("RGBA"), layer).convert("RGB")
-    g.d = ImageDraw.Draw(g.im)
+    g.overlay(layer)
     return g.done()
 
 
 def haunted_house(s):
     g = G(s)
-    g.vgrad(0, 1300, (20, 14, 40), (70, 40, 90))
-    g.circle(820, 280, 110, (240, 236, 200))
-    for (x, y) in ((200, 300), (300, 260), (700, 420)):       # bats
-        g.poly([(x - 40, y), (x - 14, y - 16), (x, y - 4), (x + 14, y - 16), (x + 40, y), (x, y + 10)], (20, 16, 30))
+    with g.on("sky"):
+        g.vgrad(0, 1300, (20, 14, 40), (70, 40, 90))
+        g.circle(820, 280, 110, (240, 236, 200))
+    with g.on("far"):
+        for (x, y) in ((200, 300), (300, 260), (700, 420)):       # bats
+            g.poly([(x - 40, y), (x - 14, y - 16), (x, y - 4), (x + 14, y - 16), (x + 40, y), (x, y + 10)],
+                   (20, 16, 30))
     g.poly([(240, 1300), (240, 640), (480, 420), (720, 640), (720, 1300)], (50, 40, 60), INK, 6)
     g.poly([(200, 660), (480, 380), (760, 660)], (36, 28, 46), INK, 6)
     g.rect(420, 520, 540, 620, (250, 220, 120), INK, 5)       # glowing attic window
@@ -634,8 +650,9 @@ def haunted_house(s):
 
 def graveyard(s):
     g = G(s)
-    g.vgrad(0, 1260, (30, 30, 60), (90, 90, 120))
-    g.circle(220, 300, 100, (240, 236, 210))
+    with g.on("sky"):
+        g.vgrad(0, 1260, (30, 30, 60), (90, 90, 120))
+        g.circle(220, 300, 100, (240, 236, 210))
     g.rect(0, 1260, LW, LH, (60, 76, 60))
     g.line([(0, 1260), (LW, 1260)], INK, 5)
     for x in range(0, LW, 60):
@@ -655,12 +672,14 @@ def graveyard(s):
 def beach(s):
     g = G(s)
     _sky(g, (110, 190, 245), (220, 238, 250), 1000)
-    g.circle(820, 300, 90, (255, 226, 130))
-    g.rect(0, 1000, LW, 1260, (60, 150, 210))
-    for i, y in enumerate(range(1030, 1260, 50)):
-        for x in range(-60 + (i % 2) * 60, LW, 120):
-            g.line([(x, y), (x + 30, y - 12), (x + 60, y)], (200, 230, 250), 4)
-    g.line([(0, 1000), (LW, 1000)], INK, 4)
+    with g.on("sky"):
+        g.circle(820, 300, 90, (255, 226, 130))
+    with g.on("far"):                                         # 2.5D: the sea is far away
+        g.rect(0, 1000, LW, 1260, (60, 150, 210))
+        for i, y in enumerate(range(1030, 1260, 50)):
+            for x in range(-60 + (i % 2) * 60, LW, 120):
+                g.line([(x, y), (x + 30, y - 12), (x + 60, y)], (200, 230, 250), 4)
+        g.line([(0, 1000), (LW, 1000)], INK, 4)
     g.poly([(0, 1260), (LW, 1240), (LW, LH), (0, LH)], (240, 220, 170))
     g.line([(0, 1260), (LW, 1240)], INK, 5)
     g.line([(140, 1300), (180, 760)], (150, 110, 70), 22)       # palm
@@ -675,12 +694,14 @@ def beach(s):
 def mountain_road(s):
     g = G(s)
     _sky(g, (130, 190, 240), (230, 240, 248), 1100)
-    g.poly([(-100, 1100), (260, 520), (560, 1100)], (150, 160, 190), INK, 5)
-    g.poly([(300, 1100), (700, 420), (1180, 1100)], (130, 140, 176), INK, 5)
-    g.poly([(640, 470), (700, 420), (760, 470), (730, 500), (680, 490)], (250, 250, 255))
-    g.poly([(0, 1100), (LW, 1100), (LW, 1300), (0, 1300)], (110, 160, 90))
-    for x in range(30, LW, 110):
-        g.poly([(x, 1180), (x + 40, 1060), (x + 80, 1180)], (50, 110, 60), INK, 3)
+    with g.on("far"):                                         # 2.5D: far mountains, a nearer hillside of pines
+        g.poly([(-100, 1100), (260, 520), (560, 1100)], (150, 160, 190), INK, 5)
+        g.poly([(300, 1100), (700, 420), (1180, 1100)], (130, 140, 176), INK, 5)
+        g.poly([(640, 470), (700, 420), (760, 470), (730, 500), (680, 490)], (250, 250, 255))
+    with g.on("mid"):
+        g.poly([(0, 1100), (LW, 1100), (LW, 1300), (0, 1300)], (110, 160, 90))
+        for x in range(30, LW, 110):
+            g.poly([(x, 1180), (x + 40, 1060), (x + 80, 1180)], (50, 110, 60), INK, 3)
     g.rect(0, 1300, LW, LH, (96, 98, 104))
     g.line([(0, 1300), (LW, 1300)], INK, 6)
     for xx in range(-40, LW, 220):
@@ -694,8 +715,10 @@ def mountain_road(s):
 def desert(s):
     g = G(s)
     _sky(g, (250, 190, 110), (250, 236, 190), 1150)
-    g.circle(760, 360, 110, (255, 244, 180))
-    g.poly([(0, 1150), (200, 1060), (420, 1120), (700, 1020), (LW, 1130), (LW, 1300), (0, 1300)], (230, 190, 120))
+    with g.on("sky"):
+        g.circle(760, 360, 110, (255, 244, 180))
+    with g.on("far"):                                         # 2.5D: the far dunes
+        g.poly([(0, 1150), (200, 1060), (420, 1120), (700, 1020), (LW, 1130), (LW, 1300), (0, 1300)], (230, 190, 120))
     g.rect(0, 1240, LW, LH, (240, 206, 140))
     g.poly([(0, 1260), (300, 1200), (600, 1250), (LW, 1210), (LW, LH), (0, LH)], (244, 214, 150))
     g.line([(0, 1260), (300, 1200), (600, 1250), (LW, 1210)], INK, 5)
@@ -749,8 +772,7 @@ def cinema(s):
     layer = Image.new("RGBA", g.im.size, (200, 220, 255, 0))
     ImageDraw.Draw(layer).polygon([(60 * g.k, 760 * g.k), (1020 * g.k, 760 * g.k), (LW * g.k, 1300 * g.k), (0, 1300 * g.k)],
                                   fill=(200, 220, 255, 40))
-    g.im = Image.alpha_composite(g.im.convert("RGBA"), layer).convert("RGB")
-    g.d = ImageDraw.Draw(g.im)
+    g.overlay(layer)
     for row, y in enumerate((1000, 1120, 1250)):
         for x in range(20 + row * 30, LW, 110):
             g.rrect(x, y, x + 96, y + 100, 18, (150, 40, 50), INK, 4)

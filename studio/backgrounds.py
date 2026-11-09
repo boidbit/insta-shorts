@@ -1,5 +1,6 @@
 """Procedural flat-cartoon backgrounds (kitchen, room, street, school, night road, plain)
 plus support for your own PNG/JPG backgrounds."""
+import contextlib
 import math
 import random
 
@@ -24,6 +25,27 @@ class G:
 
     def _p(self, pts):
         return [(x * self.k, y * self.k) for x, y in pts]
+
+    # 2.5D hooks. A normal canvas ignores them (2D pictures stay exactly the same); the 2.5D canvas
+    # (studio.style25d.autoset.LayeredG) sends what is drawn to depth layers and remembers windows / lamps.
+    layered = False
+
+    def on(self, layer):
+        return contextlib.nullcontext()
+
+    def punch(self, x0, y0, x1, y1):
+        pass
+
+    def note_window(self, x0, y0, x1, y1):
+        pass
+
+    def note_light(self, x, y, r, color):
+        pass
+
+    def overlay(self, layer):
+        """Blend a translucent RGBA layer (light rays, a lamp's pool of light) onto the canvas."""
+        self.im = Image.alpha_composite(self.im.convert("RGBA"), layer).convert("RGB")
+        self.d = ImageDraw.Draw(self.im)
 
     def rect(self, x0, y0, x1, y1, fill=None, outline=None, w=5):
         self.d.rectangle([x0 * self.k, y0 * self.k, x1 * self.k, y1 * self.k], fill=fill,
@@ -80,8 +102,7 @@ def _light_patch(g, pts, color=(255, 236, 170), alpha=52, blur=22):
     layer = Image.new("RGBA", g.im.size, color + (0,))
     ImageDraw.Draw(layer).polygon(g._p(pts), fill=color + (alpha,))
     layer = layer.filter(ImageFilter.GaussianBlur(blur * g.k))
-    g.im = Image.alpha_composite(g.im.convert("RGBA"), layer).convert("RGB")
-    g.d = ImageDraw.Draw(g.im)
+    g.overlay(layer)
 
 
 def kitchen(s):
@@ -189,9 +210,12 @@ def room(s):
     g.line([(0, y_floor), (LW, y_floor)], INK, 5)
     # window
     g.rect(110, 430, 450, 960, (255, 255, 255), INK, 8)
-    g.rect(128, 448, 432, 942, (170, 214, 238))
-    g.poly([(128, 800), (230, 700), (330, 780), (432, 690), (432, 942), (128, 942)], (150, 200, 150))
-    g.circle(360, 540, 40, (255, 232, 140))
+    g.punch(128, 448, 432, 942)
+    with g.on("window"):
+        g.rect(128, 448, 432, 942, (170, 214, 238))
+        g.poly([(128, 800), (230, 700), (330, 780), (432, 690), (432, 942), (128, 942)], (150, 200, 150))
+        g.circle(360, 540, 40, (255, 232, 140))
+    g.note_window(128, 448, 432, 942)
     g.line([(280, 448), (280, 942)], INK, 7)
     g.line([(128, 695), (432, 695)], INK, 7)
     g.poly([(60, 400), (170, 400), (160, 1000), (60, 1000)], (200, 110, 100), INK, 5)
@@ -225,20 +249,22 @@ def room(s):
 # ------------------------------------------------------------------ street
 def street(s):
     g = G(s)
-    g.vgrad(0, 900, (150, 205, 240), (226, 240, 248))
-    g.circle(860, 260, 80, (255, 226, 130))
+    with g.on("sky"):
+        g.vgrad(0, 900, (150, 205, 240), (226, 240, 248))
+        g.circle(860, 260, 80, (255, 226, 130))
     rnd = random.Random(7)
     x = -20
     cols = [(210, 150, 120), (170, 190, 200), (222, 190, 120), (170, 150, 190), (150, 190, 160)]
-    while x < LW:
-        w = rnd.randint(190, 300)
-        h = rnd.randint(500, 900)
-        c = cols[rnd.randint(0, len(cols) - 1)]
-        g.rect(x, 1240 - h, x + w, 1240, c, INK, 6)
-        for wy in range(1240 - h + 40, 1180, 110):
-            for wx in range(x + 30, x + w - 50, 70):
-                g.rect(wx, wy, wx + 38, wy + 62, (250, 236, 170) if rnd.random() < .4 else (140, 175, 205), INK, 3)
-        x += w + 6
+    with g.on("far"):
+        while x < LW:
+            w = rnd.randint(190, 300)
+            h = rnd.randint(500, 900)
+            c = cols[rnd.randint(0, len(cols) - 1)]
+            g.rect(x, 1240 - h, x + w, 1240, c, INK, 6)
+            for wy in range(1240 - h + 40, 1180, 110):
+                for wx in range(x + 30, x + w - 50, 70):
+                    g.rect(wx, wy, wx + 38, wy + 62, (250, 236, 170) if rnd.random() < .4 else (140, 175, 205), INK, 3)
+            x += w + 6
     g.rect(0, 1240, LW, 1370, (206, 202, 192))
     g.line([(0, 1240), (LW, 1240)], INK, 5)
     g.line([(0, 1370), (LW, 1370)], INK, 6)
@@ -287,7 +313,8 @@ def school(s):
 # ------------------------------------------------------------------ market (bazaar)
 def market(s):
     g = G(s, color=(250, 232, 196))
-    g.vgrad(0, 760, (246, 196, 140), (252, 232, 190))
+    with g.on("sky"):
+        g.vgrad(0, 760, (246, 196, 140), (252, 232, 190))
     g.rect(0, 640, LW, 1300, (214, 168, 128), INK, 6)
     g.line([(0, 560), (LW, 600), (LW, 560)], INK, 4)
     for i, x in enumerate(range(0, LW + 90, 90)):                                   # bunting
@@ -329,11 +356,14 @@ def office(s):
     g.rect(0, 0, LW, y_floor, (226, 230, 238))
     g.rect(0, y_floor - 70, LW, y_floor, (204, 210, 222))
     g.rect(620, 330, 1030, 900, (255, 255, 255), INK, 8)                              # big window with a skyline
-    g.rect(638, 348, 1012, 882, (170, 214, 240))
-    for (x0, w, h) in ((650, 70, 260), (730, 90, 360), (830, 70, 200), (910, 90, 320)):
-        g.rect(x0, 882 - h, x0 + w, 882, (110, 138, 168), INK, 4)
-        for wy in range(882 - h + 24, 860, 46):
-            g.rect(x0 + 12, wy, x0 + 26, wy + 24, (230, 240, 250))
+    g.punch(638, 348, 1012, 882)
+    with g.on("window"):
+        g.rect(638, 348, 1012, 882, (170, 214, 240))
+        for (x0, w, h) in ((650, 70, 260), (730, 90, 360), (830, 70, 200), (910, 90, 320)):
+            g.rect(x0, 882 - h, x0 + w, 882, (110, 138, 168), INK, 4)
+            for wy in range(882 - h + 24, 860, 46):
+                g.rect(x0 + 12, wy, x0 + 26, wy + 24, (230, 240, 250))
+    g.note_window(638, 348, 1012, 882)
     g.line([(826, 348), (826, 882)], INK, 6)
     g.rect(80, 420, 520, 760, (252, 252, 250), INK, 8)                                # whiteboard
     g.line([(130, 500), (300, 480), (380, 520)], (60, 100, 190), 6)
@@ -363,18 +393,21 @@ def office(s):
 # ------------------------------------------------------------------ bus stop
 def bus_stop(s):
     g = G(s)
-    g.vgrad(0, 1000, (150, 205, 240), (226, 240, 248))
-    g.circle(200, 240, 80, (255, 226, 130))
+    with g.on("sky"):
+        g.vgrad(0, 1000, (150, 205, 240), (226, 240, 248))
+        g.circle(200, 240, 80, (255, 226, 130))
     rnd = random.Random(11)
     x = -30
-    while x < LW:
-        w = rnd.randint(170, 260)
-        h = rnd.randint(380, 720)
-        g.rect(x, 1180 - h, x + w, 1180, [(190, 176, 160), (160, 184, 200), (206, 176, 120)][rnd.randint(0, 2)], INK, 6)
-        for wy in range(1180 - h + 36, 1130, 100):
-            for wx in range(x + 24, x + w - 40, 62):
-                g.rect(wx, wy, wx + 30, wy + 54, (140, 175, 205), INK, 3)
-        x += w + 8
+    with g.on("far"):
+        while x < LW:
+            w = rnd.randint(170, 260)
+            h = rnd.randint(380, 720)
+            g.rect(x, 1180 - h, x + w, 1180, [(190, 176, 160), (160, 184, 200), (206, 176, 120)][rnd.randint(0, 2)],
+                   INK, 6)
+            for wy in range(1180 - h + 36, 1130, 100):
+                for wx in range(x + 24, x + w - 40, 62):
+                    g.rect(wx, wy, wx + 30, wy + 54, (140, 175, 205), INK, 3)
+            x += w + 8
     g.rect(0, 1180, LW, 1330, (206, 202, 192))
     g.line([(0, 1180), (LW, 1180)], INK, 5)
     g.line([(0, 1330), (LW, 1330)], INK, 6)
@@ -680,10 +713,12 @@ class Background:
             self._draw_ambient(base, t)
         return base
 
-    def _draw_ambient(self, img, t):
+    def _draw_ambient(self, img, t, kinds=None):
         s = self.out_w / float(LW)
         for n, item in enumerate(self.ambient):
             kind = item[0]
+            if kinds is not None and kind not in kinds:
+                continue
             if kind == "cloud":
                 _k, y, speed, scale = item
                 sp = self._clouds.get(scale)

@@ -1,4 +1,5 @@
-"""The 2.5D style: picked per video, only some places change, 2d stays exactly as it was."""
+"""The 2.5D style: picked per video, every place gets depth (hand-made sets or made automatically), 2d stays
+exactly as it was."""
 import json
 import os
 import re
@@ -38,11 +39,21 @@ class StyleWordsTests(unittest.TestCase):
             styles.normalize("3d")
         self.assertEqual(styles.scene_style({}), "2d")
 
-    def test_only_the_2_5d_places_change(self):
+    def test_which_set_each_place_gets(self):
         self.assertEqual(styles.preset_for(one_scene("kitchen", "2.5d")), "kitchen_25d")
         self.assertEqual(styles.preset_for(one_scene("chai_tapri", "2.5d")), "gali_25d")
-        self.assertIsNone(styles.preset_for(one_scene("office", "2.5d")))
+        self.assertEqual(styles.preset_for(one_scene("office", "2.5d")), "auto:office")      # made automatically
+        self.assertIsNone(styles.preset_for(one_scene("plain", "2.5d")))                     # stays flat
         self.assertIsNone(styles.preset_for(one_scene("kitchen")))           # 2d
+
+    def test_every_place_has_depth_in_2_5d(self):
+        from studio.style25d.autoset import build_auto
+        for place in script.vocab()["places"]:
+            if place in styles.FLAT_IN_25D or place in styles.PLACES_25D:
+                continue
+            self.assertTrue(styles.has_depth(place), place)
+            layered = build_auto(place, 0.1)
+            self.assertGreaterEqual(len(layered.back), 2, place)              # at least a sky and the set
 
     def test_every_preset_exists(self):
         from studio.style25d.scenery import PRESETS
@@ -62,9 +73,11 @@ class ScriptTests(unittest.TestCase):
         self.assertNotIn("style", sc)
 
     def test_flat_place_is_mentioned_but_not_a_problem_for_the_ai(self):
-        text = SCRIPT.format(place="office").replace("CAST:", "STYLE: 2.5d\nCAST:") + "CAPTION: x\n"
+        text = SCRIPT.format(place="plain").replace("CAST:", "STYLE: 2.5d\nCAST:") + "CAPTION: x\n"
         _sc, w = script.parse_script(text)
         self.assertTrue(any("2.5D me flat" in x for x in w))
+        _sc, w = script.parse_script(text.replace("SCENE: plain", "SCENE: office"))
+        self.assertFalse(any("2.5D me flat" in x for x in w))
         self.assertFalse(any("2.5D me flat" in p for p in director.script_problems(text, "/tmp/_style25d_check.json")))
 
     def test_bad_style_warns(self):
@@ -97,13 +110,13 @@ class RenderTests(unittest.TestCase):
     def frame(self, scene, t=1.0):
         return Renderer(scene, self.W, use_tts=False).frame(t)
 
-    def test_other_places_render_exactly_like_2d(self):
-        a = self.frame(one_scene("office"))
-        b = self.frame(one_scene("office", "2.5d"))
+    def test_flat_places_render_exactly_like_2d(self):
+        a = self.frame(one_scene("plain"))
+        b = self.frame(one_scene("plain", "2.5d"))
         self.assertEqual(a.tobytes(), b.tobytes())
 
     def test_2_5d_places_look_different(self):
-        for place in ("kitchen", "gully", "terrace"):
+        for place in ("kitchen", "gully", "terrace", "office", "jungle"):
             a = self.frame(one_scene(place))
             b = self.frame(one_scene(place, "2.5d"))
             self.assertNotEqual(a.tobytes(), b.tobytes(), place)
@@ -116,9 +129,20 @@ class RenderTests(unittest.TestCase):
         self.assertIsNone(make_video(sc, self.W, use_tts=False).parts[0].bd25)
 
     def test_signs_are_never_mirrored(self):
-        r = Renderer(dict(one_scene("gully", "2.5d"), angle=1), self.W, use_tts=False)   # angle 1 = a mirrored shot
-        self.assertTrue(r.plan.angle["mirror"])
-        self.assertFalse(r._view25(1.0)["mirror"])
+        for place in ("gully", "canteen"):
+            r = Renderer(dict(one_scene(place, "2.5d"), angle=1), self.W, use_tts=False)   # angle 1 = a mirrored shot
+            self.assertTrue(r.plan.angle["mirror"])
+            self.assertFalse(r._view25(1.0)["mirror"], place)
+        r = Renderer(dict(one_scene("office", "2.5d"), angle=1), self.W, use_tts=False)
+        self.assertTrue(r._view25(1.0)["mirror"])                    # no writing: the reverse shot is mirrored
+
+    def test_auto_place_at_night_and_in_a_close_shot(self):
+        for place in ("street", "room"):
+            sc = one_scene(place, "2.5d")
+            sc["background"] = dict(sc["background"], time="night")
+            r = Renderer(dict(sc, angle=3), self.W, use_tts=False)
+            self.assertTrue(r.bd25.preset.startswith("auto:"))
+            self.assertEqual(r.frame(1.0).size, self.frame(one_scene(place)).size)
 
 
 class PageTests(unittest.TestCase):

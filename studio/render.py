@@ -328,9 +328,12 @@ class Renderer(Output):
         # 2.5D style: kitchen / gully / chai_tapri / kirana / terrace are layered parallax sets (style25d);
         # everything else (and every 2d scene) uses the normal flat place below, unchanged.
         preset = styles.preset_for(scene)
-        self.bd25 = self._backdrop25(preset, scene) if preset else None
-        bg_spec = {"type": "plain", "foreground": [], "ambient": False} if self.bd25 else self.plan.background
+        self._auto25 = bool(preset and preset.startswith("auto:"))
+        # the studio place still brings its foreground props and moving clouds / traffic to an auto 2.5D set
+        bg_spec = self.plan.background if (not preset or self._auto25) else \
+            {"type": "plain", "foreground": [], "ambient": False}
         self.bg = Background(bg_spec, int(self.W * ang["zoom"] + 0.5), int(self.H * ang["zoom"] + 0.5))
+        self.bd25 = self._backdrop25(preset, scene) if preset else None
         self._view25_t, self._view25_v = None, None
         self.overlay_layer = OverlayLayer(self.s)
         self.fx = Effects(self.plan.effects, self.s, self.W, self.H, self.plan.fps)
@@ -396,7 +399,25 @@ class Renderer(Output):
         same = time in (None, "", "day", native) or (native == "sunset" and time == "evening")
         cams = [sg[3] for sg in self.plan.cam_segments] + ([1.05] if self.plan.shakes else [])
         zmax = self.plan.angle["zoom"] * max([1.0] + cams)
-        return StudioBackdrop(preset, self.W, self.H, zmax=min(zmax, 2.4), time=None if same else time, grade=grade)
+        extra = []
+        if preset.startswith("auto:") and self.bg.ambient:
+            from .style25d.scenery import Layer
+            bg = self.bg
+
+            def ambient(kinds):
+                def draw(_im, t):
+                    canvas = Image.new("RGBA", (bg.out_w, bg.out_h), (0, 0, 0, 0))
+                    bg._draw_ambient(canvas, t, kinds)
+                    return canvas
+                return draw
+            k = bg.out_w / float(LW)
+            kinds = {item[0] for item in bg.ambient}
+            if kinds & {"cloud", "birds"}:              # clouds and birds far away in the sky, traffic on the road
+                extra.append(Layer(Image.new("RGBA", (8, 8)), k, 0.1, ambient({"cloud", "birds"}), "sky_life"))
+            if kinds - {"cloud", "birds"}:
+                extra.append(Layer(Image.new("RGBA", (8, 8)), k, 1.0, ambient(kinds - {"cloud", "birds"}), "ambient"))
+        return StudioBackdrop(preset, self.W, self.H, zmax=min(zmax, 2.4), time=None if same else time, grade=grade,
+                              extra=extra)
 
     def _view25(self, t):
         """Shot angle + in-shot camera at time t, as StudioBackdrop wants it (computed like _background and the
@@ -439,12 +460,13 @@ class Renderer(Output):
 
     def _foreground(self, t):
         """The place's foreground props, placed like the background of this shot (angle zoom / mirror)."""
-        if self.bd25 is not None:
+        if self.bd25 is not None and not self._auto25:
             return self.bd25.floor_items(self._view25(t))
         items = self.bg.foreground(t)
         ang = self.plan.angle
         z = ang["zoom"]
-        if not items or (z <= 1.001 and not ang["mirror"]):
+        mirror = ang["mirror"] if self.bd25 is None else self._view25(t)["mirror"]   # props turn with the set
+        if not items or (z <= 1.001 and not mirror):
             return items
         sz = self.s * z
         left = clamp(ang["x"] * sz - self.W / 2.0, 0, self.bg.out_w - self.W) if z > 1.001 else 0
@@ -452,7 +474,7 @@ class Renderer(Output):
         out = []
         for d, im, x, y in items:
             x2, y2 = x - left, y - top
-            if ang["mirror"]:
+            if mirror:
                 im = ImageOps.mirror(im)
                 x2 = self.W - x2 - im.width
             out.append((d, im, int(x2), int(y2)))
