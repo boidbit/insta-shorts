@@ -1,0 +1,17 @@
+HOOK: Bollywood gaana, mummy ke gusse me 🎤😂
+STYLE: 2.5d
+CAST: M = mummy saree maroon bun, B = beta spiky green tshirt
+SCENE: kitchen
+MUSIC: festive 108
+B (grin, sing): Mummy naraaz hui, maine kaha kal karunga | मम्मी नाराज़ हुई, मैंने कहा कल करूँगा
+M (angry, sing): Kal kal karte karte, sink bhar gaya beta | कल कल करते करते, सिंक भर गया बेटा
+CUT
+B (nervous, sing): Phone ki battery low hai, mera dil bhi low hai | फ़ोन की बैटरी लो है, मेरा दिल भी लो है
+M (angry, sing): Chappal utha li maine, ab bhaag ke dikha | चप्पल उठा ली मैंने, अब भाग के दिखा
+CUT
+B (shock, sing): Mummy naraaz hui re, ab main bhaaga re | मम्मी नाराज़ हुई रे, अब मैं भागा रे
+B -> exit left
+M (proud, sing): Beta bartan dho de, warna kal bhi yahi re | बेटा बर्तन धो दे, वरना कल भी यही रे
+CTA: Tag karo apne bartan chor dost ko 👇
+CAPTION: Mummy ka gussa, Bollywood ka tadka 😂
+HASHTAGS: #mummy #bollywood #spoof #desicomedy #funny

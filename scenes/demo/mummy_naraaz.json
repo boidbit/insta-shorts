@@ -1,0 +1,250 @@
+{
+ "hook": "Bollywood gaana, mummy ke gusse me 🎤😂",
+ "meta": {
+  "fps": 30,
+  "line_gap": 0.3,
+  "tts": {
+   "style": "Sing every line as a catchy Bollywood item-song chorus: lively, rhythmic and melodic, with a clear beat and sing-song Hindi, not plain speech. Mummy sings with a stern, teasing attitude, the son sings in a nervous, funny voice. Leave a clear silent pause of about one second between the lines."
+  }
+ },
+ "transition": "whip",
+ "characters": {
+  "M": {
+   "look": "aunty",
+   "outfit": "saree",
+   "color": "maroon",
+   "hair": "bun",
+   "voice": {
+    "name": "hi-IN-SwaraNeural",
+    "pitch": "+0Hz",
+    "rate": "+0%"
+   }
+  },
+  "B": {
+   "look": "college_boy",
+   "hair": "spiky",
+   "color": "green",
+   "outfit": "tshirt",
+   "voice": {
+    "name": "hi-IN-MadhurNeural",
+    "pitch": "+14Hz",
+    "rate": "+0%"
+   }
+  }
+ },
+ "overlays": [
+  {
+   "text": "Bollywood gaana, mummy ke gusse me 🎤😂",
+   "style": "hook",
+   "pos": [
+    540,
+    420
+   ],
+   "from": 0.0,
+   "to": 2.0
+  }
+ ],
+ "scenes": [
+  {
+   "background": {
+    "type": "kitchen"
+   },
+   "cast": [
+    "B",
+    "M"
+   ],
+   "characters": {
+    "B": {
+     "slot": "left",
+     "facing": "right"
+    },
+    "M": {
+     "slot": "right",
+     "facing": "left"
+    }
+   },
+   "timeline": [
+    {
+     "t": 0.0,
+     "who": "all",
+     "action": "idle",
+     "expression": "smile"
+    },
+    {
+     "t": 0.0,
+     "sfx": "whoosh",
+     "volume": 0.7,
+     "camera": {
+      "shake": 0.5
+     }
+    },
+    {
+     "wait": 0.3
+    },
+    {
+     "who": "B",
+     "expression": "grin",
+     "action": "sing",
+     "say": "Mummy naraaz hui, maine kaha kal karunga",
+     "speak": "मम्मी नाराज़ हुई, मैंने कहा कल करूँगा",
+     "look": "M"
+    },
+    {
+     "who": "M",
+     "expression": "angry",
+     "action": "sing",
+     "say": "Kal kal karte karte, sink bhar gaya beta",
+     "speak": "कल कल करते करते, सिंक भर गया बेटा",
+     "look": "B"
+    },
+    {
+     "hold": 1.0
+    }
+   ]
+  },
+  {
+   "background": {
+    "type": "kitchen"
+   },
+   "cast": [
+    "B",
+    "M"
+   ],
+   "characters": {
+    "B": {
+     "slot": "left",
+     "facing": "right"
+    },
+    "M": {
+     "slot": "right",
+     "facing": "left"
+    }
+   },
+   "timeline": [
+    {
+     "t": 0.0,
+     "who": "all",
+     "action": "idle",
+     "expression": "smile"
+    },
+    {
+     "wait": 0.2
+    },
+    {
+     "who": "B",
+     "expression": "nervous",
+     "action": "sing",
+     "say": "Phone ki battery low hai, mera dil bhi low hai",
+     "speak": "फ़ोन की बैटरी लो है, मेरा दिल भी लो है",
+     "look": "M"
+    },
+    {
+     "who": "M",
+     "expression": "angry",
+     "action": "sing",
+     "say": "Chappal utha li maine, ab bhaag ke dikha",
+     "speak": "चप्पल उठा ली मैंने, अब भाग के दिखा",
+     "look": "B"
+    },
+    {
+     "hold": 1.0
+    }
+   ],
+   "cut_in": true,
+   "angle": 1
+  },
+  {
+   "background": {
+    "type": "kitchen"
+   },
+   "cast": [
+    "B",
+    "M"
+   ],
+   "characters": {
+    "B": {
+     "slot": "left",
+     "facing": "right"
+    },
+    "M": {
+     "slot": "right",
+     "facing": "left"
+    }
+   },
+   "timeline": [
+    {
+     "t": 0.0,
+     "who": "all",
+     "action": "idle",
+     "expression": "smile"
+    },
+    {
+     "wait": 0.2
+    },
+    {
+     "who": "B",
+     "expression": "shock",
+     "action": "sing",
+     "say": "Mummy naraaz hui re, ab main bhaaga re",
+     "speak": "मम्मी नाराज़ हुई रे, अब मैं भागा रे",
+     "look": "M"
+    },
+    {
+     "who": "B",
+     "facing": "left",
+     "move": {
+      "x": -160,
+      "dur": 1.1
+     },
+     "hold": 1.1
+    },
+    {
+     "who": "M",
+     "expression": "proud",
+     "action": "sing",
+     "say": "Beta bartan dho de, warna kal bhi yahi re",
+     "speak": "बेटा बर्तन धो दे, वरना कल भी यही रे",
+     "look": "B"
+    },
+    {
+     "hold": 2.0,
+     "sfx": "pop",
+     "volume": 0.5,
+     "overlay": {
+      "text": "Tag karo apne bartan chor dost ko 👇",
+      "style": "card",
+      "pos": [
+       540,
+       640
+      ],
+      "color": [
+       236,
+       90,
+       70
+      ]
+     }
+    }
+   ],
+   "cut_in": true,
+   "angle": 2
+  }
+ ],
+ "post": {
+  "caption": "Mummy ka gussa, Bollywood ka tadka 😂",
+  "hashtags": [
+   "#mummy",
+   "#bollywood",
+   "#spoof",
+   "#desicomedy",
+   "#funny"
+  ]
+ },
+ "music": {
+  "type": "beat",
+  "bpm": 108,
+  "volume": 0.2,
+  "style": "festive",
+  "seed": 614
+ },
+ "style": "2.5d"
+}
