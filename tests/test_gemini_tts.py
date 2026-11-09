@@ -240,6 +240,52 @@ class MultiSceneTests(GeminiMocked):
         self.assertTrue(all(o["edge"] and not o["paths"] for o in out))
 
 
+DIWALI = ["बेटा, छत की सफ़ाई कर दी?", "हाँ पापा, एकदम चमका दी!", "तो ये पटाखों का कचरा किसका है?"]
+
+
+class CutOffTakeTests(GeminiMocked):
+    """Gemini sometimes returns a take that stops early (a real run: these 3 lines in 1.65 s). It must never be cut
+    into lines and used: ask again, and if it stays broken fall back to edge-tts (auto mode)."""
+
+    def test_the_real_cut_off_take_is_spotted(self):
+        short = fake_take([0.5, 0.3, 0.8], [0.03, 0.03])             # ~1.7 s of voice for 3 lines
+        self.assertIn("too short", g.take_problem(short, DIWALI))
+        self.assertIsNone(g.take_problem(fake_take([2.0, 1.9, 2.4], [0.4, 0.4]), DIWALI))
+
+    def test_a_cut_off_take_is_asked_for_again(self):
+        takes = [fake_take([0.4, 0.3, 0.2], [0.03, 0.03]), fake_take([2.2, 3.0, 0.9], [1.0, 1.0])]
+
+        def fake_request(payload, model=g.DEFAULT_MODEL, **kw):
+            self.calls.append(payload)
+            return takes[len(self.calls) - 1]
+        with mock.patch.object(g, "request_audio", fake_request):
+            plan = compile_scene(self.scene)
+        self.assertEqual(len(self.calls), 2)
+        voiced = [s for s in plan.speech if s["audio"]]
+        self.assertEqual(len(voiced), 3)
+        self.assertGreater(min(s["end"] - s["start"] for s in voiced), 0.7)   # whole lines, not fragments
+
+    def test_always_cut_off_falls_back_to_edge(self):
+        def fake_request(payload, model=g.DEFAULT_MODEL, **kw):
+            self.calls.append(payload)
+            return fake_take([0.4, 0.3, 0.2], [0.03, 0.03])
+        with mock.patch.object(g, "request_audio", fake_request), \
+                mock.patch.object(audio, "synth_tts", return_value=None) as edge:
+            compile_scene(self.scene)                                    # auto mode
+        self.assertEqual(len(self.calls), g.TAKE_TRIES)
+        self.assertEqual(edge.call_count, 3)
+        cached = [os.path.join(r, f) for r, _d, fs in os.walk(".cache") for f in fs if f == "full.wav"]
+        self.assertEqual(cached, [])                                     # a broken take is never cached
+
+    def test_a_broken_cached_take_is_not_reused(self):
+        compile_scene(self.scene)                                        # good take, cached
+        full = [os.path.join(r, f) for r, _d, fs in os.walk(".cache") for f in fs if f == "full.wav"][0]
+        g.write_wav(full, fake_take([0.4, 0.3, 0.2], [0.03, 0.03]))      # as if an old run cached a cut-off take
+        plan = compile_scene(self.scene)
+        self.assertEqual(len(self.calls), 2)                             # asked again instead of using it
+        self.assertEqual(len([s for s in plan.speech if s["audio"]]), 3)
+
+
 class QuotaErrorTests(unittest.TestCase):
     """A 429 is only "the day's quota is gone" when the server gives no short retry time."""
 

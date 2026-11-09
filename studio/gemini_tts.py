@@ -287,6 +287,38 @@ def _align(gaps, weights, t_first, t_last, n):
     return [gaps[j] for j in reversed(chosen)]
 
 
+# ------------------------------------------------------------------ is the take complete?
+MAX_CHARS_PER_SEC = 12.0     # a normal Hindi take runs ~6 letters/s; twice that = a cut-off or garbled take
+TAKE_TRIES = 3               # ask Gemini this many times for a complete take, then give up (auto mode -> edge-tts)
+
+
+def _letters(text):
+    return max(3, len(re.sub(r"[\W_]+", "", text)))
+
+
+def take_problem(x, texts, sr=SR):
+    """None if the take can hold all the lines, else a short reason.
+
+    Gemini now and then returns a take that stops early (3 lines in 2 s). Cut into lines it plays as fragments
+    and long silences in the video, so such a take is never used or cached."""
+    hop = int(sr * 0.01)
+    m = len(x) // hop
+    if m < 5:
+        return "take is empty"
+    rms = np.sqrt((x[: m * hop].reshape(m, hop) ** 2).mean(axis=1))
+    thr = max(float(np.percentile(rms, 95)) * 0.05, 1e-4)
+    voiced = np.flatnonzero(rms >= thr)
+    if voiced.size == 0:
+        return "take is silent"
+    span = (int(voiced[-1]) + 1 - int(voiced[0])) * 0.01
+    letters = sum(_letters(t) for t in texts)
+    need = max(letters / MAX_CHARS_PER_SEC, 0.25 * len(texts))
+    if span < need:
+        return "take too short: %.1fs of voice for %d lines (%d letters need at least %.1fs)" % (
+            span, len(texts), letters, need)
+    return None
+
+
 # ------------------------------------------------------------------ public: one call for the whole script
 def _shape(src, dst, st, rate):
     """Per-character pitch (semitones) + speed on a clip via ffmpeg. Writes dst; returns the path to use."""
@@ -322,17 +354,35 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
     d = os.path.join(cache_dir, "gemini_" + key)
     os.makedirs(d, exist_ok=True)
     full = os.path.join(d, "full.wav")
+    texts = [it["text"] for it in items]
+    x = None
     if os.path.isfile(full) and os.path.getsize(full) > 2000:
         x, _ = read_wav(full)
-        print("  [gemini] using cached voice (%d lines, no API call)" % len(items), file=sys.stderr)
-    else:
-        print("  [gemini] 1 request for %d lines (%s)" % (len(items), model), file=sys.stderr)
-        x = request_audio(build_payload(lines, style), model)
+        bad = take_problem(x, texts)
+        if bad:                                                    # a cut-off take from before this check
+            print("  [gemini] cached voice is broken (%s), asking again" % bad, file=sys.stderr)
+            os.remove(full)
+            x = None
+        else:
+            print("  [gemini] using cached voice (%d lines, no API call)" % len(items), file=sys.stderr)
+    if x is None:
+        bad = None
+        for attempt in range(TAKE_TRIES):
+            print("  [gemini] 1 request for %d lines (%s)%s" % (len(items), model,
+                                                               " - try %d" % (attempt + 1) if attempt else ""),
+                  file=sys.stderr)
+            x = request_audio(build_payload(lines, style), model)
+            bad = take_problem(x, texts)
+            if not bad:
+                break
+            print("  [gemini] %s" % bad, file=sys.stderr)
+        if bad:
+            raise GeminiTTSError("Gemini kept returning a cut-off take (%s)" % bad)
         peak = float(np.abs(x).max()) if x.size else 0.0
         if peak > 1e-4:
             x = x * (0.9 / peak)                                   # one gain for the whole take
         write_wav(full, x)
-    spans, method = split_audio(x, [it["text"] for it in items])
+    spans, method = split_audio(x, texts)
     if method != "pauses":
         print("  [gemini] pauses unclear, split lines by text length instead (check lip-sync)", file=sys.stderr)
     paths = []
