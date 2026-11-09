@@ -147,8 +147,10 @@ ROLE_LOOKS = {
     "dost": "boy", "friend": "boy", "bhai": "college_boy", "brother": "college_boy", "beta": "college_boy",
     "behen": "college_girl", "sister": "college_girl", "beti": "college_girl", "didi": "college_girl",
     "teacher": "office_guy", "boss": "office_guy", "bachcha": "kid", "student": "kid",
+    "pujari": "pandit", "panditji": "pandit", "policewala": "police", "inspector": "police", "havaldar": "police",
+    "daroga": "police", "dactor": "doctor", "chaiwale": "chaiwala", "groom": "dulha", "bride": "dulhan",
 }
-FEMALE_LOOKS = {"girl", "college_girl", "aunty", "dadi", "kid_girl", "office_girl"}
+FEMALE_LOOKS = {"girl", "college_girl", "aunty", "dadi", "kid_girl", "office_girl", "madam", "dulhan"}
 PITCHES = ["+0Hz", "+14Hz", "-8Hz", "+24Hz", "-14Hz"]
 BUILDS = ("slim", "normal", "chubby")
 GENDER_WORDS = ("female", "woman", "ladki", "aurat", "male", "man", "ladka", "aadmi")

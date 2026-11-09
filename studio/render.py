@@ -26,6 +26,7 @@ from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_
 from .animals import ANIMALS, build_animal
 from .effects import Effects, Patch
 from .sets import Sets
+from .style25d import shading
 from .text import bubble_image, chat_image, styled_box
 from .util import LH, LW, clamp, ease_in_out, ease_out, ease_out_back, load_scene
 
@@ -895,10 +896,9 @@ class Renderer(Output):
             r = render_ops(P["ops"], s, self.W, self.H)
             if r:
                 layer, (ox, oy) = r
-                if self._tint25:                    # 2.5D: the set's light falls on the people too
-                    rgb = ImageChops.multiply(layer.convert("RGB"), Image.new("RGB", layer.size, self._tint25))
-                    rgb.putalpha(layer.getchannel("A"))
-                    layer = rgb
+                if self.bd25 is not None:           # 2.5D: the set's light falls on the people (colour, shadow side, rim)
+                    ldir = self.bd25.light.get("dir", -1) * (-1 if self._view25(t)["mirror"] else 1)
+                    layer = shading.volume(layer, s * P["k"], ldir, self._tint25)
                 img.paste(layer, (ox, oy), layer)
             anchors[c.name] = P["an"]
             rf = P["rf"]

@@ -293,8 +293,8 @@ def build_auto(place, s, zmax=1.0, time=None):
 def _sky_used(lg):
     sky = lg.layers["sky"]
     base = sky.getpixel((2, 2))
-    small = sky.resize((16, 28))
-    return any(px != base for px in small.getdata())
+    small = np.asarray(sky.resize((16, 28)))
+    return bool((small != np.array(base)).any())
 
 
 BUILTIN_FLOOR = {"kitchen": 1240, "room": 1260, "living_room": 1260, "street": 1370, "school": 1290,

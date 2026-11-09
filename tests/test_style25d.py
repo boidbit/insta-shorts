@@ -145,6 +145,36 @@ class RenderTests(unittest.TestCase):
             self.assertEqual(r.frame(1.0).size, self.frame(one_scene(place)).size)
 
 
+class PeopleTests(unittest.TestCase):
+    NEW_LOOKS = ("pandit", "police", "doctor", "chaiwala", "madam", "dulha", "dulhan", "gym_bro")
+
+    def test_new_looks_everywhere(self):
+        from studio.characters import LOOKS
+        v = script.vocab()
+        for look in self.NEW_LOOKS:
+            self.assertIn(look, LOOKS)
+            self.assertIn(look, v["looks"])
+            self.assertTrue(os.path.isfile(os.path.join(ROOT, "assets", "looks", look + ".png")), look)
+        self.assertIn("madam", script.FEMALE_LOOKS)
+        self.assertIn("dulhan", script.FEMALE_LOOKS)
+        self.assertEqual(script.ROLE_LOOKS["policewala"], "police")
+
+    def test_cast_line_picks_a_new_look(self):
+        sc, w = script.parse_script(SCRIPT.format(place="mandap").replace("A = college_boy, B = uncle",
+                                                                         "A = dulha, B = pujari"))
+        self.assertEqual((sc["characters"]["A"]["look"], sc["characters"]["B"]["look"]), ("dulha", "pandit"))
+
+    def test_shading_keeps_the_shape(self):
+        from PIL import Image, ImageDraw
+        from studio.style25d.shading import volume
+        im = Image.new("RGBA", (120, 300), (0, 0, 0, 0))
+        ImageDraw.Draw(im).rounded_rectangle([20, 10, 100, 290], 30, fill=(80, 130, 200, 255))
+        out = volume(im, 1.0, -1, (255, 250, 240))
+        self.assertEqual(out.getchannel("A").tobytes(), im.getchannel("A").tobytes())
+        left, right = out.getpixel((26, 150)), out.getpixel((94, 150))
+        self.assertGreater(sum(left[:3]), sum(right[:3]))            # lit from the left: the right side is darker
+
+
 class PageTests(unittest.TestCase):
     def test_page_knows_the_2_5d_places(self):
         m = re.search(r"const STYLE_PLACES = (\[[^\]]*\]);", PAGE)

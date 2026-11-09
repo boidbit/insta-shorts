@@ -200,7 +200,7 @@ S (shock): Yeh kya hai?? | ...
 
 ## Characters
 
-Ready looks: `boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, kid, kid_girl, office_guy, office_girl`. Har cheez badal sakte ho:
+Ready looks: `boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, kid, kid_girl, office_guy, office_girl, pandit, police, doctor, chaiwala, madam, dulha, dulhan, gym_bro`. Har cheez badal sakte ho:
 
 ```json
 "R": { "look": "uncle", "outfit": "kurta", "color": "saffron", "accessories": ["turban", "beard"], "build": "chubby" }

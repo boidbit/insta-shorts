@@ -15,8 +15,8 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5
 
 ## Allowed words (use ONLY these; anything else is ignored)
 
-- Roles: mummy, papa, dadi, dada, nani, nana, chacha, chachi, dost, bhai, behen, beta, beti, didi, teacher, boss, bachcha, padosi, padosan.
-  Looks: boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, kid, kid_girl, office_guy, office_girl.
+- Roles: mummy, papa, dadi, dada, nani, nana, chacha, chachi, dost, bhai, behen, beta, beti, didi, teacher, boss, bachcha, padosi, padosan, pujari, policewala, inspector, havaldar, daroga, groom, bride.
+  Looks: boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, kid, kid_girl, office_guy, office_girl, pandit, police, doctor, chaiwala, madam (lady teacher), dulha, dulhan, gym_bro.
   Animals (they can talk too, and count as characters): dog / kutta, cat / billi, cow / gaay, crow / kauwa, parrot / tota, monkey / bandar. One color word after it is the fur: `B = kutta brown`.
 - Extras after the role/look (optional, plain words, no brackets): glasses, sunglasses, cap, turban, moustache, beard, bindi, tilak, earrings, chubby, slim, kurta, saree, salwar, shirt, tshirt, uniform, blazer, vest, and colors (red, blue, green, pink, maroon, navy, mustard, saffron, yellow, purple, white, black, grey).
   Hair: short, side_part, spiky, curly, balding, bald, long, braid, bun, ponytail. Skin: fair, wheatish, brown, dark. Build: slim, chubby.

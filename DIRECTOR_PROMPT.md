@@ -29,7 +29,7 @@ Single-scene videos put `"background"` and `"timeline"` at the top level instead
 ## Characters (Indian cartoon people)
 
 ```
-{ "look": "boy|girl|college_boy|college_girl|uncle|aunty|dada|dadi|kid|kid_girl|office_guy|office_girl",
+{ "look": "boy|girl|college_boy|college_girl|uncle|aunty|dada|dadi|kid|kid_girl|office_guy|office_girl|pandit|police|doctor|chaiwala|madam|dulha|dulhan|gym_bro",
   "slot": "left|center|right",  // or "x": 190 (logical canvas is 1080 wide; off-screen start: -140 or 1200)
   "facing": "front|left|right",
   "voice": { "name": "hi-IN-MadhurNeural|hi-IN-SwaraNeural", "pitch": "+0Hz", "rate": "+0%" },

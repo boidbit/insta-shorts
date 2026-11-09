@@ -99,6 +99,23 @@ LOOKS = {
                        shoes="black", accessories=["glasses"]),
     "office_girl": dict(skin="wheatish", hair="long", outfit="blazer", color="grey", pants="black", accent="pink",
                         shoes="black", accessories=["earrings"]),
+    # more people for the stories (made from the same parts)
+    "pandit": dict(skin="brown", hair="bald", outfit="kurta", color="saffron", pants="white", shoes="chappal",
+                   build="chubby", accessories=["tilak"]),
+    "police": dict(skin="brown", hair="short", outfit="shirt", color="khaki", pants="khaki", shoes="black",
+                   cap_color="khaki", accessories=["cap", "moustache"]),
+    "doctor": dict(skin="fair", hair="side_part", outfit="blazer", color="white", pants="navy", accent="sky",
+                   shoes="black", accessories=["glasses"]),
+    "chaiwala": dict(skin="dark", hair="curly", outfit="vest", color="white", pants="khaki", shoes="chappal",
+                     build="slim", accessories=["moustache"]),
+    "madam": dict(skin="fair", hair="bun", outfit="saree", color="teal", accent="gold", shoes="chappal",
+                  accessories=["glasses", "bindi", "earrings"]),
+    "dulha": dict(skin="wheatish", hair="short", outfit="kurta", color="cream", pants="cream", accent="gold",
+                  shoes="brown", turban_color="red", accessories=["turban"]),
+    "dulhan": dict(skin="fair", hair="bun", outfit="saree", color="red", accent="gold", shoes="chappal",
+                   accessories=["bindi", "earrings"]),
+    "gym_bro": dict(skin="brown", hair="spiky", outfit="vest", color="black", pants="grey", shoes="white",
+                    accessories=["sunglasses"]),
 }
 
 HEAD_RX = 78.0
