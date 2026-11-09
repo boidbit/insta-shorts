@@ -1,0 +1,13 @@
+HOOK: TV ka remote = ghar ki asli satta 📺😂
+STYLE: 2.5d
+CAST: P = papa moustache, B = beta curly tshirt green
+SCENE: room
+B (excited, fist_pump): Papa, bas ek over aur, India jeetne wala hai! | पापा, बस एक ओवर और, इंडिया जीतने वाला है!
+P (sly, hands_on_hips): Aur tumhara result bhi aaj hi aane wala hai. | और तुम्हारा रिज़ल्ट भी आज ही आने वाला है।
+CUT
+B (shock): Papa, aap match dekh lo, main padhne jaata hoon. | पापा, आप मैच देख लो, मैं पढ़ने जाता हूँ।
+B -> exit right
+P (smug, thumbs_up): Remote wapas, sab shaanti. | रिमोट वापस, सब शांति।
+CTA: Tag karo us bhai ko 👇
+CAPTION: Remote ki ladai har ghar me 😂
+HASHTAGS: #papa #desicomedy #cricket #relatable #funny

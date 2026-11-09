@@ -785,10 +785,21 @@ PRESETS = {
     "diwali_rooftop": diwali_rooftop,
     "kitchen_25d": _lazy("scenery_kitchen", "kitchen_25d"),
     "gali_25d": _lazy("scenery_gali", "gali_25d"),
+    "room_25d": _lazy("scenery_home", "room_25d"),
+    "classroom_25d": _lazy("scenery_home", "classroom_25d"),
 }
 
 
 # ------------------------------------------------------------------ the studio's 2.5d set
+SUNLIT = {"sunlight", "dust", "chalk dust"}         # light layers that come from the sun (they fade at night)
+
+
+def _fade(im, f):
+    out = im.copy()
+    out.putalpha(im.getchannel("A").point(lambda v: int(v * f)))
+    return out
+
+
 class StudioBackdrop:
     """A 2.5D preset as the studio renderer uses it.
 
@@ -828,9 +839,17 @@ class StudioBackdrop:
             rgb = grade(im.convert("RGB"), time)
             rgb.putalpha(im.getchannel("A"))
             return rgb
+        dark = time in ("night", "rain")
         for ly in self.layered.back + self.layered.front:
             if ly.mode != "screen" and ly.im.width > 8:
                 ly.im = regrade(ly.im)
+            elif ly.mode != "screen" and ly.fn is not None:          # moving parts (a ceiling fan) too
+                ly.fn = (lambda fn: lambda im, t: regrade(fn(im, t)))(ly.fn)
+            elif dark and ly.name in SUNLIT:                         # no sunbeam at night
+                if ly.fn is not None:
+                    ly.fn = (lambda fn: lambda im, t: _fade(fn(im, t), 0.18))(ly.fn)
+                else:
+                    ly.im = _fade(ly.im, 0.18)
         for sp in self.layered.sprites:
             sp.im = regrade(sp.im)
 

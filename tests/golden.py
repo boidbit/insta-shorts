@@ -37,6 +37,9 @@ CASES = [
     ("25d", "scripts/25d/gali_udhaar.txt", [1.0, 4.0, 9.0]),
     ("25d", "scripts/25d/kitchen_mummy.txt", [1.0, 4.0]),
     ("25d", "scripts/25d/diwali_terrace.txt", [1.0, 4.0]),
+    ("25d", "scripts/25d/ghar_remote.txt", [1.0, 5.0]),
+    ("25d", "scripts/25d/class_test.txt", [1.0, 5.0]),
+    ("25d", "scripts/25d/shaadi_pandit.txt", [1.0, 5.0]),
 ]
 
 _RUNNER = r"""

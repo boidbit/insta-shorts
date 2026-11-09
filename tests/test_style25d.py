@@ -42,6 +42,8 @@ class StyleWordsTests(unittest.TestCase):
     def test_which_set_each_place_gets(self):
         self.assertEqual(styles.preset_for(one_scene("kitchen", "2.5d")), "kitchen_25d")
         self.assertEqual(styles.preset_for(one_scene("chai_tapri", "2.5d")), "gali_25d")
+        self.assertEqual(styles.preset_for(one_scene("living_room", "2.5d")), "room_25d")
+        self.assertEqual(styles.preset_for(one_scene("classroom", "2.5d")), "classroom_25d")
         self.assertEqual(styles.preset_for(one_scene("office", "2.5d")), "auto:office")      # made automatically
         self.assertIsNone(styles.preset_for(one_scene("plain", "2.5d")))                     # stays flat
         self.assertIsNone(styles.preset_for(one_scene("kitchen")))           # 2d
@@ -116,7 +118,7 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(a.tobytes(), b.tobytes())
 
     def test_2_5d_places_look_different(self):
-        for place in ("kitchen", "gully", "terrace", "office", "jungle"):
+        for place in ("kitchen", "gully", "terrace", "room", "school", "office", "jungle"):
             a = self.frame(one_scene(place))
             b = self.frame(one_scene(place, "2.5d"))
             self.assertNotEqual(a.tobytes(), b.tobytes(), place)
@@ -129,15 +131,19 @@ class RenderTests(unittest.TestCase):
         self.assertIsNone(make_video(sc, self.W, use_tts=False).parts[0].bd25)
 
     def test_signs_are_never_mirrored(self):
-        for place in ("gully", "canteen"):
+        for place in ("gully", "canteen", "school"):
             r = Renderer(dict(one_scene(place, "2.5d"), angle=1), self.W, use_tts=False)   # angle 1 = a mirrored shot
             self.assertTrue(r.plan.angle["mirror"])
             self.assertFalse(r._view25(1.0)["mirror"], place)
         r = Renderer(dict(one_scene("office", "2.5d"), angle=1), self.W, use_tts=False)
         self.assertTrue(r._view25(1.0)["mirror"])                    # no writing: the reverse shot is mirrored
 
+    def test_premium_sets_move(self):
+        r = Renderer(one_scene("room", "2.5d"), self.W, use_tts=False)
+        self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.03).tobytes())       # the fan turns, the TV flickers
+
     def test_auto_place_at_night_and_in_a_close_shot(self):
-        for place in ("street", "room"):
+        for place in ("street", "bedroom"):
             sc = one_scene(place, "2.5d")
             sc["background"] = dict(sc["background"], time="night")
             r = Renderer(dict(sc, angle=3), self.W, use_tts=False)

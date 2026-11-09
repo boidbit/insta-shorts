@@ -26,7 +26,7 @@ Har video ke liye style chuno: GitHub Pages wale page pe sabse upar **Style: 2D 
 | Style | Kya hota hai |
 |---|---|
 | **2D** (default) | Studio ka normal look, bilkul pehle jaisa (koi farq nahi: `tests/golden.py` har bar pixel-by-pixel check karta hai). |
-| **2.5D** | Wahi log, wahi script, wahi saare shabd. Bas ye 5 jagah **gehrai wale sets** ban jaati hain: `kitchen` (din ki rasoi, khidki ke bahar ka nazara, jaali wali dhoop, cooker ki bhaap), `gully` / `chai_tapri` / `kirana` (golden-hour gali: kirana dukaan, bijli ka khamba + taar, chai tapri), `terrace` (Diwali ki raat ki chhat: jhalar, diye, patakhe). Camera zoom/shot badalne pe door ki cheezein dheere aur paas ki tez khiskti hain (parallax), door ka hissa halka blur, lights chamakti hain, aage blur me cheezein. Baaki jagah 2.5D me bhi normal dikhti hain. |
+| **2.5D** | Wahi log, wahi script, wahi saare shabd. **Har jagah gehrai ke saath** banti hai: aasmaan, door ki imaaratein / ped / pahad / samundar aur khidki ka nazara alag parat me (auto 2.5D: har jagah ki apni 2D drawing se). Camera zoom/shot badalne pe door ki cheezein dheere aur paas ki tez khiskti hain (parallax), door ka hissa halka blur, khidki aur jhalar chamakti hain, andar ki jagah me aage ek blur paudha. Logon pe us jagah ki roshni: ek taraf parchhai, doosri taraf halki chamak. **Premium sets** (haath se bane, sabse zyada gehrai): `kitchen` (din ki rasoi, khidki ke bahar ka nazara, jaali wali dhoop, cooker ki bhaap), `gully` / `chai_tapri` / `kirana` (golden-hour gali: kirana dukaan, bijli ka khamba + taar, chai tapri), `terrace` (Diwali ki raat ki chhat: jhalar, diye, patakhe), `room` / `living_room` (ghar ka kamra: sofa, TV ki jhilmil, ghoomta pankha, kaleen, dhoop me dhool), `school` / `classroom` (blackboard pe chalk se likha, teacher ki table + globe, bench, do pankhe, chalk ki dhool). Sirf apni photo, `plain` aur `night_road` flat rehti hain. |
 
 - Script me: `HOOK:` ke baad `STYLE: 2.5d` likho (na likho = 2D). Page ka Style button aur script ki ye line saath-saath badalte hain.
 - Time word bhi chalta hai: `SCENE: kitchen night` / `SCENE: gully rain` (set ka rang badalta hai, lights jalti rehti hain). `terrace` hamesha raat hai.
@@ -200,7 +200,7 @@ S (shock): Yeh kya hai?? | ...
 
 ## Characters
 
-Ready looks: `boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, kid, kid_girl, office_guy, office_girl, pandit, police, doctor, chaiwala, madam, dulha, dulhan, gym_bro`. Har cheez badal sakte ho:
+Ready looks: `boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, kid, kid_girl, office_guy, office_girl, pandit, police, doctor, chaiwala, madam, dulha, dulhan, gym_bro` (roles bhi: `pujari`, `policewala`, `inspector`, `havaldar`, `daroga`, `groom`, `bride`...). Har cheez badal sakte ho:
 
 ```json
 "R": { "look": "uncle", "outfit": "kurta", "color": "saffron", "accessories": ["turban", "beard"], "build": "chubby" }

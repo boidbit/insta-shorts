@@ -1,0 +1,12 @@
+HOOK: Kal test hai 😱
+STYLE: 2.5d
+CAST: T = madam, S = student spiky, R = student curly glasses
+SCENE: classroom
+T (proud, point): Bachcho, kal surprise test hai! | बच्चो, कल सरप्राइज़ टेस्ट है!
+S (shock): Madam, surprise bata diya to surprise kaisa? | मैडम, सरप्राइज़ बता दिया तो सरप्राइज़ कैसा?
+CUT
+T (sly, arms_crossed): To ab test aaj hi hoga. | तो अब टेस्ट आज ही होगा।
+R (cry, facepalm): Bhai, tujhe chup rehna tha. | भाई, तुझे चुप रहना था।
+CTA: Tag karo apne backbencher dost ko 👇
+CAPTION: Har class me ek aisa hota hai 😂
+HASHTAGS: #school #teacher #desicomedy #exam #funny
