@@ -256,6 +256,7 @@ Ready looks: `boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, ki
 - `skin`: fair, wheatish, brown, dark · `hair`: short, side_part, spiky, curly, balding, bald, long, braid, bun, ponytail · `hair_color`: black, brown, grey, white, henna
 - `outfit`: tshirt, shirt, kurta, salwar (dupatta ke saath), saree, uniform, blazer, vest · `color` / `accent` (dupatta, blouse, tie) / `pants` / `shoes` (black, white, chappal)
 - **Chehra** (face): `face` oval, round, long, square · `eyes` dot, big, small · `nose` hook, button, long, big · `brows` normal, thick, thin. Script me CAST words: `round_face big_eyes button_nose thick_brows`. Na likho to studio har character ko apna alag chehra deta hai (pehla character classic chehra), aur ek jaise do characters (do `college_boy`) ko alag baal, rang (skin) aur shirt ka colour.
+- **Lambai aur wazan**: sab ek jaise nahi lagte: studio har video me logon ko alag body deta hai (koi lamba-patla, koi nata-mota...). Khud chunna ho to CAST me `mota / moti` (chubby), `patla / patli` (slim), `lamba / lambi` (tall), `nata / nati` (short; `short` akela baal ka style hai). JSON: `"height": "tall" | "short"`, `"build"`. `CAMERA: classic` me sab pehle jaise.
 - `build`: slim, normal, chubby · `scale` (bachche ~0.72) · `accessories`: glasses, cap, turban, moustache, beard, bindi, tilak, earrings
 - 17 expressions, 17 actions (walk, talk, dance, point, laugh, shock, jump, wave, clap, cry, fall, facepalm, shrug, sway, sleep...)
 - **Desi dance pack** (music ki beat pe chalta hai, `MUSIC: beat 110`): `naagin` (haath maathe pe phan), `bhangra`, `aeroplane` (uncle special), `thumka`, `dance_walk` (chalte-chalte dance, `night_road` pe best), `kamar_dard` (hero dance… phir kamar jawab de deti hai), `sing` (mic apne aap haath me, mooh gaata hai). Example: `scripts/shaadi_dance.txt`.
@@ -279,6 +280,27 @@ Ready looks: `boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, ki
 ```
 
 Poora example: `scenes/doodh_story_demo.json`. Poora schema: `DIRECTOR_PROMPT.md`. Music aur upar wale overlays (hook, caption) poori video pe chalte hain; transition `whip | fade | cut`.
+
+### Lambi duniya: ek hi take me ek jagah se doosri jagah (`pan`) 🎥
+
+Pehle naya SCENE = camera cut. Ab koi bhi character chalta / bhaagta hua agli jagah tak jaa sakta hai aur **camera bina cut ke saath chalta hai**: purani jagah side se nikal jaati hai, nayi andar aati hai, beech me deewar ka kona, aur character ke pair zameen pe tike rehte hain.
+
+```
+SCENE: room
+M (angry): Raju, doodh le aa! | राजू, दूध ले आ!
+R -> exit right            <- (exit right fast = bhaagta hai)
+SCENE: street pan           <- R chalta hua sadak tak, ek hi shot me
+S: Aao Raju, chai piyoge? | आओ राजू, चाय पियोगे?
+R -> exit right fast
+SCENE: jail pan             <- phir sadak se jail (koi bhi jagah, kitni bhi baar)
+```
+
+- Kaun jaata hai: pichhle scene ka aakhri `X -> exit left|right`; ya naam do: `SCENE: school pan A`.
+- Nayi jagah ke log tab tak apni jagah khade rehte hain; unki baat chalne wale ke pahunchne ke baad shuru hoti hai. Scene ka title (`| Bazaar`) chalte waqt hi chhota card ban kar dikhta hai (beech me poori screen ka card nahi).
+- JSON me: agle scene me `"pan": {"who": "R", "run": true}`.
+- Demo: `scripts/demo/jail_se_ghar.txt` (chor jail ka darwaza todta hai, phir jail → sadak → ghar ek hi take me).
+
+**Jail ka darwaza**: har `SCENE: jail` me salakhon wala darwaza (`jail_door`) apne aap hota hai: `C -> kick` phir `OBJ: jail_door broken` = dhadaam se girta hai (awaaz + camera jhatka); `OBJ: jail_door open` = khul jaata hai.
 
 ## Hook styles (pehla second)
 

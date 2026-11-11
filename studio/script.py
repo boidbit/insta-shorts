@@ -80,6 +80,7 @@ BACKGROUNDS = tuple(dict.fromkeys(("kitchen", "room", "street", "school", "marke
                                    "plain", "living_room", "classroom") + tuple(_LOC)))
 TIMES = ("day", "night", "evening", "sunset", "dawn", "rain")      # SCENE: <place> night
 WEATHER = ("snow", "fog", "fireflies", "leaves")                    # SCENE: <place> fog
+PAN_WORDS = ("pan", "follow")      # SCENE: street pan = one take: whoever just left walks on into the next place
 from .characters import PROPS as _HELD   # noqa: E402
 
 PROPS = tuple(_HELD)
@@ -95,7 +96,9 @@ from . import sets as _sets   # noqa: E402
 
 # set pieces for OBJ: lines (table / dustbin stay the OBJ objects they already were)
 SET_TYPES = tuple(sorted(k for k in _sets.SPEC if k not in ("table", "dustbin")))
-SET_STATES = ("open", "closed", "on", "off", "ringing", "idle", "rustle", "night", "day")
+SET_STATES = ("open", "closed", "on", "off", "ringing", "idle", "rustle", "night", "day", "broken")
+# the jail's barred door is a set piece over the painted one: `OBJ: jail_door broken` / `OBJ: jail_door open`
+JAIL_DOOR = {"id": "jail_door", "type": "jail_door", "x": 930, "y": 1290, "fit": True}
 SET_X = {"far_left": 120, "left": 230, "center": 540, "right": 850, "far_right": 960}
 SEAT_ACTIONS = ("sit", "lie_down", "lie", "sleep_lie", "rofl")
 
@@ -178,7 +181,7 @@ def vocab():
                          | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS) | set(FACE_WORDS)),
         "expressions": sorted(EXPRESSIONS), "actions": sorted(actions.ACTIONS),
         "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS), "fx": sorted(FX),
-        "times": sorted(TIMES + WEATHER),
+        "times": sorted(TIMES + WEATHER), "pan_words": list(PAN_WORDS),
         "sets": sorted(SET_TYPES), "set_words": sorted(set(SET_STATES) | set(SET_X) | {"big", "small", "back", "front", "flip"}),
         "seat_actions": sorted(SEAT_ACTIONS), "animals": sorted(ANIMAL_WORDS),
         "moods": sorted(audio.MOODS), "ambience": sorted(audio.AMBIENCE),
@@ -606,6 +609,20 @@ def ui_line(key, val):
     return spec, 2.4, None
 
 
+def pan_traveler(prev, who=None):
+    """`SCENE: <place> pan`: who walks from the scene `prev` into the next one, and which way. The one whose
+    `X -> exit left|right` comes last in prev (or `who`, if named). None if nobody."""
+    for ln in reversed(prev["lines"]):
+        if ln[0] != "do" or (who and ln[1] != who):
+            continue
+        words = [w.lower() for w in ln[2]]
+        if "exit" in words:
+            i = words.index("exit")
+            side = words[i + 1] if i + 1 < len(words) and words[i + 1] in ("left", "right") else "right"
+            return {"who": ln[1], "dir": side}
+    return {"who": who, "dir": "right"} if who else None
+
+
 def resolve_background(raw):
     """`street` / `gali` (= assets/backgrounds/gali.png) / `assets/backgrounds/x.jpg` -> (background dict, warning)."""
     name = raw.strip()
@@ -804,6 +821,14 @@ def parse_script(text):
             elif key == "SCENE":
                 bg, _, rest = val.partition("|")
                 title, _, frame = rest.partition("|")
+                bgw, pan = bg.split(), None
+                pi = next((i for i, w in enumerate(bgw) if w.lower() in PAN_WORDS), None)
+                if pi is not None and pi > 0:       # `SCENE: street pan` / `SCENE: street pan C`
+                    nxt = bgw[pi + 1] if pi + 1 < len(bgw) else None
+                    named = nxt if nxt and (nxt in cast or re.match(r"^[A-Z]\w*$", nxt)) else None
+                    pan = {"who": named}
+                    bgw = bgw[:pi] + bgw[pi + (2 if named else 1):]
+                    bg = " ".join(bgw)
                 bg, warn = resolve_background(bg.strip() or "room")
                 if warn:
                     warnings.append(warn)
@@ -813,6 +838,10 @@ def parse_script(text):
                     frame = ""
                 cur = new_scene(bg, title.strip() or None)
                 cur["framing"] = frame or None
+                if pan:
+                    cur["pan"] = pan
+                if bg.get("type") == "jail":
+                    cur["sets"] = {"jail_door": dict(JAIL_DOOR)}
             else:
                 meta[key] = val
             continue
@@ -939,6 +968,16 @@ def parse_script(text):
             if ln[0] in ("do", "say") and ln[1].upper() not in ("ALL", "NARRATOR") and ln[1] not in order:
                 order.append(ln[1])
         narrated = any(ln[0] == "say" and ln[1] == "NARRATOR" for ln in sc["lines"])
+        pan = None
+        if sc.get("pan") and si:
+            pan = pan_traveler(scenes[si - 1], sc["pan"].get("who"))
+            if pan is None:
+                warnings.append("SCENE pan: pichhle scene se kaun chalkar aaye? Pichhla scene `C -> exit right` par "
+                                "khatam karo, ya `SCENE: <jagah> pan C` likho")
+            else:                                   # they come in on the side they walked towards
+                if pan["who"] in order:
+                    order.remove(pan["who"])
+                order.insert(0 if pan["dir"] == "right" else len(order), pan["who"])
         for name in order:
             if declared and name not in cast:
                 warnings.append("%s CAST me nahi hai: CAST line me '%s = <role/look>' jodo" % (name, name))
@@ -1081,6 +1120,8 @@ def parse_script(text):
             item["ambience"] = sc["ambience"]
         if sc["title"]:
             item["title"] = sc["title"]
+        if pan:
+            item["pan"] = pan
         if sc.get("framing"):
             item["framing"] = sc["framing"]
         if sc.get("cut_in"):

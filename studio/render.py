@@ -16,20 +16,20 @@ import sys
 import time
 
 import numpy as np
-from PIL import Image, ImageChops, ImageOps
+from PIL import Image, ImageChops, ImageDraw, ImageOps
 
 from . import actions, audio, gemini_music, objects, rides, styles, ui
 from .backgrounds import Background
 from .characters import LA, SH, TH, UA, DEFAULT_POSE, build_character, render_ops, skeleton
 from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_at, camera_roll, camera_whip,
-                    compile_music, compile_scene,
-                    prepare_voice, split_scenes, static_overlays)
+                    compile_music, compile_scene, ease_travel,
+                    prepare_voice, split_scenes, start_xs, static_overlays)
 from .animals import ANIMALS, build_animal
 from .effects import Effects, Patch
 from .sets import Sets
 from .style25d import shading
 from .text import bubble_image, chat_image, styled_box
-from .util import LH, LW, clamp, ease_in_out, ease_out, ease_out_back, load_scene
+from .util import LH, LW, clamp, ease_in_out, ease_out, ease_out_back, lerp, load_scene
 
 POS = {"top": (540, 330), "center": (540, 960), "lower": (540, 1450), "bottom": (540, 1560),
        "upper": (540, 520)}
@@ -723,7 +723,7 @@ class Renderer(Output):
 
     def _travel(self, c, t):
         """Logical px walked so far (all moves up to t): the legs step with the distance, so feet do not slide."""
-        d = 0.0
+        d = getattr(c, "travel0", 0.0)
         for m in c.moves:
             if m[0] >= t:
                 break
@@ -1022,61 +1022,83 @@ class Renderer(Output):
             img = Image.blend(img, img.convert("L").convert("RGB"), 0.85)
         return img
 
-    def story_frame(self, t):
+    def _prep(self, c, t, states, k=None):
+        """Everything about one character at time t (pose, drawing ops, anchors); painted by draw_char. k = draw
+        them at this size instead of their own (the one-take walk from one place into the next)."""
+        k = c.draw_scale(t) if k is None else k
+        E = self._eff(c, t)
+        st, x, y, action, a_t0, mv, rf = E["st"], E["x"], E["y"], E["action"], E["a_t0"], E["mv"], E["rf"]
+        states[c.name] = st
+        pose = self._build_pose(c, t, E)
+        if not rf and not c.spec.get("kind"):
+            pose = self._blend_from_previous(c, t, E, pose)     # one action flows into the next
+        pose = self._apply_crouch(pose)
+        singing = action in actions.SING_ACTIONS and not st["talking"]
+        self._smooth_gaze(c, t, E, pose)        # eyes and face glide to a new target; a new face hides in a blink
+        mouth_open = 0.0
+        chewing = False
+        if st["talking"]:
+            mouth_open = self._lip_open(st["talking"], t)
+        elif singing:                       # sings along to the music: believable mouth movement
+            mouth_open = self._lip_open({}, t)
+        elif pose.get("chew") is not None:  # eating
+            mouth_open, chewing = float(pose["chew"]), pose["chew"] > 0.1
+        blink = self._blinking(c, t) or pose.pop("_face_change", False)
+        spec = dict(c.spec)
+        spec["facing"] = st["facing"]
+        prop = st["prop"] or ("mic" if singing else None) or pose.get("prop")
+        if st["prop"] == "" or pose.get("hide_prop"):
+            prop = None
+        expr = pose.get("face") or st["expression"]      # some actions bring their own face (yawn, sneeze...)
+        speaking = bool(st["talking"]) and st["talking"].get("bubble") != "thought"   # thoughts: lips shut
+        if spec.get("kind") in ANIMALS:          # dog, cat, cow, crow, parrot: their own rig
+            running = bool(mv and len(mv) > 6 and mv[6])
+            dirn = -1 if st["facing"] == "left" else 1
+            k_an = k * (0.82 if spec["kind"] in ("dog", "cat", "cow") else 1.0)   # next to these people
+            ops, an = build_animal(spec, action, t - a_t0, t, x, y, k_an, dirn, bool(mv), running,
+                                   mouth_open if speaking else 0.0, expr)
+        else:
+            ops, an = build_character(spec, pose, expr, mouth_open, t, x, y, k,
+                                      blink=blink, prop=prop, talking=speaking or singing or chewing,
+                                      tear_phase=(t * 1.1) % 1.0)
+            dx = self._keep_in_frame(ops, pose, st, rf)
+            if dx:                              # cine: a body on the floor slides back inside the picture
+                x += dx
+                ops, an = build_character(spec, pose, expr, mouth_open, t, x, y, k,
+                                          blink=blink, prop=prop, talking=speaking or singing or chewing,
+                                          tear_phase=(t * 1.1) % 1.0)
+        return dict(ops=ops, an=an, rf=rf, pose=pose, x=x, y=y, k=k, animal=spec.get("kind"))
+
+    def actor(self, name, t, k=None):
+        """One character alone at story time t, not cut off at the frame edge: (RGBA layer, (left, top) in this
+        shot's frame pixels, prep) or None. The one-take walk carries them from this place into the next."""
+        c = self.plan.chars[name]
+        P = self._prep(c, t, {}, k)
+        shifted = [dict(op, pts=[(x + LW, y) for x, y in op["pts"]]) for op in P["ops"]]
+        r = render_ops(shifted, self.s, 3 * self.W, self.H)
+        if not r:
+            return None
+        layer, (ox, oy) = r
+        if self.bd25 is not None:
+            ldir = self.bd25.light.get("dir", -1) * (-1 if self._view25(t)["mirror"] else 1)
+            layer = shading.volume(layer, self.s * P["k"], ldir, self._tint25)
+        return layer, (ox - int(round(LW * self.s)), oy), P
+
+    def story_frame(self, t, hide=(), bare=False):
+        """The picture at story time t. hide = names left out; bare = no lens vignette, captions, fades or whip
+        streak (a part of the one-take walk between two places, put together by Sequence)."""
         plan, s = self.plan, self.s
         img = self._background(t)
         self._draw_objects(img, t, False)
         light = self._light_level(t)
         for im_, (px_, py_) in self.sets.wall(t, power=light >= 0.5):     # doors, windows, clocks, fans...
             img.paste(im_, (px_, py_), im_)
-        order = sorted((c for c in plan.chars.values() if not c.spec.get("hidden")),
+        order = sorted((c for c in plan.chars.values() if not c.spec.get("hidden") and c.name not in hide),
                        key=lambda c: (c.draw_pos(t)[1], c.draw_pos(t)[0]))
         anchors = {}
         states = {}
         def prep_char(c):
-            """Everything about this character at time t (pose, drawing ops, anchors); painted by draw_char."""
-            E = self._eff(c, t)
-            st, x, y, action, a_t0, mv, rf = E["st"], E["x"], E["y"], E["action"], E["a_t0"], E["mv"], E["rf"]
-            states[c.name] = st
-            pose = self._build_pose(c, t, E)
-            if not rf and not c.spec.get("kind"):
-                pose = self._blend_from_previous(c, t, E, pose)     # one action flows into the next
-            pose = self._apply_crouch(pose)
-            singing = action in actions.SING_ACTIONS and not st["talking"]
-            self._smooth_gaze(c, t, E, pose)        # eyes and face glide to a new target; a new face hides in a blink
-            mouth_open = 0.0
-            chewing = False
-            if st["talking"]:
-                mouth_open = self._lip_open(st["talking"], t)
-            elif singing:                       # sings along to the music: believable mouth movement
-                mouth_open = self._lip_open({}, t)
-            elif pose.get("chew") is not None:  # eating
-                mouth_open, chewing = float(pose["chew"]), pose["chew"] > 0.1
-            blink = self._blinking(c, t) or pose.pop("_face_change", False)
-            spec = dict(c.spec)
-            spec["facing"] = st["facing"]
-            prop = st["prop"] or ("mic" if singing else None) or pose.get("prop")
-            if st["prop"] == "" or pose.get("hide_prop"):
-                prop = None
-            expr = pose.get("face") or st["expression"]      # some actions bring their own face (yawn, sneeze...)
-            speaking = bool(st["talking"]) and st["talking"].get("bubble") != "thought"   # thoughts: lips shut
-            if spec.get("kind") in ANIMALS:          # dog, cat, cow, crow, parrot: their own rig
-                running = bool(mv and len(mv) > 6 and mv[6])
-                dirn = -1 if st["facing"] == "left" else 1
-                k_an = c.draw_scale(t) * (0.82 if spec["kind"] in ("dog", "cat", "cow") else 1.0)   # next to these people
-                ops, an = build_animal(spec, action, t - a_t0, t, x, y, k_an, dirn, bool(mv), running,
-                                       mouth_open if speaking else 0.0, expr)
-            else:
-                ops, an = build_character(spec, pose, expr, mouth_open, t, x, y, c.draw_scale(t),
-                                          blink=blink, prop=prop, talking=speaking or singing or chewing,
-                                          tear_phase=(t * 1.1) % 1.0)
-                dx = self._keep_in_frame(ops, pose, st, rf)
-                if dx:                              # cine: a body on the floor slides back inside the picture
-                    x += dx
-                    ops, an = build_character(spec, pose, expr, mouth_open, t, x, y, c.draw_scale(t),
-                                              blink=blink, prop=prop, talking=speaking or singing or chewing,
-                                              tear_phase=(t * 1.1) % 1.0)
-            return dict(ops=ops, an=an, rf=rf, pose=pose, x=x, y=y, k=c.draw_scale(t), animal=spec.get("kind"))
+            return self._prep(c, t, states)
 
         prep = {}
         for c in order:
@@ -1180,13 +1202,15 @@ class Renderer(Output):
             img = img.resize((self.W, self.H),      # as an untouched frame; classic stays as it was)
                              Image.BICUBIC if getattr(plan, "camera", "") == "cine" else Image.BILINEAR,
                              box=(vl, vt, vl + vw, vt + vh))
-        t_prev = camera_whip(plan, t, 1.0 / plan.fps) if getattr(plan, "camera", "") == "cine" else None
+        t_prev = camera_whip(plan, t, 1.0 / plan.fps) if getattr(plan, "camera", "") == "cine" and not bare else None
         if t_prev is not None:                      # cine: the camera swings to somebody else: streak the picture
             _z0, l0, _t0, w0, _h0 = self._cam_view(t_prev)
             k = int(min(abs((vl + vw / 2.0) - (l0 + w0 / 2.0)) * z * 0.5, 0.07 * self.W))
             if k >= max(3, int(0.012 * self.W)):
                 img = img.resize((max(1, self.W // k), self.H), Image.BOX).resize((self.W, self.H), Image.BILINEAR)
 
+        if bare:
+            return img
         if self._vig is not None:                   # lens vignette: screen-fixed, under the captions
             img = ImageChops.multiply(img.convert("RGB"), self._vig)
         self.overlay_layer.draw(img, plan.overlays, t)    # captions stay screen-fixed (not zoomed)
@@ -1202,6 +1226,56 @@ class Renderer(Output):
         return img
 
 
+PAN_SPEED = {False: 400.0, True: 820.0}    # one-take walk between places: walking / running pace, logical px/s
+PAN_MIN = {False: 2.2, True: 1.7}          # ... and its shortest time (the camera has a whole picture to cross)
+
+
+def pan_geometry(prev, sub):
+    """The walk of sub["pan"]["who"] from the end of the shot `prev` (a Renderer) into the scene `sub`:
+    where they start / stop, which way, how far and how long. None when it cannot be done."""
+    pan = sub.get("pan")
+    who = pan.get("who") if isinstance(pan, dict) else None
+    if who not in prev.plan.chars or who not in sub.get("characters", {}) or prev.plan.chars[who].spec.get("hidden"):
+        return None
+    c = prev.plan.chars[who]
+    t0 = prev.plan.duration
+    xa, ya = c.pos_at(t0)
+    xa = clamp(xa, -150.0, LW + 150.0)
+    dirn = -1 if pan.get("dir") == "left" else 1
+    xb = start_xs(sub).get(who, LW / 2.0)
+    dist = max(300.0, LW + dirn * (xb - xa))
+    run = bool(pan.get("run"))
+    dur = clamp(dist / (PAN_SPEED[run] * 0.8), PAN_MIN[run], 4.5)
+    return dict(who=who, t0=t0, xa=xa, ya=ya, xb=xb, dirn=dirn, dist=dist, run=run, dur=round(dur, 3),
+                title=pan.get("title"))
+
+
+def link_pan(prev, part, g):
+    """Both shots act out the walk: the one leaving walks out of `prev` after its end, and walks into `part` (whose
+    story waits g["dur"] seconds for them). Both cameras show the whole picture while it happens."""
+    who, t0, dur, dirn, dist, run = g["who"], g["t0"], g["dur"], g["dirn"], g["dist"], g["run"]
+    side = "right" if dirn > 0 else "left"
+    ca, cb = prev.plan.chars[who], part.plan.chars[who]
+    end_a = ca.state_at(t0)
+    ca.events.append({"t": t0, "action": "idle", "facing": side})
+    ca.moves.append((t0, t0 + dur, g["xa"], g["ya"], g["xa"] + dirn * dist, g["ya"], run, "pan"))
+    prev.plan.wide = list(getattr(prev.plan, "wide", [])) + [(t0, t0 + dur + 60.0, 0.8, 0.0)]
+    xb = cb.x
+    cb.moves.insert(0, (0.0, dur, xb - dirn * dist, cb.y, xb, cb.y, run, "pan"))
+    cb.events[:0] = [{"t": 0.0, "facing": side, "expression": end_a["expression"], "prop": end_a["prop"]},
+                     {"t": dur, "facing": cb.spec.get("facing", "front")}]     # (what they carry, they still carry)
+    cb.events.sort(key=lambda e: e["t"])
+    cb.travel0 = prev._travel(ca, t0)               # the feet keep their step from one place into the next
+    part.plan.wide = list(getattr(part.plan, "wide", [])) + [(-1.0, dur, 0.0, 0.9)]
+    for name, vol, at in (("whoosh", 0.5, 0.05), ("footsteps", 0.5, 0.15), ("footsteps", 0.45, 1.6)):
+        if (name == "whoosh") != run and name == "whoosh":
+            continue
+        path = audio.sfx_path(name)
+        if path and at < dur:
+            part.sfx.append(dict(t=at, path=path, volume=vol))
+    g["k"] = (ca.draw_scale(t0), cb.draw_scale(dur))
+
+
 class Sequence(Output):
     """Several scenes back to back + whole-video music and overlays."""
 
@@ -1210,7 +1284,20 @@ class Sequence(Output):
         fps = int(fps or meta.get("fps", 30))
         subs = split_scenes(scene)
         voices = prepare_voice(subs, use_tts, tts_provider)      # one Gemini request for ALL scenes
-        self.parts = [Renderer(sub, width, use_tts, fps, tts_provider, v) for sub, v in zip(subs, voices)]
+        self.parts, self.pans = [], []
+        for sub, v in zip(subs, voices):
+            g = pan_geometry(self.parts[-1], sub) if self.parts and sub.get("pan") else None
+            if g:                                   # one take: this scene waits while they walk in
+                sub = dict(sub, lead_in=max(float(sub.get("lead_in", 0.0)), g["dur"]))
+                if g["title"]:                      # the place's title while they walk in (gone before anyone talks)
+                    sub["overlays"] = list(sub.get("overlays", [])) + [
+                        {"text": g["title"], "style": "card", "pos": "upper", "from": max(0.3, g["dur"] - 1.5),
+                         "to": g["dur"] + 0.1, "color": [40, 40, 48]}]
+            part = Renderer(sub, width, use_tts, fps, tts_provider, v)
+            if g:
+                link_pan(self.parts[-1], part, g)
+            self.parts.append(part)
+            self.pans.append(g)
         self.W, self.H = self.parts[0].W, self.parts[0].H
         self.s = self.W / float(LW)
         self.fps = fps
@@ -1235,13 +1322,72 @@ class Sequence(Output):
             i += 1
         return i
 
+    def _pan_frame(self, i, tau):
+        """The one take: the camera travels with the one walking, out of the last place and into this one.
+        Both places are drawn without them, side by side, sliding by; they are drawn on top, stepping with the
+        ground (their feet stay planted on it as it slides)."""
+        prev, part, g = self.parts[i - 1], self.parts[i], self.pans[i]
+        who, dirn, dist, dur = g["who"], g["dirn"], g["dist"], g["dur"]
+        u = clamp(tau / dur)
+        x = g["xa"] + dirn * dist * ease_travel(u)                  # the walker, in the last place's coordinates
+        on_screen = lerp(g["xa"], g["xb"], ease_in_out(u))        # ... and where the camera keeps them
+        miss = dirn * LW - (g["xa"] + dirn * dist - g["xb"])       # (0 unless the walk had to be lengthened)
+        cam = x - on_screen + miss * ease_in_out(u)
+        off_a = int(round(-cam * self.s))
+        off_b = off_a + dirn * self.W
+        t_a = g["t0"] + tau
+        img = Image.new("RGB", (self.W, self.H))
+        img.paste(prev.story_frame(t_a, hide=(who,), bare=True), (off_a, 0))
+        img.paste(part.story_frame(tau, hide=(who,), bare=True), (off_b, 0))
+        self._seam(img, off_a + (self.W if dirn > 0 else 0), dirn, clamp(u / 0.15) * clamp((1.0 - u) / 0.15))
+        in_prev = (x < LW) if dirn > 0 else (x > 0)
+        src, ts, off = (prev, t_a, off_a) if in_prev else (part, tau, off_b)
+        k = lerp(g["k"][0], g["k"][1], ease_in_out(u))
+        r = src.actor(who, ts, k)
+        if r:
+            layer, (ox, oy), P = r
+            if src.shadows:
+                src._contact_shadow(img, dict(P, x=P["x"] + off / self.s))
+            img.paste(layer, (ox + off, oy), layer)
+        if part._vig is not None:
+            img = ImageChops.multiply(img, part._vig)
+        part.overlay_layer.draw(img, part.plan.overlays, tau)
+        return img
+
+    def _seam(self, img, x, dirn, alpha=1.0):
+        """Where one place meets the next: the edge of a wall (a corner, with its shadow on the far side). It
+        fades in / out at the frame edges, where the take starts and lands on an ordinary shot."""
+        w = max(4, int(0.03 * self.W))
+        if x + w < 0 or x - w > self.W or alpha <= 0.0:
+            return
+        band = Image.new("RGBA", (2 * w, self.H), (0, 0, 0, 0))
+        d = ImageDraw.Draw(band)
+        for i in range(2 * w):                      # the wall's edge, lit on one side
+            f = i / (2.0 * w - 1)
+            c = int(lerp(178, 118, f)) if dirn > 0 else int(lerp(118, 178, f))
+            d.line([(i, 0), (i, self.H)], fill=(c, c - 6, c - 16, 255))
+        d.line([(0, 0), (0, self.H)], fill=(16, 16, 16, 255), width=max(2, w // 6))
+        d.line([(2 * w - 1, 0), (2 * w - 1, self.H)], fill=(16, 16, 16, 255), width=max(2, w // 6))
+        if alpha < 1.0:
+            band.putalpha(band.getchannel("A").point(lambda a_: int(a_ * alpha)))
+        img.paste(band, (x - w, 0), band)
+        sh = Image.new("L", (3 * w, self.H), 0)     # its soft shadow on the next place
+        ds = ImageDraw.Draw(sh)
+        for i in range(3 * w):
+            ds.line([(i, 0), (i, self.H)], fill=int(70 * alpha * (1 - i / (3.0 * w))))
+        if dirn < 0:
+            sh = ImageOps.mirror(sh)
+        dark = Image.new("RGB", sh.size, (0, 0, 0))
+        img.paste(dark, (x + w if dirn > 0 else x - 4 * w, 0), sh)
+
     def frame(self, t):
         i = self._part_at(t)
         part, lt = self.parts[i], t - self.offsets[i]
-        img = part.frame(lt)
+        pan = self.pans[i]
+        img = self._pan_frame(i, lt) if pan and lt < pan["dur"] else part.frame(lt)
         D = 0.28
-        cut_in = bool(part.plan.cut_in)                                     # a CUT shot: no whip / fade into it
-        cut_out = i + 1 < len(self.parts) and bool(self.parts[i + 1].plan.cut_in)
+        cut_in = bool(part.plan.cut_in or pan)                              # a CUT shot / one take: no whip / fade
+        cut_out = i + 1 < len(self.parts) and bool(self.parts[i + 1].plan.cut_in or self.pans[i + 1])
         if i > 0 and lt < D and self.transition == "whip" and not cut_in:
             prev = self.parts[i - 1]
             old = prev.frame(prev.duration - 1.0 / self.fps)

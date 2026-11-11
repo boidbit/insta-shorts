@@ -42,6 +42,20 @@ def shot_angle(scene, framing):
     return out
 
 
+def fit_to_angle(ob, ang):
+    """A set piece drawn over the painted place moves with it when a shot sees the place closer / mirrored."""
+    z = float(ang.get("zoom", 1.0))
+    if z > 1.001:
+        left = clamp(ang["x"] * z - LW / 2.0, 0, LW * z - LW)
+        top = clamp(GROUND_Y * (z - 1.0), 0, LH * z - LH)
+        ob["x"] = float(ob.get("x", 540)) * z - left
+        ob["y"] = float(ob.get("y", GROUND_Y)) * z - top
+        ob["scale"] = float(ob.get("scale", 1.0)) * z
+    if ang.get("mirror"):
+        ob["x"] = LW - float(ob.get("x", 540))
+        ob["flip"] = not ob.get("flip")
+
+
 PEOPLE_SCALE_3 = 1.06        # ...three people side by side need the room
 PEOPLE_SCALE = 1.22          # medium shots: people this much bigger than the painted place (x sqrt of the angle zoom)
 FOCUS_H = {"dog": 170.0, "cat": 120.0, "cow": 260.0, "crow": 70.0, "parrot": 70.0}   # animals: camera looks lower
@@ -250,7 +264,17 @@ def compile_obj(plan, spec, t, warnings=None):
     return 0.0
 
 
-MOVE_EASE = {"out": ease_out, "back": lambda u: ease_out_back(u, 1.5)}
+def ease_travel(u, a=0.2):
+    """A long walk: speeds up over the first fifth, keeps an even pace, slows down over the last fifth."""
+    u = clamp(u)
+    if u < a:
+        return u * u / (2 * a * (1 - a))
+    if u > 1 - a:
+        return 1 - (1 - u) ** 2 / (2 * a * (1 - a))
+    return (u - a / 2) / (1 - a)
+
+
+MOVE_EASE = {"out": ease_out, "back": lambda u: ease_out_back(u, 1.5), "pan": ease_travel}
 
 
 class Char:
@@ -262,6 +286,7 @@ class Char:
         rs = resolve_spec(spec)
         self.scale = float(rs.get("scale", 1.0))
         self.leg_k = float(rs.get("leg_k", 1.0))
+        self.travel0 = 0.0      # px already walked before this shot (a walk that goes on from the last place)
         self.phase = float(spec.get("phase", index * 0.9))
         self.events = []        # sorted by t
         self.moves = []         # (t0, t1, x0, y0, x1, y1[, run[, ease]]); ease: "out" (lands fast), "back" (overshoots)
@@ -890,7 +915,9 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     for i, ob in enumerate(scene.get("sets", [])):
         ob = dict(ob)
         ob.setdefault("id", "%s%d" % (ob.get("type", "set"), i + 1))
-        if plan.world != 1.0:
+        if ob.get("fit"):                           # drawn over the painted place (the jail door): goes with it
+            fit_to_angle(ob, plan.angle)
+        elif plan.world != 1.0:
             ob["scale"] = float(ob.get("scale", 1.0)) * plan.world      # a sofa grows with the people sitting on it
         plan.sets.append(ob)
     set_by_id = {o["id"]: o for o in plan.sets}
@@ -1054,6 +1081,12 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         if "set" in ev:
             for sid in (ev["set"] if isinstance(ev["set"], list) else [ev["set"]]):
                 plan.set_events.append({"t": t, "set": sid, "state": ev.get("state"), "move": ev.get("move")})
+                if ev.get("state") == "broken" and set_by_id.get(sid, {}).get("type") == "jail_door":
+                    for name_, vol_ in (("thud", 1.0), ("glass_break", 0.35)):      # bars torn off: a crash
+                        path_ = audio.sfx_path(name_)
+                        if path_:
+                            plan.sfx.append(dict(t=t, path=path_, volume=vol_))
+                    shakes.append((t, 0.7, 0.45))
         if "lights" in ev:
             v = ev["lights"]
             plan.lights.append((t, float({"on": 1.0, "off": 0.32, "dim": 0.6}.get(v, v)
@@ -1268,6 +1301,49 @@ def apply_options(scene, dialogue=None, hook=None):
 
 
 # keys of a multi-scene file that belong to the whole video, not to one scene
+def start_xs(scene):
+    """Where everybody stands when a scene starts (logical x), placed the way compile_scene places them."""
+    cdefs = scene.get("characters", {})
+    names = list(cdefs.keys())
+    visible = [nm for nm in names if not cdefs[nm].get("hidden")]
+    n = len(visible)
+    slots = SLOTS.get(n, SLOTS[3])
+    auto = ["left", "center", "right"] if n == 3 else (["left", "right"] if n == 2 else ["center"])
+    out = {}
+    for name in names:
+        spec = cdefs[name]
+        vi = visible.index(name) if name in visible else 0
+        slot = spec.get("slot") or (auto[vi] if vi < len(auto) else "center")
+        out[name] = float(spec.get("x", slots.get(slot, 540)))
+    return out
+
+
+def drop_last_exit(timeline, who):
+    """The scene before a one-take walk ends with `who` leaving the shot: they walk on into the next place instead,
+    so that exit goes. Returns (timeline, side, fast); side is None when the scene does not end with their exit."""
+    for i in range(len(timeline) - 1, -1, -1):
+        ev = timeline[i]
+        if "wait" in ev or ("who" not in ev and "say" not in ev):
+            continue                                # sounds, waits, screen cards
+        if ev.get("who") != who:
+            return timeline, None, False
+        lv, mv = ev.get("leave"), ev.get("move")
+        if isinstance(lv, dict):
+            side, fast = (lv.get("side") if lv.get("side") in ("left", "right") else "left"), True
+        elif isinstance(mv, dict) and not -40 <= float(mv.get("x", 540)) <= LW + 40:
+            side, fast = ("left" if float(mv["x"]) < 0 else "right"), bool(mv.get("run") or ev.get("action") == "run")
+        else:
+            return timeline, None, False
+        rest = {k: v for k, v in ev.items() if k not in ("leave", "move", "hold", "facing")}
+        tl = list(timeline)
+        if set(rest) <= {"t", "who"}:
+            del tl[i]
+        else:
+            tl[i] = rest
+        return tl, side, fast
+    return timeline, None, False
+
+
 VIDEO_KEYS = ("scenes", "music", "caption", "overlays", "post", "hook", "vars", "name", "about", "transition")
 
 
@@ -1298,13 +1374,31 @@ def split_scenes(scene):
         sub = deep_merge(base, {k: v for k, v in sc.items() if k not in ("cast", "characters", "meta", "title")})
         sub["meta"] = dict(base_meta, **sc.get("meta", {}))
         cast = sc.get("cast", []) if sc.get("chat") else (sc.get("cast") or list(cast_all.keys()))
+        pan = sc.get("pan") if out and isinstance(sc.get("pan"), dict) else None
+        if pan and pan.get("who") in cast_all:
+            # one take: `who` walks out of the last place and on into this one, the camera going with them
+            who = pan["who"]
+            tl, side, fast = drop_last_exit(out[-1].get("timeline", []), who)
+            out[-1]["timeline"] = tl
+            pan = dict(pan, dir=pan.get("dir") or side or "right", run=bool(pan.get("run", fast)))
+            if who not in cast:                     # (they come in from the side they walked towards)
+                cast = ([who] + list(cast)) if pan["dir"] == "right" else (list(cast) + [who])
+            if sc.get("title"):
+                pan["title"] = sc["title"]
+        elif "pan" in sc:
+            pan = None
         chars = {n: dict(cast_all.get(n, {})) for n in cast}
         for n, spec in sc.get("characters", {}).items():
             chars[n] = dict(chars.get(n, {}), **spec)
         sub["characters"] = chars
+        sub.pop("pan", None)
+        if pan:
+            sub["pan"] = pan                        # (its title shows while they walk in: Sequence)
         if shot_no and "angle" not in sub:
             sub["angle"] = shot_no
-        if sc.get("title") and camera_style(sub["meta"]) == "cine":
+        if sc.get("title") and pan:
+            pass                                    # (no full-screen card in the middle of one take)
+        elif sc.get("title") and camera_style(sub["meta"]) == "cine":
             # its own short full-screen card before the shot (over the shot it covered the first speech bubble)
             sub["lead_in"] = max(float(sub.get("lead_in", 0.0)), TITLE_LEAD)
             sub["overlays"] = list(sub.get("overlays", [])) + [
@@ -1333,13 +1427,31 @@ def camera_at(plan, t):
         z = max(z, 1.0) * (1.014 + 0.010 * math.sin(t * 0.83 + 0.6))
         cx += 7.0 * math.sin(t * 0.61 + 1.9)
         cy += 5.0 * math.sin(t * 0.47)
+    w = wide_weight(plan, t)
+    if w:                                           # a one-take walk into the next place: the whole picture
+        z, cx, cy = lerp(z, 1.0, w), lerp(cx, LW / 2.0, w), lerp(cy, LH / 2.0, w)
     dx = dy = 0.0
     for (ts, amp, dur) in plan.shakes:
         if ts <= t < ts + dur:
-            k = (1 - (t - ts) / dur)
+            k = (1 - (t - ts) / dur) * (1.0 - w)
             dx += amp * 22 * k * math.sin(95 * t)
             dy += amp * 16 * k * math.cos(83 * t)
     return z, cx, cy, dx, dy
+
+
+def wide_weight(plan, t):
+    """0..1: how far the camera has eased out to the whole picture. plan.wide = [(t0, t1, ease_in, ease_out)]: wide
+    from t0 to t1, easing there over ease_in seconds before and back over ease_out seconds after (a one-take walk
+    from one place into the next starts and ends on the whole picture)."""
+    w = 0.0
+    for (a, b, rin, rout) in getattr(plan, "wide", ()):
+        if a - rin <= t < a:
+            w = max(w, ease_in_out((t - (a - rin)) / rin))
+        elif a <= t <= b:
+            return 1.0
+        elif b < t < b + rout:
+            w = max(w, 1.0 - ease_in_out((t - b) / rout))
+    return w
 
 
 def camera_roll(plan, t):

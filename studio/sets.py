@@ -60,6 +60,7 @@ SPEC = {
     "cooler": (160, 560, 20, False, None, False),
     "washing_machine": (160, 470, 20, False, None, False),   # `OBJ: washing_machine on` spins and shakes
     "mirror": (120, 800, 20, False, None, False),
+    "jail_door": (150, 1110, 10, True, None, False),     # barred cell door: closed / open / broken (kicked down)
 }
 
 ALL = set(SPEC)
@@ -521,6 +522,43 @@ def d_mirror(o, st, t, ob):
     o.ellipse(0, -530, 92, 252, (196, 222, 236, 255))
     o.line([(-40, -680), (20, -740)], (255, 255, 255, 255), 8)
     o.line([(-30, -620), (40, -700)], (255, 255, 255, 255), 5)
+
+
+BARS, BARS_L, CORRIDOR = (150, 152, 160, 255), (200, 202, 210, 255), (64, 66, 72, 255)
+
+
+def d_jail_door(o, st, t, ob):
+    """The jail's barred door (in the jail it sits exactly over the painted one): closed, open (swung back into the
+    corridor) or broken (kicked off its hinges, lying in the corridor, the lock on the floor)."""
+    o.rect(-150, -1110, 150, 0, CORRIDOR, None)
+    if st == "open":
+        for i in range(6):
+            dx = 150 - 10 * i
+            o.line([(dx, -1080 + 10 * i), (dx, -20 - 6 * i)], BARS, 12)
+        for dy in (-1050, -550, -60):
+            o.line([(100, dy + 40), (150, dy)], BARS, 14)
+        o.rect(96, -600, 116, -520, (120, 100, 60, 255), INK, 3)
+        return
+    if st == "broken":
+        o.line([(140, -1110), (140, -700), (112, -560)], BARS, 14)          # a bar left hanging off the hinge
+        o.line([(136, -1110), (136, -700)], BARS_L, 4)
+        lo, hi = (-150, -8, 150, -8), (-104, -190, 112, -190)               # the door, lying on the corridor floor
+        for i in range(6):
+            f = i / 5.0
+            o.line([(lo[0] + (lo[2] - lo[0]) * f, lo[1]), (hi[0] + (hi[2] - hi[0]) * f, hi[1])], BARS, 12)
+        for f in (0.04, 0.5, 0.96):
+            ax, bx = lo[0] + (hi[0] - lo[0]) * f, lo[2] + (hi[2] - lo[2]) * f
+            y = lo[1] + (hi[1] - lo[1]) * f
+            o.line([(ax, y), (bx, y)], BARS, 14)
+        o.poly([(-128, -40), (-82, -52), (-74, -10), (-120, 2)], (120, 100, 60, 255), INK, 3)   # the lock
+        return
+    for i in range(6):
+        dx = -130 + 56 * i
+        o.line([(dx, -1110), (dx, 0)], BARS, 16)
+        o.line([(dx - 4, -1110), (dx - 4, 0)], BARS_L, 4)
+    for dy in (-1070, -550, -50):
+        o.line([(-150, dy), (150, dy)], BARS, 18)
+    o.rect(-110, -590, -50, -500, (120, 100, 60, 255), INK, 4)
 
 
 DRAW = {k: globals()["d_" + k] for k in SPEC}

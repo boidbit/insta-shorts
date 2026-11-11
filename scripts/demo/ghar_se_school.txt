@@ -1,0 +1,14 @@
+HOOK: Ghar se school... bina cut ke 🎥
+CAST: R = kid, M = aunty, T = principal
+SCENE: kitchen
+M (angry, point): Raju! Tiffin bhool gaya phir se! | राजू! टिफ़िन भूल गया फिर से!
+R (shy, carry tiffin): Le liya mummy, ab jaata hoon | ले लिया मम्मी, अब जाता हूँ
+R -> exit right
+SCENE: gully pan
+R (smile, wave): Sab dost aage nikal gaye... | सब दोस्त आगे निकल गए...
+R -> exit right fast
+SCENE: school pan | 10 minute late
+T (angry): Raju, ghadi dekhi hai? | राजू, घड़ी देखी है?
+R (nervous): Sir, gully bahut lambi thi! | सर, गली बहुत लंबी थी!
+CTA: Tumhari gully kitni lambi hai? 😂
+STYLE: 2.5d

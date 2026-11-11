@@ -1,0 +1,18 @@
+HOOK: Jail se ghar tak... ek hi shot me 😂
+CAST: C = chor, P = police, M = aunty
+SCENE: jail
+C (sly): Bas, aaj raat ye jail chhod dunga! | बस, आज रात ये जेल छोड़ दूँगा!
+C -> walk right
+C -> kick
+OBJ: jail_door broken
+C (shock): Arre baap re, sach me toot gaya! | अरे बाप रे, सच में टूट गया!
+C -> exit right fast
+SCENE: street pan
+P (angry, point): Ruk ja chor! Bhaag kahan raha hai? | रुक जा चोर! भाग कहाँ रहा है?
+C (scared): Ghar ja raha hoon sahab, mummy wait kar rahi hai! | घर जा रहा हूँ साहब, मम्मी वेट कर रही है!
+C -> exit right fast
+SCENE: room pan
+M (shock): Tu jail se aa gaya?! | तू जेल से आ गया?!
+C (smile): Haan mummy, chai milegi? | हाँ मम्मी, चाय मिलेगी?
+M (angry, slap): Chai nahi, chappal milegi! | चाय नहीं, चप्पल मिलेगी!
+CTA: Aise bete ko tag karo 😂
