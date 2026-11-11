@@ -192,6 +192,16 @@ class EntryTests(unittest.TestCase):
         self.assertAlmostEqual(c.depth_at(1.25)[0], 1.15)           # 0.5 s, as before
 
 
+class SetPieceWordTests(unittest.TestCase):
+    def test_unknown_word_on_a_set_piece_is_a_warning_not_a_crash(self):
+        # an AI wrote `OBJ: door left lakdi`: the script reader used to crash (KeyError 'id') on every attempt
+        sc, w = script.parse_script(HEAD + "OBJ: door left lakdi\nB (angry): Kahan the? | कहाँ थे?\n")
+        self.assertTrue(any("lakdi" in x for x in w))
+        self.assertEqual(sc["scenes"][0]["sets"][0]["type"], "door")
+        sc, w = script.parse_script(HEAD + "OBJ: door left lakdi\nOBJ: door open\nB: Aa gaye | आ गए\n")
+        self.assertTrue(any(e.get("set") == "door" and e.get("state") == "open" for e in sc["scenes"][0]["timeline"]))
+
+
 class RenderTests(unittest.TestCase):
     W = 160
 

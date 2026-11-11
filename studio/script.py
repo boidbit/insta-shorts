@@ -123,12 +123,12 @@ def parse_set(raw, placed):
         spec["flip"] = True
     known = set(SET_STATES) | set(SET_X) | {"big", "small", "back", "front", "flip"}
     text = [w for w in rest if w.lower() not in known]
+    sid = typ if typ not in placed else "%s%d" % (typ, sum(1 for k in placed if k.startswith(typ)) + 1)
+    spec["id"] = sid                                # (also when a word is unknown: the piece is still placed)
     if typ == "signboard" and text:
         spec["text"] = " ".join(text)
     elif text:
         return "place", spec, ["OBJ %s: %s samajh nahi aaye" % (typ, ", ".join(repr(w) for w in text))]
-    sid = typ if typ not in placed else "%s%d" % (typ, sum(1 for k in placed if k.startswith(typ)) + 1)
-    spec["id"] = sid
     return "place", spec, []
 NARRATION_NAMES = ("narrator", "vo", "narration", "voiceover", "voice_over")   # a voice with no body
 NARRATOR_SPEC = {"hidden": True, "voice": {"name": "hi-IN-MadhurNeural", "pitch": "-12Hz", "rate": "-4%",
