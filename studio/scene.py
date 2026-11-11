@@ -1,10 +1,11 @@
 """Compile a scene.json dict into a render plan (timeline, speech, audio, camera)."""
 import math
+import os
 import sys
 
 from . import audio, effects, gemini_tts, objects, rides
 from .characters import assign_faces, color_of, resolve_spec
-from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, lerp
+from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, ease_out, ease_out_back, lerp
 
 SLOTS = {
     1: {"center": 540},
@@ -249,6 +250,9 @@ def compile_obj(plan, spec, t, warnings=None):
     return 0.0
 
 
+MOVE_EASE = {"out": ease_out, "back": lambda u: ease_out_back(u, 1.5)}
+
+
 class Char:
     def __init__(self, name, spec, x, ground_y, index):
         self.name = name
@@ -258,9 +262,9 @@ class Char:
         self.scale = float(resolve_spec(spec).get("scale", 1.0))
         self.phase = float(spec.get("phase", index * 0.9))
         self.events = []        # sorted by t
-        self.moves = []         # (t0, t1, x0, y0, x1, y1)
+        self.moves = []         # (t0, t1, x0, y0, x1, y1[, run[, ease]]); ease: "out" (lands fast), "back" (overshoots)
         self.speech = []        # dicts
-        self.depth = []         # (t, k0, dy0, k1, dy1): step towards / away from the camera
+        self.depth = []         # (t, k0, dy0, k1, dy1[, seconds]): step towards / away from the camera
         self.rides = []         # {"t0", "obj", "seat", "t_off", "land_x", "land_y"}: sitting on a vehicle
         self.world = {}         # the scene's objects (set by compile_scene)
         self._rf = (None, None)
@@ -272,17 +276,18 @@ class Char:
         for (t0, t1, x0, y0, x1, y1, *_r) in self.moves:
             if t < t0:
                 break
-            e = ease_in_out((t - t0) / max(1e-6, t1 - t0))
+            u = (t - t0) / max(1e-6, t1 - t0)
+            e = MOVE_EASE[_r[1]](u) if len(_r) > 1 and _r[1] in MOVE_EASE else ease_in_out(u)
             x, y = lerp(x0, x1, e), lerp(y0, y1, e)
         return x, y
 
     def depth_at(self, t):
         """(size multiplier, feet offset) - 1.0 / 0 on the normal ground line."""
         k, dy = 1.0, 0.0
-        for (t0, k0, dy0, k1, dy1) in self.depth:
+        for (t0, k0, dy0, k1, dy1, *_r) in self.depth:
             if t < t0:
                 break
-            e = ease_in_out((t - t0) / 0.5)
+            e = ease_in_out((t - t0) / (_r[0] if _r else 0.5))
             k, dy = lerp(k0, k1, e), lerp(dy0, dy1, e)
         return k, dy
 
@@ -368,6 +373,75 @@ class Char:
 
 class Plan:
     pass
+
+
+ENTRY_STYLES = ("back", "pop", "fast", "peek")      # (walking in from the side is an ordinary `move`)
+ENTRY_HOLD = {"back": 1.3, "pop": 0.7, "fast": 0.95, "peek": 2.2}     # seconds until they stand in their place
+BACK_DEPTH = (0.55, -215.0)                         # far end of the place: (size, feet offset)
+
+
+def compile_entry(plan, c, spec, t):
+    """A character comes into the shot at time t in a livelier way than walking in from the side.
+    spec = {"style": "back" | "pop" | "fast" | "peek", "side": "left" | "right", "x": where they end up}
+      back  from the far corner of the place towards the camera (small and far -> full size)
+      pop   jumps up into the frame from below, with a bounce
+      fast  shoots in from the side and skids to a stop (dust, whoosh)
+      peek  leans in at the edge of the frame, looks, then walks in
+    Before t they are out of sight. Returns the seconds it takes."""
+    style = spec.get("style")
+    x1, y1 = float(spec.get("x", c.x)), c.y
+    side = spec.get("side") if spec.get("side") in ("left", "right") else ("left" if x1 < LW / 2.0 else "right")
+    edge = -170.0 if side == "left" else LW + 170.0
+    face = "right" if side == "left" else "left"
+
+    def sound(name, at, volume=0.6):
+        path = audio.sfx_path(name)
+        if path:
+            plan.sfx.append(dict(t=at, path=path, volume=volume))
+
+    if style == "pop":
+        y0 = LH + 80.0 + 920.0 * c.scale           # the whole body below the frame
+        c.x, c.y = x1, y0
+        c.moves.append((t, t + 0.42, x1, y0, x1, y1, False, "back"))
+        sound("boing", t, 0.55)
+    elif style == "fast":
+        c.x = edge
+        c.moves.append((t, t + 0.36, edge, y1, x1, y1, True, "out"))
+        c.events.append({"t": t, "facing": face})
+        c.events.append({"t": t + 0.34, "action": "skid", "facing": face})
+        c.events.append({"t": t + 0.9, "action": "idle"})
+        plan.effects.append(effects.normalize({"type": "dust", "who": c.name}, t + 0.3))
+        sound("whoosh", t, 0.7)
+    elif style == "peek":
+        xp = 46.0 if side == "left" else LW - 46.0  # half of them inside the frame
+        c.x = edge
+        c.moves.append((t, t + 0.4, edge, y1, xp, y1, False, "out"))
+        c.events.append({"t": t, "action": "peek", "facing": face})
+        c.events.append({"t": t + 1.3, "action": "idle", "facing": face})
+        c.moves.append((t + 1.3, t + 2.15, xp, y1, x1, y1, False))
+    else:                                           # back
+        k0, dy0 = BACK_DEPTH
+        x0 = -70.0 if side == "left" else LW + 70.0     # the far corner of the place: in sight from the first step
+        c.x = edge                                  # out of sight until they come
+        c.depth.append((-1.0, k0, dy0, k0, dy0, 0.001))
+        c.depth.append((t, k0, dy0, 1.0, 0.0, 1.25))
+        c.moves.append((t, t + 0.001, edge, y1, x0, y1, False))
+        c.moves.append((t + 0.001, t + 1.25, x0, y1, x1, y1, False))
+        c.events.append({"t": t, "facing": "front"})
+    return ENTRY_HOLD.get(style, 1.0)
+
+
+def compile_leave(plan, c, spec, t):
+    """`exit left fast`: runs out of the shot in a blink (whoosh, dust where they stood)."""
+    side = spec.get("side") if spec.get("side") in ("left", "right") else "left"
+    x0, y0 = c.pos_at(t)
+    c.events.append({"t": t, "facing": side})
+    c.moves.append((t + 0.12, t + 0.5, x0, y0, -200.0 if side == "left" else LW + 200.0, y0, True))
+    plan.effects.append(effects.normalize({"type": "dust", "who": c.name}, t + 0.1))
+    path = audio.sfx_path("whoosh")
+    if path:
+        plan.sfx.append(dict(t=t + 0.1, path=path, volume=0.7))
+    return 0.7
 
 
 def _norm_who(who, names):
@@ -497,6 +571,194 @@ def auto_camera(plan, chars, cam_events, shakes):
             shakes.append((max(0.0, sp["end"] - 0.15), 0.5, 0.45))
     if speech and plan.duration - speech[-1]["end"] > 0.7:
         cam_events.append(dict(t=speech[-1]["end"] + 0.2, zoom=1.0, dur=0.5))
+    for w in plan.warps:                            # slow motion: pull back to watch it happen
+        if w[0] == "slow":
+            cam_events.append(dict(t=w[1], zoom=1.0, dur=0.4))
+    for fx in plan.effects:                         # a throw: frame the thrower and the target together
+        if fx.get("type") == "projectile" and fx.get("src") in chars and fx.get("dst") in chars:
+            t0 = max(0.0, fx["from"] - 0.45)
+            (x1, y1), (x2, y2) = chars[fx["src"]].draw_pos(t0), chars[fx["dst"]].draw_pos(fx["to"])
+            zoom = round(max(1.0, min(1.3, 1080.0 / (abs(x2 - x1) + 420.0))), 2)
+            cam_events.append(dict(t=t0, zoom=zoom, focus=[(x1 + x2) / 2.0, (y1 + y2) / 2.0 - 560], dur=0.16))
+
+
+# ------------------------------------------------------------------ camera style
+# "cine" (default): the camera stays with whoever it looks at, never stands completely still, shows the listener's
+# face after the last line of a shot, holds fast back-and-forth talk in one two-shot, tilts a little on an angry or
+# scared line and whips (with motion blur) from one speaker to the other.
+# "classic": the camera exactly as it was before (`CAMERA: classic` in a script, "meta": {"camera": "classic"} in a
+# scene file, or the environment variable STUDIO_CAMERA=classic for everything).
+FOLLOW_LAG = 0.1                # seconds the camera trails behind the one it follows
+BANTER_MAX = 2.0                # lines up to this long, back and forth, are "fast talk"
+TILT_EXPR = {"angry", "shout", "evil", "scared"}
+TILT_DEG = 3.5
+MOVE_MIN = 200.0                # a walk at least this long (logical px) is worth following
+# the face of the one who was spoken to, when the script gave them no reaction of their own: by the speaker's mood
+REACTIONS = {"angry": "nervous", "shout": "scared", "evil": "scared", "determined": "nervous",
+             "shock": "confused", "surprised": "confused", "scared": "confused",
+             "laugh": "bored", "lol": "bored", "grin": "bored", "smug": "bored", "sly": "confused", "proud": "bored",
+             "wink": "shy", "love": "shy", "kiss": "shy", "sad": "sad", "cry": "sad", "hurt": "sad"}
+
+
+def _card_over_faces(plan, t):
+    """True when a text card (the CTA at the end) sits in the upper middle of the screen from time t on: a close
+    shot must keep the face below it."""
+    for o in plan.overlays:
+        if o.get("style") != "card" or float(o.get("from", 0.0)) > plan.duration or float(o.get("to", 1e9)) <= t:
+            continue
+        pos = o.get("pos", "upper")
+        if (isinstance(pos, (list, tuple)) and 350 <= float(pos[1]) <= 1000) or pos in ("upper", "center", "middle"):
+            return True
+    return False
+
+
+def camera_style(meta=None):
+    v = os.environ.get("STUDIO_CAMERA") or (meta or {}).get("camera") or "cine"
+    return "classic" if str(v).strip().lower() in ("classic", "old", "purana", "off") else "cine"
+
+
+def _on_stage(c, t):
+    """A person the camera can show at time t (not just a voice, not seen from behind, inside the frame)."""
+    if c.spec.get("hidden") or c.spec.get("view") == "back" or not c.state_at(t).get("visible", True):
+        return False
+    x, y = c.draw_pos(t)
+    return -40.0 <= x <= LW + 40.0 and y <= LH + 60.0
+
+
+def _banter_runs(speech):
+    """[(i, j)]: lines i..j (inclusive) are fast talk between changing speakers, at least 3 of them."""
+    runs, i, n = [], 0, len(speech)
+    while i < n:
+        j = i
+        while (j + 1 < n and speech[j + 1]["who"] != speech[j]["who"]
+               and speech[j]["end"] - speech[j]["start"] <= BANTER_MAX
+               and speech[j + 1]["end"] - speech[j + 1]["start"] <= BANTER_MAX
+               and speech[j + 1]["start"] - speech[j]["end"] < 0.8):
+            j += 1
+        if j - i >= 2:
+            runs.append((i, j))
+        i = j + 1
+    return runs
+
+
+def auto_camera_cine(plan, chars, cam_events, shakes, rolls):
+    """The "cine" direction for scenes that have no camera moves of their own (see camera_style)."""
+    speech = sorted((sp for sp in plan.speech if sp.get("who") and not chars[sp["who"]].spec.get("hidden")),
+                    key=lambda sp: sp["start"])
+    n = len(speech)
+    held = {}                                       # line index -> the run it belongs to (no cut of its own)
+    for (a, b) in _banter_runs(speech):
+        if b == n - 1 and n > 2:
+            b -= 1                                  # the punch line keeps its own tight shot
+        if b - a >= 1:
+            for k in range(a, b + 1):
+                held[k] = (a, b)
+    size = 1.0
+    for i, sp in enumerate(speech):
+        t0 = sp["start"]
+        d = max(0.6, sp["end"] - t0)
+        c = chars[sp["who"]]
+        shot = SHOT_ALIASES.get(sp.get("shot"), sp.get("shot"))
+        punch = i == n - 1 and n > 1
+        if shot in SHOT_ZOOM:                       # the script asked for a shot: as before
+            cut = shot_camera(shot, max(0.0, t0 - 0.05), chars, [sp["who"]], sp["who"])
+            cam_events.append(cut)
+            size = cut["zoom"]
+            if size > 1.0 and d > 1.0:
+                cam_events.append(dict(cut, t=t0 + 0.2, zoom=round(size + 0.1, 2), dur=max(0.4, d - 0.2)))
+        elif i in held:                             # fast talk: both in one frame, no cut for every line
+            a, b = held[i]
+            if i == a:
+                other = chars[speech[a + 1]["who"]]
+                (x1, y1), (x2, y2) = c.focus_at(t0), other.focus_at(t0)
+                size = round(clamp(LW / (abs(x2 - x1) + 440.0), 1.0, 1.35), 2)
+                mid = [(x1 + x2) / 2.0, (y1 + y2) / 2.0]
+                run_d = speech[b]["end"] - t0
+                cam_events.append(dict(t=max(0.0, t0 - 0.05), zoom=size, focus=mid, dur=0.3 if i == 0 else 0.18))
+                cam_events.append(dict(t=t0 + 0.3, zoom=round(size + 0.1, 2), focus=mid, dur=max(0.4, run_d - 0.3)))
+        else:
+            if i == 0:                              # first line: ease in from the wide establishing shot
+                cam_events.append(dict(t=t0, zoom=1.2, focus=sp["who"], dur=min(0.6, d)))
+                size = 1.2
+            else:
+                size = 1.7 if (punch and n > 2) else SHOT_SIZES[i % len(SHOT_SIZES)]
+                if c.spec.get("kind") in FOCUS_H:
+                    size = min(1.8, size + 0.2)
+                cam_events.append(dict(t=max(0.0, t0 - 0.05), zoom=size, focus=sp["who"], dur=0.16))
+            if d > 1.0:                             # slow push-in while the line is spoken
+                cam_events.append(dict(t=t0 + 0.65 if i == 0 else t0 + 0.2, zoom=round(size + 0.12, 2),
+                                       focus=sp["who"], dur=max(0.4, d - (0.65 if i == 0 else 0.2))))
+            if c.state_at(t0 + 0.05)["expression"] in TILT_EXPR and size >= 1.2:
+                rolls.append((t0, sp["end"], TILT_DEG if c.draw_pos(t0)[0] < LW / 2.0 else -TILT_DEG))
+        if punch:
+            shakes.append((max(0.0, sp["end"] - 0.15), 0.5, 0.45))
+
+    # ---- a long walk / run / entrance while nobody talks: the camera goes with the one who moves
+    talk = [(sp["start"] - 0.05, sp["end"]) for sp in speech]
+    movers = []
+    for c in chars.values():
+        if c.spec.get("hidden") or c.spec.get("view") == "back":
+            continue
+        for m in c.moves:
+            if m[1] - m[0] < 0.25 or max(abs(m[4] - m[2]), abs(m[5] - m[3])) < MOVE_MIN:
+                continue
+            if any(a <= m[0] <= b for a, b in talk):
+                continue
+            movers.append((m[0], m[1], c.name))
+    for (m0, m1, name) in movers:
+        cam_events.append(dict(t=max(0.0, m0 - 0.02), zoom=1.15, focus=name, dur=0.3))
+
+    # ---- after the last line: the reaction, not an empty wide shot
+    if speech:
+        last = speech[-1]
+        t_free = last["end"]                        # from here the camera is free for the reaction
+        later = [m for m in movers if m[0] >= last["start"]]
+        if later:                                   # somebody walks after the line: the camera is with them...
+            _m0, m1, name = max(later, key=lambda m: m[1])
+            gone = not _on_stage(chars[name], m1 + 0.05)
+            t_free = m1 - 0.35 if gone else None    # ...and when they have left, it turns to who is still there
+        voice_over = any(sp["start"] >= last["start"] and sp.get("who") and chars[sp["who"]].spec.get("hidden")
+                         for sp in plan.speech)
+        if voice_over:                              # a narrator speaks over what follows: the whole place, as before
+            if plan.duration - last["end"] > 0.7:
+                cam_events.append(dict(t=last["end"] + 0.2, zoom=1.0, dur=0.5))
+        elif t_free is not None and plan.duration - t_free > 0.7:
+            t_r = t_free + 0.15
+            left = plan.duration - t_free
+            here = [c for c in chars.values() if _on_stage(c, t_r) and _on_stage(c, min(plan.duration, t_r + 0.5))]
+            acting = [c for c in here if any(
+                "action" in e and e["t"] >= last["end"] - 0.05 and e["action"] not in ("idle", "talk", "none", "stand")
+                for e in c.events)]
+            if len(acting) >= 2:                    # everybody does something (a dance): show them all
+                cam_events.append(dict(t=t_free + 0.2, zoom=1.0, dur=0.5))
+            elif here:
+                pick = acting[0] if acting else None        # the one who reacts with an action (a facepalm)...
+                if pick is None:                            # ...or the one who was spoken to
+                    others = [c for c in here if c.name != last["who"]]
+                    spoke = [sp["who"] for sp in reversed(speech[:-1]) if sp["who"] != last["who"]]
+                    pick = next((c for w in spoke for c in others if c.name == w), None)
+                    if pick is None and others:
+                        sx = chars[last["who"]].draw_pos(t_r)[0]
+                        pick = min(others, key=lambda c_: abs(c_.draw_pos(t_r)[0] - sx))
+                if pick is not None and (pick.name != last["who"] or later):
+                    z, focus = (1.6 if pick.spec.get("kind") in FOCUS_H else 1.5), pick.name
+                    if _card_over_faces(plan, t_r):         # looser, and the face below the card
+                        fx, fy = pick.focus_at(t_r)
+                        z, focus = 1.3, [fx, fy - 170.0]
+                    cam_events.append(dict(t=t_r, zoom=z, focus=focus, dur=0.14))
+                    cam_events.append(dict(t=t_r + 0.2, zoom=round(z + 0.1, 2), focus=focus,
+                                           dur=max(0.4, left - 0.4)))
+                    # the script gave the listener no reaction of their own: their face answers the line
+                    directed = any(e["t"] >= last["start"] - 0.05 and ("expression" in e or "action" in e)
+                                   for e in pick.events)
+                    mood = REACTIONS.get(chars[last["who"]].state_at(last["start"] + 0.05)["expression"])
+                    if mood and not directed and pick.name != last["who"] and plan.auto_react \
+                            and not pick.spec.get("kind"):
+                        pick.events.append({"t": t_r + 0.2, "expression": mood})
+                        pick.events.sort(key=lambda e: e["t"])
+                else:                               # alone: stay on the face a little longer
+                    cam_events.append(dict(t=t_free + 0.05, zoom=round(max(size, 1.2) + 0.2, 2), focus=last["who"],
+                                           dur=max(0.4, left - 0.15)))
     for w in plan.warps:                            # slow motion: pull back to watch it happen
         if w[0] == "slow":
             cam_events.append(dict(t=w[1], zoom=1.0, dur=0.4))
@@ -654,6 +916,10 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 dur = float(m.get("dur", 0.8))
                 c.moves.append((t, t + dur, x0, y0, float(m.get("x", x0)), float(m.get("y", y0)),
                                 bool(m.get("run") or ev.get("action") == "run")))
+            if isinstance(ev.get("entry"), dict) and ev["entry"].get("style") in ENTRY_STYLES:
+                plan_end = max(plan_end, t + compile_entry(plan, c, ev["entry"], t))
+            if isinstance(ev.get("leave"), dict):
+                plan_end = max(plan_end, t + compile_leave(plan, c, ev["leave"], t))
 
         if "say" in ev and who:
             c = chars[who[0]]
@@ -830,26 +1096,39 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.n_frames = int(round(plan.duration * plan.fps))
 
     # ---- camera segments ----
+    cine = camera_style(meta) == "cine"
+    plan.camera, plan.rolls, plan.drift = ("cine" if cine else "classic"), [], False
+    plan.auto_react = bool(meta.get("auto_react", True))
     if meta.get("auto_camera", True) and not cam_events and plan.framing == "medium":     # wide / inside are composed shots
-        auto_camera(plan, chars, cam_events, shakes)
+        if cine:
+            auto_camera_cine(plan, chars, cam_events, shakes, plan.rolls)
+            plan.drift = not scene.get("chat")      # the camera never stands completely still
+        else:
+            auto_camera(plan, chars, cam_events, shakes)
         cam_events[:] = [c_ for c_ in cam_events if not any(h0 <= c_["t"] <= h1 for h0, h1 in cam_hold)]
+        plan.rolls = [r for r in plan.rolls if not any(h0 <= r[0] <= h1 for h0, h1 in cam_hold)]
     cam_events += shot_events
     segs = []
     z, cx, cy = 1.0, LW / 2.0, LH / 2.0
+    was = None                                      # cine: who the camera was following before this move
     for cam in sorted(cam_events, key=lambda c_: c_["t"]):
         tz = float(cam.get("zoom", z))
         f = cam.get("focus")
+        follow = None
         if isinstance(f, str) and f in chars:
             tc = chars[f].focus_at(cam["t"])
+            follow = f if cine else None
         elif isinstance(f, (list, tuple)):
             tc = (float(f[0]), float(f[1]))
         elif tz == 1.0:
             tc = (LW / 2.0, LH / 2.0)
         else:
             tc = (cx, cy)
+            follow = was                            # only the zoom changes: keep following the same one
         dur = float(cam.get("dur", 0.35))
-        segs.append((cam["t"], cam["t"] + dur, z, tz, (cx, cy), tc))
-        z, cx, cy = tz, tc[0], tc[1]
+        seg = (cam["t"], cam["t"] + dur, z, tz, (cx, cy), tc)
+        segs.append(seg + (follow, was) if cine else seg)
+        z, cx, cy, was = tz, tc[0], tc[1], follow
     plan.cam_segments = segs
     plan.shakes = shakes
 
@@ -973,11 +1252,20 @@ def split_scenes(scene):
 def camera_at(plan, t):
     """Returns (zoom, cx, cy, shake_dx, shake_dy)."""
     z, cx, cy = 1.0, LW / 2.0, LH / 2.0
-    for (t0, t1, z0, z1, c0, c1) in plan.cam_segments:
+    for (t0, t1, z0, z1, c0, c1, *fol) in plan.cam_segments:
         if t < t0:
             break
+        if fol:                                     # cine: stay with the one the camera looks at (a little behind)
+            if fol[1] in plan.chars:
+                c0 = plan.chars[fol[1]].focus_at(max(0.0, t0 - FOLLOW_LAG))
+            if fol[0] in plan.chars:
+                c1 = plan.chars[fol[0]].focus_at(max(0.0, t - FOLLOW_LAG))
         e = ease_in_out((t - t0) / max(1e-6, t1 - t0))
         z, cx, cy = lerp(z0, z1, e), lerp(c0[0], c1[0], e), lerp(c0[1], c1[1], e)
+    if getattr(plan, "drift", False):               # cine: a slow breath, so a held shot is never a frozen picture
+        z = max(z, 1.0) * (1.014 + 0.010 * math.sin(t * 0.83 + 0.6))
+        cx += 7.0 * math.sin(t * 0.61 + 1.9)
+        cy += 5.0 * math.sin(t * 0.47)
     dx = dy = 0.0
     for (ts, amp, dur) in plan.shakes:
         if ts <= t < ts + dur:
@@ -985,3 +1273,20 @@ def camera_at(plan, t):
             dx += amp * 22 * k * math.sin(95 * t)
             dy += amp * 16 * k * math.cos(83 * t)
     return z, cx, cy, dx, dy
+
+
+def camera_roll(plan, t):
+    """Degrees the frame is tilted at time t (cine: a dutch angle on an angry / scared line); 0 = level."""
+    for (t0, t1, deg) in getattr(plan, "rolls", ()):
+        if t0 <= t < t1 + 0.25:
+            return deg * ease_in_out((t - t0) / 0.22) * (1.0 - ease_in_out((t - t1) / 0.25))
+    return 0.0
+
+
+def camera_whip(plan, t, dt):
+    """While the camera swings from one person to another (a move of 0.1 s or more, not a real cut): the earlier
+    moment to measure its travel from. None when it is not swinging."""
+    for seg in plan.cam_segments:
+        if seg[0] < t <= seg[1] + dt and seg[1] - seg[0] >= 0.1:
+            return max(seg[0], t - dt)
+    return None

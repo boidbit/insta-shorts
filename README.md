@@ -123,7 +123,22 @@ Mummy naraaz hui re, ab main bhaaga re | मम्मी नाराज़ ह�
 
 ## Camera, objects aur naye formats
 
-- **Camera apne aap:** har bolne wali line par speaker pe cut-in + halka push-in, punchline pe sabse tight shot + shake, phir wide reaction. Band karna ho: JSON me `"meta": {"auto_camera": false}`. Apni marzi: line ke brackets me `wide`, `medium`, `close`, `two_shot` (jaise `A (shock, close): ...` ya `ALL -> wide`).
+- **Camera apne aap (naya "cine" direction):** har bolne wali line par speaker pe cut-in + halka push-in, punchline pe sabse tight shot + shake. Uske upar ab:
+  - **Camera saath chalta hai:** jis par camera hai wo chale, bhaage ya paas/door jaye to camera uske saath khiskta hai. Koi lamba chale / andar aaye / bahar jaye (aur koi bol na raha ho) to camera usi ke saath ho jata hai.
+  - **Kabhi poora rukta nahi:** ruke hue shot me bhi bahut halki saans jaisi harkat (zoom ~1%, kuch pixel).
+  - **Reaction shot:** shot ki aakhri line ke baad camera wide pe nahi jata; **sunne wale ke chehre** pe jata hai (ya uspe jo line ke baad action karta hai, jaise `B -> facepalm`). Script ne sunne wale ko koi reaction nahi diya to chehra khud badalta hai (gusse wali line → ghabraya, mazaak → bore...). Band: `"meta": {"auto_react": false}`. Koi chala gaya (exit) to camera jo bacha uspe. Aakhri "Tag karo" card ke saath chehra card ke neeche rehta hai.
+  - **Tez behas ek frame me:** 3+ chhoti lines baari-baari (har ek ~2 sec tak) → dono ek two-shot me, har line pe cut nahi. Punchline phir bhi tight.
+  - **Halka tedha frame:** `angry`, `shout`, `evil`, `scared` wali line pe frame 3.5° jhukta hai.
+  - **Whip:** ek se doosre pe jaate waqt tasveer me halka dhundhla streak.
+  - **Purana camera chahiye?** Script me `CAMERA: classic` (JSON: `"meta": {"camera": "classic"}`): camera bilkul pehle jaisa. Golden guard isi mode me live code se pixel-by-pixel milata hai.
+  Band karna ho: JSON me `"meta": {"auto_camera": false}`. Apni marzi: line ke brackets me `wide`, `medium`, `close`, `two_shot` (jaise `A (shock, close): ...` ya `ALL -> wide`).
+- **Entry / exit ke naye tareeke** (kinare se chal ke aana ab bhi hai: `A -> enter left`):
+  - `A -> enter back` = jagah ke peeche se camera ki taraf aata hai (chhota → bada). `enter back left|right` = kis taraf se.
+  - `A -> enter pop` = neeche se uchhal ke frame me (boing).
+  - `A -> enter left fast` / `enter right fast` = tezi se aake fisal ke rukta hai (dhool + whoosh).
+  - `A -> enter left peek` / `enter right peek` = kinare se jhaankta hai, phir andar aata hai.
+  - `A -> exit left fast` / `exit right fast` = palak jhapakte bhaag jata hai.
+  - Sabse achha: **video shuru hote hi sab apni jagah pe hon** (pehla second hook ka hai), aur naya banda `CUT` ke baad seedha maujood ho. AI writer ka prompt ab yahi sikhata hai.
 - **Depth:** `B -> near` (character camera ki taraf aata hai, bada), `far` (peeche, chhota), `mid` (normal). `near` ke saath `close` mat milao: shot bahut tight ho jaata hai.
 - **Objects:** `OBJ: truck enter left to right` (gaadi aati hai aur right pe ruk jaati hai), `OBJ: dustbin left`, `OBJ: truck exit right`. Objects: truck (kachra gaadi), auto, car, scooter, cow, dustbin, bags, table; rang (`OBJ: car red ...`), `front` (characters ke aage), `big`/`small`. Apni PNG: `OBJ: assets/objects/x.png right`. Gaadi ke aane tak kahani ruki rehti hai. Jahan character khade hain wahan gaadi mat roko (wo chhup jaati hai), ya `front` lagao.
 - **Apni image se background:** 9:16 (1080x1920) image `assets/backgrounds/gali.png` me daalo, phir script me `SCENE: gali | title` (ya poora path `SCENE: assets/backgrounds/gali.jpg`). Character neeche ki taraf (zameen/sadak ~ neeche ke 35%) khade hote hain, to image me wahan khaali jagah rakho. Image main bana nahi sakta: kisi AI image tool se banwao ya free-licence image lo (flat cartoon style character ke saath mel khaati hai).

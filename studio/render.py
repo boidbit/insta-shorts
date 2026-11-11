@@ -21,7 +21,8 @@ from PIL import Image, ImageChops, ImageOps
 from . import actions, audio, gemini_music, objects, rides, styles, ui
 from .backgrounds import Background
 from .characters import LA, UA, DEFAULT_POSE, build_character, render_ops, skeleton
-from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_at, compile_music, compile_scene,
+from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_at, camera_roll, camera_whip,
+                    compile_music, compile_scene,
                     prepare_voice, split_scenes, static_overlays)
 from .animals import ANIMALS, build_animal
 from .effects import Effects, Patch
@@ -50,6 +51,21 @@ def _shadow_sprite(w=256, h=64, peak=0.55):
     rgba[..., 0], rgba[..., 1], rgba[..., 2] = 24, 20, 34
     rgba[..., 3] = (a * 255).astype("uint8")
     return Image.fromarray(rgba, "RGBA")
+
+
+def _rolled_crop(img, vl, vt, vw, vh, deg, W, H):
+    """The camera's window (vl, vt, vw, vh) blown up to the frame, tilted by `deg` degrees - or by as much of that
+    as the zoom leaves room for, so no empty corner ever shows."""
+    z = W / float(vw)
+    th = math.radians(deg)
+    while abs(th) > 1e-3 and math.cos(th) + (H / float(W)) * abs(math.sin(th)) > z:
+        th *= 0.8
+    c, sn = math.cos(th) / z, math.sin(th) / z
+    hx, hy = (W * abs(c) + H * abs(sn)) / 2.0, (W * abs(sn) + H * abs(c)) / 2.0     # half size of the tilted window
+    cx = clamp(vl + vw / 2.0, hx, max(hx, W - hx))
+    cy = clamp(vt + vh / 2.0, hy, max(hy, H - hy))
+    return img.transform((W, H), Image.AFFINE, (c, -sn, cx - W / 2.0 * c + H / 2.0 * sn,
+                                                sn, c, cy - W / 2.0 * sn - H / 2.0 * c), Image.BICUBIC)
 
 
 def _vignette(w, h, strength):
@@ -432,15 +448,20 @@ class Renderer(Output):
             sz = s * za
             left = clamp(ang["x"] * sz - self.W / 2.0, 0, self.bg.out_w - self.W)
             top = clamp(GROUND_Y * (sz - s), 0, self.bg.out_h - self.H)
+        z, vl, vt, _vw, _vh = self._cam_view(t)
+        mirror = ang["mirror"] and self.bd25.preset not in styles.NO_MIRROR
+        v = dict(za=za, La=int(left) / (s * za), Ta=int(top) / (s * za), zc=max(z, 1.0), mirror=mirror, vl=vl, vt=vt)
+        self._view25_t, self._view25_v = t, v
+        return v
+
+    def _cam_view(self, t):
+        """The in-shot camera at time t: (zoom, left, top, width, height) of its window in frame pixels."""
         z, cx, cy, dx, dy = camera_at(self.plan, t)
         if dx or dy:
             z = max(z, 1.05)
+        s = self.s
         vw, vh = self.W / max(z, 1.0), self.H / max(z, 1.0)
-        mirror = ang["mirror"] and self.bd25.preset not in styles.NO_MIRROR
-        v = dict(za=za, La=int(left) / (s * za), Ta=int(top) / (s * za), zc=max(z, 1.0), mirror=mirror,
-                 vl=clamp((cx + dx) * s - vw / 2, 0, self.W - vw), vt=clamp((cy + dy) * s - vh / 2, 0, self.H - vh))
-        self._view25_t, self._view25_v = t, v
-        return v
+        return z, clamp((cx + dx) * s - vw / 2, 0, self.W - vw), clamp((cy + dy) * s - vh / 2, 0, self.H - vh), vw, vh
 
     def _background(self, t):
         """The place, seen from this shot's angle: drawn bigger (crisp, not blown up), the part around angle x, with the
@@ -944,15 +965,13 @@ class Renderer(Output):
                                            for n, a in anchors.items()})
 
         # camera first, so the speech bubbles can be kept inside the visible part of the frame
-        z, cx, cy, dx, dy = camera_at(plan, t)
-        if dx or dy:
-            z = max(z, 1.05)
-        vw, vh = self.W / max(z, 1.0), self.H / max(z, 1.0)
-        vl = clamp((cx + dx) * s - vw / 2, 0, self.W - vw)
-        vt = clamp((cy + dy) * s - vh / 2, 0, self.H - vh)
+        z, vl, vt, vw, vh = self._cam_view(t)
         zb = max(1.0, z * 0.8)          # a bubble never grows more than ~1.25x on screen when the camera zooms
         sb = s / zb
         mar = 22 * s / max(z, 1.0)      # margin to the edge of the visible part (pre-zoom pixels)
+        roll = camera_roll(plan, t) if z > 1.001 else 0.0
+        if roll:                        # a tilted frame swings its corners in: keep the bubble clear of them
+            mar += 0.5 * vh * abs(math.sin(math.radians(roll)))
 
         # labels + bubbles
         for c in order:
@@ -984,8 +1003,18 @@ class Renderer(Output):
                     vt = clamp(ty - tipy - mar, 0, self.H - vh)
 
         # camera crop
-        if z > 1.001:
-            img = img.resize((self.W, self.H), Image.BILINEAR, box=(vl, vt, vl + vw, vt + vh))
+        if roll:                                    # cine: a tilted frame on an angry / scared line
+            img = _rolled_crop(img, vl, vt, vw, vh, roll, self.W, self.H)
+        elif z > 1.001:                             # (cine is always a little zoomed: bicubic keeps it as crisp
+            img = img.resize((self.W, self.H),      # as an untouched frame; classic stays as it was)
+                             Image.BICUBIC if getattr(plan, "camera", "") == "cine" else Image.BILINEAR,
+                             box=(vl, vt, vl + vw, vt + vh))
+        t_prev = camera_whip(plan, t, 1.0 / plan.fps) if getattr(plan, "camera", "") == "cine" else None
+        if t_prev is not None:                      # cine: the camera swings to somebody else: streak the picture
+            _z0, l0, _t0, w0, _h0 = self._cam_view(t_prev)
+            k = int(min(abs((vl + vw / 2.0) - (l0 + w0 / 2.0)) * z * 0.5, 0.07 * self.W))
+            if k >= max(3, int(0.012 * self.W)):
+                img = img.resize((max(1, self.W // k), self.H), Image.BOX).resize((self.W, self.H), Image.BILINEAR)
 
         if self._vig is not None:                   # lens vignette: screen-fixed, under the captions
             img = ImageChops.multiply(img.convert("RGB"), self._vig)

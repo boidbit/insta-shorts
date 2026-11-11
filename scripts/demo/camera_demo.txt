@@ -1,0 +1,22 @@
+HOOK: Result ka din 😱
+CAST: B = beta spiky tshirt green, M = mummy saree maroon bun, P = papa moustache
+SCENE: room
+B (grin): Mummy, aaj school ki chhutti thi. | मम्मी, आज स्कूल की छुट्टी थी।
+M (angry): Achha? To ye result kiska hai? | अच्छा? तो ये रिज़ल्ट किसका है?
+CUT
+B (nervous): Wo... padosi ka hoga. | वो... पड़ोसी का होगा।
+M: Naam? | नाम?
+B: Mera. | मेरा।
+M: Number? | नंबर?
+B: Kam. | कम।
+M (shout): Kitne kam?! | कितने कम?!
+CUT
+P -> enter back
+P (smug): Mere bhi itne hi aate the. | मेरे भी इतने ही आते थे।
+M (angry): Tum dono idhar aao! | तुम दोनों इधर आओ!
+B -> exit left fast
+P -> exit right fast
+M -> facepalm
+CTA: Tag karo us dost ko 👇
+CAPTION: Result ka din har ghar me aisa hi hota hai 😂
+HASHTAGS: #result #mummy #papa #desicomedy #funny

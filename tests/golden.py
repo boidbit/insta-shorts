@@ -2,8 +2,11 @@
 
     python tests/golden.py compare-base --base DIR
         Render the 2d cases with the code in DIR (a checkout of desi-toons-studio) AND with this code, on the
-        same machine, and require pixel-identical frames: 2.5D work must never change the 2d look. Fonts / OS do
-        not matter because both sides render in the same place. CI runs this.
+        same machine, and require pixel-identical frames: new work must never change the 2d look by accident.
+        Fonts / OS do not matter because both sides render in the same place. CI runs this.
+        Both sides run with STUDIO_CAMERA=classic: the "cine" camera direction is an intended change of where the
+        camera looks, so the guard compares the drawing itself with the old camera (which must stay available,
+        `CAMERA: classic`). The cine look is covered by `check` below.
     python tests/golden.py check      # render every case, compare with tests/golden/ (small font noise allowed)
     python tests/golden.py update     # re-create tests/golden/ (only after an intended look change)
 
@@ -64,7 +67,7 @@ def frame_name(path, t):
     return "%s_%s.png" % (os.path.splitext(os.path.basename(path))[0], t)
 
 
-def render_cases(code_dir, out_root, looks):
+def render_cases(code_dir, out_root, looks, extra_env=None):
     done = {}
     code_dir = os.path.abspath(code_dir)
     for look, path, times in CASES:
@@ -73,7 +76,7 @@ def render_cases(code_dir, out_root, looks):
         out_dir = os.path.join(out_root, look)
         os.makedirs(out_dir, exist_ok=True)
         names = [(frame_name(path, t), t) for t in times]
-        env = dict(os.environ, PYTHONPATH=code_dir)
+        env = dict(os.environ, PYTHONPATH=code_dir, **(extra_env or {}))
         subprocess.run([sys.executable, "-c", _RUNNER, code_dir, os.path.join(ROOT, path), str(WIDTH), out_dir,
                         json.dumps(names)], check=True, cwd=code_dir, env=env)
         done.setdefault(look, []).extend(n for n, _ in names)
@@ -144,9 +147,10 @@ def main(argv=None):
             ap.error("compare-base needs --base DIR")
         base_out, head_out = os.path.join(OUT, "base"), os.path.join(OUT, "head")
         print("rendering 2d with the base code: %s" % args.base)
-        render_cases(args.base, base_out, ("2d",))
-        print("rendering 2d with this code: %s" % ROOT)
-        rendered = render_cases(ROOT, head_out, ("2d",))
+        classic = {"STUDIO_CAMERA": "classic"}
+        render_cases(args.base, base_out, ("2d",), classic)
+        print("rendering 2d with this code (classic camera): %s" % ROOT)
+        rendered = render_cases(ROOT, head_out, ("2d",), classic)
         fails = run_compare(base_out, head_out, rendered, strict=True)
     print("FAILED: %d frame(s) changed" % fails if fails else "PASSED: no unexpected change")
     return 1 if fails else 0

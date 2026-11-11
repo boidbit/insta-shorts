@@ -71,9 +71,9 @@ from . import actions, audio, gemini_music, objects, rides, styles
 from .characters import (ACCESSORIES, EXPRESSIONS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE,
                          SKIN_TONES)
 from .util import asset_path
-from .scene import DEPTHS, SHOT_ALIASES, SHOT_ZOOM, SLOTS, chat_length
+from .scene import DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLOTS, chat_length
 
-HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE")
+HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA")
 from .locations import LOCATIONS as _LOC   # noqa: E402
 
 BACKGROUNDS = tuple(dict.fromkeys(("kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road",
@@ -154,7 +154,7 @@ FEMALE_LOOKS = {"girl", "college_girl", "aunty", "dadi", "kid_girl", "office_gir
 PITCHES = ["+0Hz", "+14Hz", "-8Hz", "+24Hz", "-14Hz"]
 BUILDS = ("slim", "normal", "chubby")
 GENDER_WORDS = ("female", "woman", "ladki", "aurat", "male", "man", "ladka", "aadmi")
-MOVE_WORDS = ("enter", "exit", "walk", "left", "right", "center", "up", "down", "up_left", "up_right",
+MOVE_WORDS = ("enter", "exit", "walk", "left", "right", "center", "up", "down", "up_left", "up_right", "fast",
               "pump", "swing", "cheer", "disco", "shake", "drop", "noprop", "interrupt", "beech_me",
               "freeze", "slowmo", "slow_motion", "zoom", "reveal")
 
@@ -357,6 +357,14 @@ def _stage(tokens, ev, scene_cast, who):
         elif w in ("enter", "exit") and nxt in ("left", "right"):
             move = (w, nxt)
             i += 1
+            how = tokens[i + 1] if i + 1 < len(tokens) else None
+            if how == "fast" or (w == "enter" and how == "peek"):      # enter left fast / enter right peek / exit left fast
+                move = (w, nxt, how)
+                i += 1
+        elif w == "enter" and nxt in ("back", "pop"):                  # enter back [left|right] / enter pop
+            side = tokens[i + 2] if i + 2 < len(tokens) and tokens[i + 2] in ("left", "right") else None
+            move = ("enter", side, nxt)
+            i += 2 if side else 1
         elif w == "walk" and nxt in ("left", "center", "right"):
             move = ("walk", nxt)
             i += 1
@@ -676,7 +684,8 @@ def parse_chat(meta, title, msgs):
     return scene, warnings
 
 
-HEADER_WORDS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "OBJ", "NARRATOR",
+HEADER_WORDS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "OBJ",
+                "NARRATOR",
                 "LIGHTS", "AMBIENCE", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
 
 
@@ -942,8 +951,16 @@ def parse_script(text):
                                 % (ln[-1][:50], ", ".join(repr(u) for u in lost)))
             if move and who != "all":
                 x, _slot = _slot_x(order, who)
-                kind, side = move
-                if kind == "enter":
+                kind, side, *how = move
+                if kind == "enter" and how:             # back / pop / fast / peek: the studio stages it
+                    ev["entry"] = {"style": how[0], "x": x}
+                    if side:
+                        ev["entry"]["side"] = side
+                    ev.setdefault("hold", ENTRY_HOLD[how[0]])
+                elif kind == "exit" and how:            # exit left fast
+                    ev["leave"] = {"style": "fast", "side": side}
+                    ev.setdefault("hold", 0.7)
+                elif kind == "enter":
                     chars[who]["x"] = -140 if side == "left" else 1200
                     chars[who]["facing"] = "right" if side == "left" else "left"
                     ev["move"] = {"x": x, "dur": 1.1}
@@ -1066,6 +1083,12 @@ def parse_script(text):
             scene["style"] = styles.normalize(meta["STYLE"])
         except ValueError:
             warnings.append("STYLE %r: 2d ya 2.5d likho" % meta["STYLE"])
+    if meta.get("CAMERA"):                              # CAMERA: classic = the old camera; cine (default) = the new one
+        cam = meta["CAMERA"].strip().lower()
+        if cam in ("classic", "old", "purana"):
+            scene["meta"]["camera"] = "classic"
+        elif cam not in ("cine", "new", "naya"):
+            warnings.append("CAMERA %r: cine (naya, default) ya classic (purana) likho" % meta["CAMERA"])
     if scene.get("style") == "2.5d":
         flat = sorted({str(sc["background"].get("type")) for sc in scenes
                        if not styles.has_depth(sc["background"].get("type"))})
