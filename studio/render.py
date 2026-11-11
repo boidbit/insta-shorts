@@ -14,6 +14,7 @@ import os
 import subprocess
 import sys
 import time
+import zlib
 
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageOps
@@ -22,7 +23,7 @@ from . import actions, audio, gemini_music, objects, rides, styles, ui
 from .backgrounds import Background
 from .characters import LA, SH, TH, UA, DEFAULT_POSE, build_character, render_ops, skeleton
 from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_at, camera_roll, camera_whip,
-                    compile_music, compile_scene, ease_travel,
+                    apply_loop, compile_music, compile_scene, ease_travel, mascot_kind,
                     prepare_voice, split_scenes, start_xs, static_overlays)
 from .animals import ANIMALS, build_animal
 from .effects import Effects, Patch
@@ -269,8 +270,10 @@ class Output:
             if not self.music["generated"]:
                 cmd += ["-stream_loop", "-1"]
             cmd += ["-i", self.music["path"]]
-            filters.append("[%d:a]aresample=44100,aformat=channel_layouts=mono,atrim=0:%.2f,volume=%.2f[mus]"
-                           % (idx, self.duration, self.music["volume"]))
+            fade = getattr(self, "loop_fade", 0.0)      # LOOP: the music dips out as the reel whips back to its start
+            fade = ",afade=t=out:st=%.2f:d=%.2f" % (max(0.0, self.duration - fade), fade) if fade else ""
+            filters.append("[%d:a]aresample=44100,aformat=channel_layouts=mono,atrim=0:%.2f,volume=%.2f%s[mus]"
+                           % (idx, self.duration, self.music["volume"], fade))
             mus = "[mus]"
             idx += 1
 
@@ -1069,6 +1072,28 @@ class Renderer(Output):
                                           tear_phase=(t * 1.1) % 1.0)
         return dict(ops=ops, an=an, rf=rf, pose=pose, x=x, y=y, k=k, animal=spec.get("kind"))
 
+    mascots = ()            # set by place_mascot: [{"kind", "who", "t0", "t1", "side", "level"}]
+
+    def _draw_mascot(self, img, c, t, m):
+        """The easter egg: a little bhoot / billi / chooha slides out from behind `c`, looks at us, blinks, and slides
+        back. Drawn just before c, so c's body hides the part of it that is still behind them."""
+        k = c.draw_scale(t)
+        x, y = c.draw_pos(t)
+        out = min((t - m["t0"]) / MASCOT_SLIDE, (m["t1"] - t) / MASCOT_SLIDE, 1.0)
+        out = ease_in_out(clamp(out))
+        if out <= 0.01:
+            return
+        r = MASCOT_R[m["kind"]] * k
+        ax, ay = mascot_anchor(m["kind"], x, y, k, m["side"], m.get("level"))
+        ax += m["side"] * (r * 1.6) * out           # slides out sideways from behind them
+        if m["kind"] == "bhoot":
+            ay += 6.0 * k * math.sin(t * 5.0)       # floats
+        blink = abs((t - m["t0"]) - 0.75 * (m["t1"] - m["t0"])) < 0.07
+        sprite = mascot_sprite(m["kind"], r * self.s, -m["side"], blink)
+        if out < 0.999:
+            sprite.putalpha(sprite.getchannel("A").point(lambda a_: int(a_ * min(1.0, out * 1.6))))
+        img.paste(sprite, (int(ax * self.s - sprite.width / 2), int(ay * self.s - sprite.height / 2)), sprite)
+
     def actor(self, name, t, k=None):
         """One character alone at story time t, not cut off at the frame edge: (RGBA layer, (left, top) in this
         shot's frame pixels, prep) or None. The one-take walk carries them from this place into the next."""
@@ -1135,6 +1160,9 @@ class Renderer(Output):
                 img.paste(floor[fi][1], (floor[fi][2], floor[fi][3]), floor[fi][1])
                 fi += 1
             if c not in in_front and c.state_at(t).get("visible", True):
+                for m in self.mascots:              # the easter egg peeks out from behind this person
+                    if m["who"] == c.name and m["t0"] <= t <= m["t1"]:
+                        self._draw_mascot(img, c, t, m)
                 draw_char(c)
         for _d, im_, px_, py_ in floor[fi:]:
             img.paste(im_, (px_, py_), im_)
@@ -1224,6 +1252,185 @@ class Renderer(Output):
         if f < 0.999:
             img = Image.blend(Image.new("RGB", img.size, (0, 0, 0)), img, clamp(f))
         return img
+
+
+LOOP_WHIP = 0.32            # LOOP: the last moment whips back into the opening frame
+MASCOT_R = {"bhoot": 56.0, "billi": 46.0, "chooha": 34.0}      # head radius, logical px at a person's size
+MASCOT_SLIDE = 0.28
+
+
+def mascot_anchor(kind, x, y, k, side, level=None):
+    """Where the mascot's head is when it is still hidden behind a person standing at (x, y) at size k: a bhoot
+    over the shoulder, a billi at the knee, a chooha at the feet (level "high" = shoulder height for any)."""
+    if level == "high" or kind == "bhoot":
+        return x + side * 70.0 * k, y - 610.0 * k
+    if kind == "billi":
+        return x + side * 45.0 * k, y - 200.0 * k
+    return x + side * 36.0 * k, y - 40.0 * k
+
+
+_SPRITES = {}
+
+
+def mascot_sprite(kind, r, look, blink):
+    """RGBA picture of the mascot's head (+ the paws that hold on to the edge it peeks round); r in frame px."""
+    key = (kind, int(r * 4), look, blink)
+    if key in _SPRITES:
+        return _SPRITES[key]
+    SS = 3
+    R = max(4.0, r) * SS
+    W = int(R * 3.2)
+    im = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    cx = cy = W / 2.0
+    ink, lw = (20, 20, 24, 255), max(2, int(R * 0.09))
+    eye_dx = R * 0.36 + look * R * 0.08
+    if kind == "bhoot":
+        body = (246, 248, 255, 238)
+        d.ellipse([cx - R, cy - R, cx + R, cy + R], fill=body, outline=ink, width=lw)
+        d.rectangle([cx - R + lw / 2, cy, cx + R - lw / 2, cy + R * 1.05], fill=body)
+        for i in range(3):                          # the wavy hem
+            bx = cx - R + R * (2 * i + 1) / 3.0
+            d.ellipse([bx - R / 3, cy + R * 0.75, bx + R / 3, cy + R * 1.35], fill=body)
+        d.line([(cx - R, cy), (cx - R, cy + R * 1.05)], fill=ink, width=lw)
+        d.line([(cx + R, cy), (cx + R, cy + R * 1.05)], fill=ink, width=lw)
+        for (ex, ey) in ((cx - eye_dx + look * R * 0.1, cy - R * 0.1), (cx + eye_dx * 0.6 + look * R * 0.1, cy - R * 0.1)):
+            if blink:
+                d.line([(ex - R * 0.14, ey), (ex + R * 0.14, ey)], fill=ink, width=lw)
+            else:
+                d.ellipse([ex - R * 0.13, ey - R * 0.2, ex + R * 0.13, ey + R * 0.2], fill=ink)
+        d.ellipse([cx - R * 0.1 + look * R * 0.1, cy + R * 0.3, cx + R * 0.1 + look * R * 0.1, cy + R * 0.52],
+                  fill=ink)                         # "o"
+    else:
+        fur = (232, 150, 70, 255) if kind == "billi" else (150, 150, 160, 255)
+        inner = (246, 170, 180, 255)
+        if kind == "billi":
+            for sx in (-1, 1):
+                d.polygon([(cx + sx * R * 0.85, cy - R * 0.25), (cx + sx * R * 0.75, cy - R * 1.35),
+                           (cx + sx * R * 0.15, cy - R * 0.8)], fill=fur, outline=ink)
+                d.polygon([(cx + sx * R * 0.72, cy - R * 0.45), (cx + sx * R * 0.68, cy - R * 1.05),
+                           (cx + sx * R * 0.35, cy - R * 0.78)], fill=inner)
+        else:
+            for sx in (-1, 1):
+                ex_, ey_ = cx + sx * R * 0.85, cy - R * 0.8
+                d.ellipse([ex_ - R * 0.6, ey_ - R * 0.6, ex_ + R * 0.6, ey_ + R * 0.6], fill=fur, outline=ink, width=lw)
+                d.ellipse([ex_ - R * 0.35, ey_ - R * 0.35, ex_ + R * 0.35, ey_ + R * 0.35], fill=inner)
+        d.ellipse([cx - R, cy - R, cx + R, cy + R], fill=fur, outline=ink, width=lw)
+        eye = (110, 200, 90, 255) if kind == "billi" else ink
+        for ex in (cx - eye_dx, cx + eye_dx):
+            ex += look * R * 0.12
+            if blink:
+                d.line([(ex - R * 0.16, cy - R * 0.1), (ex + R * 0.16, cy - R * 0.1)], fill=ink, width=lw)
+            else:
+                d.ellipse([ex - R * 0.17, cy - R * 0.3, ex + R * 0.17, cy + R * 0.08], fill=eye, outline=ink)
+                if kind == "billi":
+                    d.line([(ex, cy - R * 0.26), (ex, cy + R * 0.04)], fill=ink, width=max(1, lw // 2))
+        nx = cx + look * R * 0.15
+        d.polygon([(nx - R * 0.12, cy + R * 0.18), (nx + R * 0.12, cy + R * 0.18), (nx, cy + R * 0.32)], fill=inner,
+                  outline=ink)
+        for sy in (0.22, 0.36):                     # whiskers
+            for sx in (-1, 1):
+                d.line([(nx + sx * R * 0.25, cy + R * sy), (nx + sx * R * 1.05, cy + R * (sy - 0.1 + 0.12 * sy))],
+                       fill=ink, width=max(1, lw // 2))
+        for sx in (-1, 1):                          # the paws holding on
+            px = cx + sx * R * 0.55
+            d.ellipse([px - R * 0.28, cy + R * 0.78, px + R * 0.28, cy + R * 1.12], fill=fur, outline=ink, width=lw)
+    im = im.resize((max(1, W // SS), max(1, W // SS)), Image.LANCZOS)
+    _SPRITES[key] = im
+    return im
+
+
+def place_mascot(parts, spec, seed, loop=False):
+    """Hide the mascot in the video: during one line in the middle of the story it peeks out from behind someone the
+    camera is showing at that moment (never on the first line or the punch line); with LOOP it peeks once more in
+    the very last second ("bhai end me kya tha?"). Same video, same place; another video, another place."""
+    kind = mascot_kind(spec)
+    if not kind:
+        return []
+    people = lambda p: [c for c in p.plan.chars.values()                      # noqa: E731
+                        if not c.spec.get("hidden") and not c.spec.get("kind")]
+    lines = [(p, sp) for p in parts for sp in p.plan.speech
+             if sp["who"] in p.plan.chars and p.plan.chars[sp["who"]] in people(p) and sp["end"] - sp["start"] > 0.9]
+    pool = lines[1:-1] if len(lines) >= 3 else lines
+    placed = []
+
+    def seen(p, c, t, side, level):
+        """Is the hidden spot (and the spot it slides out to) inside what the camera shows at t?"""
+        z, vl, vt, vw, vh = p._cam_view(t)
+        x, y = c.draw_pos(t)
+        k = c.draw_scale(t)
+        ax, ay = mascot_anchor(kind, x, y, k, side, level)
+        r = MASCOT_R[kind] * k
+        pts = [(ax, ay - r), (ax + side * 2.8 * r, ay + r)]
+        m = 0.04 * vw
+        return all(vl + m <= px * p.s <= vl + vw - m and vt + m <= py * p.s <= vt + vh - m for px, py in pts)
+
+    def try_at(p, c, t0, t1, checks=None):
+        others = [o.draw_pos(t0)[0] for o in people(p) if o is not c and o.state_at(t0).get("visible", True)]
+        x = c.draw_pos(t0)[0]
+        near = min(others, key=lambda ox: abs(ox - x)) if others else None
+        sides = [(-1 if near > x else 1)] if near is not None else [1 if seed % 2 else -1]
+        sides.append(-sides[0])
+        for level in (None, "high"):
+            for side in sides:
+                if all(seen(p, c, t, side, level) for t in (checks or (t0, (t0 + t1) / 2, t1))):
+                    return {"kind": kind, "who": c.name, "t0": t0, "t1": t1, "side": side, "level": level}
+        return None
+
+    for j in range(len(pool)):
+        p, sp = pool[(seed + j) % len(pool)]
+        t0 = sp["start"] + 0.25
+        m = try_at(p, p.plan.chars[sp["who"]], t0, min(sp["end"], t0 + 1.9))
+        if m:
+            p.mascots = list(p.mascots) + [m]
+            placed.append(m)
+            break
+    if loop and parts:
+        p = parts[-1]
+        t1 = p.plan.duration - LOOP_WHIP - 0.1
+        t0 = t1 - 0.7
+        z, cx, cy, _dx, _dy = camera_at(p.plan, t1)                # whoever the camera ends on (the reaction)
+        cands = sorted((c for c in people(p) if c.state_at(t1).get("visible", True)),
+                       key=lambda c: abs(c.draw_pos(t1)[0] - cx))
+        for c in cands:
+            m = try_at(p, c, t0, t1, ((t0 + t1) / 2, t1))
+            if m:
+                p.mascots = list(p.mascots) + [m]
+                placed.append(m)
+                break
+    return placed
+
+
+class Looped(Output):
+    """LOOP: the reel's last moment whips back into its own first frame, so when Instagram plays it again there is
+    no seam (people watch it twice before they notice). Wraps a Renderer / Sequence."""
+
+    def __init__(self, video):
+        self.v = video
+        for key in ("W", "H", "fps", "duration", "n_frames", "speech", "sfx", "music"):
+            setattr(self, key, getattr(video, key))
+        self.ambience = getattr(video, "ambience", [])
+        self.parts = getattr(video, "parts", [video])
+        self.loop_fade = LOOP_WHIP
+        self._first = None
+
+    def frame(self, t):
+        img = self.v.frame(t)
+        start = self.duration - LOOP_WHIP
+        if t < start:
+            return img
+        if self._first is None:
+            self._first = self.v.frame(0.0)
+        last = (self.n_frames - 1) / float(self.fps)
+        e = ease_in_out(clamp((t - start) / max(1e-6, last - start)))      # the very last frame IS the first one
+        off = int(round(self.W * e))
+        canvas = Image.new("RGB", img.size)
+        canvas.paste(img, (-off, 0))
+        canvas.paste(self._first, (self.W - off, 0))
+        k = int(0.06 * self.W * math.sin(math.pi * e))                      # a whip streaks the picture
+        if k >= 3:
+            canvas = canvas.resize((max(1, self.W // k), self.H), Image.BOX).resize((self.W, self.H), Image.BILINEAR)
+        return canvas
 
 
 PAN_SPEED = {False: 400.0, True: 820.0}    # one-take walk between places: walking / running pace, logical px/s
@@ -1415,15 +1622,29 @@ class Sequence(Output):
         return img
 
 
-def make_video(scene, width=1080, use_tts=True, fps=None, tts_provider=None, dialogue=None, hook=None, style=None):
+def make_video(scene, width=1080, use_tts=True, fps=None, tts_provider=None, dialogue=None, hook=None, style=None,
+               loop=None, mascot=None):
+    """loop: True = LOOP mode (the reel runs round without a seam); mascot: bhoot | billi | chooha | off (hidden
+    easter egg). Both also come from the script (`LOOP: on`, `MASCOT: billi`) / the scene ("loop", "mascot")."""
     scene = gemini_music.prepare(scene, use_tts)        # `MUSIC: gemini ...`: the song (or the beat if Gemini cannot)
     if dialogue or hook:
         scene = apply_options(scene, dialogue, hook)
     if style:                                       # "2d" / "2.5d" from the command line / web page wins
         scene = dict(scene, style=styles.normalize(style))
+    if loop or (scene.get("loop") and not scene.get("_looped")):
+        scene = apply_loop(scene)
+    if mascot is not None:
+        scene = dict(scene, mascot=mascot)
     if scene.get("scenes"):
-        return Sequence(scene, width, use_tts, fps, tts_provider)
-    return Renderer(scene, width, use_tts, fps, tts_provider)
+        v = Sequence(scene, width, use_tts, fps, tts_provider)
+        parts = v.parts
+    else:
+        v = Renderer(scene, width, use_tts, fps, tts_provider)
+        parts = [v]
+    if scene.get("mascot"):
+        seed = zlib.crc32(str(scene.get("hook") or scene.get("name") or "reel").encode("utf-8"))
+        place_mascot(parts, scene["mascot"], seed, bool(scene.get("loop")))
+    return Looped(v) if scene.get("loop") else v
 
 
 def main(argv=None):
@@ -1441,6 +1662,10 @@ def main(argv=None):
                     help="spoken words: bubble (default) | subtitle (at the bottom) | both | none (voice only)")
     ap.add_argument("--style", choices=["2d", "2.5d"], default=None,
                     help="look: 2d (default) | 2.5d (kitchen, gully, chai_tapri, kirana, terrace as layered sets)")
+    ap.add_argument("--loop", action="store_true",
+                    help="LOOP mode: no end card, the last moment whips back into the first frame (watched twice)")
+    ap.add_argument("--mascot", choices=["bhoot", "billi", "chooha", "off"], default=None,
+                    help="hide a little mascot (easter egg) in the video; off = none even if the script asks")
     ap.add_argument("--hook", choices=HOOK_MODES, default=None, dest="hook_mode",
                     help="hook card: over (over the first line, default) | first (hook card, then the story) | off")
     args = ap.parse_args(argv)
@@ -1448,7 +1673,8 @@ def main(argv=None):
     scene = load_scene(args.scene)
     name = os.path.splitext(os.path.basename(args.scene))[0]
     r = make_video(scene, args.width, use_tts=not args.no_tts, fps=args.fps, tts_provider=args.tts,
-                   dialogue=args.dialogue, hook=args.hook_mode, style=args.style)
+                   dialogue=args.dialogue, hook=args.hook_mode, style=args.style, loop=args.loop or None,
+                   mascot=args.mascot)
     if args.frame is not None:
         out = args.out or os.path.join("out", name + ".png")
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)

@@ -1,0 +1,13 @@
+HOOK: Mummy ka "bas 5 minute" 😭
+CAST: M = mummy, R = beta
+SCENE: kitchen
+M (angry, point): Raju, bas 5 minute me khana lag raha hai! | राजू, बस 5 मिनट में खाना लग रहा है!
+R (smile, phone): Theek hai mummy, ek game aur | ठीक है मम्मी, एक गेम और
+CUT
+M (shock): Teen ghante ho gaye! Khana thanda ho gaya! | तीन घंटे हो गए! खाना ठंडा हो गया!
+CUT
+R (think): To khana kab lagega? | तो खाना कब लगेगा?
+M (angry): Bas 5 minute! | बस 5 मिनट!
+CTA: Har ghar ki kahani 😂 Tag karo
+LOOP: on
+MASCOT: bhoot

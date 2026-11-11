@@ -71,9 +71,11 @@ from . import actions, audio, gemini_music, objects, rides, styles
 from .characters import (ACCESSORIES, EXPRESSIONS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE,
                          SKIN_TONES)
 from .util import asset_path
-from .scene import DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLOTS, chat_length
+from .scene import DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLOTS, apply_loop, chat_length, mascot_kind
 
-HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA")
+HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP",
+           "MASCOT")
+ON_WORDS, OFF_WORDS = ("on", "yes", "haan", "true", "1"), ("off", "no", "nahi", "false", "0", "none")
 from .locations import LOCATIONS as _LOC   # noqa: E402
 
 BACKGROUNDS = tuple(dict.fromkeys(("kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road",
@@ -182,6 +184,7 @@ def vocab():
         "expressions": sorted(EXPRESSIONS), "actions": sorted(actions.ACTIONS),
         "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS), "fx": sorted(FX),
         "times": sorted(TIMES + WEATHER), "pan_words": list(PAN_WORDS),
+        "feel_words": sorted([k, v] for k, v in FEEL_WORDS.items()),
         "sets": sorted(SET_TYPES), "set_words": sorted(set(SET_STATES) | set(SET_X) | {"big", "small", "back", "front", "flip"}),
         "seat_actions": sorted(SEAT_ACTIONS), "animals": sorted(ANIMAL_WORDS),
         "moods": sorted(audio.MOODS), "ambience": sorted(audio.AMBIENCE),
@@ -353,9 +356,34 @@ def ots_back(sc, before, order, cast):
     return others[0] if others else None
 
 
+# plain words a writer (or a chat AI) often uses for a feeling or an action -> the studio's own word, so a script
+# written with "happy", "gussa", "running" still acts (the writer prompt then needs fewer rules)
+FEEL_WORDS = {
+    "happy": "smile", "khush": "smile", "cheerful": "smile", "smiling": "smile", "gusse": "angry",
+    "naraz": "angry", "naraaz": "angry", "irritated": "angry", "annoyed": "angry", "frustrated": "angry",
+    "furious": "angry", "mad": "angry", "dukhi": "sad", "upset": "sad", "udaas": "sad", "udas": "sad",
+    "worried": "nervous", "tension": "nervous", "tense": "nervous", "anxious": "nervous", "ghabraya": "nervous",
+    "darr": "scared", "dara": "scared", "afraid": "scared", "hairan": "surprised", "shocked": "shock",
+    "amazed": "surprised", "confident": "proud", "tired": "sleepy", "thaka": "sleepy", "embarrassed": "shy",
+    "sharma": "shy", "sarcastic": "smug", "naughty": "sly", "mischievous": "sly", "serious": "neutral",
+    "calm": "relaxed", "chill": "relaxed", "crying": "cry", "rona": "cry", "laughing": "laugh", "hasna": "laugh",
+    "thinking": "think", "soch": "think", "romantic": "love", "pyaar": "love", "disgusted": "disgust",
+    "shouting": "shout", "chillana": "shout", "whispering": "whisper", "running": "run", "bhaag": "run",
+    "bhaago": "run", "walking": "walk", "dancing": "dance", "naach": "dance", "nachna": "dance", "sitting": "sit",
+    "baith": "sit", "baitho": "sit", "jumping": "jump", "kood": "jump", "pointing": "point", "waving": "wave",
+    "clapping": "clap", "taali": "clap", "sleeping": "sleep", "khaana": "eat", "drinking": "drink",
+    "peena": "drink", "reading": "read", "padhna": "read", "writing": "write", "likhna": "write", "falling": "fall",
+    "gira": "fall", "girna": "fall", "hugging": "hug", "shrugging": "shrug", "nodding": "nod", "slapping": "slap",
+    "thappad": "slap", "punching": "punch", "kicking": "kick", "throwing": "throw", "singing": "sing",
+    "texting": "text", "cooking": "cook", "sweeping": "sweep", "jhadu": "sweep", "hiding": "hide", "peeking": "peek",
+    "jhaank": "peek",
+}
+
+
 def _stage(tokens, ev, scene_cast, who):
     """Apply bracket / arrow words to an event dict.
     Returns (move request or None, unknown words, words that were overridden)."""
+    tokens = [FEEL_WORDS.get(w, w) for w in tokens]
     move = None
     unknown, acts, exprs = [], [], []
     # words that are both an action and a face (think, shock, laugh, scared...) are the face when the line
@@ -749,6 +777,7 @@ def parse_chat(meta, title, msgs):
 
 
 HEADER_WORDS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "OBJ",
+                "LOOP", "MASCOT",
                 "NARRATOR",
                 "LIGHTS", "AMBIENCE", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
 
@@ -1185,6 +1214,18 @@ def parse_script(text):
         if flat:
             warnings.append("STYLE 2.5d: %s 2.5D me flat dikhegi (baaki har jagah 2.5D me gehraai ke saath banti hai)"
                             % ", ".join(flat))
+    if meta.get("LOOP"):                                # LOOP: on = the reel runs round without a visible end
+        v = meta["LOOP"].strip().lower()
+        if v in ON_WORDS:
+            scene = apply_loop(scene)
+        elif v not in OFF_WORDS:
+            warnings.append("LOOP %r: on ya off likho" % meta["LOOP"])
+    if meta.get("MASCOT"):                              # MASCOT: bhoot | billi | chooha: the hidden easter egg
+        v = meta["MASCOT"].strip().lower()
+        if mascot_kind(v):
+            scene["mascot"] = {"kind": mascot_kind(v)}
+        elif v not in OFF_WORDS:
+            warnings.append("MASCOT %r: bhoot, billi, chooha ya off likho" % meta["MASCOT"])
     if len([n for n in cast if n != "NARRATOR"]) > 3:
         warnings.append("more than 3 characters: the screen gets crowded")
     return scene, warnings

@@ -1277,6 +1277,58 @@ HOOK_MODES = ("over", "first", "off")
 HOOK_LEAD = 1.7                                     # seconds the hook card has the screen to itself ("first")
 
 
+MASCOTS = {"bhoot": "bhoot", "ghost": "bhoot", "billi": "billi", "cat": "billi", "chooha": "chooha",
+           "chuha": "chooha", "mouse": "chooha"}
+
+
+def mascot_kind(value):
+    """`MASCOT: bhoot` / {"kind": "billi"} / "off" -> bhoot | billi | chooha | None."""
+    if isinstance(value, dict):
+        value = value.get("kind")
+    return MASCOTS.get(str(value or "").strip().lower())
+
+
+LOOP_HOLD = 0.6              # LOOP: seconds the last reaction is held before the reel whips back to its start
+
+
+def apply_loop(scene):
+    """LOOP: the reel plays round and round without a visible end (people watch it twice). On a copy: the CTA end
+    card goes (an end card says "the end"; its text goes into the post caption instead), the last reaction is held
+    only a moment, no fades. The renderer then whips the last moment back into the opening frame (render.Looped)."""
+    import copy
+    scene = copy.deepcopy(scene)
+    if scene.get("loop") is True and scene.get("_looped"):
+        return scene
+    scene["loop"], scene["_looped"] = True, True
+    ctas = []
+
+    def keep(o):
+        if isinstance(o, dict) and o.get("cta"):
+            ctas.append(str(o.get("text", "")))
+            return False
+        return True
+    scene["overlays"] = [o for o in scene.get("overlays", []) if keep(o)]
+    for sc in scene.get("scenes", []) or [scene]:
+        if sc is not scene:
+            sc["overlays"] = [o for o in sc.get("overlays", []) if keep(o)]
+        tl = []
+        for ev in sc.get("timeline", []):
+            if isinstance(ev.get("overlay"), dict) and not keep(ev["overlay"]):
+                ev = {k: v for k, v in ev.items() if k not in ("overlay", "sfx", "volume")}
+                ev["hold"] = min(float(ev.get("hold", LOOP_HOLD)), LOOP_HOLD)
+            tl.append(ev)
+        if "timeline" in sc:
+            sc["timeline"] = tl
+    meta = scene.setdefault("meta", {})
+    meta["fade_in"] = meta["fade_out"] = 0
+    if ctas:
+        post = scene.setdefault("post", {})
+        cap = str(post.get("caption") or "").strip()
+        extra = " ".join(c for c in ctas if c and c not in cap)
+        post["caption"] = (cap + "\n" + extra).strip() if extra else cap
+    return scene
+
+
 def apply_options(scene, dialogue=None, hook=None):
     """The studio page's video options, on a copy of the scene.
     dialogue: bubble (speech bubbles) | subtitle (words at the bottom) | both | none (voice only).
@@ -1300,7 +1352,6 @@ def apply_options(scene, dialogue=None, hook=None):
     return scene
 
 
-# keys of a multi-scene file that belong to the whole video, not to one scene
 def start_xs(scene):
     """Where everybody stands when a scene starts (logical x), placed the way compile_scene places them."""
     cdefs = scene.get("characters", {})
@@ -1344,7 +1395,9 @@ def drop_last_exit(timeline, who):
     return timeline, None, False
 
 
-VIDEO_KEYS = ("scenes", "music", "caption", "overlays", "post", "hook", "vars", "name", "about", "transition")
+# keys of a multi-scene file that belong to the whole video, not to one scene
+VIDEO_KEYS = ("scenes", "music", "caption", "overlays", "post", "hook", "vars", "name", "about", "transition",
+              "loop", "mascot")
 
 
 TITLE_LEAD = 1.1            # cine: seconds of the full-screen "Agle din..." card before a titled shot

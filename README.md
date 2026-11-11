@@ -185,7 +185,7 @@ Ye sab script me seedhe chalte hain (page ka checker bhi inhe jaanta hai), aur A
 
 ## Video options (page / command line)
 
-Page pe "Approve: Video banao" ke upar do options (page yaad rakhta hai):
+Page pe "Approve: Video banao" ke upar ye options hain (page yaad rakhta hai):
 
 | Option | Kya karta hai | Command line |
 |---|---|---|
@@ -193,6 +193,38 @@ Page pe "Approve: Video banao" ke upar do options (page yaad rakhta hai):
 | Hook card | `Pehli line ke saath` (pehle jaisa), `Pehle hook, phir baat` (hook card 1.7s akela, phir kahani), `Hook card nahi` | `--hook over/first/off` |
 
 GitHub Actions me ye `dialogue` aur `intro` inputs hain. Style ka input `style`: `auto` (script ki `STYLE:` line, warna 2D) / `2d` / `2.5d`; page apna chuna hua style bhejta hai.
+
+### Loop 🔁 aur Mascot 👻 (watch time ke liye)
+
+| Option | Kya karta hai | Script line | Command line |
+|---|---|---|---|
+| Loop | Video ka end ek whip ke saath seedha pehle frame me ghus jaata hai (aakhri frame = pehla frame), music bhi wahin dheema hota hai. Instagram reel dobara chalaye to jod pata nahi chalta, log 2 baar dekhte hain. CTA ka end card nahi aata (end card "the end" bolta hai); CTA ka text caption me chala jaata hai. | `LOOP: on` | `--loop` |
+| Mascot | Ek chhota mascot (chhotu bhoot 👻 / billi 🐱 / chooha 🐭) kahani ke beech ki ek line pe bolne wale ke peeche se jhaankta hai, aankh jhapakata hai, wapas chhup jaata hai. Pehli line aur punch line pe kabhi nahi. Loop ke saath aakhri second me ek baar aur ("bhai end me kya tha?"). Har video me alag jagah, wahi video dobara banao to wahi jagah. | `MASCOT: bhoot` (billi, chooha, off) | `--mascot bhoot` |
+
+Page pe ye dono video options me hain. Approve karne pe page `LOOP: on` / `MASCOT: ...` line script ke saath bhej deta hai; script me apni line ho to wahi chalti hai. JSON me: `"loop": true`, `"mascot": "billi"`.
+
+### Chhota prompt (ChatGPT / Gemini app ke liye)
+
+"📋 prompt copy" ab sirf wahi copy karta hai jo aapke idea ko chahiye. Hamesha jaata hai: format, shabd aur likhne ke niyam (~12.7k akshar, pehle ~24k). Baaki hisse tabhi judte hain jab idea me unke shabd hon:
+
+| Hissa | Kab judta hai |
+|---|---|
+| Gaadi | gaadi, bike, auto, truck... |
+| Dance / gaana | dance, shaadi, gaana, gym, cricket... |
+| Ek take (pan) | bhaag, peecha, raste, jail, nikla... |
+| Screen cards | notification, salary, bank, "baad"... |
+| Camera tricks | slow, freeze, entry... |
+| Kapde / chehra | baal, dadhi, mota, patla... |
+| Dark comedy | Tone dark/satire/absurd, ya maut, EMI, bhoot... |
+| Loop | Loop option on ho to |
+
+"Poora prompt" tick karo to sab kuch jaata hai. Copy ke baad page batata hai ki prompt kitna lamba hai aur kya-kya juda. Studio ka apna AI writer (key ke saath) hamesha poora prompt use karta hai.
+
+Prompt chhota rakhne ke liye ye kaam ab studio khud karta hai, prompt me nahi likhna padta:
+- camera chalana;
+- logon ke chehre, lambai aur wazan;
+- style, dialogue text, hook card, loop, mascot (page ke options);
+- aam shabd samajhna: `happy` → smile, `gussa`/`naraz` → angry, `worried` → nervous, `tired` → sleepy, `running`/`bhaag` → run, `baith` → sit, `naach` → dance... AI aise shabd likhe to bhi script chalti hai.
 
 ## Chat video (alag, chhota format)
 

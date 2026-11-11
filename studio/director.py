@@ -299,11 +299,25 @@ def style_prompt(style):
         return f.read().strip()
 
 
+MODULE = re.compile(r"<!-- module: (\w+) -->\n(.*?)<!-- /module -->\n?", re.S)
+
+
+def prompt_text(text, keep=None, drop=("loop",)):
+    """A writer prompt with its optional modules (`<!-- module: x --> ... <!-- /module -->`): keep = the modules to
+    keep (None = all of them except `drop`). The studio page copies only the modules an idea needs (a short prompt
+    for a chat app); the studio's own writer gets them all (except loop, a page option)."""
+    def sub(m):
+        name = m.group(1)
+        wanted = (name in keep) if keep is not None else (name not in drop)
+        return m.group(2) if wanted else ""
+    return MODULE.sub(sub, text)
+
+
 def _setup(hook_style, llm, tmp_path, rng, log, prompt_file, fmt, tone="auto", idea="", style="2d"):
     rng = rng or random.Random()
     log = log or (lambda m: print(m, file=sys.stderr))
     with open(os.path.join(ROOT, prompt_file), encoding="utf-8") as f:
-        base = f.read()
+        base = prompt_text(f.read())
     extra = style_prompt(style)
     if extra:
         base = base.rstrip() + "\n\n" + extra + "\n"
