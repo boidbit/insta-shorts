@@ -382,7 +382,7 @@ python -m unittest discover -s tests                                            
 Page pe video options me **Awaaz**: `Auto` (Gemini key ho to Gemini, warna free) · `Gemini` · `ElevenLabs` · `Free (Edge)`. Page ise yaad rakhta hai. Command line: `--tts auto|gemini|elevenlabs|edge`.
 
 **ElevenLabs** (bahut natural Hindi, `eleven_multilingual_v2`):
-- Key: repo → Settings → Secrets and variables → Actions → **Repository secret** `ELEVENLABS_API_KEY`. Ye naam bhi chalte hain: `ELEVEN_LABS_API_KEY`, `ELEVENLABS_KEY`, `ELEVEN_API_KEY`, `ELEVENLABS`, `XI_API_KEY`.
+- Key: repo → Settings → Secrets and variables → Actions → **Repository secret** `ELEVENLABS_API_KEY`. Ye naam bhi chalte hain: `ELEVEN_LAB_1` (is repo me yahi hai), `ELEVEN_LABS_API_KEY`, `ELEVENLABS_KEY`, `ELEVEN_API_KEY`, `ELEVENLABS`, `XI_API_KEY`.
 - Har line ki alag request jaati hai. Har character ki apni awaaz hoti hai aur poori video me wahi rehti hai; do characters ki ek awaaz nahi hoti. Aurat/aadmi cast se pata chalta hai; bachche ki awaaz thodi patli kar di jaati hai.
 - Aapke ElevenLabs account me koi Indian/Hindi voice judi ho (Voice Library se "Add"), to wo pehle use hoti hai. Warna ElevenLabs ki standard awaazein lagti hain.
 - Apni pasand ki voice: `ELEVENLABS_VOICES_MALE` / `ELEVENLABS_VOICES_FEMALE` (comma se voice ids, repo variables/secrets), ya JSON me `"voice": {"eleven": "<voice id>"}`. Model badalna: `ELEVENLABS_MODEL` (jaise `eleven_flash_v2_5`, sasta).

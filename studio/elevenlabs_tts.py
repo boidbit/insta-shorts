@@ -20,7 +20,7 @@ ENDPOINT = "https://api.elevenlabs.io/v1/text-to-speech/%s?output_format=mp3_441
 VOICES_URL = "https://api.elevenlabs.io/v1/voices"
 DEFAULT_MODEL = "eleven_multilingual_v2"
 CACHE_DIR = os.path.join(".cache", "tts", "eleven")
-KEY_NAMES = ("ELEVENLABS_API_KEY", "ELEVEN_LABS_API_KEY", "ELEVENLABS_KEY", "ELEVEN_API_KEY", "XI_API_KEY", "ELEVENLAB_API_KEY",
+KEY_NAMES = ("ELEVEN_LAB_1", "ELEVENLABS_API_KEY", "ELEVEN_LABS_API_KEY", "ELEVENLABS_KEY", "ELEVEN_API_KEY", "XI_API_KEY", "ELEVENLAB_API_KEY",
              "ELEVENLAB_KEY")
 # ElevenLabs' standard (premade) voices, available to every account
 MALE = ["pNInz6obpgDQGcFmaJgB", "TxGEqnHWrfWFTfGW9XjX", "onwK4e9ZLuTAKqWW03F9", "nPczCjzI2devNBz1zQrb",
