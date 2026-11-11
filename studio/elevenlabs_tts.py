@@ -107,7 +107,13 @@ def synth_lines(items, model=None, cache_dir=None, key=None):
     cache_dir = cache_dir or CACHE_DIR
     os.makedirs(cache_dir, exist_ok=True)
     pools = None
-    chosen, taken, blocked = {}, set(), set()
+    refused = os.path.join(cache_dir, "refused_voices.json")   # voices this plan refused before: not asked again
+    try:
+        with open(refused, encoding="utf-8") as f:
+            blocked = set(json.load(f))
+    except (OSError, ValueError):
+        blocked = set()
+    chosen, taken = {}, set()
 
     def pick(spec):
         """The next voice for a new character: one nobody else in the video has, and not one the plan refused."""
@@ -126,7 +132,7 @@ def synth_lines(items, model=None, cache_dir=None, key=None):
         spec = it.get("spec") or {}
         who = it.get("who") or "?"
         if who not in chosen:
-            chosen[who] = str(spec["eleven"]) if spec.get("eleven") else pick(spec)
+            chosen[who] = str(spec["eleven"]) if spec.get("eleven") and str(spec["eleven"]) not in blocked else pick(spec)
         for _attempt in range(10):
             voice = chosen[who]
             body = {"text": it["text"], "model_id": model, "voice_settings": settings_for(it.get("expression"))}
@@ -145,6 +151,11 @@ def synth_lines(items, model=None, cache_dir=None, key=None):
                 # a free plan cannot use a Voice Library voice through the API: take a standard voice instead
                 print("  [eleven] voice %s needs a paid plan -> a standard voice" % voice, file=sys.stderr)
                 blocked.add(voice)
+                try:
+                    with open(refused, "w", encoding="utf-8") as f:
+                        json.dump(sorted(blocked), f)
+                except OSError:
+                    pass
                 chosen[who] = pick(spec)
                 continue
             if len(data) < 1000:

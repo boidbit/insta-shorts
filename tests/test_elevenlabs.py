@@ -96,6 +96,12 @@ class ElevenTests(unittest.TestCase):
         self.assertEqual(voice[0], elevenlabs_tts.FEMALE[0])       # mummy: the first standard woman's voice
         self.assertEqual(voice[0], voice[3])
         self.assertEqual(len({voice[0], voice[1], voice[2]}), 3)
+        api.calls.clear()                                   # the next video does not ask for the refused voice
+        items = [dict(it, text=it["text"] + " 2") for it in self.items()]
+        with mock.patch.object(elevenlabs_tts, "_request", api), \
+                mock.patch.object(elevenlabs_tts, "_kid_voice", lambda p, pitch: p):
+            elevenlabs_tts.synth_lines(items, cache_dir=self.tmp.name)
+        self.assertEqual(len(api.calls), 4)
 
     def test_a_second_render_costs_nothing(self):
         api = FakeAPI()
