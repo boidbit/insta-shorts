@@ -1,6 +1,10 @@
 """One take across places (`SCENE: <place> pan`): whoever leaves walks on into the next place and the camera goes
 with them, no cut. And the jail's barred door that can be kicked down. python -m unittest discover -s tests"""
+import json
 import os
+import re
+import shutil
+import subprocess
 import sys
 import unittest
 
@@ -148,6 +152,24 @@ class JailDoorTests(unittest.TestCase):
         door = [o for o in p.sets if o["type"] == "jail_door"][0]
         self.assertEqual(door.get("scale", 1.0), 1.0)              # not grown with the people
         self.assertEqual((door["x"], door["y"]), (930, 1290))
+
+
+@unittest.skipUnless(shutil.which("node"), "node is not installed")
+class PageCheckerTests(unittest.TestCase):
+    def lint(self, text):
+        page = open(os.path.join(os.path.dirname(__file__), "..", "index.html"), encoding="utf-8").read()
+        vocab = re.search(r'id="vocab">(.*?)</script>', page, re.S).group(1)
+        start, at = page.index("const V = "), page.index("function lintScript")
+        js = "const $ = (id) => ({ textContent: %s });\n%s\n" % (json.dumps(vocab), page[start:page.index("\nfunction ", at + 10)])
+        out = subprocess.run(["node", "-e", js + "console.log(JSON.stringify(lintScript(%s)));" % json.dumps(text)],
+                             capture_output=True, text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        return json.loads(out.stdout)
+
+    def test_the_page_accepts_pan_and_the_jail_door(self):
+        self.assertEqual(self.lint(JAIL), [])
+        self.assertEqual(self.lint(HOME_TO_STREET), [])
+        self.assertEqual(self.lint(HOME_TO_STREET.replace("street pan", "street pan R")), [])
 
 
 if __name__ == "__main__":
