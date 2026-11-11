@@ -142,6 +142,15 @@ class HandleAndCoverTests(unittest.TestCase):
         im2 = make_cover(make_video(sc2, 216, use_tts=False), sc2)
         self.assertGreater(diff(im, im2), 5.0)
 
+    def test_a_runner_without_network_cannot_hang_the_job(self):
+        for wf in (".github/workflows/render.yml", ".github/workflows/golden.yml"):
+            text = read(wf)
+            step = text[text.index("- name: System packages"):]
+            step = step[:step.index("- name:", 10)]
+            self.assertIn("timeout-minutes: 12", step, wf)
+            self.assertIn("Acquire::http::Timeout=20", step, wf)
+            self.assertIn("for try in 1 2 3", step, wf)
+
     def test_the_workflow_and_the_page(self):
         self.assertIn("--cover -o \"out/$name.cover.png\"", read(".github/workflows/render.yml"))
         page = read("index.html")

@@ -114,9 +114,21 @@ jobs:
 
       - name: System packages (ffmpeg, fonts, emoji)
         if: env.STAGE != 'script'
+        timeout-minutes: 12      # a runner whose network is down must not hang the whole job for 40 minutes
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-color-emoji fonts-liberation libraqm0
+          # short network timeouts + a few tries: on a runner that cannot resolve the Ubuntu mirrors apt used to
+          # wait 20 s per package for ever; a busy dpkg lock (unattended upgrades) is waited for, not fought
+          APT="-o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o DPkg::Lock::Timeout=180"
+          PKGS="ffmpeg fonts-noto-core fonts-noto-color-emoji fonts-liberation libraqm0"
+          for try in 1 2 3; do
+            if timeout 180 sudo apt-get $APT update -y && timeout 420 sudo apt-get $APT install -y $PKGS; then
+              break
+            fi
+            [ "$try" = 3 ] && { echo "::error title=Machine ka internet kharab::GitHub machine Ubuntu packages download nahi kar payi (network/DNS). Page pe Approve dobara dabao: nayi machine milegi."; exit 1; }
+            echo "::warning::apt try $try failed (network?), retrying in 20 s"
+            sleep 20
+          done
+          ffmpeg -version | head -1
 
       - name: Python packages
         run: pip install -r requirements.txt

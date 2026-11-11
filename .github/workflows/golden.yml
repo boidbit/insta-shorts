@@ -39,9 +39,18 @@ jobs:
           cache: pip
 
       - name: System packages (fonts, emoji)
+        timeout-minutes: 12
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ffmpeg fonts-noto-core fonts-noto-color-emoji fonts-liberation libraqm0
+          APT="-o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o DPkg::Lock::Timeout=180"
+          PKGS="ffmpeg fonts-noto-core fonts-noto-color-emoji fonts-liberation libraqm0"
+          for try in 1 2 3; do
+            if timeout 180 sudo apt-get $APT update -y && timeout 420 sudo apt-get $APT install -y $PKGS; then
+              break
+            fi
+            [ "$try" = 3 ] && exit 1
+            echo "::warning::apt try $try failed (network?), retrying in 20 s"
+            sleep 20
+          done
 
       - name: Python packages
         run: pip install -r requirements.txt
