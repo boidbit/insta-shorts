@@ -116,7 +116,9 @@ class WorkflowAndPageTests(unittest.TestCase):
     def test_the_workflow_offers_it_and_finds_the_key(self):
         wf = read(".github/workflows/render.yml")
         self.assertIn("options: [auto, gemini, elevenlabs, edge]", wf)
-        self.assertIn("ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY", wf)
+        line = next(ln for ln in wf.splitlines() if ln.strip().startswith("ELEVENLABS_API_KEY: ${{"))
+        for name in ("ELEVEN_LAB_1", "ELEVENLABS_API_KEY"):        # this repo's secret, and the usual name
+            self.assertIn("secrets.%s " % name, line)
 
     def test_the_page_has_the_voice_choice_and_sends_it(self):
         page = read("index.html")
