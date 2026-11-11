@@ -11,5 +11,5 @@ This video uses the studio's **2.5D look**: every place is drawn as layered dept
   - `school` / `classroom`: a school classroom by day: blackboard with chalk writing, teacher's table with a globe, benches, two ceiling fans, a window onto the school ground with chalk dust in the sunlight. Good for teacher/madam and students, homework, exams, backbenchers, "kal test hai" jokes.
 - The other places (street, office, jungle, beach, mandap, hospital...) get their depth automatically. Only `plain` and `night_road` stay flat.
 - A time word after the place still works (`SCENE: kitchen night`, `SCENE: gully rain`): the set is re-lit, the lamps keep glowing.
-- Depth shows best when the camera moves: use `CUT` (a new shot), and `near` / `far` (`B -> near shock`) so people step towards or away from the camera.
+- Depth shows best when the camera and the people move through it: use `CUT` (a new shot), `near` / `far` (`B -> near shock`) so people step towards or away from the camera, and for an arrival `NAME -> enter back` (they come from the far corner of the place towards the camera, small to full size: the strongest entrance in 2.5D). The camera follows whoever moves, so one such move per video is enough.
 - Keep it to 1-2 places: one strong 2.5D place reads better than many quick ones.
