@@ -3,7 +3,7 @@ import math
 import os
 import sys
 
-from . import audio, effects, gemini_tts, objects, rides
+from . import audio, effects, elevenlabs_tts, gemini_tts, objects, rides
 from .characters import assign_faces, color_of, resolve_spec
 from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, ease_out, ease_out_back, lerp
 
@@ -494,7 +494,8 @@ def collect_lines(scene):
         v = cdefs[who[0]].get("voice", {})
         v = dict(v) if isinstance(v, dict) else {"name": v}
         v.update(raw.get("voice", {}) if isinstance(raw.get("voice"), dict) else {})
-        out.append(dict(ti=ti, text=text, voice=gemini_tts.voice_for(v), pitch=v.get("pitch"), rate=v.get("rate")))
+        out.append(dict(ti=ti, text=text, voice=gemini_tts.voice_for(v), pitch=v.get("pitch"), rate=v.get("rate"),
+                        who=who[0], spec=v, expression=raw.get("expression") or raw.get("emotion")))
     return out
 
 
@@ -510,10 +511,18 @@ def prepare_voice(scenes, use_tts=True, tts_provider=None):
         return silent
     cfg = (scenes[0].get("meta") or {}).get("tts") or {}
     provider, explicit = audio.resolve_provider(tts_provider, cfg)
-    if provider != "gemini":
-        return [{"paths": {}, "edge": True} for _ in scenes]
     per_scene = [collect_lines(sc) for sc in scenes]
     flat = [it for lines in per_scene for it in lines]
+    if provider == "elevenlabs" and flat:
+        try:
+            return _per_scene(per_scene, elevenlabs_tts.synth_lines(flat, model=cfg.get("eleven_model")))
+        except Exception as e:                      # (quota, a wrong key...): the video is still made
+            provider = "gemini" if gemini_tts.api_key() else "edge"
+            explicit = False
+            print("::warning title=ElevenLabs awaaz nahi bani::%s -> %s ki awaaz use hui"
+                  % (str(e)[:200], "Gemini" if provider == "gemini" else "free (edge)"), file=sys.stderr)
+    if provider != "gemini":
+        return [{"paths": {}, "edge": True} for _ in scenes]
     if not flat:
         return silent
     try:
@@ -524,6 +533,11 @@ def prepare_voice(scenes, use_tts=True, tts_provider=None):
             raise SystemExit("[tts] Gemini failed: %s" % e)
         print("  [tts] Gemini failed (%s) -> falling back to edge-tts" % str(e)[:160], file=sys.stderr)
         return [{"paths": {}, "edge": True} for _ in scenes]
+    return _per_scene(per_scene, paths)
+
+
+def _per_scene(per_scene, paths):
+    """Voice files of the whole video (speaking order) -> one {"paths": {timeline index: file}} per scene."""
     out, k = [], 0
     for lines in per_scene:
         out.append({"paths": {it["ti"]: paths[k + j] for j, it in enumerate(lines)}, "edge": False})

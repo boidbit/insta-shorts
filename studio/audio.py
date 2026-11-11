@@ -25,19 +25,21 @@ DEFAULT_VOICE = "hi-IN-MadhurNeural"
 
 
 def resolve_provider(requested=None, cfg=None):
-    """-> (provider, explicit). provider is 'gemini' or 'edge'.
+    """-> (provider, explicit). provider is 'gemini', 'elevenlabs' or 'edge'.
 
     Order: argument / --tts, env TTS_PROVIDER, scene meta.tts.provider, else 'auto'
     (auto = Gemini when GEMINI_API_KEY is set, otherwise edge-tts). `explicit` means the user asked for it
-    by name, so a failure should stop the render instead of silently switching voice.
+    by name, so a Gemini failure stops the render instead of silently switching voice (ElevenLabs falls back to
+    Gemini / edge with a warning: a used-up quota should not cost the whole video).
     """
     from . import gemini_tts
     p = str(requested or os.environ.get("TTS_PROVIDER") or (cfg or {}).get("provider") or "auto").lower()
+    p = {"eleven": "elevenlabs", "11labs": "elevenlabs", "eleven_labs": "elevenlabs", "free": "edge"}.get(p, p)
     if p == "auto":
         return ("gemini" if gemini_tts.api_key() else "edge"), False
-    if p in ("gemini", "edge"):
+    if p in ("gemini", "edge", "elevenlabs"):
         return p, True
-    raise SystemExit("unknown TTS provider %r (use auto | gemini | edge)" % p)
+    raise SystemExit("unknown TTS provider %r (use auto | gemini | elevenlabs | edge)" % p)
 
 
 def have_tts():

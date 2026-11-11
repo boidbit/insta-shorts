@@ -17,18 +17,35 @@
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink);
          font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 60px; }
-  header { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; }
-  h1 { margin: 0; font-size: 28px; }
+  main { max-width: 1080px; margin: 0 auto; padding: 20px 16px 60px; }
+  header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 16px;
+           position: relative; }
+  h1 { margin: 0; font-size: 26px; }
   h2 { font-size: 18px; margin: 0 0 10px; }
-  .sub { margin: 4px 0 20px; color: var(--muted); }
+  .sub { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+  /* GitHub connection: a small pill in the corner, its panel drops down only when opened */
+  details.gh { flex: none; }
+  details.gh > summary { list-style: none; cursor: pointer; font-size: 13px; padding: 6px 12px; border-radius: 999px;
+                         border: 1px solid var(--line); background: var(--card); color: var(--muted); white-space: nowrap;
+                         max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+  details.gh > summary::-webkit-details-marker { display: none; }
+  details.gh.warn > summary { border-color: var(--brand); color: var(--brand); }
+  .ghpanel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: min(380px, 100%);
+             background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px;
+             box-shadow: 0 12px 32px rgba(0, 0, 0, .18); }
+  .ghpanel ol { padding-left: 18px; margin: 0 0 10px; font-size: 13px; }
+  .ghpanel .row { margin-top: 8px; }
+  .ghpanel label { flex: 1 1 140px; }
+  .ghpanel input { width: 100%; }
   .grid { display: grid; grid-template-columns: 1fr 330px; gap: 20px; align-items: start; }
   @media (max-width: 840px) { .grid { grid-template-columns: 1fr; } }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 20px; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
   .tab { border: 1px solid var(--line); background: transparent; color: var(--ink); padding: 8px 14px;
          border-radius: 999px; cursor: pointer; font: inherit; }
   .tab[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .tab.second { font-size: 14px; padding: 6px 12px; color: var(--muted); }
+  .tab.second[aria-selected="true"] { color: var(--bg); }
   textarea { width: 100%; min-height: 260px; resize: vertical; border: 1px solid var(--line); border-radius: 10px;
              padding: 12px; font: 15px/1.5 ui-monospace, "Cascadia Code", Consolas, monospace;
              background: var(--bg); color: var(--ink); }
@@ -56,7 +73,17 @@
   .stylebar .opt { border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
   .stylebar .opt:has(input:checked) { border-color: var(--brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 30%, transparent); }
   .stylebar input { margin: 0 6px 0 0; accent-color: var(--brand); }
-  .promptcopy { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .promptcopy { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  details.mini { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+  details.mini > summary { cursor: pointer; font-size: 14px; color: var(--muted); }
+  .linkbtn.inline { margin: 0; font-size: 13px; }
+  /* options: a label above each control, in a grid that folds to two columns on a phone */
+  .opts { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .opts h3 { margin: 0 0 8px; font-size: 14px; color: var(--muted); font-weight: 600; }
+  .optgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; }
+  .optgrid > label { flex-direction: column; align-items: stretch; gap: 3px; font-size: 13px; }
+  .optgrid > label select { width: 100%; }
+  .optgrid > label.check { flex-direction: row; align-items: center; gap: 8px; align-self: end; padding: 8px 0; }
   .linkbtn { background: none; border: 0; padding: 0; margin-top: 8px; color: var(--brand); cursor: pointer;
              font: inherit; font-size: 14px; text-align: left; text-decoration: underline; }
   .banner { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--accent); color: var(--accent-ink);
@@ -80,6 +107,8 @@
           text-align: left; padding: 0; font: inherit; color: var(--ink); }
   .reel img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; display: block; background: var(--line); }
   .reel span { display: block; padding: 6px 8px; font-size: 13px; line-height: 1.3; }
+  .gallery.short .reel:nth-child(n+7) { display: none; }
+  #more { margin-top: 12px; width: 100%; }
   details.setup summary { cursor: pointer; font-weight: 600; }
   .setup ol { padding-left: 20px; margin: 8px 0; font-size: 14px; }
   code { background: var(--bg); padding: 1px 5px; border-radius: 5px; }
@@ -99,20 +128,42 @@
   .chip { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px;
           padding: 4px 10px; font: inherit; font-size: 14px; cursor: pointer; }
   .setup label { max-width: 100%; }
-  #token { width: 100%; max-width: 330px; }
+  #token { width: 100%; }
+  .stylehint { font-size: 13px; }
+  @media (max-width: 640px) {
+    main { padding: 12px 12px 90px; }
+    h1 { font-size: 21px; }
+    .sub { display: none; }
+    .card { padding: 14px; border-radius: 12px; margin-bottom: 14px; }
+    .ghpanel { position: fixed; left: 12px; right: 12px; top: 56px; width: auto; }
+    .tabs .tab { flex: 1; text-align: center; }
+    .optgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    textarea { min-height: 220px; }
+    textarea, select, input[type=text], input[type=password] { font-size: 16px; }   /* no zoom-in on iPhone */
+    .chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+    .chip { flex: none; }
+    .go { font-size: 18px; }
+    .placeholder { aspect-ratio: auto; min-height: 90px; }
+    .stylebar .opt { flex: 1; justify-content: center; }
+    h1 { white-space: nowrap; }
+    details.gh > summary { max-width: 130px; padding: 6px 10px; }
+    .ghpanel label { flex: 1 1 100%; }
+    .gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .reel span { font-size: 12px; padding: 4px 6px; }
+  }
   .hidden { display: none !important; }
 </style>
 </head>
 <body>
 <main>
   <header>
-    <h1>🎬 Desi Toons Studio</h1>
-    <span id="who" class="hint"></span>
-  </header>
-  <p class="sub">Idea ya script likho → "Banao" dabao → GitHub pe Hindi cartoon reel banti hai (1080×1920, awaaz ke saath).</p>
-
-  <details class="card setup" id="setup">
-    <summary>⚙️ GitHub connection (ek baar)</summary>
+    <div>
+      <h1>🎬 Desi Toons Studio</h1>
+      <p class="sub">Script likho → Approve → GitHub pe Hindi cartoon reel banti hai (1080×1920, awaaz ke saath).</p>
+    </div>
+    <details class="gh setup" id="setup">
+      <summary><span id="who">⚙️ GitHub</span></summary>
+      <div class="ghpanel">
     <ol>
       <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Naya fine-grained token banao</a>:
         Repository access → <b>Only select repositories</b> → <code id="repoName">insta-shorts</code>.</li>
@@ -122,26 +173,30 @@
     <div class="row">
       <label>Token <input type="password" id="token" size="34" autocomplete="off" placeholder="github_pat_…"></label>
       <label>Branch <input type="text" id="ref" size="18"></label>
+    </div>
+    <div class="row">
       <button class="small" id="save">Save</button>
       <button class="small" id="forget">Token hatao</button>
     </div>
     <p class="hint" id="connMsg"></p>
-  </details>
+      </div>
+    </details>
+  </header>
 
   <div class="grid">
     <section class="card">
       <div class="stylebar" role="radiogroup" aria-label="Video style">
         <span class="hint">Style:</span>
         <label class="opt"><input type="radio" name="style" value="2d" checked>2D (normal)</label>
-        <label class="opt"><input type="radio" name="style" value="2.5d">2.5D ✨ (gehrai / parallax)</label>
-        <span class="hint hidden" id="styleHint">2.5D me <b>har jagah</b> gehrai ke saath banti hai (aasmaan, door ki
+        <label class="opt"><input type="radio" name="style" value="2.5d">2.5D ✨ (gehrai)</label>
+        <span class="hint stylehint hidden" id="styleHint">2.5D me <b>har jagah</b> gehrai ke saath banti hai (aasmaan, door ki
           imaaratein, khidki ka nazara alag parat me; roshni aur parchhai logon pe bhi). ✨ wali jagahein haath se bane
           premium sets hain: <b>rasoi (kitchen), gali (gully / chai_tapri / kirana), chhat (terrace), ghar ka kamra
           (room / living_room), classroom (school)</b>. Sirf apni photo, plain aur night_road flat rehti hain.</span>
       </div>
       <div class="tabs" role="tablist">
-        <button class="tab" role="tab" data-mode="idea" aria-selected="true">💡 Idea do (AI)</button>
-        <button class="tab" role="tab" data-mode="script" aria-selected="false">📝 Apni script</button>
+        <button class="tab" role="tab" data-mode="script" aria-selected="true">📝 Apni script</button>
+        <button class="tab second" role="tab" data-mode="idea" aria-selected="false">💡 Idea do (AI)</button>
       </div>
       <details class="builder" id="builder">
         <summary>🎭 Jagah aur characters khud chuno <span class="hint">(optional)</span></summary>
@@ -165,14 +220,19 @@
       <div class="chips" id="chips"><span class="hint">Line me jodo:</span></div>
       <ul class="lint hidden" id="lint" aria-live="polite"></ul>
       <p class="hint" id="hint"></p>
+      <button class="linkbtn inline" id="example" type="button">📄 Example script daalo</button>
+      <details class="mini" id="promptBox">
+        <summary>🤖 ChatGPT / Gemini app se script likhwani hai? Prompt copy karo</summary>
       <div class="promptcopy">
-        <span class="hint">🤖 ChatGPT / Claude / Gemini app se script likhwani hai? Unke liye poora prompt copy karo:</span>
         <button class="small" id="copyPrompt" data-style="2d" type="button">📋 2D prompt copy</button>
         <button class="small" id="copyPrompt25" data-style="2.5d" type="button">📋 2.5D prompt copy</button>
         <label class="hint" title="Chhota prompt: sirf wahi hisse jo aapke idea ko chahiye (gaadi, dance, ek-take, dark comedy... idea ke shabdon se apne aap). Poora = sab kuch."><input type="checkbox" id="fullPrompt"> Poora prompt</label>
       </div>
       <p class="hint hidden" id="promptNote">Prompt copy ho gaya. Us AI me paste karo (aakhri line me apna idea likho) → jo script mile wo "📝 Apni script" tab me paste karo → upar wala checker dekho → Approve.</p>
-      <div class="row">
+      </details>
+      <div class="opts" id="aiOpts">
+        <h3>✍️ AI ki kahani</h3>
+        <div class="optgrid">
         <label id="hookWrap">Hook
           <select id="hook">
             <option value="auto">Auto (AI chune)</option>
@@ -196,11 +256,15 @@
             <option value="twist">Meetha shuru, tez twist</option>
           </select>
         </label>
-        <label class="videoOpt">Quality
+        </div>
+      </div>
+      <div class="opts videoOpt" id="videoOpts">
+        <h3>🎬 Video options</h3>
+        <div class="optgrid">
+        <label>Quality
           <select id="width"><option value="1080">1080p (HD)</option><option value="720">720p (jaldi)</option></select>
         </label>
-        <label class="videoOpt"><input type="checkbox" id="voice" checked> Hindi awaaz</label>
-        <label class="videoOpt">Dialogue text
+        <label>Dialogue text
           <select id="dialogue">
             <option value="bubble">Bubble me 💬</option>
             <option value="subtitle">Neeche subtitle</option>
@@ -208,20 +272,20 @@
             <option value="none">Koi text nahi (sirf awaaz)</option>
           </select>
         </label>
-        <label class="videoOpt">Hook card
+        <label>Hook card
           <select id="intro">
             <option value="over">Pehli line ke saath</option>
             <option value="first">Pehle hook, phir baat</option>
             <option value="off">Hook card nahi</option>
           </select>
         </label>
-        <label class="videoOpt" title="End seedha shuruaat me jud jaata hai: log reel 2 baar dekhte hain. CTA end card ki jagah caption me chala jaata hai.">Loop 🔁
+        <label title="End seedha shuruaat me jud jaata hai: log reel 2 baar dekhte hain. CTA end card ki jagah caption me chala jaata hai.">Loop 🔁
           <select id="loop">
-            <option value="off">Nahi (normal end)</option>
-            <option value="on">Haan: end → start</option>
+            <option value="off">Nahi</option>
+            <option value="on">Haan (end → start)</option>
           </select>
         </label>
-        <label class="videoOpt" title="Ek chhota mascot video me kahin chhupa hota hai (beech ki ek line pe kisi ke peeche se jhaankta hai). Log comment karte hain: peeche kya tha?">Mascot 👻
+        <label title="Ek chhota mascot video me kahin chhupa hota hai (beech ki ek line pe kisi ke peeche se jhaankta hai). Log comment karte hain: peeche kya tha?">Mascot 👻
           <select id="mascot">
             <option value="off">Koi nahi</option>
             <option value="bhoot">Chhotu bhoot 👻</option>
@@ -229,6 +293,16 @@
             <option value="chooha">Chooha 🐭</option>
           </select>
         </label>
+        <label title="Kis API se awaaz bane. ElevenLabs ke liye repo me ELEVENLABS_API_KEY secret chahiye; fail ho to apne aap Gemini / free awaaz lagti hai.">Awaaz 🎙️
+          <select id="tts">
+            <option value="auto">Auto</option>
+            <option value="gemini">Gemini</option>
+            <option value="elevenlabs">ElevenLabs</option>
+            <option value="edge">Free (Edge)</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" id="voice" checked> Hindi awaaz 🔊</label>
+        </div>
       </div>
       <p class="banner hidden" id="draftNote">✍️ AI ki script taiyar hai. Padho, jo badalna ho yahin badlo, phir <b>Approve</b> dabao. Pasand na aaye to idea badal ke dobara likhwao.</p>
       <button class="go" id="go">Script likho ✍️</button>
@@ -258,7 +332,8 @@
 
   <section class="card">
     <h2>📼 Pichli reels</h2>
-    <div class="gallery" id="gallery"><p class="hint">Load ho raha hai…</p></div>
+    <div class="gallery short" id="gallery"><p class="hint">Load ho raha hai…</p></div>
+    <button class="small hidden" id="more" type="button">Aur reels dikhao ⬇️</button>
   </section>
 </main>
 
@@ -295,17 +370,17 @@ CAPTION: Har ghar ki dadi aur naya phone 😂📱
 HASHTAGS: #dadi #desicomedy #relatable`;
 const HINTS = {
   idea: "Bas idea likho, jaise: \"mummy ne doodh mangaya aur beta cricket khelne chala gaya\". Khali chhodo to AI khud topic chunega. (Repo me GEMINI_API_KEY ya ANTHROPIC_API_KEY secret chahiye.)",
-  script: "HOOK: …, CAST: M = mummy, R = beta …, SCENE: room | street | kitchen | school | night_road, phir lines: " +
-          "M (angry, point): Roman line | देवनागरी line.  R -> enter back / enter pop / exit left fast / dance.  CTA: …  CAPTION: …  HASHTAGS: …",
+  script: "Format: HOOK → CAST → SCENE → lines (A (acting): Roman | देवनागरी, ya B -> action) → CTA. Neeche wala checker " +
+          "galti turant batata hai. Format yaad nahi? 📄 Example daalo, ya 🤖 prompt copy karke ChatGPT/Gemini se likhwao.",
 };
 const STEP_NAMES = {
   "System packages (ffmpeg, fonts, emoji)": "Machine taiyar", "Python packages": "Tools install", "Tests": "Check",
   "Write the story": "Kahani likhna", "Publish draft script": "Script bhejna", "Render": "Video banana",
   "Upload videos": "Upload", "Publish as release (the web page plays it from here)": "Publish",
 };
-const drafts = { idea: "", script: EXAMPLE_SCRIPT };
+const drafts = { idea: "", script: "" };      // the script box starts empty (📄 Example fills it in)
 const DRAFT_NOTE = $("draftNote").innerHTML;
-let mode = "idea", timer = null, busy = false;
+let mode = "script", timer = null, busy = false;
 
 // ---------------------------------------------------------------- GitHub API
 async function gh(path, opts = {}) {
@@ -323,19 +398,22 @@ async function gh(path, opts = {}) {
   return j;
 }
 
-async function checkConnection() {
+// openOnFail: the small GitHub panel opens by itself only when something needs it (Approve without a token)
+async function checkConnection(openOnFail = false) {
   const token = store.get("token");
   $("ref").value = store.get("ref", CONFIG.ref);
   $("repoName").textContent = CONFIG.owner + "/" + CONFIG.repo;
+  $("setup").classList.toggle("warn", !token);
   if (!token) {
-    $("setup").open = true;
-    $("who").textContent = "⚠ GitHub se connect nahi";
+    if (openOnFail) $("setup").open = true;
+    $("who").textContent = "⚠ GitHub jodo";
     $("connMsg").textContent = "Video banane ke liye token chahiye (pichli reels bina token ke bhi dikhti hain).";
     return false;
   }
   try {
     const [user, repo] = await Promise.all([gh("/user"), gh(REPO())]);
-    $("who").textContent = "✅ " + user.login + " · " + CONFIG.owner + "/" + CONFIG.repo;
+    $("who").textContent = "✅ " + user.login;
+    $("setup").title = "Connected: " + user.login + " · " + CONFIG.owner + "/" + CONFIG.repo;
     $("connMsg").className = "hint ok";
     $("connMsg").textContent = "Connected. Branch: " + store.get("ref", CONFIG.ref);
     if (repo.permissions && repo.permissions.push === false) {
@@ -344,7 +422,8 @@ async function checkConnection() {
     }
     return true;
   } catch (e) {
-    $("setup").open = true;
+    if (openOnFail) $("setup").open = true;
+    $("setup").classList.add("warn");
     $("who").textContent = "⚠ Token kaam nahi kar raha";
     $("connMsg").className = "hint err";
     $("connMsg").textContent = "GitHub ne mana kiya: " + e.message;
@@ -750,7 +829,11 @@ function setMode(m) {
   mode = m;
   document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.mode === m)));
   $("text").value = drafts[m];
-  $("text").placeholder = m === "idea" ? "Idea yahan likho… (khali = AI khud soche)" : "Script yahan likho…";
+  $("text").placeholder = m === "idea" ? "Idea yahan likho… (khali = AI khud soche)"
+    : "Apni script yahan likho ya paste karo…\n\nHOOK: Dadi ko mila naya smartphone 😂\nCAST: D = dadi, P = beta\nSCENE: room\n" +
+      "D (think, phone): Beta, photo kaise bhejte hain? | बेटा, फ़ोटो कैसे भेजते हैं?\nP -> facepalm\nCTA: Apni dadi ko tag karo 👇";
+  $("example").classList.toggle("hidden", m !== "script");
+  $("aiOpts").classList.toggle("hidden", m !== "idea");
   $("hint").textContent = HINTS[m];
   $("builder").classList.toggle("hidden", m !== "idea");
   $("chips").classList.toggle("hidden", m !== "idea");
@@ -786,7 +869,7 @@ function showStatus(stage, frac) {
 // stage "script": AI writes a script (from the idea, or improves the script tab) -> shown for approval.
 // stage "video":  the (approved / own) script in the script tab -> video.
 async function start(stage) {
-  if (busy || !(await checkConnection())) return;
+  if (busy || !(await checkConnection(true))) return;
   const text = $("text").value.trim();
   if (stage === "video" && !text) { showStatus("Script khali hai 🙂", 0); return; }
   if (stage === "video") {
@@ -800,6 +883,7 @@ async function start(stage) {
     if (mode === "idea") inputs.instruction = ideaWithSettings(text, builder); else inputs.script_text = text;
   } else {
     Object.assign(inputs, { script_text: withVideoOptions(text), width: $("width").value, voice: String($("voice").checked),
+                            tts: $("tts").value,
                             dialogue: $("dialogue").value, intro: $("intro").value, draft_id: store.get("draft") });
   }
   setBusy(true);
@@ -917,6 +1001,7 @@ async function loadGallery() {
   try {
     const rels = (await gh(`${REPO()}/releases?per_page=30`)).filter((r) => r.tag_name.startsWith("reel-"));
     if (!rels.length) { $("gallery").replaceChildren(el("p", { className: "hint", textContent: "Abhi koi reel nahi." })); return; }
+    $("more").classList.toggle("hidden", Math.min(rels.length, 18) <= 6);     // the first 6, the rest on a tap
     $("gallery").replaceChildren(...rels.slice(0, 18).map((r) => {
       const png = (r.assets || []).find((a) => a.name.endsWith(".png"));
       const img = el("img", { alt: "", loading: "lazy" });
@@ -932,6 +1017,14 @@ async function loadGallery() {
 }
 
 // ---------------------------------------------------------------- wiring
+$("voice").addEventListener("change", () => { $("tts").disabled = !$("voice").checked; });
+$("more").addEventListener("click", () => { $("gallery").classList.remove("short"); $("more").classList.add("hidden"); });
+$("example").addEventListener("click", () => {
+  if ($("text").value.trim() && !confirm("Box me jo likha hai uski jagah example script aa jayegi. Theek hai?")) return;
+  $("text").value = EXAMPLE_SCRIPT;
+  showLint();
+  goLabel();
+});
 $("save").addEventListener("click", async () => {
   const t = $("token").value.trim();
   if (t) store.set("token", t);
@@ -952,7 +1045,7 @@ const PLACE_NAMES = { auto: "AI chune / kamra", room: "Ghar ka kamra", kitchen: 
 let builder = { place: "auto", cast: [], hook: "", cta: "" };
 try { builder = Object.assign(builder, JSON.parse(store.get("builder") || "{}")); } catch {}
 const saveBuilder = () => store.set("builder", JSON.stringify(builder));
-for (const id of ["dialogue", "intro", "loop", "mascot"]) {      // the video options are remembered
+for (const id of ["dialogue", "intro", "loop", "mascot", "tts"]) {      // the video options are remembered
   const v = store.get(id);
   if (v && [...$(id).options].some((o) => o.value === v)) $(id).value = v;
   $(id).addEventListener("change", () => store.set(id, $(id).value));
@@ -969,6 +1062,7 @@ function goLabel() {
   $("go").textContent = dialogue ? "📝 Script banao (bina AI)" : "Script likho ✍️";
   $("hookWrap").classList.toggle("hidden", dialogue);         // the AI's hook / tone mean nothing for a ready dialogue
   $("toneWrap").classList.toggle("hidden", dialogue);
+  $("aiOpts").classList.toggle("hidden", dialogue);
   $("timeHint").textContent = dialogue
     ? "Script turant ban jayegi (AI nahi lagega). Phir padh ke Approve karo."
     : "AI ko script likhne me ~1 minute lagta hai. Video tabhi banegi jab aap script approve karoge.";
@@ -1130,7 +1224,7 @@ $("copy").addEventListener("click", async () => {
 });
 
 setStyle(store.get("style") === "2.5d" ? "2.5d" : "2d", true);
-setMode("idea");
+setMode("script");
 checkConnection();
 loadGallery();
 try {

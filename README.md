@@ -4,6 +4,12 @@ Idea ya script do → 1080x1920 Instagram reel ban jati hai: Indian cartoon log 
 
 ## Sabse aasaan: webpage
 
+GitHub Pages wala studio page (mobile pe bhi):
+- **📝 Apni script** pehla tab hai aur box khali milta hai. Format yaad na ho to "📄 Example script daalo" dabao.
+- **💡 Idea do (AI)** doosra tab hai.
+- GitHub token upar kone me chhote **GitHub** button me hai (sirf zarurat pe khulta hai).
+- Video options ek grid me hain: Quality, Dialogue text, Hook card, Loop, Mascot, Awaaz, Hindi awaaz.
+
 ```bash
 pip install -r requirements.txt        # + ffmpeg system me chahiye
 python -m studio.web                   # browser me kholo: http://127.0.0.1:7860
@@ -370,6 +376,19 @@ python -m unittest discover -s tests                                            
 ```
 
 `--no-tts` = awaaz skip (testing). `--dialogue subtitle` / `--hook first` = upar wale video options.
+
+### Awaaz kaun banaye: Gemini ya ElevenLabs 🎙️
+
+Page pe video options me **Awaaz**: `Auto` (Gemini key ho to Gemini, warna free) · `Gemini` · `ElevenLabs` · `Free (Edge)`. Page ise yaad rakhta hai. Command line: `--tts auto|gemini|elevenlabs|edge`.
+
+**ElevenLabs** (bahut natural Hindi, `eleven_multilingual_v2`):
+- Key: repo → Settings → Secrets and variables → Actions → **Repository secret** `ELEVENLABS_API_KEY`. Ye naam bhi chalte hain: `ELEVEN_LABS_API_KEY`, `ELEVENLABS_KEY`, `ELEVEN_API_KEY`, `ELEVENLABS`, `XI_API_KEY`.
+- Har line ki alag request jaati hai. Har character ki apni awaaz hoti hai aur poori video me wahi rehti hai; do characters ki ek awaaz nahi hoti. Aurat/aadmi cast se pata chalta hai; bachche ki awaaz thodi patli kar di jaati hai.
+- Aapke ElevenLabs account me koi Indian/Hindi voice judi ho (Voice Library se "Add"), to wo pehle use hoti hai. Warna ElevenLabs ki standard awaazein lagti hain.
+- Apni pasand ki voice: `ELEVENLABS_VOICES_MALE` / `ELEVENLABS_VOICES_FEMALE` (comma se voice ids, repo variables/secrets), ya JSON me `"voice": {"eleven": "<voice id>"}`. Model badalna: `ELEVENLABS_MODEL` (jaise `eleven_flash_v2_5`, sasta).
+- Gusse / excitement wali line zyada expressive banti hai, udaas line dheemi aur naram.
+- Har line cache hoti hai (`.cache/tts/eleven`), isliye dobara render ya preview frame me **credits kharch nahi** hote.
+- ElevenLabs fail ho (galat key, credits khatam), to video phir bhi banti hai: Gemini key ho to Gemini ki awaaz, warna free awaaz. GitHub run me iski chetavni (warning) dikhti hai.
 
 ### Gemini voice (realistic) - poori script ek hi request me
 

@@ -1654,9 +1654,10 @@ def main(argv=None):
     ap.add_argument("--width", type=int, default=1080, help="output width in px (height is 16:9 portrait)")
     ap.add_argument("--fps", type=int, default=None)
     ap.add_argument("--no-tts", action="store_true", help="skip speech synthesis (estimated timing, silent voice)")
-    ap.add_argument("--tts", choices=["auto", "gemini", "edge"], default=None,
+    ap.add_argument("--tts", choices=["auto", "gemini", "elevenlabs", "edge"], default=None,
                     help="voice engine: gemini = the WHOLE video's script in ONE Gemini request, then split per line "
-                         "(needs GEMINI_API_KEY); edge = edge-tts per line; auto (default) = gemini if a key is set")
+                         "(needs GEMINI_API_KEY); elevenlabs = ElevenLabs per line (needs ELEVENLABS_API_KEY; falls back "
+                         "to gemini / edge if it fails); edge = edge-tts per line; auto (default) = gemini if a key is set")
     ap.add_argument("--frame", type=float, default=None, help="render one PNG frame at this time (seconds)")
     ap.add_argument("--dialogue", choices=DIALOGUE_MODES, default=None,
                     help="spoken words: bubble (default) | subtitle (at the bottom) | both | none (voice only)")
