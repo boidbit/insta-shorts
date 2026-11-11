@@ -79,6 +79,24 @@ class ElevenTests(unittest.TestCase):
         self.assertLess(api.calls[0][1]["voice_settings"]["stability"],     # angry line: more expressive
                         api.calls[3][1]["voice_settings"]["stability"])     # than the sad one
 
+    def test_a_library_voice_the_free_plan_refuses_is_swapped_for_a_standard_one(self):
+        class FreePlan(FakeAPI):
+            def __call__(self, url, key, body=None, timeout=120):
+                if body is not None and "IND_F" in url:
+                    raise elevenlabs_tts.ElevenLabsError(
+                        'HTTP 402 {"detail":{"code":"paid_plan_required","message":"Free users cannot use library voices"}}')
+                return super().__call__(url, key, body, timeout)
+        api = FreePlan()
+        with mock.patch.object(elevenlabs_tts, "_request", api), \
+                mock.patch.object(elevenlabs_tts, "_kid_voice", lambda p, pitch: p):
+            paths = elevenlabs_tts.synth_lines(self.items(), cache_dir=self.tmp.name)
+        self.assertEqual(len(paths), 4)
+        voice = [url.split("/")[-1].split("?")[0] for url, _b in api.calls]
+        self.assertNotIn("IND_F", voice)
+        self.assertEqual(voice[0], elevenlabs_tts.FEMALE[0])       # mummy: the first standard woman's voice
+        self.assertEqual(voice[0], voice[3])
+        self.assertEqual(len({voice[0], voice[1], voice[2]}), 3)
+
     def test_a_second_render_costs_nothing(self):
         api = FakeAPI()
         with mock.patch.object(elevenlabs_tts, "_request", api), \

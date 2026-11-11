@@ -29,6 +29,7 @@ FEMALE = ["21m00Tcm4TlvDq8ikWAM", "EXAVITQu4vr4xnSDxMaL", "XrExE9yKIg1WjnnlVkGX"
           "cgSgspJ2msm6clMCkdW9", "MF3mGyEYCl7XYWbV9V5O"]
 LOUD = {"angry", "shout", "excited", "shock", "scared", "laugh", "lol", "surprised", "evil"}
 SOFT = {"sad", "cry", "hurt", "sleepy", "shy", "nervous", "dead", "bored"}
+PLAN_ONLY = re.compile(r"HTTP 402|paid_plan_required|library voices", re.I)    # this voice needs a paid plan
 
 
 class ElevenLabsError(RuntimeError):
@@ -106,35 +107,53 @@ def synth_lines(items, model=None, cache_dir=None, key=None):
     cache_dir = cache_dir or CACHE_DIR
     os.makedirs(cache_dir, exist_ok=True)
     pools = None
-    chosen, used = {}, {"m": 0, "f": 0}
+    chosen, taken, blocked = {}, set(), set()
+
+    def pick(spec):
+        """The next voice for a new character: one nobody else in the video has, and not one the plan refused."""
+        nonlocal pools
+        if pools is None:
+            pools = voice_pools(key)
+        pool = pools[1] if is_female(spec) else pools[0]
+        free = [v for v in pool if v not in blocked and v not in taken] or [v for v in pool if v not in blocked]
+        if not free:
+            raise ElevenLabsError("no voice this plan can use")
+        taken.add(free[0])
+        return free[0]
+
     paths = []
     for it in items:
         spec = it.get("spec") or {}
         who = it.get("who") or "?"
         if who not in chosen:
-            if spec.get("eleven"):
-                chosen[who] = str(spec["eleven"])
-            else:
-                if pools is None:
-                    pools = voice_pools(key)
-                fem = is_female(spec)
-                pool = pools[1] if fem else pools[0]
-                k = "f" if fem else "m"
-                chosen[who] = pool[used[k] % len(pool)]
-                used[k] += 1
-        voice = chosen[who]
-        body = {"text": it["text"], "model_id": model, "voice_settings": settings_for(it.get("expression"))}
-        if re.search(r"v2_5|flash|turbo|v3", model):
-            body["language_code"] = "hi"            # (only these models take a language)
-        h = hashlib.sha1(json.dumps([voice, body], ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
-        path = os.path.join(cache_dir, h + ".mp3")
-        if not (os.path.isfile(path) and os.path.getsize(path) > 1000):
+            chosen[who] = str(spec["eleven"]) if spec.get("eleven") else pick(spec)
+        for _attempt in range(10):
+            voice = chosen[who]
+            body = {"text": it["text"], "model_id": model, "voice_settings": settings_for(it.get("expression"))}
+            if re.search(r"v2_5|flash|turbo|v3", model):
+                body["language_code"] = "hi"        # (only these models take a language)
+            h = hashlib.sha1(json.dumps([voice, body], ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+            path = os.path.join(cache_dir, h + ".mp3")
+            if os.path.isfile(path) and os.path.getsize(path) > 1000:
+                break
             print("  [eleven] %s: %s" % (who, it["text"][:40]), file=sys.stderr)
-            data = _request(ENDPOINT % voice, key, body)
+            try:
+                data = _request(ENDPOINT % voice, key, body)
+            except ElevenLabsError as e:
+                if not PLAN_ONLY.search(str(e)):
+                    raise
+                # a free plan cannot use a Voice Library voice through the API: take a standard voice instead
+                print("  [eleven] voice %s needs a paid plan -> a standard voice" % voice, file=sys.stderr)
+                blocked.add(voice)
+                chosen[who] = pick(spec)
+                continue
             if len(data) < 1000:
                 raise ElevenLabsError("the audio is only %d bytes" % len(data))
             with open(path, "wb") as f:
                 f.write(data)
+            break
+        else:
+            raise ElevenLabsError("no voice this plan can use")
         paths.append(_kid_voice(os.path.abspath(path), it.get("pitch")))
     return paths
 
