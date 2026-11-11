@@ -79,7 +79,7 @@ class PromptTests(unittest.TestCase):
         self.assertIn("Story facts first", read("DIRECTOR_PROMPT.md"))
 
     def test_long_stories_are_not_rejected(self):
-        """No length limit: a long, detailed script passes the AI writer's checks."""
+        """Length never fails a video: a long script only gets a soft note (the writer is asked once to tighten)."""
         line = "Ye ek lambi si line hai jo kaafi der tak chalti hai aur poori baat saaf saaf samjhati hai"
         body = "\n".join("A (smile): %s | ये एक लंबी सी लाइन है जो काफ़ी देर तक चलती है" % line for _ in range(14))
         text = "HOOK: h\nCAST: A = dost\nSCENE: room\n%s\nCTA: c\nCAPTION: c\n" % body
@@ -87,7 +87,25 @@ class PromptTests(unittest.TestCase):
         self.assertFalse([w for w in warns if "long" in w], warns)
         import tempfile
         probs = director.script_problems(text, os.path.join(tempfile.mkdtemp(), "x.json"))
-        self.assertFalse([p for p in probs if "long" in p], probs)
+        long_ = [p for p in probs if "long" in p]
+        self.assertEqual(len(long_), 1, probs)
+        self.assertTrue(long_[0].startswith(director.SOFT))
+        short = text.replace(line, "Chhoti line")
+        self.assertFalse([p for p in director.script_problems(short, os.path.join(tempfile.mkdtemp(), "y.json"))
+                          if "long" in p])
+
+    def test_a_long_script_is_asked_once_then_accepted(self):
+        calls = []
+
+        def llm(system, messages, json_mode=False):
+            calls.append(messages[-1]["content"])
+            return "same long script"
+        out = director._iterate(llm, "sys", "idea", lambda t: t, lambda r: [director.SOFT + "too long"], False,
+                                lambda m: None, 3)
+        self.assertEqual((out, len(calls)), ("same long script", 2))      # one retry, then it is used as it is
+        with self.assertRaises(SystemExit):                                 # a real problem still fails
+            director._iterate(llm, "sys", "idea", lambda t: t, lambda r: ["missing CTA: line"], False,
+                              lambda m: None, 2)
 
 
 class WriterTests(unittest.TestCase):

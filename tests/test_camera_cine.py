@@ -192,6 +192,74 @@ class EntryTests(unittest.TestCase):
         self.assertAlmostEqual(c.depth_at(1.25)[0], 1.15)           # 0.5 s, as before
 
 
+class StayInFrameTests(unittest.TestCase):
+    BED = ("HOOK: Bill\nCAST: P = uncle, D = doctor\nSCENE: hospital\nOBJ: bed center\nP -> lie_down bed\n"
+           "D (smile): Aap theek hain. | आप ठीक हैं।\nD (sly): Bill paanch lakh. | बिल पाँच लाख।\nP -> get_up\n"
+           "P (shock): Paanch lakh?! | पाँच लाख?!\nP -> faint\nCTA: Tag karo\n")
+
+    def test_getting_up_from_a_bed_lands_inside_the_frame(self):
+        p = plan(self.BED)[0]
+        P, D = p.chars["P"], p.chars["D"]
+        t_up = next(e["t"] for e in P.events if e.get("action") == "get_up")
+        self.assertGreater(P.pos_at(t_up)[0], S.LW - S.STAND_MIN)          # lying: the feet at the edge
+        x = P.pos_at(t_up + 1.0)[0]
+        self.assertTrue(S.STAND_MIN <= x <= S.LW - S.STAND_MIN, x)          # standing: inside the picture
+        self.assertGreaterEqual(abs(x - D.pos_at(t_up + 1.0)[0]), S.STAND_GAP)
+        c = plan(self.BED, STUDIO_CAMERA="classic")[0]
+        self.assertEqual(len(c.chars["P"].moves), 1)                         # classic: exactly as before
+
+    def test_a_fall_is_watched_wide(self):
+        p = plan(self.BED)[0]
+        t_f = next(e["t"] for e in p.chars["P"].events if e.get("action") == "faint") + S.FALL_ACTIONS["faint"]
+        self.assertEqual(S.camera_at(p, t_f + 0.5)[0] // 1, 1.0)            # (1.0 x the breath)
+        self.assertLess(S.camera_at(p, t_f + 0.5)[0], 1.05)
+
+    def test_end_card_goes_above_the_faces(self):
+        last = plan(self.BED)[-1]
+        card = [o for o in last.overlays if o.get("cta")]
+        self.assertEqual(card[0]["pos"], [540, S.CTA_Y])
+        last = plan(self.BED, STUDIO_CAMERA="classic")[-1]
+        self.assertEqual([o for o in last.overlays if o.get("cta")][0]["pos"], [540, 640])
+
+    def test_fallen_body_slides_back_into_the_frame(self):
+        r = Renderer_ = render.Renderer(script.parse_script(TWO)[0]["scenes"][0] | {"characters":
+                                       script.parse_script(TWO)[0]["characters"]}, 120, use_tts=False)
+        r.plan.camera = "cine"
+        ops = [{"pts": [(-300.0, 1600.0), (500.0, 1650.0)], "w": 6}]
+        self.assertAlmostEqual(r._keep_in_frame(ops, {"tilt": -86}, {}, None), 326.0)      # 300 out + margin
+        ops = [{"pts": [(700.0, 1600.0), (1200.0, 1650.0)], "w": 6}]
+        self.assertAlmostEqual(r._keep_in_frame(ops, {"tilt": 86}, {}, None), -146.0)
+        self.assertEqual(r._keep_in_frame(ops, {"tilt": 5}, {}, None), 0.0)               # standing: untouched
+        self.assertEqual(r._keep_in_frame(ops, {"tilt": 86}, {"on": "bed"}, None), 0.0)  # the bed decides
+        wide = [{"pts": [(-400.0, 1600.0), (1500.0, 1650.0)], "w": 6}]
+        self.assertAlmostEqual(r._keep_in_frame(wide, {"tilt": 86}, {}, None), 540.0 - 550.0)   # centred
+        r.plan.camera = "classic"
+        self.assertEqual(r._keep_in_frame(ops, {"tilt": 86}, {}, None), 0.0)
+        del Renderer_
+
+    def test_rendered_faint_stays_in_the_picture(self):
+        sc, _w = script.parse_script(HEAD.replace("A = beta, B = mummy", "A = uncle") + "A -> faint\n")
+        drawn = []
+        real = render.build_character
+
+        def spy(*a, **k):
+            ops, an = real(*a, **k)
+            xs = [px for op in ops for (px, _py) in op["pts"]]
+            drawn.append((min(xs), max(xs)))
+            return ops, an
+        spans = {}
+        for cam in ("classic", "cine"):
+            with mock.patch.dict(os.environ, {"STUDIO_CAMERA": cam}), mock.patch.object(render, "build_character", spy):
+                v = make_video(sc, 120, use_tts=False)
+                drawn.clear()
+                v.frame(v.duration - 0.2)
+                spans[cam] = drawn[-1]                          # the last drawing of the frame is the one painted
+        self.assertLess(spans["classic"][0], 0)                 # before: half of him lay outside the picture
+        lo, hi = spans["cine"]
+        self.assertGreaterEqual(lo, 0)
+        self.assertLessEqual(hi, S.LW)
+
+
 class SetPieceWordTests(unittest.TestCase):
     def test_unknown_word_on_a_set_piece_is_a_warning_not_a_crash(self):
         # an AI wrote `OBJ: door left lakdi`: the script reader used to crash (KeyError 'id') on every attempt

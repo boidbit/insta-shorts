@@ -1004,7 +1004,7 @@ def parse_script(text):
                     "overlay": {"text": meta["CTA"], "style": "card",
                                 "pos": [540, 1460 if any(ln[0] == "ui" and ln[1]["type"] == "endcard"
                                                          for ln in sc["lines"]) else 640],   # below an end card
-                                "color": [236, 90, 70]}}
+                                "color": [236, 90, 70], "cta": True}}
         tl.append(last)
         sc_sets = []
         if sc.get("sets"):

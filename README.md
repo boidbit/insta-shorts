@@ -130,8 +130,11 @@ Mummy naraaz hui re, ab main bhaaga re | मम्मी नाराज़ ह�
   - **Tez behas ek frame me:** 3+ chhoti lines baari-baari (har ek ~2 sec tak) → dono ek two-shot me, har line pe cut nahi. Punchline phir bhi tight.
   - **Halka tedha frame:** `angry`, `shout`, `evil`, `scared` wali line pe frame 3.5° jhukta hai.
   - **Whip:** ek se doosre pe jaate waqt tasveer me halka dhundhla streak.
+  - **Frame se bahar nahi:** koi behosh ho / gire / zameen pe lete (`faint`, `fall`, `slip`, `trip`, `lie_down`...) to camera wide hoke dekhta hai aur gira hua shareer frame ke andar khisak jaata hai. Bed (ya sofa) pe leta insaan uthte hi (`get_up` ya koi bhi agla action) frame ke andar sabse paas ki khaali jagah pe aa jaata hai.
+  - **"Tag karo" card chehre pe nahi:** aakhri card ab upar (chehron ke upar) aata hai; card ke saath close shot thoda dheela, chehra card ke neeche.
   - **Purana camera chahiye?** Script me `CAMERA: classic` (JSON: `"meta": {"camera": "classic"}`): camera bilkul pehle jaisa. Golden guard isi mode me live code se pixel-by-pixel milata hai.
   Band karna ho: JSON me `"meta": {"auto_camera": false}`. Apni marzi: line ke brackets me `wide`, `medium`, `close`, `two_shot` (jaise `A (shock, close): ...` ya `ALL -> wide`).
+- **Lambi lines:** AI writer ko chhoti lines likhne ko kaha jaata hai (zyada tar 60 akshar tak, sab milake ~350). AI fir bhi bahut lambi likhe to use **ek baar** chhota karne ko kaha jaata hai; lambai ki wajah se video kabhi fail nahi hoti.
 - **Entry / exit ke naye tareeke** (kinare se chal ke aana ab bhi hai: `A -> enter left`):
   - `A -> enter back` = jagah ke peeche se camera ki taraf aata hai (chhota → bada). `enter back left|right` = kis taraf se.
   - `A -> enter pop` = neeche se uchhal ke frame me (boing).

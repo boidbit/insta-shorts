@@ -1,0 +1,14 @@
+HOOK: Hospital ka bill 😱
+CAST: P = uncle, D = doctor
+SCENE: hospital
+OBJ: bed center
+P -> lie_down bed
+D (smile): Badhai ho, aap bilkul theek hain! | बधाई हो, आप बिल्कुल ठीक हैं!
+P (smile): Shukriya doctor sahab! | शुक्रिया डॉक्टर साहब!
+D (sly): Aur ye raha bill. | और ये रहा बिल।
+P -> get_up
+P (shock): Paanch lakh?! | पाँच लाख?!
+P -> faint
+CTA: Tag karo us dost ko jo hospital se darta hai 👇
+CAPTION: Ilaaj se zyada dard bill me hai 😂
+HASHTAGS: #hospital #doctor #desicomedy #funny

@@ -176,6 +176,11 @@ def _char_problems(name, spec):
     return out
 
 
+SOFT = "(soft) "            # a problem worth one more try, never a reason to fail
+LINE_MAX = 80               # letters (Roman) of one spoken line
+TOTAL_MAX = 380             # letters of all spoken lines together (about 30 seconds of speech)
+
+
 def problems(scene_dict, tmp_path):
     """Return a list of human-readable problems (empty list = good)."""
     out = []
@@ -207,7 +212,17 @@ def problems(scene_dict, tmp_path):
             if "say" in raw and not raw.get("speak"):
                 out.append(where + "line %r has no 'speak' (Devanagari) text" % str(raw["say"])[:30])
 
-    # (no length limit: a story takes as long as it needs to be clear)
+    # length: never a reason to fail a video, but the writer is asked ONCE to tighten too-long lines (a reel of
+    # 20-35 s holds; 60 s of long speeches does not)
+    said = [str(raw["say"]) for sub in subs for raw in sub.get("timeline", []) if raw.get("say")]
+    long_ = [ln for ln in said if len(ln) > LINE_MAX]
+    if long_ or sum(len(ln) for ln in said) > TOTAL_MAX:
+        out.append(SOFT + "the spoken lines are too long for a 20-35 second reel (%d letters in all, keep it under "
+                   "%d%s): shorten them (one breath each, split a long explanation into two short lines), keep the "
+                   "story, the order and every joke" % (
+                       sum(len(ln) for ln in said), TOTAL_MAX,
+                       "; over %d letters: %s" % (LINE_MAX, ", ".join(repr(ln[:28] + "...") for ln in long_[:4]))
+                       if long_ else ""))
 
     # hook: text + a hook overlay at t=0 + something happening in the first second
     if not scene.get("hook"):
@@ -262,8 +277,8 @@ def _iterate(llm, system, first_msg, parse, check, json_mode, log, max_tries):
             probs = check(result)
         except Exception as e:  # noqa: BLE001
             result, probs = None, ["output could not be read: %r" % (e,)]
-        if not probs:
-            return result
+        if not probs or (attempt >= 1 and all(p.startswith(SOFT) for p in probs)):
+            return result                           # (length is asked for once; it never fails a video)
         last = probs
         log("  [director] attempt %d had problems: %s" % (attempt + 1, "; ".join(probs)))
         messages += [{"role": "assistant", "content": text},

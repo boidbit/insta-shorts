@@ -559,6 +559,22 @@ class Renderer(Output):
                 self._draw_crank(img, o, t)
 
     # ------------------------------------------------------------ one frame
+    KEEP_MARGIN = 26.0                              # logical px a fallen body keeps from the frame's edge
+
+    def _keep_in_frame(self, ops, pose, st, rf):
+        """cine: how far (logical px) to move a person whose body is on its way down or lying on the floor, so the
+        whole body stays inside the picture (it would otherwise fall out of the frame). 0 = no change: standing,
+        on a set piece (the bed decides), riding, or the classic camera."""
+        if getattr(self.plan, "camera", "") != "cine" or rf or st.get("on") or abs(pose.get("tilt", 0.0)) < 20:
+            return 0.0
+        xs = [px for op in ops for (px, _py) in op["pts"]]
+        if not xs:
+            return 0.0
+        lo, hi, m = min(xs), max(xs), self.KEEP_MARGIN
+        if hi - lo > LW - 2 * m:                    # longer than the picture is wide: centre it
+            return LW / 2.0 - (lo + hi) / 2.0
+        return max(0.0, m - lo) - max(0.0, hi - (LW - m))
+
     def _seated(self, c, t, st, action, pose, opts):
         """On a set piece: hips on the seat (sit), body on the mattress (lie). Any other action done
         while seated keeps the sitting legs, so a character can drink or talk on the sofa."""
@@ -905,6 +921,12 @@ class Renderer(Output):
                 ops, an = build_character(spec, pose, expr, mouth_open, t, x, y, c.draw_scale(t),
                                           blink=blink, prop=prop, talking=speaking or singing or chewing,
                                           tear_phase=(t * 1.1) % 1.0)
+                dx = self._keep_in_frame(ops, pose, st, rf)
+                if dx:                              # cine: a body on the floor slides back inside the picture
+                    x += dx
+                    ops, an = build_character(spec, pose, expr, mouth_open, t, x, y, c.draw_scale(t),
+                                              blink=blink, prop=prop, talking=speaking or singing or chewing,
+                                              tear_phase=(t * 1.1) % 1.0)
             return dict(ops=ops, an=an, rf=rf, pose=pose, x=x, y=y, k=c.draw_scale(t), animal=spec.get("kind"))
 
         prep = {}

@@ -600,6 +600,47 @@ REACTIONS = {"angry": "nervous", "shout": "scared", "evil": "scared", "determine
              "wink": "shy", "love": "shy", "kiss": "shy", "sad": "sad", "cry": "sad", "hurt": "sad"}
 
 
+CTA_Y = 330.0               # cine: the end card ("Tag karo...") sits above the faces instead of on them
+LIE_ACTIONS = ("lie_down", "lie", "sleep_lie", "rofl")
+# a body on its way to the floor: seconds after the action starts when it really goes down (faint wobbles first)
+FALL_ACTIONS = {"faint": 0.6, "fall": 0.15, "slip": 0.1, "trip": 0.25, "lie_down": 0.0, "lie": 0.0,
+                "sleep_lie": 0.0, "rofl": 0.0}
+STAND_MIN = 170.0           # a standing person's centre keeps this far from the frame's edges
+STAND_GAP = 240.0           # ...and this far from the next person
+
+
+def stand_up_in_frame(chars, set_by_id):
+    """cine: somebody lying on a bed (or sofa) has their feet at its far end - often at the edge of the picture.
+    When they get up (any action that is not lying), they step to the nearest free spot inside the frame."""
+    for c in chars.values():
+        if c.spec.get("hidden") or c.spec.get("kind"):
+            continue
+        lying = False
+        for e in list(c.events):
+            a = e.get("action")
+            if a is None:
+                continue
+            if a in LIE_ACTIONS and e.get("on") in set_by_id:
+                lying = True
+                continue
+            if not lying:
+                continue
+            lying = False
+            t2 = e["t"]
+            if any(t2 - 0.01 <= m[0] <= t2 + 0.15 for m in c.moves):
+                continue                            # they walk / leave right away: that move takes them
+            fx, fy = c.pos_at(t2)
+            others = [o.draw_pos(t2)[0] for o in chars.values()
+                      if o is not c and not o.spec.get("hidden") and o.spec.get("view") != "back" and _on_stage(o, t2)]
+            spots = [x for x in range(int(STAND_MIN), int(LW - STAND_MIN) + 1, 10)
+                     if all(abs(x - ox) >= STAND_GAP for ox in others)]
+            to = min(spots, key=lambda x: abs(x - fx)) if spots else clamp(c.x, STAND_MIN, LW - STAND_MIN)
+            if abs(to - fx) > 20:
+                dur = clamp(0.35 + abs(to - fx) / 1500.0, 0.4, 0.85)
+                c.moves.append((t2, t2 + dur, fx, fy, float(to), fy, False, "out"))
+                c.moves.sort(key=lambda m: m[0])
+
+
 def _card_over_faces(plan, t):
     """True when a text card (the CTA at the end) sits in the upper middle of the screen from time t on: a close
     shot must keep the face below it."""
@@ -607,7 +648,7 @@ def _card_over_faces(plan, t):
         if o.get("style") != "card" or float(o.get("from", 0.0)) > plan.duration or float(o.get("to", 1e9)) <= t:
             continue
         pos = o.get("pos", "upper")
-        if (isinstance(pos, (list, tuple)) and 350 <= float(pos[1]) <= 1000) or pos in ("upper", "center", "middle"):
+        if (isinstance(pos, (list, tuple)) and 150 <= float(pos[1]) <= 1000) or pos in ("upper", "center", "middle"):
             return True
     return False
 
@@ -757,8 +798,11 @@ def auto_camera_cine(plan, chars, cam_events, shakes, rolls):
                         pick.events.append({"t": t_r + 0.2, "expression": mood})
                         pick.events.sort(key=lambda e: e["t"])
                 else:                               # alone: stay on the face a little longer
-                    cam_events.append(dict(t=t_free + 0.05, zoom=round(max(size, 1.2) + 0.2, 2), focus=last["who"],
-                                           dur=max(0.4, left - 0.15)))
+                    z, focus = round(max(size, 1.2) + 0.2, 2), last["who"]
+                    if _card_over_faces(plan, t_free + 0.05):       # looser, and the face below the card
+                        fx, fy = chars[last["who"]].focus_at(t_free + 0.05)
+                        z, focus = 1.3, [fx, fy - 170.0]
+                    cam_events.append(dict(t=t_free + 0.05, zoom=z, focus=focus, dur=max(0.4, left - 0.15)))
     for w in plan.warps:                            # slow motion: pull back to watch it happen
         if w[0] == "slow":
             cam_events.append(dict(t=w[1], zoom=1.0, dur=0.4))
@@ -768,11 +812,21 @@ def auto_camera_cine(plan, chars, cam_events, shakes, rolls):
             (x1, y1), (x2, y2) = chars[fx["src"]].draw_pos(t0), chars[fx["dst"]].draw_pos(fx["to"])
             zoom = round(max(1.0, min(1.3, 1080.0 / (abs(x2 - x1) + 420.0))), 2)
             cam_events.append(dict(t=t0, zoom=zoom, focus=[(x1 + x2) / 2.0, (y1 + y2) / 2.0 - 560], dur=0.16))
+    for c in chars.values():                        # somebody faints / falls / lies down on the floor: watch it wide
+        if c.spec.get("hidden") or c.spec.get("view") == "back":
+            continue
+        for e in c.events:
+            a = e.get("action")
+            if a in FALL_ACTIONS and not e.get("on"):
+                tf = e["t"] + FALL_ACTIONS[a]
+                cam_events[:] = [ev for ev in cam_events if not (tf < ev["t"] < tf + 3.0 and ev.get("focus") == c.name)]
+                cam_events.append(dict(t=tf, zoom=1.0, dur=0.35))
 
 
 def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan = Plan()
     meta = scene.get("meta", {})
+    cine = camera_style(meta) == "cine"
     plan.fps = int(fps or meta.get("fps", 30))
     plan.fade_in = float(meta.get("fade_in", 0.0))
     plan.fade_out = float(meta.get("fade_out", 0.0))
@@ -992,6 +1046,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         if "overlay" in ev:
             o = dict(ev["overlay"])
             o.setdefault("from", t)
+            if cine and o.get("cta") and list(o.get("pos") or []) == [540, 640]:
+                o["pos"] = [540, CTA_Y]             # (it used to sit right on the faces)
             plan.overlays.append(o)
         if "set" in ev:
             for sid in (ev["set"] if isinstance(ev["set"], list) else [ev["set"]]):
@@ -1096,7 +1152,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.n_frames = int(round(plan.duration * plan.fps))
 
     # ---- camera segments ----
-    cine = camera_style(meta) == "cine"
+    if cine:                                        # off a bed: back inside the picture
+        stand_up_in_frame(chars, set_by_id)
     plan.camera, plan.rolls, plan.drift = ("cine" if cine else "classic"), [], False
     plan.auto_react = bool(meta.get("auto_react", True))
     if meta.get("auto_camera", True) and not cam_events and plan.framing == "medium":     # wide / inside are composed shots
