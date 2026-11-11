@@ -52,6 +52,7 @@ SKIN_TONES = {
     "wheatish": (222, 176, 134),
     "brown": (188, 134, 94),
     "dark": (140, 94, 64),
+    "ghost": (214, 228, 238),          # the bhoot's pale blue-white (never given to anyone by chance)
 }
 
 HAIR_COLORS = {
@@ -136,6 +137,29 @@ LOOKS = {
                       build="slim", accessories=["moustache"]),
     "nai": dict(skin="brown", hair="side_part", outfit="shirt", color="sky", pants="khaki", shoes="chappal",
                 accessories=["moustache"]),
+    # everyday people of the city, the road and the journey
+    "delivery_boy": dict(skin="brown", hair="short", outfit="tshirt", color="red", pants="denim", shoes="white",
+                         cap_color="red", prop="box", accessories=["cap"]),
+    "driver": dict(skin="dark", hair="short", outfit="shirt", color="khaki", pants="khaki", shoes="chappal",
+                   accessories=["moustache"]),
+    "conductor": dict(skin="brown", hair="side_part", outfit="shirt", color="khaki", pants="khaki", shoes="black",
+                      prop="bag", accessories=["moustache"]),
+    "watchman": dict(skin="brown", hair="short", outfit="uniform", color="navy", pants="navy", accent="sky",
+                     shoes="black", cap_color="navy", prop="stick", accessories=["cap", "moustache"]),
+    "landlord": dict(skin="wheatish", hair="balding", hair_color="grey", outfit="kurta", color="white", pants="white",
+                     shoes="chappal", build="chubby", accessories=["moustache", "glasses"]),
+    "influencer": dict(skin="fair", hair="spiky", outfit="tshirt", color="teal", pants="black", shoes="white",
+                       prop="phone", accessories=["sunglasses", "beard"]),
+    "doodhwala": dict(skin="brown", hair="short", outfit="kurta", color="white", pants="white", shoes="chappal",
+                      build="slim", prop="milk_can", accessories=["moustache"]),
+    "tt": dict(skin="wheatish", hair="balding", outfit="blazer", color="black", pants="black", accent="white",
+               shoes="black", prop="notebook", accessories=["glasses", "moustache"]),
+    "bhoot": dict(skin="ghost", hair="long", hair_color="white", outfit="kurta", color="white", pants="white",
+                  shoes="chappal", build="slim", expression="evil"),
+    "pilot": dict(skin="fair", hair="side_part", outfit="blazer", color="navy", pants="navy", accent="gold",
+                  shoes="black", cap_color="navy", accessories=["cap", "sunglasses"]),
+    "air_hostess": dict(skin="fair", hair="bun", outfit="blazer", color="red", pants="red", accent="white",
+                        shoes="black", accessories=["earrings"]),
 }
 
 HEAD_RX = 78.0
@@ -211,7 +235,7 @@ PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick", "bag", "chai", "glass"
          "money", "newspaper", "book", "notebook", "pen", "laptop", "umbrella", "remote", "broom", "belan", "pillow",
          "gift", "balloon", "trophy", "torch", "key", "bat", "flag", "camera", "banana", "bottle", "letter",
          "toothbrush", "dumbbell", "box", "cooker", "thali", "lota", "tiffin", "mithai", "report_card", "injection",
-         "stethoscope")
+         "stethoscope", "milk_can")
 
 
 def d2r(a):
@@ -589,6 +613,11 @@ def _draw_prop2(S, prop, hand, d, n, pt):
         brass = (214, 162, 60)
         S.poly(closed_ellipse(hand[0], hand[1] - 34, 34, 30, 24), brass, INK, 5)
         S.poly([ab(-16, -64), ab(16, -64), ab(22, -80), ab(-22, -80)], brass, INK, 4)
+    elif prop == "milk_can":                  # the doodhwala's steel can, carried by its handle
+        steel = (196, 198, 206)
+        S.line([ab(-22, 0), ab(-22, -18), ab(22, -18), ab(22, 0)], 6, (90, 92, 100))
+        S.poly([ab(-30, 0), ab(30, 0), ab(44, 40), ab(44, 130), ab(-44, 130), ab(-44, 40)], steel, INK, 4)
+        S.poly([ab(-44, 70), ab(44, 70), ab(44, 80), ab(-44, 80)], (160, 162, 170), None, 0)
     elif prop == "tiffin":                    # three steel boxes on a clip, carried by the handle
         steel = (200, 202, 210)
         S.line([ab(-26, -2), ab(-26, 16), ab(26, 16), ab(26, -2)], 6, (90, 92, 100))

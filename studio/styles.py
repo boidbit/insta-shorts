@@ -48,7 +48,8 @@ def scene_style(scene):
     return normalize(scene.get("style") or meta.get("style") or DEFAULT)
 
 
-FLAT_IN_25D = {"image", "plain", "night_road"}       # stay as they are in 2.5D too
+FLAT_IN_25D = {"image", "plain", "night_road", "train", "bus", "metro", "plane", "car",
+               "auto"}       # stay as they are in 2.5D too (a vehicle's view already moves in layers)
 
 
 def has_depth(kind):

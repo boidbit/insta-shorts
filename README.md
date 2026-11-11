@@ -209,6 +209,30 @@ GitHub Actions me ye `dialogue` aur `intro` inputs hain. Style ka input `style`:
 
 Page pe ye dono video options me hain. Approve karne pe page `LOOP: on` / `MASCOT: ...` line script ke saath bhej deta hai; script me apni line ho to wahi chalti hai. JSON me: `"loop": true`, `"mascot": "billi"`.
 
+### Gaadi ke andar: train, bus, metro, plane, car, auto 🚆✈️
+
+`SCENE: train` (ya `bus`, `metro`, `plane`/`aeroplane`/`flight`, `car`/`taxi`, `auto`/`auto_rickshaw`) = gaadi ke **andar** ka shot:
+- **Bahar ka nazara chalta hai:** door ka pahad dheere, paas ke khambe aur ped tez aur dhundhle. Khidki pe halki chamak (kaanch).
+- **Gaadi hilti hai:** train me patri ka jhatka, bus me gaddhe, plane me turbulence, auto me engine ki thartharahat.
+- **Awaaz:** train, engine, plane cabin ki apni awaaz.
+- **Log apne aap seat pe baithe hote hain** (train me berth, bus/metro/plane/car/auto ki apni seat). Baithe-baithe bolte, ishaara karte, khaate, phone chalate hain; `run`, `walk`, `jump` jaisa action karein to uth jaate hain. TT, conductor aur air hostess khade rehte hain.
+- **Nazara aur samay:** `SCENE: train gaon night`, `SCENE: bus city`, `SCENE: car samundar`. Nazare: city, gaon, highway, pahad, samundar, clouds (plane), tunnel (metro). Har gaadi ka apna default hai (train → gaon, metro → tunnel, plane → clouds...).
+
+### Jagah sajao: `DRESS` 🎉
+
+Ek SCENE ke andar line: `DRESS: shaadi` (genda maala + lights + "Shaadi Mubarak" banner). Packs: **shaadi, birthday, new_year, party, independence (tiranga jhandiyaan + jhanda + "Jai Hind"), monsoon (chhata + paani ka gaddha), cricket, exam**. Ya cheezein chuno: `DRESS: poster, calendar, plant` (poster, calendar, photo_frame, fairy_lights, bunting, garland, balloons, banner, ac, wall_shelf, flag_stand, umbrella, puddle, plant, box, cooler, clock).
+- DRESS na likho to studio **andar wali jagahon ko khud thoda sajata hai** (2 cheezein, har video me alag). Isse wahi office har video me naya lagta hai. `DRESS: none` = khaali. CUT ke baad sajawat wahi rehti hai.
+- Koi dharmik cheez nahi (na diya, na murti, na mandir).
+
+### Nayi jagahein aur behtar purani 🏙️
+
+- **Nayi:** `court` (judge ki oonchi bench, gawah ka kathghara, nyay ka tarazu), `dhaba` (tin ki chhat, bulb wala board, tandoor, menu board), `salon` (bada sheesha bulbs ke saath, kursi, bottlein), `mall` (do manzil dukaanein, escalator, chamakta farsh).
+- **Behtar:** `street` (dukaanein board ke saath, taar, khamba, zebra crossing), `market` (stall ke board, peeche imaaratein, lights, bore), `office` (shehar wali khidki, glass partition, chart, water cooler), `hospital` (reception, notice board, OPD darwaze). `CAMERA: classic` me purani drawings hi rehti hain.
+
+### Naye log 👥
+
+`delivery_boy` (laal topi, dibba), `driver` (autowala, cabwala), `conductor`, `watchman` (guard, chowkidar; topi, danda), `landlord` (makaan_malik), `influencer` (youtuber, vlogger; kaala chashma, phone), `doodhwala` (doodh ki kenn), `tt` (train ka ticket checker), `bhoot` (ghost; safed chehra, shaitani muskaan), `pilot`, `air_hostess`.
+
 ### Har video alag dikhe 🎨 (rang, pehla shot, cover, handle)
 
 Instagram grid me saari reels ek jaisi na lagein, isliye har video ka apna look hota hai:

@@ -951,6 +951,7 @@ LOC_HORIZON = {
     "haunted_house": 1300, "graveyard": 1260, "beach": 1260, "mountain_road": 1300, "desert": 1250,
     "hospital": 1280, "police_station": 1280, "cinema": 1320, "bank": 1280, "jail": 1280, "gaon": 1240,
     "school_ground": 1110,
+    "train": 1250, "bus": 1250, "metro": 1250, "plane": 1250, "car": 1250, "auto": 1250,
 }
 
 
@@ -978,3 +979,10 @@ def grade(img, time):
         img = Image.blend(img, gray, 0.4)
         return Image.blend(img, Image.new("RGB", img.size, (60, 70, 90)), 0.28)
     return img
+
+
+# the new places (court, dhaba, salon, mall) live in places_plus (it uses the helpers above)
+from .places_plus import HORIZON as _NEW_HORIZON, NEW as _NEW_PLACES   # noqa: E402
+
+LOCATIONS.update(_NEW_PLACES)
+LOC_HORIZON.update(_NEW_HORIZON)

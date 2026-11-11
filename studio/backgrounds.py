@@ -633,6 +633,26 @@ class Background:
         self.parallax = float(spec.get("parallax", 1.0))   # 0 = all layers move with the ground
         self.layers = []       # scrolling layers, back-to-front: (RGBA strip, y offset, speed multiplier)
         self.fg = []           # foreground props: (depth y, RGBA strip, x, y, speed multiplier or None)
+        self.interior = None   # inside a vehicle: the inside (RGBA, see-through windows) over the moving view
+        from . import vehicles
+        vkind = vehicles.resolve(self.kind)
+        if vkind:
+            self.kind = vkind
+            v = vehicles.VEHICLES[vkind]
+            view = vehicles.VIEW_WORDS.get(str(spec.get("view", "")).lower(), v["view"])
+            sky, wides = vehicles.outside(view, s, spec.get("time"))
+            self.static = sky if sky.size == (out_w, out_h) else sky.resize((out_w, out_h), Image.LANCZOS)
+            self.scroll = float(spec.get("scroll", v["speed"]))
+            for im, mult in wides:
+                if im.size != (out_w * 2, out_h):
+                    im = im.resize((out_w * 2, out_h), Image.LANCZOS)
+                bb = im.getchannel("A").getbbox()
+                if bb:
+                    self.layers.append((im.crop((0, bb[1], im.width, bb[3])), bb[1], mult))
+            inner = vehicles.inside(vkind, s)
+            self.interior = inner if inner.size == (out_w, out_h) else inner.resize((out_w, out_h), Image.LANCZOS)
+            self.ambient = []
+            return
         if self.kind == "image":
             im = Image.open(asset_path(spec["path"])).convert("RGB")
             r = max(out_w / im.width, out_h / im.height)
@@ -653,6 +673,9 @@ class Background:
             self.kind = {"living_room": "room", "classroom": "school"}.get(self.kind, self.kind)
             fn = dict(LOCATIONS, **{"kitchen": kitchen, "room": room, "street": street, "school": school,
                                     "market": market, "office": office, "bus_stop": bus_stop}).get(self.kind)
+            if not spec.get("classic"):              # the new camera gets the richer drawings of the busiest places
+                from .places_plus import RICH
+                fn = RICH.get(self.kind, fn)
             if fn:
                 self.static = fn(s)
             else:
@@ -709,6 +732,8 @@ class Background:
                 nxt = strip.crop((o + 1, 0, o + 1 + self.out_w, strip.height))
                 part = Image.blend(part, nxt, off - o)
             base.paste(part, (0, y0), part)
+        if self.interior is not None:               # the vehicle's inside, the view moving past its windows
+            base.paste(self.interior, (0, 0), self.interior)
         if self.ambient:
             self._draw_ambient(base, t)
         return base

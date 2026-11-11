@@ -694,7 +694,7 @@ def beat_path(bpm, duration, style="desi", seed=None):
 
 
 # ------------------------------------------------------------------ ambience beds (looped by ffmpeg)
-AMBIENCE = ("rain", "street", "office", "night", "jungle", "crowd", "wind", "sea")
+AMBIENCE = ("rain", "street", "office", "night", "jungle", "crowd", "wind", "sea", "train", "engine", "cabin")
 
 
 def ambience_path(kind):
@@ -733,6 +733,15 @@ def ambience_path(kind):
         sig = sum(_bp(_noise(d, 40 + i), 400 + i * 260, 3) * (0.7 + 0.3 * np.sin(2 * np.pi * (0.5 + i * 0.3) * t)) for i in range(5))
     elif kind == "sea":
         sig = _lp(_noise(d, 41), 700) * 2.5 * (0.35 + 0.65 * np.sin(np.pi * ((t / 4.0) % 1.0)) ** 2)
+    elif kind == "train":                # rumble + the clack of the wheels over the rail joints
+        sig = _lp(_noise(d, 42), 160) * 3.0 + 0.2 * np.sin(2 * np.pi * 55 * t)
+        clack = _bp(_noise(0.05, 43), 900, 2) * _env(_t(0.05), 0.001, 70)
+        sig += _place(d, [(i * 0.62 + dt, clack * 1.2) for i in range(int(d / 0.62)) for dt in (0.0, 0.11)])
+    elif kind == "engine":               # a bus / car / auto engine and the road
+        sig = (0.35 * np.sin(2 * np.pi * 38 * t) * (0.8 + 0.2 * np.sin(2 * np.pi * 0.4 * t))
+               + _lp(_noise(d, 44), 300) * 2.0 + _bp(_noise(d, 45), 1200, 1.2) * 0.25)
+    elif kind == "cabin":                # a plane's steady hum
+        sig = _lp(_noise(d, 46), 500) * 2.2 + 0.12 * np.sin(2 * np.pi * 110 * t)
     else:  # wind
         sig = _s_wind()
         sig = np.concatenate([sig, sig[::-1], sig])[: t.size]

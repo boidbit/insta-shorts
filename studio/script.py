@@ -67,7 +67,7 @@ import os
 import re
 import zlib
 
-from . import actions, audio, gemini_music, objects, rides, styles, theme
+from . import actions, audio, decor, gemini_music, objects, rides, styles, theme, vehicles
 from .characters import (ACCESSORIES, EXPRESSIONS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE,
                          SKIN_TONES)
 from .util import asset_path
@@ -82,7 +82,14 @@ ON_WORDS, OFF_WORDS = ("on", "yes", "haan", "true", "1"), ("off", "no", "nahi", 
 from .locations import LOCATIONS as _LOC   # noqa: E402
 
 BACKGROUNDS = tuple(dict.fromkeys(("kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road",
-                                   "plain", "living_room", "classroom") + tuple(_LOC)))
+                                   "plain", "living_room", "classroom") + tuple(_LOC) + tuple(vehicles.VEHICLES)))
+# inside a vehicle people sit on its seats, except these (they work there and stand)
+STANDING_LOOKS = ("tt", "air_hostess", "conductor")
+# actions that make a seated person get up (anything else is done sitting: talk, point, eat, phone...)
+STAND_UP = ("walk", "run", "jog", "sneak", "limp", "crouch", "jump", "jump_over", "climb", "slide", "slip", "trip",
+            "skid", "fall", "get_up", "spin", "cartwheel", "moonwalk", "lie_down", "sleep_lie", "sit_floor", "faint",
+            "celebrate", "jumping_jacks", "squat", "pushup", "lift_weights", "race_start", "bat", "bowl", "kick",
+            "stomp", "bow", "turn_around", "hide", "dodge", "push", "tug", "drag", "carry", "hug")
 TIMES = ("day", "night", "evening", "sunset", "dawn", "rain")      # SCENE: <place> night
 WEATHER = ("snow", "fog", "fireflies", "leaves")                    # SCENE: <place> fog
 PAN_WORDS = ("pan", "follow")      # SCENE: street pan = one take: whoever just left walks on into the next place
@@ -100,7 +107,8 @@ FX = tuple(sorted(set(_FX) - {"projectile", "thought"})) + tuple(FX_ALIASES)
 from . import sets as _sets   # noqa: E402
 
 # set pieces for OBJ: lines (table / dustbin stay the OBJ objects they already were)
-SET_TYPES = tuple(sorted(k for k in _sets.SPEC if k not in ("table", "dustbin")))
+SET_TYPES = tuple(sorted(k for k in _sets.SPEC if k not in ("table", "dustbin") and k not in _sets.VEHICLE_SEATS
+                         and k not in _sets.DECOR))      # (seats come with the vehicles, decor with DRESS lines)
 SET_STATES = ("open", "closed", "on", "off", "ringing", "idle", "rustle", "night", "day", "broken")
 # the jail's barred door is a set piece over the painted one: `OBJ: jail_door broken` / `OBJ: jail_door open`
 JAIL_DOOR = {"id": "jail_door", "type": "jail_door", "x": 930, "y": 1290, "fit": True}
@@ -160,8 +168,13 @@ ROLE_LOOKS = {
     "netaji": "neta", "mantri": "neta", "politician": "neta", "sarpanch": "neta", "mla": "neta",
     "kaidi": "chor", "prisoner": "chor", "thief": "chor", "sasu": "saas", "saasu": "saas", "bhabhi": "bahu",
     "patni": "bahu", "biwi": "bahu", "headmaster": "principal", "barber": "nai", "hajjam": "nai",
+    "delivery": "delivery_boy", "deliverywala": "delivery_boy", "autowala": "driver", "cabwala": "driver",
+    "taxiwala": "driver", "guard": "watchman", "chowkidar": "watchman", "security": "watchman",
+    "makaan_malik": "landlord", "malik": "landlord", "youtuber": "influencer", "vlogger": "influencer",
+    "milkman": "doodhwala", "ticket_checker": "tt", "ghost": "bhoot", "hostess": "air_hostess",
+    "busconductor": "conductor",
 }
-FEMALE_LOOKS = {"girl", "college_girl", "aunty", "dadi", "kid_girl", "office_girl", "madam", "dulhan", "nurse",
+FEMALE_LOOKS = {"air_hostess", "girl", "college_girl", "aunty", "dadi", "kid_girl", "office_girl", "madam", "dulhan", "nurse",
                 "saas", "bahu"}
 PITCHES = ["+0Hz", "+14Hz", "-8Hz", "+24Hz", "-14Hz"]
 BUILDS = ("slim", "normal", "chubby")
@@ -188,6 +201,8 @@ def vocab():
         "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS), "fx": sorted(FX),
         "times": sorted(TIMES + WEATHER), "pan_words": list(PAN_WORDS),
         "themes": sorted(set(theme.THEMES) | set(theme.ALIASES)), "cta_styles": list(CTA_STYLES),
+        "vehicles": sorted(set(vehicles.VEHICLES) | set(vehicles.ALIASES)), "views": sorted(vehicles.VIEW_WORDS),
+        "dress": sorted(set(decor.PACKS) | set(decor.PACK_WORDS) | set(decor.PIECES) | {"none"}),
         "feel_words": sorted([k, v] for k, v in FEEL_WORDS.items()),
         "sets": sorted(SET_TYPES), "set_words": sorted(set(SET_STATES) | set(SET_X) | {"big", "small", "back", "front", "flip"}),
         "seat_actions": sorted(SEAT_ACTIONS), "animals": sorted(ANIMAL_WORDS),
@@ -664,6 +679,17 @@ def resolve_background(raw):
     if low in BACKGROUNDS:
         return {"type": low}, None
     words = name.lower().split()
+    veh = vehicles.resolve(words[0]) if words else None
+    if veh and all(w in TIMES or w in WEATHER or w in vehicles.VIEW_WORDS for w in words[1:]):
+        bg = {"type": veh}                          # "train gaon night": inside the train, fields going past
+        for w in words[1:]:
+            if w in vehicles.VIEW_WORDS:
+                bg["view"] = vehicles.VIEW_WORDS[w]
+            elif w in TIMES:
+                bg["time"] = w
+            else:
+                bg.setdefault("weather", []).append(w)
+        return bg, None
     if len(words) > 1 and all(w in TIMES or w in WEATHER for w in words[1:]):   # "gully night fog"
         bg, warn = resolve_background(words[0])
         for w in words[1:]:
@@ -783,6 +809,7 @@ def parse_chat(meta, title, msgs):
 
 
 HEADER_WORDS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "OBJ",
+                "DRESS",
                 "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER",
                 "NARRATOR",
                 "LIGHTS", "AMBIENCE", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
@@ -872,6 +899,7 @@ def parse_script(text):
                     warnings.append("SCENE framing %r: wide / medium / inside" % frame)
                     frame = ""
                 cur = new_scene(bg, title.strip() or None)
+                cur["place_no"] = len(scenes)
                 cur["framing"] = frame or None
                 if pan:
                     cur["pan"] = pan
@@ -911,8 +939,11 @@ def parse_script(text):
             shot_no = cur.get("shot", 0) + 1
             prev_sets = {k: dict(v) for k, v in cur.get("sets", {}).items()}
             prev_lights = cur.get("lights", "on")
-            prev_amb = cur.get("ambience")
+            prev_amb, prev_dress, place_no = cur.get("ambience"), cur.get("dress"), cur.get("place_no", 0)
             cur = new_scene(dict(cur["background"]), None)
+            cur["place_no"] = place_no              # same place: dressed the same
+            if prev_dress is not None:
+                cur["dress"] = prev_dress
             if prev_amb is not None:
                 cur["ambience"] = prev_amb              # same place: the same sound around
             cur["sets"] = prev_sets                 # same place: the door / sofa / fan are still there
@@ -932,6 +963,17 @@ def parse_script(text):
                 warnings.append(warn)
             if spec:
                 cur["lines"].append(("ui", spec, hold))
+            continue
+        m = re.match(r"^DRESS\s*:\s*(.*)$", line, re.I)
+        if m:                                       # DRESS: shaadi / poster, plant / none: dress up the place
+            if cur is None:
+                cur = new_scene()
+            words = _words(m.group(1))
+            _items, bad = decor.words_to_items(words)
+            if bad:
+                warnings.append("DRESS: %s nahi hai (packs: %s; pieces: %s)"
+                                % (", ".join(bad), ", ".join(decor.PACKS), ", ".join(decor.PIECES)))
+            cur["dress"] = [w for w in words if w not in bad]
             continue
         m = re.match(r"^AMBIENCE\s*:\s*(.*)$", line, re.I)
         if m:
@@ -1049,6 +1091,25 @@ def parse_script(text):
             tl.append({"t": 0.0, "sfx": "whoosh", "volume": 0.7, "camera": {"shake": 0.5}})
         # the story starts a moment in; a `wait`, a screen card or a set change before the first line now really
         # comes first (they used to be skipped because the first line had a fixed start time)
+        for name in fronts:                         # a look with its own face keeps it (the bhoot grins)
+            face = LOOKS.get(cast.get(name, {}).get("look", ""), {}).get("expression")
+            if face and "expression" not in cast.get(name, {}):
+                tl.append({"t": 0.0, "who": name, "expression": face})
+        seated = {}
+        veh = vehicles.resolve(sc["background"].get("type"))
+        if veh:                                     # inside a vehicle: everybody starts on a seat at their place
+            for name in fronts:
+                spec_ = cast.get(name, {})
+                if spec_.get("kind") or spec_.get("hidden") or spec_.get("look") in STANDING_LOOKS:
+                    continue
+                x, _slot = _slot_x(fronts, name)
+                sid = "seat_" + re.sub(r"\W", "", name.lower())
+                piece = {"id": sid, "type": vehicles.VEHICLES[veh]["seat"], "x": x, "y": 1700}
+                if len(fronts) >= 3:
+                    piece["scale"] = 0.8
+                sc.setdefault("sets", {})[sid] = piece
+                seated[name] = sid
+                tl.append({"t": 0.0, "who": name, "action": "sit", "on": sid})
         tl.append({"wait": 0.3 if si == 0 else 0.2})
         first = True
         for ln in sc["lines"]:
@@ -1101,6 +1162,12 @@ def parse_script(text):
                 else:
                     ev["move"] = {"x": SLOTS[3][side], "dur": 1.0}
                     ev.setdefault("hold", 1.0)
+            if who in seated:                           # inside a vehicle, seated
+                act = ev.get("action")
+                if move or "entry" in ev or "leave" in ev or act in STAND_UP:
+                    seated.pop(who, None)               # gets up
+                elif act:
+                    ev["on"] = seated[who]              # pointing, eating, on the phone... still seated
             if ln[0] == "say":
                 ev["say"], ev["speak"] = ln[3], ln[4] or ln[3]
                 if not ln[4] and not re.search(r"[ऀ-ॿ]", ln[3]):
@@ -1161,6 +1228,13 @@ def parse_script(text):
             item["lights"] = sc["lights_start"]
         if sc.get("ambience") is not None:
             item["ambience"] = sc["ambience"]
+        if sc.get("dress") is not None:
+            item["dress"] = sc["dress"]
+        elif not classic:                           # every video dresses its places a little differently
+            item["dress"] = "auto"
+        if "dress" in item:
+            item["dress_seed"] = zlib.crc32(("%s|%d" % (meta.get("HOOK") or "reel", sc.get("place_no", si)))
+                                            .encode("utf-8")) % 997
         if sc["title"]:
             item["title"] = sc["title"]
         if pan:

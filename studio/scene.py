@@ -3,7 +3,7 @@ import math
 import os
 import sys
 
-from . import audio, effects, elevenlabs_tts, gemini_tts, objects, rides
+from . import audio, decor, effects, elevenlabs_tts, gemini_tts, objects, rides, vehicles
 from .characters import assign_faces, color_of, resolve_spec
 from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, ease_out, ease_out_back, lerp
 
@@ -287,6 +287,7 @@ class Char:
         self.scale = float(rs.get("scale", 1.0))
         self.leg_k = float(rs.get("leg_k", 1.0))
         self.travel0 = 0.0      # px already walked before this shot (a walk that goes on from the last place)
+        self.look_prop, self.look_face = rs.get("prop"), rs.get("expression")   # a look's own (doodhwala's can...)
         self.phase = float(spec.get("phase", index * 0.9))
         self.events = []        # sorted by t
         self.moves = []         # (t0, t1, x0, y0, x1, y1[, run[, ease]]); ease: "out" (lands fast), "back" (overshoots)
@@ -367,8 +368,8 @@ class Char:
         return x, y - h * self.scale * self.depth_at(t)[0]
 
     def state_at(self, t):
-        st = dict(action="idle", action_t0=0.0, expression=self.spec.get("expression", "neutral"),
-                  prop=self.spec.get("prop"), label=None, look=self.spec.get("look"),
+        st = dict(action="idle", action_t0=0.0, expression=self.spec.get("expression", self.look_face or "neutral"),
+                  prop=self.spec.get("prop", self.look_prop), label=None, look=self.spec.get("look"),
                   facing=self.spec.get("facing", "front"), visible=self.spec.get("visible", True), on=None,
                   speed=1.0, intensity=1.0, opts={}, talking=None)
         for ev in self.events:
@@ -891,6 +892,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         widest = max(objects.SPRITE_LEN[k_] / objects.PERSON_R[k_] for k_ in kinds_) * objects.REF_SCALE
         world = clamp(900.0 / widest, 0.22, 1.0)
     plan.angle = shot_angle(scene, framing)
+    plan.vehicle = vehicles.resolve((scene.get("background") or {}).get("type")
+                                    if isinstance(scene.get("background"), dict) else scene.get("background"))
     if framing == "medium":
         # people (and their props / set pieces) a bit bigger than the painted place, and more so when the shot's
         # angle shows the place closer: otherwise the room and its furniture dwarf the characters
@@ -926,7 +929,9 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     # ---- timeline ----
     # ---- set pieces (door, bed, sofa, fan...) ----
     plan.sets = []
-    for i, ob in enumerate(scene.get("sets", [])):
+    bgd = scene.get("background") if isinstance(scene.get("background"), dict) else {"type": scene.get("background")}
+    dress = decor.pieces_for(bgd.get("type"), scene.get("dress"), scene.get("dress_seed", 0))   # walls dressed up
+    for i, ob in enumerate(list(scene.get("sets", [])) + dress):
         ob = dict(ob)
         ob.setdefault("id", "%s%d" % (ob.get("type", "set"), i + 1))
         if ob.get("fit"):                           # drawn over the painted place (the jail door): goes with it
@@ -1063,7 +1068,10 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             c.speech.append(sp)
             plan.speech.append(sp)
             if ev.get("action") in BURST_ACTIONS and dur > BURST_ACTIONS[ev["action"]] + 0.4:
-                c.events.append({"t": t + BURST_ACTIONS[ev["action"]], "action": "idle", "_settle_from": t})
+                settle = {"t": t + BURST_ACTIONS[ev["action"]], "action": "idle", "_settle_from": t}
+                if ev.get("on"):
+                    settle["on"] = ev["on"]             # (still on the seat: a seated shock settles seated)
+                c.events.append(settle)
             if ev.get("interrupt") and len(plan.speech) > 1:
                 prev = plan.speech[-2]
                 if prev["end"] > t and prev["who"] != sp["who"]:      # the other person gets cut off
@@ -1248,6 +1256,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     bg = scene.get("background") if isinstance(scene.get("background"), dict) else {}
     if amb is None and bg.get("time") == "rain":
         amb = "rain"                                # it rains: you hear it
+    if amb is None and vehicles.resolve(bg.get("type")):
+        amb = vehicles.VEHICLES[vehicles.resolve(bg.get("type"))]["ambience"]     # the train / engine / cabin
     for a in (amb if isinstance(amb, list) else [amb] if amb else []):
         a = {"type": a} if isinstance(a, str) else dict(a)
         if a.get("type") in audio.AMBIENCE:
@@ -1540,6 +1550,10 @@ def camera_at(plan, t):
     w = wide_weight(plan, t)
     if w:                                           # a one-take walk into the next place: the whole picture
         z, cx, cy = lerp(z, 1.0, w), lerp(cx, LW / 2.0, w), lerp(cy, LH / 2.0, w)
+    if getattr(plan, "vehicle", None):              # inside a moving vehicle: everything rocks a little
+        rx, ry = vehicles.rock(plan.vehicle, t)
+        z = max(z, 1.0 + 0.045 * (1.0 - w))
+        cx, cy = cx + rx * (1.0 - w), cy + ry * (1.0 - w)
     dx = dy = 0.0
     for (ts, amp, dur) in plan.shakes:
         if ts <= t < ts + dur:

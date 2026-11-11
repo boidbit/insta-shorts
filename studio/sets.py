@@ -61,7 +61,29 @@ SPEC = {
     "washing_machine": (160, 470, 20, False, None, False),   # `OBJ: washing_machine on` spins and shakes
     "mirror": (120, 800, 20, False, None, False),
     "jail_door": (150, 1110, 10, True, None, False),     # barred cell door: closed / open / broken (kicked down)
+    # seats inside the vehicles (placed by the script reader for SCENE: train / bus / metro / plane / car / auto)
+    "berth": (210, 400, 20, False, 205, False),
+    "bus_seat": (175, 450, 20, False, 200, False),
+    "metro_seat": (230, 300, 20, False, 195, False),
+    "plane_seat": (135, 560, 20, False, 205, False),
+    "car_seat": (140, 560, 20, False, 205, False),
+    "auto_seat": (230, 330, 20, False, 200, False),
 }
+VEHICLE_SEATS = ("berth", "bus_seat", "metro_seat", "plane_seat", "car_seat", "auto_seat")
+# decor: what dresses a place up (studio.decor places them; script `DRESS: shaadi` / `DRESS: poster, plant`)
+SPEC.update({
+    "poster": (100, 1150, 0, True, None, False), "calendar": (80, 1100, 0, True, None, False),
+    "photo_frame": (110, 1160, 0, True, None, False), "fairy_lights": (540, 1420, 0, True, None, False),
+    "bunting": (540, 1480, 0, True, None, False), "garland": (540, 1540, 0, True, None, False),
+    "balloons": (120, 1320, 0, True, None, False), "banner": (380, 1330, 0, True, None, False),
+    "ac": (170, 1340, 0, True, None, False), "wall_shelf": (170, 1060, 0, True, None, False),
+    "flag_stand": (90, 720, 20, False, None, False), "umbrella": (110, 250, 20, False, None, False),
+    "puddle": (220, 40, 30, False, None, False),
+})
+DECOR = ("poster", "calendar", "photo_frame", "fairy_lights", "bunting", "garland", "balloons", "banner", "ac",
+         "wall_shelf", "flag_stand", "umbrella", "puddle")
+TIRANGA = ((255, 153, 51, 255), (255, 255, 255, 255), (19, 136, 8, 255))
+PARTY = ((240, 80, 90, 255), (250, 200, 60, 255), (80, 170, 240, 255), (120, 200, 110, 255), (200, 110, 220, 255))
 
 ALL = set(SPEC)
 
@@ -91,6 +113,16 @@ class O:
     def text(self, cx, cy, txt, size, fill=(20, 20, 20, 255)):
         c = self.X(cx, cy)
         self.p.text(c[0], c[1], txt, size * self.sc, fill, 0.6, fill)
+
+    def rrect(self, x0, y0, x1, y1, r, fill=None, outline=INK, w=5):
+        """A rectangle with rounded corners (as a polygon)."""
+        r = max(0.0, min(r, (x1 - x0) / 2.0, (y1 - y0) / 2.0))
+        pts = []
+        for (cx, cy, a0) in ((x1 - r, y0 + r, -90), (x1 - r, y1 - r, 0), (x0 + r, y1 - r, 90), (x0 + r, y0 + r, 180)):
+            for i in range(7):
+                a = math.radians(a0 + i * 15)
+                pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+        self.poly(pts, fill, outline, w)
 
     def shadow(self, hw, h=22):
         self.ellipse(0, 4, hw, h, (0, 0, 0, 55), None)
@@ -524,6 +556,179 @@ def d_mirror(o, st, t, ob):
     o.line([(-30, -620), (40, -700)], (255, 255, 255, 255), 5)
 
 
+def _bench(o, back, seat, frame, x0, x1, top, legs=True):
+    o.shadow(x1 - 10, 16)
+    o.rrect(x0 + 10, top, x1 - 10, -205, 22, back)
+    o.rrect(x0, -218, x1, -176, 16, seat)
+    if legs:
+        for lx in (x0 + 40, x1 - 60):
+            o.rect(lx, -180, lx + 20, 0, frame)
+
+
+def d_berth(o, st, t, ob):                    # train: a blue cushioned berth
+    _bench(o, (60, 94, 152, 255), (78, 116, 176, 255), (120, 120, 126, 255), -210, 210, -400)
+    for x in (-110, 0, 110):
+        o.line([(x, -390), (x, -215)], (44, 70, 120, 255), 4)
+
+
+def d_bus_seat(o, st, t, ob):                 # bus: a maroon double seat with a steel grab bar on top
+    _bench(o, (130, 40, 54, 255), (150, 50, 64, 255), (130, 130, 136, 255), -175, 175, -440)
+    o.rrect(-170, -456, 170, -432, 10, (196, 198, 204, 255))
+
+
+def d_metro_seat(o, st, t, ob):               # metro: a steel bench
+    _bench(o, (196, 200, 208, 255), (176, 180, 190, 255), (150, 152, 160, 255), -230, 230, -300)
+    for x in (-115, 0, 115):
+        o.line([(x, -296), (x, -210)], (150, 154, 162, 255), 4)
+
+
+def d_plane_seat(o, st, t, ob):               # plane: a tall blue seat, a white headrest cover, armrests
+    _bench(o, (42, 70, 138, 255), (54, 86, 160, 255), (110, 110, 116, 255), -125, 125, -560)
+    o.rrect(-85, -540, 85, -470, 14, (244, 244, 240, 255))
+    for x in (-135, 112):
+        o.rrect(x, -270, x + 24, -236, 8, (90, 90, 96, 255))
+
+
+def d_car_seat(o, st, t, ob):                 # car: a black bucket seat with a headrest
+    o.rrect(-60, -560, 60, -496, 18, (36, 36, 40, 255))
+    o.line([(-30, -500), (-30, -476)], (150, 150, 156, 255), 6)
+    o.line([(30, -500), (30, -476)], (150, 150, 156, 255), 6)
+    _bench(o, (40, 40, 44, 255), (52, 52, 56, 255), (30, 30, 34, 255), -140, 140, -480, legs=False)
+    o.rect(-120, -176, 120, 0, (30, 30, 34, 255))
+
+
+def d_auto_seat(o, st, t, ob):                # auto: a black rexine bench with a yellow edge
+    _bench(o, (30, 30, 32, 255), (40, 40, 42, 255), (40, 120, 70, 255), -230, 230, -330)
+    o.rect(-230, -182, 230, -170, (240, 200, 40, 255))
+
+
+def _oval(o, x0, y0, x1, y1, fill=None, outline=INK, w=5):
+    """An ellipse given by its box (O.ellipse takes the centre and the radii)."""
+    o.ellipse((x0 + x1) / 2.0, (y0 + y1) / 2.0, abs(x1 - x0) / 2.0, abs(y1 - y0) / 2.0, fill, outline, w)
+
+
+def _col(ob, default):
+    c = ob.get("color")
+    return tuple(c) + (255,) if isinstance(c, (list, tuple)) and len(c) == 3 else default
+
+
+def d_poster(o, st, t, ob):
+    c = _col(ob, (230, 90, 70, 255))
+    o.rect(-90, -1140, 90, -880, (250, 248, 240, 255), INK, 5)
+    o.rect(-76, -1126, 76, -950, c, None)
+    _oval(o, -30, -1090, 30, -1030, (255, 230, 120, 255), None)
+    o.poly([(-76, -950), (-20, -1010), (30, -970), (76, -1020), (76, -950)], (60, 60, 70, 180), None)
+    if ob.get("text"):
+        o.text(0, -914, str(ob["text"])[:14], 30, (20, 20, 20, 255))
+
+
+def d_calendar(o, st, t, ob):
+    o.rect(-70, -1090, 70, -900, (252, 252, 250, 255), INK, 4)
+    o.rect(-70, -1090, 70, -1050, (220, 50, 50, 255), INK, 4)
+    for i in range(1, 5):
+        o.line([(-60, -1050 + i * 30), (60, -1050 + i * 30)], (190, 190, 190, 255), 2)
+    for j in range(1, 6):
+        o.line([(-70 + j * 23, -1045), (-70 + j * 23, -905)], (190, 190, 190, 255), 2)
+    _oval(o, 10, -1000, 40, -970, None, (220, 50, 50, 255), 4)            # a date circled
+
+
+def d_photo_frame(o, st, t, ob):
+    o.rect(-100, -1150, 100, -930, WOOD_D, INK, 5)
+    o.rect(-84, -1134, 84, -946, (190, 220, 236, 255), None)
+    for x, r in ((-40, 22), (0, 26), (40, 20)):                              # a family smiling
+        _oval(o, x - r, -1060 - r, x + r, -1060 + r, (222, 176, 134, 255), INK, 3)
+        o.rect(x - r, -1036, x + r, -950, (120, 150, 200, 255), INK, 3)
+
+
+def _string(o, y, color_fn, n=16, sag=60, hw=520, kind="dot"):
+    pts = [(-hw + 2 * hw * i / 30.0, y + sag * math.sin(math.pi * i / 30.0)) for i in range(31)]
+    o.line(pts, (60, 60, 60, 255), 3)
+    for i in range(n):
+        u = (i + 0.5) / n
+        x, yy = -hw + 2 * hw * u, y + sag * math.sin(math.pi * u)
+        c = color_fn(i)
+        if kind == "flag":
+            o.poly([(x - 26, yy), (x + 26, yy), (x, yy + 52)], c, INK, 2)
+        elif kind == "bead":
+            for k in range(3):
+                _oval(o, x - 12, yy + k * 22 - 12, x + 12, yy + k * 22 + 12, c if k % 2 == 0 else (250, 200, 60, 255), None)
+        else:
+            _oval(o, x - 10, yy + 4, x + 10, yy + 24, c, INK, 2)
+
+
+def d_fairy_lights(o, st, t, ob):
+    tw = lambda i: PARTY[(i + int(t * 3)) % len(PARTY)] if ob.get("twinkle", True) else PARTY[i % len(PARTY)]  # noqa
+    _string(o, -1400, tw, n=18, sag=50)
+
+
+def d_bunting(o, st, t, ob):
+    cols = TIRANGA if ob.get("style") == "tiranga" else PARTY
+    _string(o, -1460, lambda i: cols[i % len(cols)], n=14, sag=70, kind="flag")
+
+
+def d_garland(o, st, t, ob):
+    _string(o, -1520, lambda i: (246, 140, 30, 255), n=12, sag=80, kind="bead")
+
+
+def d_balloons(o, st, t, ob):
+    for i, (x, y) in enumerate(((-50, -1250), (30, -1280), (-5, -1200))):
+        c = PARTY[(i + int(ob.get("x", 0))) % len(PARTY)]
+        o.line([(x, y + 50), (0, -1000)], (90, 90, 90, 255), 2)
+        _oval(o, x - 42, y - 50, x + 42, y + 50, c, INK, 3)
+        _oval(o, x - 20, y - 34, x - 6, y - 14, (255, 255, 255, 120), None)
+
+
+def d_banner(o, st, t, ob):
+    c = _col(ob, (240, 80, 120, 255))
+    o.line([(-380, -1320), (-360, -1290)], (60, 60, 60, 255), 3)
+    o.line([(380, -1320), (360, -1290)], (60, 60, 60, 255), 3)
+    o.rect(-360, -1300, 360, -1180, c, INK, 5)
+    o.text(0, -1240, str(ob.get("text") or "")[:24], 58, (255, 255, 255, 255))
+
+
+def d_ac(o, st, t, ob):
+    o.rrect(-160, -1330, 160, -1220, 22, (246, 246, 244, 255), INK, 4)
+    o.line([(-130, -1240), (130, -1240)], (170, 170, 170, 255), 4)
+    _oval(o, 120, -1310, 134, -1296, (60, 200, 90, 255), None)
+
+
+def d_wall_shelf(o, st, t, ob):
+    o.rect(-160, -900, 160, -880, WOOD_D, INK, 4)
+    cols = ((200, 70, 64, 255), (70, 110, 180, 255), (230, 190, 70, 255), (90, 160, 100, 255))
+    x = -150
+    for i in range(7):
+        h = 70 + (i * 23) % 40
+        o.rect(x, -900 - h, x + 26, -900, cols[i % 4], INK, 2)
+        x += 30
+    o.rrect(70, -980, 140, -900, 10, (236, 230, 210, 255), INK, 3)        # a jar
+
+
+def d_flag_stand(o, st, t, ob):
+    o.shadow(60, 12)
+    o.rect(-40, -40, 40, 0, (120, 120, 126, 255), INK, 4)
+    o.line([(0, -40), (0, -700)], (150, 150, 156, 255), 8)
+    wave = 8 * math.sin(t * 4)
+    for k, c in enumerate(TIRANGA):
+        o.poly([(4, -690 + k * 50), (210, -690 + k * 50 + wave), (210, -640 + k * 50 + wave), (4, -640 + k * 50)],
+               c, INK, 2)
+    _oval(o, 95, -625 + wave, 125, -595 + wave, None, (0, 0, 128, 255), 3)   # the chakra
+
+
+def d_umbrella(o, st, t, ob):
+    c = _col(ob, (60, 120, 220, 255))
+    o.shadow(100, 12)
+    o.poly([(-110, -40), (-80, -200), (0, -250), (80, -200), (110, -40)], c, INK, 4)
+    for x in (-55, 0, 55):
+        o.line([(0, -250), (x, -40)], INK, 2)
+    o.line([(0, -40), (20, 0)], (90, 70, 50, 255), 6)
+
+
+def d_puddle(o, st, t, ob):
+    _oval(o, -210, -30, 210, 24, (110, 150, 200, 170), None)
+    r = 40 + (t * 60) % 120
+    _oval(o, -r, -12 - r * 0.12, r, -12 + r * 0.12, None, (220, 236, 250, 200), 2)
+
+
 BARS, BARS_L, CORRIDOR = (150, 152, 160, 255), (200, 202, 210, 255), (64, 66, 72, 255)
 
 
@@ -624,7 +829,8 @@ class Sets:
         hw, h_up, h_dn, _wall, _seat, _light = SPEC[typ]
         sc = float(ob.get("scale", 1.0))
         x, y, dirn, dist = self.pos(ob["id"], t)
-        animated = typ in ("clock", "fan", "tv", "tree", "bush", "phone", "chulha", "drip", "washing_machine")
+        animated = typ in ("clock", "fan", "tv", "tree", "bush", "phone", "chulha", "drip", "washing_machine",
+                           "fairy_lights", "flag_stand", "puddle")
         key = (ob["id"], st) if not animated else None
         if key and key in self._cache:
             return self._cache[key]

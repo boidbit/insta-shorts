@@ -357,6 +357,8 @@ class Renderer(Output):
         # the studio place still brings its foreground props and moving clouds / traffic to an auto 2.5D set
         bg_spec = self.plan.background if (not preset or self._auto25) else \
             {"type": "plain", "foreground": [], "ambient": False}
+        if getattr(self.plan, "camera", "") != "cine" and isinstance(bg_spec, dict):
+            bg_spec = dict(bg_spec, classic=True)          # CAMERA: classic keeps the old drawings
         self.bg = Background(bg_spec, int(self.W * ang["zoom"] + 0.5), int(self.H * ang["zoom"] + 0.5))
         self.bd25 = self._backdrop25(preset, scene) if preset else None
         self._view25_t, self._view25_v = None, None

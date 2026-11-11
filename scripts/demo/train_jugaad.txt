@@ -1,0 +1,15 @@
+HOOK: Train me "uncle ka jugaad" 🚆
+CAST: U = landlord, B = college_boy, T = tt
+SCENE: train pahad
+U (sly, point): Beta, tum upar wali berth pe so jao | बेटा, तुम ऊपर वाली बर्थ पे सो जाओ
+B (confused): Par uncle, upar wali to aapki hai | पर अंकल, ऊपर वाली तो आपकी है
+T -> enter right fast
+T (angry, point): Ticket dikhao dono! | टिकट दिखाओ दोनों!
+U (nervous): Sahab, iska ticket mere paas hai | साहब, इसका टिकट मेरे पास है
+B (shock): Mera ticket? | मेरा टिकट?
+U (smug): Haan, aur fine bhi yahi dega | हाँ, और फ़ाइन भी यही देगा
+B -> facepalm
+CTA: Tag karo apne jugaadu uncle ko 😂
+CTA_STYLE: sticker
+HANDLE: desitoons
+COVER: UNCLE KA JUGAAD 🚆

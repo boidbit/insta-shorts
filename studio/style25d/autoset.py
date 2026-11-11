@@ -128,13 +128,13 @@ class LayeredG:
 @contextlib.contextmanager
 def layered_canvas():
     """While inside, the place functions draw on LayeredG (they look the name G up when they run)."""
-    from .. import backgrounds, locations
-    old = backgrounds.G, locations.G
-    backgrounds.G = locations.G = LayeredG
+    from .. import backgrounds, locations, places_plus
+    old = backgrounds.G, locations.G, places_plus.G
+    backgrounds.G = locations.G = places_plus.G = LayeredG
     try:
         yield
     finally:
-        backgrounds.G, locations.G = old
+        backgrounds.G, locations.G, places_plus.G = old
 
 
 def place_function(place):
@@ -144,7 +144,8 @@ def place_function(place):
     builtin = {"kitchen": backgrounds.kitchen, "room": backgrounds.room, "street": backgrounds.street,
                "school": backgrounds.school, "market": backgrounds.market, "office": backgrounds.office,
                "bus_stop": backgrounds.bus_stop}
-    return builtin.get(place) or LOCATIONS.get(place)
+    from ..places_plus import RICH
+    return RICH.get(place) or builtin.get(place) or LOCATIONS.get(place)
 
 
 # ------------------------------------------------------------------ finishing touches
