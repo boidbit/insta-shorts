@@ -20,7 +20,7 @@ from PIL import Image, ImageChops, ImageOps
 
 from . import actions, audio, gemini_music, objects, rides, styles, ui
 from .backgrounds import Background
-from .characters import LA, UA, DEFAULT_POSE, build_character, render_ops, skeleton
+from .characters import LA, SH, TH, UA, DEFAULT_POSE, build_character, render_ops, skeleton
 from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_at, camera_roll, camera_whip,
                     compile_music, compile_scene,
                     prepare_voice, split_scenes, static_overlays)
@@ -598,6 +598,8 @@ class Renderer(Output):
         else:
             p_ = dict(DEFAULT_POSE)
             p_.update({kk: vv for kk, vv in pose.items() if vv is not None})
+            lk = getattr(c, "leg_k", 1.0)
+            p_["th_k"], p_["sh_k"] = p_.get("th_k", 1.0) * lk, p_.get("sh_k", 1.0) * lk
             fy = skeleton(p_)["fy"]                 # hips sit this high above the feet
             pose["lift"] = pose.get("lift", 0.0) + fy - (seat / k + 14.0)
         return pose
@@ -675,6 +677,18 @@ class Renderer(Output):
             action, a_t0 = ("run" if len(mv) > 6 and mv[6] else "walk"), 0.0
         if mv and st["facing"] == "front" and abs(mv[4] - mv[2]) > 1:
             st["facing"] = "right" if mv[4] > mv[2] else "left"          # face the way you walk
+        if self._natural() and not c.spec.get("kind"):
+            if st["facing"] in ("left", "right"):  # turning round goes through the front, it does not flip
+                before = self._facing_at(c, t - self.TURN)
+                if before in ("left", "right") and before != st["facing"]:
+                    st["facing"] = "front"
+            if action == "sit" and st.get("on") and st["facing"] == "front":
+                # seen straight from the front a seated body looks like a standing one (the thighs point at the
+                # camera): sit turned to the one you talk to, or alone toward the middle of the picture
+                other = self._partner(c, t, x)
+                if other is None:
+                    other = LW / 2.0 if abs(x - LW / 2.0) > 40 else x + 1.0
+                st["facing"] = "right" if other > x else "left"
         rf = c.ride_frame(t)
         listen = None
         if (not st["talking"] and not mv and not rf and action in ("idle", "none", "stand") and not st.get("on")
@@ -686,6 +700,39 @@ class Renderer(Output):
         return dict(st=st, x=x, y=y, action=action, a_t0=a_t0, mv=mv, rf=rf, listen=listen,
                     dr=self._act_dir(c, st, mv, x, t))
 
+    TURN = 0.12           # seconds a character spends facing the front while turning round
+
+    def _natural(self):
+        """The human-like motion (planted feet, turning, weight, drag) is part of the new camera's look;
+        `CAMERA: classic` keeps the old motion exactly."""
+        return getattr(self.plan, "camera", "") == "cine"
+
+    def _facing_at(self, c, t):
+        st = c.state_at(max(0.0, t))
+        mv = next((m for m in c.moves if m[0] <= t < m[1]), None)
+        if mv and st["facing"] == "front" and abs(mv[4] - mv[2]) > 1:
+            return "right" if mv[4] > mv[2] else "left"
+        return st["facing"]
+
+    def _partner(self, c, t, x):
+        """x of the nearest other person in the shot (to turn toward), or None."""
+        xs = [o.draw_pos(t)[0] for o in self.plan.chars.values()
+              if o is not c and not o.spec.get("hidden") and o.state_at(t).get("visible", True)
+              and -100 <= o.draw_pos(t)[0] <= LW + 100]
+        return min(xs, key=lambda ox: abs(ox - x)) if xs else None
+
+    def _travel(self, c, t):
+        """Logical px walked so far (all moves up to t): the legs step with the distance, so feet do not slide."""
+        d = 0.0
+        for m in c.moves:
+            if m[0] >= t:
+                break
+            if m[1] - m[0] < 0.02:
+                continue                            # (a snap onto a seat is not a walk)
+            x1, y1 = c.pos_at(min(t, m[1]))
+            d += math.hypot(x1 - m[2], y1 - m[3])
+        return d
+
     @staticmethod
     def _key(E):
         return (E["action"], round(E["a_t0"], 4), E["dr"], E["st"].get("on"), bool(E["rf"]))
@@ -694,15 +741,116 @@ class Renderer(Output):
         st, x, action, a_t0 = E["st"], E["x"], E["action"], E["a_t0"]
         opts = dict(st["opts"], _x=x, _bpm=self.plan.bpm, _prop=st["prop"], _dir=E["dr"], _facing=st["facing"],
                     _expr=st["expression"], _amp=self._amp(st["talking"], t) if st["talking"] else 0.0)
-        pose = actions.pose_for(action, t - a_t0 if action not in ("walk", "run") else t, st["speed"],
-                                st["intensity"], c.phase, opts)
+        at = t - a_t0 if action not in ("walk", "run") else t
+        natural = self._natural() and not c.spec.get("kind")
+        crouch = 0.0
+        if natural and action in self.LEAPS and t - a_t0 < self.CROUCH:     # bend the knees before a jump
+            crouch = math.sin(math.pi * (t - a_t0) / self.CROUCH)
+            at = 0.0
+        elif natural and action in self.LEAPS:
+            at = t - a_t0 - self.CROUCH
+        pose = actions.pose_for(action, at, st["speed"], st["intensity"], c.phase, opts)
         if E["rf"]:                                 # on a vehicle: the seat decides the pose
             pose = dict(E["rf"]["pose"])
         elif st.get("on"):
             pose = self._seated(c, t, st, action, pose, opts)
         elif E["listen"]:
             self._react(c, t, E, pose)
+        if natural and E["mv"] and action in ("walk", "run") and not E["rf"] and not st.get("on"):
+            self._planted_legs(c, t, E, pose, action)
+        if natural and not E["rf"] and not st.get("on"):
+            self._weight(c, t, E, pose, crouch)
         return pose
+
+    # foot lock: (rig px the body travels per gait cycle = two steps, share of the cycle a foot is on the ground,
+    # how far below the hip the feet are: knees a little bent so the stride can reach, step height)
+    GAIT = {"walk": (440.0, 0.5, 0.92, 34.0), "run": (600.0, 0.38, 0.86, 70.0)}
+
+    def _planted_legs(self, c, t, E, pose, action):
+        """Legs by foot lock (inverse kinematics): a foot on the ground stays exactly where it was put down while
+        the body passes over it, the other one lifts and swings forward. The steps follow the distance actually
+        travelled, so the feet never slide (the old walk cycle ran on the clock and moonwalked)."""
+        stride, duty, low, step_h = self.GAIT[action]
+        lk = getattr(c, "leg_k", 1.0)                # tall / short legs take longer / shorter steps
+        stride, step_h = stride * lk, step_h * lk
+        k = max(0.05, c.draw_scale(t))
+        mv = E["mv"]
+        dirn = 1.0 if mv[4] >= mv[2] else -1.0
+        phi = self._travel(c, t) / (stride * k)                    # gait cycles done
+        th, sh = TH * pose.get("th_k", 1.0) * lk, SH * pose.get("sh_k", 1.0) * lk
+        reach = (th + sh) * low
+        bob = 0.0
+        for side, hip_x, off in (("l", -32.0, 0.0), ("r", 32.0, 0.5)):
+            ph = (phi + off) % 1.0
+            if ph < duty:                               # on the ground: slides back under the hip at body speed
+                rel = (0.5 - ph / duty) * duty * stride
+                fy = reach
+                bob = max(bob, math.sin(math.pi * ph / duty))
+            else:                                       # in the air: swings forward and lifts
+                u = (ph - duty) / (1.0 - duty)
+                e = u * u * (3 - 2 * u)
+                rel = (-0.5 + e) * duty * stride
+                fy = reach - step_h * math.sin(math.pi * u)
+            fx = hip_x + rel * dirn
+            a1, a2 = self._leg_ik(hip_x, fx, fy, th, sh, dirn)
+            pose[side + "l1"], pose[side + "l2"] = a1, a2
+        swing = math.cos(2 * math.pi * phi)            # arms against the legs
+        if action == "run":
+            pose["la1"], pose["ra1"] = -10 - 34 * dirn * swing, 10 + 34 * dirn * swing
+            pose["la2"], pose["ra2"] = pose["la1"] + 95 * dirn, pose["ra1"] + 95 * dirn
+            pose["lift"] = -16 * abs(math.sin(2 * math.pi * phi))
+        else:
+            pose["la1"], pose["ra1"] = -14 - 16 * dirn * swing, 14 + 16 * dirn * swing
+            pose["la2"], pose["ra2"] = pose["la1"] + 10 * dirn, pose["ra1"] + 10 * dirn
+            pose["lift"] = -5 * bob                 # highest over the foot, lowest when both feet are down
+        pose["tilt"] = 1.5 * dirn * (2.5 if action == "run" else 1.0)
+
+    @staticmethod
+    def _leg_ik(hx, fx, fy, th, sh, dirn):
+        """Thigh and shin angles (0 = straight down, +90 = screen right) that put the foot at (fx, fy) from a hip
+        at (hx, 0); the knee bends forward, the way the body goes."""
+        dx, dy = fx - hx, fy
+        d = max(1.0, min(math.hypot(dx, dy), th + sh - 0.5))
+        base = math.atan2(dx, dy)
+        cos_a = (th * th + d * d - sh * sh) / (2 * th * d)
+        knee = base + math.acos(max(-1.0, min(1.0, cos_a))) * dirn
+        kx, ky = hx + th * math.sin(knee), th * math.cos(knee)
+        return math.degrees(knee), math.degrees(math.atan2(fx - kx, fy - ky))
+    LEAPS = ("jump", "jump_joy", "celebrate", "jumping_jacks")
+    CROUCH = 0.2                                    # seconds of bending the knees before taking off
+
+    @staticmethod
+    def _apply_crouch(pose):
+        c = pose.pop("_crouch", 0.0)
+        if not c:
+            return pose
+        pose["ll1"] = pose.get("ll1", -7.0) - 30 * c            # knees out, feet stay under the hips: the body sinks
+        pose["ll2"] = pose.get("ll2", -2.0) + 26 * c
+        pose["rl1"] = pose.get("rl1", 7.0) + 30 * c
+        pose["rl2"] = pose.get("rl2", 2.0) - 26 * c
+        pose["la1"] = pose.get("la1", -14.0) - 18 * c           # arms swing back, ready to throw up
+        pose["ra1"] = pose.get("ra1", 14.0) + 18 * c
+        return pose
+
+    def _weight(self, c, t, E, pose, crouch):
+        """Human weight: lean into a walk and settle back when stopping, bend before a jump, shift the weight
+        from foot to foot while standing (never perfectly regular), and let the kurta hem / braid trail."""
+        def vx(tt):
+            return (c.draw_pos(tt + 0.04)[0] - c.draw_pos(max(0.0, tt - 0.04))[0]) / 0.08
+        v = vx(t)
+        a = (vx(t + 0.06) - vx(max(0.0, t - 0.06))) / 0.12
+        if abs(v) > 1 or abs(a) > 30:               # moving: lean into it, a little more when speeding up
+            pose["tilt"] = pose.get("tilt", 0.0) + clamp(v * 0.0055 + a * 0.0012, -6.0, 6.0)
+        if crouch:                                  # (applied after the blend from the last action: _crouch)
+            pose["_crouch"] = crouch
+        if E["action"] in ("idle", "talk", "none", "stand") and not E["mv"]:   # weight from foot to foot
+            ph = c.phase
+            n1 = 0.6 * math.sin(0.37 * t + ph) + 0.4 * math.sin(0.83 * t + 2.1 * ph)
+            n2 = 0.5 * math.sin(0.29 * t + 1.7 * ph) + 0.5 * math.sin(0.61 * t + 0.4)
+            pose["shift"] = pose.get("shift", 0.0) + 5.0 * n1
+            pose["tilt"] = pose.get("tilt", 0.0) + 0.9 * n1
+            pose["head_tilt"] = pose.get("head_tilt", 0.0) + 1.8 * n2
+        pose["drag"] = clamp(-v * 0.03, -22.0, 22.0)  # cloth trails behind the body
 
     def _react(self, c, t, E, pose):
         """A listener reacts to whoever is talking: nods, leans back from anger, tilts the head at questions."""
@@ -727,7 +875,7 @@ class Renderer(Output):
             pose["lift"] = pose.get("lift", 0.0) - 3 * abs(math.sin(2 * math.pi * 2.6 * t)) * ramp
 
     _ANGLES = ("la1", "la2", "ra1", "ra2", "ll1", "ll2", "rl1", "rl2", "tilt", "head_tilt")
-    _NUM_DEFAULTS = {"dx": 0.0, "head_dx": 0.0, "head_dy": 0.0, "th_k": 1.0, "sh_k": 1.0, "arm_k": 1.0,
+    _NUM_DEFAULTS = {"dx": 0.0, "drag": 0.0, "head_dx": 0.0, "head_dy": 0.0, "th_k": 1.0, "sh_k": 1.0, "arm_k": 1.0,
                      "la_k1": 1.0, "la_k2": 1.0, "ra_k1": 1.0, "ra_k2": 1.0,
                      "lift": 0.0, "shift": 0.0, "tilt": 0.0, "head_tilt": 0.0, "look_x": 0.0, "look_y": 0.0}
 
@@ -893,6 +1041,7 @@ class Renderer(Output):
             pose = self._build_pose(c, t, E)
             if not rf and not c.spec.get("kind"):
                 pose = self._blend_from_previous(c, t, E, pose)     # one action flows into the next
+            pose = self._apply_crouch(pose)
             singing = action in actions.SING_ACTIONS and not st["talking"]
             self._smooth_gaze(c, t, E, pose)        # eyes and face glide to a new target; a new face hides in a blink
             mouth_open = 0.0

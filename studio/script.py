@@ -157,6 +157,11 @@ FEMALE_LOOKS = {"girl", "college_girl", "aunty", "dadi", "kid_girl", "office_gir
                 "saas", "bahu"}
 PITCHES = ["+0Hz", "+14Hz", "-8Hz", "+24Hz", "-14Hz"]
 BUILDS = ("slim", "normal", "chubby")
+BUILD_WORDS = {"mota": "chubby", "moti": "chubby", "fat": "chubby", "patla": "slim", "patli": "slim", "thin": "slim"}
+HEIGHT_WORDS = {"tall": "tall", "lamba": "tall", "lambi": "tall", "nata": "short", "nati": "short"}
+# body types handed out so that the people of one video do not all have the same height and weight
+BODIES = (("normal", "normal"), ("tall", "slim"), ("short", "chubby"), ("tall", "normal"), ("normal", "slim"),
+          ("short", "normal"), ("normal", "chubby"))
 GENDER_WORDS = ("female", "woman", "ladki", "aurat", "male", "man", "ladka", "aadmi")
 MOVE_WORDS = ("enter", "exit", "walk", "left", "right", "center", "up", "down", "up_left", "up_right", "fast",
               "pump", "swing", "cheer", "disco", "shake", "drop", "noprop", "interrupt", "beech_me",
@@ -169,6 +174,7 @@ def vocab():
         "places": sorted(BACKGROUNDS),
         "looks": sorted(LOOKS), "roles": sorted(ROLE_LOOKS),
         "extras": sorted(set(ACCESSORIES) | set(HAIR_STYLES) | set(OUTFITS) | set(SKIN_TONES) | set(BUILDS)
+                         | set(BUILD_WORDS) | set(HEIGHT_WORDS)
                          | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS) | set(FACE_WORDS)),
         "expressions": sorted(EXPRESSIONS), "actions": sorted(actions.ACTIONS),
         "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS), "fx": sorted(FX),
@@ -223,6 +229,10 @@ def cast_spec(words, index, unknown=None):
             spec["skin"] = w
         elif w in ("slim", "normal", "chubby"):
             spec["build"] = w
+        elif w in BUILD_WORDS:                         # mota / patla / fat / thin
+            spec["build"] = BUILD_WORDS[w]
+        elif w in HEIGHT_WORDS:                        # tall / lamba / nata
+            spec["height"] = HEIGHT_WORDS[w]
         elif w in FACE_WORDS:                          # round_face, big_eyes, button_nose, thick_brows...
             spec[FACE_WORDS[w][0]] = FACE_WORDS[w][1]
         elif w in ("female", "woman", "ladki", "aurat"):
@@ -258,6 +268,39 @@ MALE_HAIR = ("short", "side_part", "curly", "spiky", "balding")
 FEMALE_HAIR = ("ponytail", "bun", "long", "braid")
 SKIN_ORDER = ("wheatish", "brown", "fair", "dark")
 SHIRT_ORDER = ("blue", "mustard", "red", "teal", "purple", "orange", "green", "maroon")
+
+
+def _classic_env():
+    from .scene import camera_style
+    return camera_style({}) == "classic"
+
+
+def vary_bodies(cast):
+    """People are not all the same height and weight: everybody the script left open gets a body type (tall and
+    slim, short and chubby...), each one different from the others in the video. A look that has its own build
+    (uncle chubby, dada slim) keeps it and only gets a height; children and the old keep their size."""
+    used = []
+    for name, spec in cast.items():
+        if spec.get("hidden") or spec.get("kind"):
+            continue
+        base = LOOKS.get(spec.get("look", "boy"), {})
+        fixed_build = "build" in spec or "build" in base
+        fixed_height = "height" in spec or float(base.get("scale", 1.0)) != 1.0
+        if fixed_build and fixed_height:
+            continue
+        start = zlib.crc32(name.encode("utf-8")) % len(BODIES)
+        for i in range(len(BODIES)):
+            h, b = BODIES[(start + i) % len(BODIES)]
+            hh = spec.get("height", "normal" if fixed_height else h)
+            bb = spec.get("build", base.get("build", b))
+            if (hh, bb) not in used:
+                break
+        used.append((hh, bb))
+        if not fixed_height and hh != "normal":
+            spec["height"] = hh
+        if not fixed_build and bb != "normal":
+            spec["build"] = bb
+    return cast
 
 
 def vary_cast(cast):
@@ -1049,6 +1092,8 @@ def parse_script(text):
         out_scenes.append(item)
 
     vary_cast(cast)
+    if not (meta.get("CAMERA", "").strip().lower() in ("classic", "old", "purana") or _classic_env()):
+        vary_bodies(cast)                           # (`CAMERA: classic`: everybody as before)
     hook = meta.get("HOOK") or ""
     if not hook:
         warnings.append("no HOOK: line - the first second has no hook text")

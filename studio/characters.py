@@ -65,6 +65,8 @@ HAIR_COLORS = {
 HAIR_STYLES = ("short", "side_part", "spiky", "curly", "balding", "bald", "long", "braid", "bun", "ponytail")
 OUTFITS = ("tshirt", "shirt", "kurta", "salwar", "saree", "uniform", "blazer", "vest", "kurta_jacket", "stripes")
 BUILDS = {"slim": (0.9, 0.0), "normal": (1.0, 6.0), "chubby": (1.2, 44.0)}
+# height: (whole-body scale, extra leg length). A tall person is mostly longer legs, the head stays readable.
+HEIGHTS = {"tall": (1.05, 1.13), "normal": (1.0, 1.0), "short": (0.96, 0.9)}
 # Face variety: every character on screen gets its own face (assign_faces), or the script picks one.
 FACE_SHAPES = {"oval": (1.0, 1.0), "round": (1.08, 0.94), "long": (0.9, 1.08), "square": (1.04, 0.98)}
 EYE_STYLES = ("dot", "big", "small")
@@ -316,6 +318,10 @@ def resolve_spec(spec):
     """Character spec with its `look` preset filled in (spec keys win)."""
     out = dict(LOOKS.get(spec.get("look"), {}))
     out.update({k: v for k, v in spec.items() if v is not None})
+    if out.get("height") in HEIGHTS:                # tall / short: a bigger / smaller body, longer / shorter legs
+        sc, lk = HEIGHTS[out["height"]]
+        out["scale"] = float(out.get("scale", 1.0)) * sc
+        out["leg_k"] = lk
     acc = list(out.get("accessories", []))
     if "tuft" in acc and "hair" not in spec:
         out["hair"] = "spiky"
@@ -648,7 +654,16 @@ def _draw_feet(S, sk, shoes, skin):
                 S.line([(c[0] - 26, c[1] + 6), (c[0] + 26, c[1] + 6)], 4, (190, 190, 190))
 
 
-def _draw_outfit(S, o, sk, cols, build, back=False):
+def _skew(pts, y0, y1, drag):
+    """Cloth below y0 trails sideways by up to `drag` at y1 (a kurta hem / saree swinging behind a walk)."""
+    if not drag:
+        return pts
+    return [(x + drag * max(0.0, min(1.0, (y - y0) / max(1.0, y1 - y0))), y) for x, y in pts]
+
+
+def _draw_outfit(S, o, sk, cols, build, back=False, drag=0.0, lap=False):
+    """lap: sitting, seen from the front (the thighs point at the camera): a long kurta / saree lies on the lap
+    and the knees show, otherwise the person looks as if standing."""
     outfit = o.get("outfit", "tshirt")
     main, accent, skin = cols["main"], cols["accent"], cols["skin"]
     bw, belly = BUILDS.get(build, BUILDS["normal"])
@@ -660,11 +675,18 @@ def _draw_outfit(S, o, sk, cols, build, back=False):
         xl = min(sk["kneeL"][0], sk["footL"][0]) - 26
         xr = max(sk["kneeR"][0], sk["footR"][0]) + 26
         waist = -120
+        if lap:                                     # sitting: the saree spreads over the knees
+            xl, xr = min(xl, sk["kneeL"][0] - 40), max(xr, sk["kneeR"][0] + 40)
         skirt = [(-ww - belly * 0.6, waist)] + bezier((-ww - belly, waist + 60), (xl + 4, hem_y - 120), (xl, hem_y), 8) \
             + [(xr, hem_y)] + bezier((xr, hem_y), (xr - 4, hem_y - 120), (ww + belly, waist + 60), 8) \
             + [(ww + belly * 0.6, waist)]
+        skirt = _skew(skirt, waist + 60, hem_y, drag)
         S.poly(skirt, main, INK, OUTLINE)
-        S.line([(xl + 6, hem_y - 12), (xr - 6, hem_y - 12)], 12, accent)
+        S.line([(xl + 6 + drag, hem_y - 12), (xr - 6 + drag, hem_y - 12)], 12, accent)
+        if lap:                                     # the lap: a fold over the knees
+            ky = max(sk["kneeL"][1], sk["kneeR"][1])
+            S.line(bezier((sk["kneeL"][0] - 34, ky - 4), (0, ky + 18), (sk["kneeR"][0] + 34, ky - 4), 10), 5,
+                   shade(main, 0.7))
         # pleats
         for dx in (-14, 0, 14):
             S.line([(dx, waist + 40), (dx * 1.6, hem_y - 24)], 3, shade(main, 0.78))
@@ -685,13 +707,22 @@ def _draw_outfit(S, o, sk, cols, build, back=False):
     hem = {"tshirt": 18, "shirt": 18, "uniform": 18, "vest": 10, "blazer": 30, "stripes": 18,
            "kurta": 130, "kurta_jacket": 130, "salwar": 120}.get(outfit, 18)
     hw = ww + (16 if outfit in ("kurta", "salwar", "kurta_jacket") else 4)
+    long_top = outfit in ("kurta", "salwar", "kurta_jacket")
+    if lap and long_top:                            # sitting: the kurta ends on the knees, wide over the lap
+        hem = max(sk["kneeL"][1], sk["kneeR"][1]) + 16
+        hw = max(hw, max(abs(sk["kneeL"][0]), abs(sk["kneeR"][0])) + 30)
 
     if outfit == "salwar":           # dupatta tails hang behind the shoulders
         for sgn in (-1, 1):
             S.tube([(sgn * (sw - 6), top + 10), (sgn * (sw + 14), -40)], 26, accent)
 
     body = _torso_pts(top, hem, sw if outfit != "vest" else sw - 10, ww, hw, belly)
+    if long_top:
+        body = _skew(body, 0.0, hem, drag)
     S.poly(body, main, INK, OUTLINE)
+    if lap and long_top and not back:               # knees under the cloth
+        for kx in (sk["kneeL"][0], sk["kneeR"][0]):
+            S.poly(ellipse_pts(kx, hem - 10, 30, 14, 12, 0, 180), shade(main, 0.9), INK, 4)
     if outfit == "stripes":         # prisoner's stripes: white bands across the shirt
         for y in range(int(top + 34), int(hem - 8), 44):
             half = _half_width(top, hem, sw, ww, hw, belly, y) - 5
@@ -906,10 +937,10 @@ def _head_cap(S, HH, kind, o):
         S.line([HH(q) for q in [(-10, -HEAD_RY - 14), (10, -HEAD_RY - 14)]], 7, (210, 40, 50))
 
 
-def _braid(S, HH, hc, accent):
-    for i in range(8):
-        S.poly(closed_ellipse(*HH((66 + (i % 2) * 6 - i * 1.5, 50 + i * 30)), 16, 20, 18), hc, INK, 4)
-    S.dot(HH((60, 50 + 8 * 30)), 10, accent, INK, 4)
+def _braid(S, HH, hc, accent, drag=0.0):
+    for i in range(8):                              # (drag: the braid swings behind a walk)
+        S.poly(closed_ellipse(*HH((66 + (i % 2) * 6 - i * 1.5 + drag * i / 8.0, 50 + i * 30)), 16, 20, 18), hc, INK, 4)
+    S.dot(HH((60 + drag, 50 + 8 * 30)), 10, accent, INK, 4)
 
 
 # ---------------------------------------------------------------- the character
@@ -919,6 +950,9 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     o = resolve_spec(spec)
     p = dict(DEFAULT_POSE)
     p.update({kk: vv for kk, vv in pose.items() if vv is not None or kk == "finger"})
+    lk = float(o.get("leg_k", 1.0))
+    if lk != 1.0:                                   # tall / short legs
+        p["th_k"], p["sh_k"] = p.get("th_k", 1.0) * lk, p.get("sh_k", 1.0) * lk
     sk = skeleton(p)
     S = Sketch(x0, ground_y, k, p["tilt"], p["shift"], p["lift"], sk["fy"], p.get("dx", 0.0))
     if not pose.get("arms_front"):          # a hand in front of the face: draw the arms over the head
@@ -986,9 +1020,9 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
 
     # ---- neck + torso ----
     S.tube([(0, -TORSO_H + 20), HH((0, HEAD_RY * 0.55))], 30, skin)
-    _draw_outfit(S, o, sk, cols, build, back=back)
+    _draw_outfit(S, o, sk, cols, build, back=back, drag=p.get("drag", 0.0), lap=p.get("th_k", 1.0) < 0.6)
     if hair == "braid" and not covered and not back:
-        _braid(S, HH, hcol, cols["accent"])
+        _braid(S, HH, hcol, cols["accent"], p.get("drag", 0.0))
 
     # ---- arms (normally behind the head; a pose can bring them in front, e.g. the naagin hood) ----
     def draw_arms():

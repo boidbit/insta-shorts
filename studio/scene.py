@@ -259,7 +259,9 @@ class Char:
         self.spec = spec
         self.x = x
         self.y = ground_y
-        self.scale = float(resolve_spec(spec).get("scale", 1.0))
+        rs = resolve_spec(spec)
+        self.scale = float(rs.get("scale", 1.0))
+        self.leg_k = float(rs.get("leg_k", 1.0))
         self.phase = float(spec.get("phase", index * 0.9))
         self.events = []        # sorted by t
         self.moves = []         # (t0, t1, x0, y0, x1, y1[, run[, ease]]); ease: "out" (lands fast), "back" (overshoots)
@@ -1269,6 +1271,9 @@ def apply_options(scene, dialogue=None, hook=None):
 VIDEO_KEYS = ("scenes", "music", "caption", "overlays", "post", "hook", "vars", "name", "about", "transition")
 
 
+TITLE_LEAD = 1.1            # cine: seconds of the full-screen "Agle din..." card before a titled shot
+
+
 def split_scenes(scene):
     """A multi-scene file ({"scenes": [...]}) -> list of ordinary single-scene dicts.
 
@@ -1299,7 +1304,12 @@ def split_scenes(scene):
         sub["characters"] = chars
         if shot_no and "angle" not in sub:
             sub["angle"] = shot_no
-        if sc.get("title"):
+        if sc.get("title") and camera_style(sub["meta"]) == "cine":
+            # its own short full-screen card before the shot (over the shot it covered the first speech bubble)
+            sub["lead_in"] = max(float(sub.get("lead_in", 0.0)), TITLE_LEAD)
+            sub["overlays"] = list(sub.get("overlays", [])) + [
+                {"type": "timecard", "text": sc["title"], "from": 0.0, "to": TITLE_LEAD, "color": [40, 40, 48]}]
+        elif sc.get("title"):
             sub["overlays"] = list(sub.get("overlays", [])) + [
                 {"text": sc["title"], "style": "card", "pos": "upper", "from": 0.0, "to": 1.4, "color": [40, 40, 48]}]
         out.append(sub)

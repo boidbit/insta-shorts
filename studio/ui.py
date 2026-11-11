@@ -134,12 +134,14 @@ def counter(o, lt, s, dur):
 def timecard(o, lt, s, size):
     W, H = size
     im = Image.new("RGBA", (W, H), tuple(o.get("color", (60, 120, 210))) + (255,))
-    d = ImageDraw.Draw(im, "RGBA")                         # blend the rays, don't punch holes
+    rays = Image.new("RGBA", (W, H), (255, 255, 255, 0))  # (drawn on their own layer: on the card itself the
+    d = ImageDraw.Draw(rays)                               # translucent rays punched see-through holes)
     for i in range(14):                                    # sunburst
         a0 = i * 2 * math.pi / 14 + lt * 0.4
         pts = [(W / 2, H / 2), (W / 2 + 2000 * math.cos(a0), H / 2 + 2000 * math.sin(a0)),
                (W / 2 + 2000 * math.cos(a0 + 0.22), H / 2 + 2000 * math.sin(a0 + 0.22))]
         d.polygon(pts, fill=(255, 255, 255, 34))
+    im.alpha_composite(rays)
     tb = text_block(str(o.get("text", "Kuch der baad...")), 96 * s, W - 120 * s, fill=(255, 240, 120), stroke=10 * s)
     sc = 0.6 + 0.4 * ease_out_back(lt / 0.35)
     tb = tb.resize((max(1, int(tb.width * sc)), max(1, int(tb.height * sc))))

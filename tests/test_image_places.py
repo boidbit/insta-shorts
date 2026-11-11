@@ -51,7 +51,7 @@ class ImagePlaceTests(unittest.TestCase):
     def test_the_video_uses_the_picture(self):
         sc, _ = script.parse_script(SCRIPT % self.png)
         v = make_video(sc, 216, use_tts=False)
-        r, g, b = v.frame(0.2).convert("RGB").getpixel((10, 10))
+        r, g, b = v.frame(1.5).convert("RGB").getpixel((10, 10))     # (after the "Gali me" title card)
         self.assertTrue(abs(r - 120) < 12 and abs(b - 160) < 12, (r, g, b))
 
 

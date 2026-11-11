@@ -6,6 +6,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from studio.characters import HEIGHTS                # noqa: E402
 from studio.render import Renderer                    # noqa: E402
 from studio.scene import compile_scene, split_scenes  # noqa: E402
 from studio.script import parse_script                # noqa: E402
@@ -396,7 +397,9 @@ class NaturalActingTests(unittest.TestCase):
     def test_people_are_bigger_than_the_painted_place_in_medium_shots(self):
         scene, _ = parse_script(ROOM)
         p = compile_scene(split_scenes(scene)[0], use_tts=False)
-        self.assertGreaterEqual(p.chars["A"].scale, 1.2)
+        a = p.chars["A"]
+        height = HEIGHTS[a.spec.get("height", "normal")][0]                       # (a short boy is a bit smaller)
+        self.assertGreaterEqual(a.scale / height, 1.2)
         self.assertTrue(all(o.get("scale", 1.0) >= 1.2 for o in p.sets))          # the sofa grows with them
 
     def test_camera_looks_at_a_dog_lower_than_at_a_person(self):
