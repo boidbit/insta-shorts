@@ -120,13 +120,15 @@ jobs:
           # wait 20 s per package for ever; a busy dpkg lock (unattended upgrades) is waited for, not fought
           APT="-o Acquire::Retries=2 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o DPkg::Lock::Timeout=180"
           PKGS="ffmpeg fonts-noto-core fonts-noto-color-emoji fonts-liberation libraqm0"
+          bash .github/apt_mirrors.sh 0                                    # (try 1: the runner's own mirrors)
           for try in 1 2 3; do
             if timeout 180 sudo apt-get $APT update -y && timeout 420 sudo apt-get $APT install -y $PKGS; then
               break
             fi
-            [ "$try" = 3 ] && { echo "::error title=Machine ka internet kharab::GitHub machine Ubuntu packages download nahi kar payi (network/DNS). Page pe Approve dobara dabao: nayi machine milegi."; exit 1; }
-            echo "::warning::apt try $try failed (network?), retrying in 20 s"
-            sleep 20
+            [ "$try" = 3 ] && { echo "::error title=Machine ka internet kharab::GitHub machine Ubuntu packages download nahi kar payi (network/DNS). Thodi der baad Approve dobara dabao."; exit 1; }
+            echo "::warning::apt try $try failed (Ubuntu mirrors unreachable?): switching to another mirror"
+            bash .github/apt_mirrors.sh "$try"                               # *.ubuntu.com down: other mirrors
+            sleep 5
           done
           ffmpeg -version | head -1
 

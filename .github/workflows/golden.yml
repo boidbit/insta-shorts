@@ -48,8 +48,9 @@ jobs:
               break
             fi
             [ "$try" = 3 ] && exit 1
-            echo "::warning::apt try $try failed (network?), retrying in 20 s"
-            sleep 20
+            echo "::warning::apt try $try failed (Ubuntu mirrors unreachable?): switching to another mirror"
+            bash .github/apt_mirrors.sh "$try"
+            sleep 5
           done
 
       - name: Python packages

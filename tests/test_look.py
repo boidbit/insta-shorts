@@ -150,6 +150,9 @@ class HandleAndCoverTests(unittest.TestCase):
             self.assertIn("timeout-minutes: 12", step, wf)
             self.assertIn("Acquire::http::Timeout=20", step, wf)
             self.assertIn("for try in 1 2 3", step, wf)
+            self.assertIn("bash .github/apt_mirrors.sh", step, wf)          # *.ubuntu.com down: another mirror
+        sh = read(".github/apt_mirrors.sh")
+        self.assertIn("mirrors.edge.kernel.org/ubuntu", sh)
 
     def test_the_workflow_and_the_page(self):
         self.assertIn("--cover -o \"out/$name.cover.png\"", read(".github/workflows/render.yml"))
