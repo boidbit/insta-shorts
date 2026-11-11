@@ -158,6 +158,13 @@ class PromptTests(unittest.TestCase):
 
 
 class FeelWordTests(unittest.TestCase):
+    def test_gussa_means_an_angry_face_too(self):
+        sc, warns = parse_script("HOOK: h\nCAST: A = boy\nSCENE: room\nA (gussa): Hi | हाय\nB (gussa, smile): Hi | हाय\n"
+                                 "CTA: c\n")
+        ev = [e for e in sc["scenes"][0]["timeline"] if e.get("who") in ("A", "B")]
+        self.assertEqual((ev[0]["expression"], ev[0]["fx"]), ("angry", ["anger"]))
+        self.assertEqual(ev[1]["expression"], "smile")             # a face the writer chose wins
+
     def test_plain_words_act(self):
         sc, warns = parse_script("HOOK: h\nCAST: A = boy, B = girl\nSCENE: room\nA (happy, pointing): Dekho! | देखो!\n"
                                  "B (worried): Kya? | क्या?\nA -> running scared\nCTA: c\n")

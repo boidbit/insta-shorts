@@ -8,7 +8,7 @@ GitHub Pages wala studio page (mobile pe bhi):
 - **📝 Apni script** pehla tab hai aur box khali milta hai. Format yaad na ho to "📄 Example script daalo" dabao.
 - **💡 Idea do (AI)** doosra tab hai.
 - GitHub token upar kone me chhote **GitHub** button me hai (sirf zarurat pe khulta hai).
-- Video options ek grid me hain: Quality, Dialogue text, Hook card, Loop, Mascot, Awaaz, Hindi awaaz.
+- Video options ek grid me hain: Quality, Dialogue text, Hook card, Loop, Mascot, Awaaz (Gemini default), Hindi awaaz.
 
 ```bash
 pip install -r requirements.txt        # + ffmpeg system me chahiye
@@ -379,7 +379,7 @@ python -m unittest discover -s tests                                            
 
 ### Awaaz kaun banaye: Gemini ya ElevenLabs 🎙️
 
-Page pe video options me **Awaaz**: `Auto` (Gemini key ho to Gemini, warna free) · `Gemini` · `ElevenLabs` · `Free (Edge)`. Page ise yaad rakhta hai. Command line: `--tts auto|gemini|elevenlabs|edge`.
+Page pe video options me **Awaaz**: `Gemini (default)` (Gemini fail ho to free awaaz) · `ElevenLabs` · `Free (Edge)`. Page ise yaad rakhta hai. Command line: `--tts auto|gemini|elevenlabs|edge` (`auto` = Gemini key ho to Gemini; `gemini` = sirf Gemini, fail ho to render ruk jaata hai).
 
 **ElevenLabs** (bahut natural Hindi, `eleven_multilingual_v2`):
 - Key: repo → Settings → Secrets and variables → Actions → **Repository secret** `ELEVENLABS_API_KEY`. Ye naam bhi chalte hain: `ELEVEN_LAB_1` (is repo me yahi hai), `ELEVEN_LABS_API_KEY`, `ELEVENLABS_KEY`, `ELEVEN_API_KEY`, `ELEVENLABS`, `XI_API_KEY`.

@@ -359,7 +359,7 @@ def ots_back(sc, before, order, cast):
 # plain words a writer (or a chat AI) often uses for a feeling or an action -> the studio's own word, so a script
 # written with "happy", "gussa", "running" still acts (the writer prompt then needs fewer rules)
 FEEL_WORDS = {
-    "happy": "smile", "khush": "smile", "cheerful": "smile", "smiling": "smile", "gusse": "angry",
+    "happy": "smile", "khush": "smile", "cheerful": "smile", "smiling": "smile", "gusse": "angry", "ghussa": "angry",
     "naraz": "angry", "naraaz": "angry", "irritated": "angry", "annoyed": "angry", "frustrated": "angry",
     "furious": "angry", "mad": "angry", "dukhi": "sad", "upset": "sad", "udaas": "sad", "udas": "sad",
     "worried": "nervous", "tension": "nervous", "tense": "nervous", "anxious": "nervous", "ghabraya": "nervous",
@@ -384,6 +384,8 @@ def _stage(tokens, ev, scene_cast, who):
     """Apply bracket / arrow words to an event dict.
     Returns (move request or None, unknown words, words that were overridden)."""
     tokens = [FEEL_WORDS.get(w, w) for w in tokens]
+    if "gussa" in tokens and not any(w in EXPRESSIONS for w in tokens):
+        tokens.append("angry")                      # (gussa) = the 💢 mark AND an angry face, as a writer means it
     move = None
     unknown, acts, exprs = [], [], []
     # words that are both an action and a face (think, shock, laugh, scared...) are the face when the line
