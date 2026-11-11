@@ -19,11 +19,11 @@ import zlib
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageOps
 
-from . import actions, audio, gemini_music, objects, rides, styles, ui
+from . import actions, audio, gemini_music, objects, rides, styles, theme, ui
 from .backgrounds import Background
 from .characters import LA, SH, TH, UA, DEFAULT_POSE, build_character, render_ops, skeleton
 from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_at, camera_roll, camera_whip,
-                    apply_loop, compile_music, compile_scene, ease_travel, mascot_kind,
+                    apply_cta, apply_loop, compile_music, compile_scene, ease_travel, mascot_kind,
                     prepare_voice, split_scenes, start_xs, static_overlays)
 from .animals import ANIMALS, build_animal
 from .effects import Effects, Patch
@@ -136,10 +136,14 @@ class OverlayLayer:
         self._cache = {}
 
     def _image(self, o):
-        key = json.dumps([o.get("text"), o.get("style"), o.get("color"), o.get("size"), o.get("max_w")], default=str)
+        key = json.dumps([o.get("text"), o.get("style"), o.get("color"), o.get("size"), o.get("max_w"), o.get("fg"),
+                          o.get("rotate")], default=str)
         if key not in self._cache:
-            self._cache[key] = styled_box(str(o.get("text", "")), o.get("style", "caption_box"), self.s,
-                                          o.get("color"), o.get("size"), o.get("max_w"))
+            im = styled_box(str(o.get("text", "")), o.get("style", "caption_box"), self.s,
+                            o.get("color"), o.get("size"), o.get("max_w"), o.get("fg"))
+            if o.get("rotate"):                     # (the @handle runs up the side of the picture)
+                im = im.rotate(float(o["rotate"]), expand=True, resample=Image.BICUBIC)
+            self._cache[key] = im
         return self._cache[key]
 
     def _chat(self, o, shown, typing=None):
@@ -212,6 +216,7 @@ class OverlayLayer:
                 al = clamp(lt / 0.2)
             if t1 < 1e8 and anim != "none":
                 al *= clamp((t1 - t) / 0.2)
+            al *= float(o.get("alpha", 1.0))          # (the @handle in the corner is see-through)
             if o.get("chat"):                       # anchored at the top, so the panel only grows downwards
                 paste_rgba(img, im, px * self.s, py * self.s, sc, al, anchor=(im.width / 2.0, 0.0))
             else:
@@ -374,6 +379,9 @@ class Renderer(Output):
         self.shadows = bool(meta.get("shadows", True))          # soft contact shadow under each character
         self._shadow = _shadow_sprite() if self.shadows else None
         own_picture = (scene.get("background") or {}).get("type") == "image"      # the user's picture stays as it is
+        self._theme = theme.resolve(meta.get("theme")) if getattr(self.plan, "camera", "") == "cine" else None
+        if self._theme and self.bd25 is None and not own_picture and getattr(self.bg, "static", None) is not None:
+            self.bg.static = theme.shift_place(self.bg.static, self._theme)        # this video's own colours
         vig_default = 0.0 if own_picture else 0.16
         if self.bd25:
             vig_default = float(self.bd25.light.get("vignette", vig_default))
@@ -457,9 +465,13 @@ class Renderer(Output):
         self._view25_t, self._view25_v = t, v
         return v
 
+    cam_override = None     # (zoom, cx, cy): a fixed camera (the cover picture's close-up)
+
     def _cam_view(self, t):
         """The in-shot camera at time t: (zoom, left, top, width, height) of its window in frame pixels."""
         z, cx, cy, dx, dy = camera_at(self.plan, t)
+        if self.cam_override:
+            (z, cx, cy), dx, dy = self.cam_override, 0.0, 0.0
         if dx or dy:
             z = max(z, 1.05)
         s = self.s
@@ -1109,9 +1121,10 @@ class Renderer(Output):
             layer = shading.volume(layer, self.s * P["k"], ldir, self._tint25)
         return layer, (ox - int(round(LW * self.s)), oy), P
 
-    def story_frame(self, t, hide=(), bare=False):
+    def story_frame(self, t, hide=(), bare=False, clean=False):
         """The picture at story time t. hide = names left out; bare = no lens vignette, captions, fades or whip
-        streak (a part of the one-take walk between two places, put together by Sequence)."""
+        streak (a part of the one-take walk between two places, put together by Sequence); clean = no speech
+        bubbles or name tags either (the cover picture)."""
         plan, s = self.plan, self.s
         img = self._background(t)
         self._draw_objects(img, t, False)
@@ -1184,6 +1197,8 @@ class Renderer(Output):
         # rain, fog, lightning, spotlight...: over the whole scene but under bubbles and captions
         img = self.fx.draw_screen(img, t, {n: (a["head_center"][0] * s, a["head_center"][1] * s)
                                            for n, a in anchors.items()})
+        if self._theme:                             # the video's colour mood (under the bubbles and captions)
+            img = theme.grade(img, self._theme)
 
         # camera first, so the speech bubbles can be kept inside the visible part of the frame
         z, vl, vt, vw, vh = self._cam_view(t)
@@ -1195,7 +1210,7 @@ class Renderer(Output):
             mar += 0.5 * vh * abs(math.sin(math.radians(roll)))
 
         # labels + bubbles
-        for c in order:
+        for c in ([] if clean else order):
             if c.name not in anchors:
                 continue
             st, an = states[c.name], anchors[c.name]
@@ -1663,6 +1678,11 @@ def main(argv=None):
                     help="spoken words: bubble (default) | subtitle (at the bottom) | both | none (voice only)")
     ap.add_argument("--style", choices=["2d", "2.5d"], default=None,
                     help="look: 2d (default) | 2.5d (kitchen, gully, chai_tapri, kirana, terrace as layered sets)")
+    ap.add_argument("--cover", action="store_true", help="save the cover picture (PNG) instead of the video")
+    ap.add_argument("--color", default=None, help="colour mood: auto | classic | golden | cool | rose | teal_orange | "
+                                                   "punchy | lime (default: the script's COLOR line / its own)")
+    ap.add_argument("--cta", choices=["card", "sticker", "caption"], default=None,
+                    help="CTA: card (end card) | sticker (small, during the punch line) | caption (only in the post)")
     ap.add_argument("--loop", action="store_true",
                     help="LOOP mode: no end card, the last moment whips back into the first frame (watched twice)")
     ap.add_argument("--mascot", choices=["bhoot", "billi", "chooha", "off"], default=None,
@@ -1673,9 +1693,21 @@ def main(argv=None):
 
     scene = load_scene(args.scene)
     name = os.path.splitext(os.path.basename(args.scene))[0]
+    if args.color:
+        import copy
+        scene = theme.apply(copy.deepcopy(scene), theme.resolve(args.color) or theme.auto(scene.get("hook")))
+    if args.cta:
+        scene = apply_cta(scene, args.cta)
     r = make_video(scene, args.width, use_tts=not args.no_tts, fps=args.fps, tts_provider=args.tts,
                    dialogue=args.dialogue, hook=args.hook_mode, style=args.style, loop=args.loop or None,
                    mascot=args.mascot)
+    if args.cover:
+        from .cover import make_cover
+        out = args.out or os.path.join("out", name + ".cover.png")
+        os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+        make_cover(r, scene if args.mascot is None else dict(scene, mascot=args.mascot)).save(out)
+        print("saved", out)
+        return
     if args.frame is not None:
         out = args.out or os.path.join("out", name + ".png")
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)

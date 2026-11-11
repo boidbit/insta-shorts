@@ -224,6 +224,7 @@ jobs:
             name=$(basename "$f" .json)
             python -m studio.render "$f" -o "out/$name.mp4" --width "$WIDTH" $FLAGS
             python -m studio.render "$f" --frame 1.0 -o "out/$name.png" --width 540 $FLAGS
+            python -m studio.render "$f" --cover -o "out/$name.cover.png" --width 1080 $FLAGS || true    # Instagram cover
             [ -f "${f%.json}.post.txt" ] && cp "${f%.json}.post.txt" "out/$name.post.txt"
             echo "- \`$name.mp4\`" >> "$GITHUB_STEP_SUMMARY"
           done

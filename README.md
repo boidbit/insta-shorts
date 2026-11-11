@@ -8,7 +8,7 @@ GitHub Pages wala studio page (mobile pe bhi):
 - **📝 Apni script** pehla tab hai aur box khali milta hai. Format yaad na ho to "📄 Example script daalo" dabao.
 - **💡 Idea do (AI)** doosra tab hai.
 - GitHub token upar kone me chhote **GitHub** button me hai (sirf zarurat pe khulta hai).
-- Video options ek grid me hain: Quality, Dialogue text, Hook card, Loop, Mascot, Awaaz (Gemini default), Hindi awaaz.
+- Video options ek grid me hain: Quality, Dialogue text, Hook card, Loop, Mascot, Awaaz (Gemini default), Rang, CTA, Handle, Hindi awaaz.
 
 ```bash
 pip install -r requirements.txt        # + ffmpeg system me chahiye
@@ -208,6 +208,28 @@ GitHub Actions me ye `dialogue` aur `intro` inputs hain. Style ka input `style`:
 | Mascot | Ek chhota mascot (chhotu bhoot 👻 / billi 🐱 / chooha 🐭) kahani ke beech ki ek line pe bolne wale ke peeche se jhaankta hai, aankh jhapakata hai, wapas chhup jaata hai. Pehli line aur punch line pe kabhi nahi. Loop ke saath aakhri second me ek baar aur ("bhai end me kya tha?"). Har video me alag jagah, wahi video dobara banao to wahi jagah. | `MASCOT: bhoot` (billi, chooha, off) | `--mascot bhoot` |
 
 Page pe ye dono video options me hain. Approve karne pe page `LOOP: on` / `MASCOT: ...` line script ke saath bhej deta hai; script me apni line ho to wahi chalti hai. JSON me: `"loop": true`, `"mascot": "billi"`.
+
+### Har video alag dikhe 🎨 (rang, pehla shot, cover, handle)
+
+Instagram grid me saari reels ek jaisi na lagein, isliye har video ka apna look hota hai:
+
+| Cheez | Kya hota hai | Page option | Script line |
+|---|---|---|---|
+| Rang (colour mood) | Hook card aur CTA ka rang, poori tasveer pe halki colour grading (sunehri, thandi neeli, gulabi, teal-orange, punchy, lime, classic peela), aur jagah ki deewaron/imaaraton ke rang thode alag (aasmaan neela hi rehta hai). **Auto** = har video ka apna rang, kahani (hook) se chuna hua; wahi video dobara = wahi rang. | Rang 🎨 | `COLOR: golden` (classic, golden, cool, rose, teal_orange, punchy, lime; gulabi, neela, peela... bhi) |
+| Pehla shot | Har video alag tarah khulti hai: kabhi seedha, kabhi bolne wale ke chehre se shuru hoke peeche khinchta camera (reveal), kabhi close-up. Jaldi-jaldi wali baat-cheet pe nahi lagta. | (apne aap) | (pehli line pe `close` / `reveal` likho to wahi) |
+| Cover | Har video ke saath ek **cover picture**: punch line pe bolne wale ka bada chehra, upar bade shabd (hook, ya `COVER:` line), hook ka emoji sticker ki tarah, mascot, aapka handle aur video ke rang ka border. Sab kuch beech ke 3:4 hisse me (profile grid wahi dikhata hai). Page pe "🖼️ Cover download"; Instagram pe upload karte waqt **Edit cover → Add from camera roll**. Pichli reels ki gallery bhi ab cover dikhati hai. | (apne aap) | `COVER: BAS 5 MINUTE 😭` |
+| Handle | Aapka `@page` video ke baayein kinare pe halka sa, khada (watermark). | Handle 🏷️ | `HANDLE: @desitoons` |
+
+`CAMERA: classic` me sab pehle jaisa (koi rang/pehla shot nahi). Command line: `--color golden`, `--cover` (cover PNG banata hai).
+
+### CTA: end card, sticker ya sirf caption 📣
+
+CTA ab zaruri nahi: `CTA:` line na likho to video punch line ke baad khatam. Likho to page pe **CTA 📣** se chuno kaise dikhe:
+- **End card** (pehle jaisa, ~2 s)
+- **Sticker**: punch line ke saath chhota sa upar, video lambi nahi hoti
+- **Sirf caption**: video me nahi, post ke caption me
+
+Script me `CTA_STYLE: sticker` (card / sticker / caption), command line `--cta sticker`. Loop on ho to end card kabhi nahi aata.
 
 ### Chhota prompt (ChatGPT / Gemini app ke liye)
 

@@ -67,14 +67,17 @@ import os
 import re
 import zlib
 
-from . import actions, audio, gemini_music, objects, rides, styles
+from . import actions, audio, gemini_music, objects, rides, styles, theme
 from .characters import (ACCESSORIES, EXPRESSIONS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE,
                          SKIN_TONES)
 from .util import asset_path
-from .scene import DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLOTS, apply_loop, chat_length, mascot_kind
+from .scene import (CTA_STYLES, DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLOTS, apply_cta, apply_loop, chat_length,
+                    mascot_kind)
 
 HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP",
-           "MASCOT")
+           "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER")
+OPENINGS = ("plain", "reveal", "close")     # the first shot of a video: as it comes / starts on a face and pulls back /
+                                            # a close-up (each video gets one, picked from its hook)
 ON_WORDS, OFF_WORDS = ("on", "yes", "haan", "true", "1"), ("off", "no", "nahi", "false", "0", "none")
 from .locations import LOCATIONS as _LOC   # noqa: E402
 
@@ -184,6 +187,7 @@ def vocab():
         "expressions": sorted(EXPRESSIONS), "actions": sorted(actions.ACTIONS),
         "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS), "fx": sorted(FX),
         "times": sorted(TIMES + WEATHER), "pan_words": list(PAN_WORDS),
+        "themes": sorted(set(theme.THEMES) | set(theme.ALIASES)), "cta_styles": list(CTA_STYLES),
         "feel_words": sorted([k, v] for k, v in FEEL_WORDS.items()),
         "sets": sorted(SET_TYPES), "set_words": sorted(set(SET_STATES) | set(SET_X) | {"big", "small", "back", "front", "flip"}),
         "seat_actions": sorted(SEAT_ACTIONS), "animals": sorted(ANIMAL_WORDS),
@@ -779,7 +783,7 @@ def parse_chat(meta, title, msgs):
 
 
 HEADER_WORDS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "OBJ",
-                "LOOP", "MASCOT",
+                "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER",
                 "NARRATOR",
                 "LIGHTS", "AMBIENCE", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
 
@@ -990,6 +994,14 @@ def parse_script(text):
 
     if not scenes:
         raise ValueError("script has no lines")
+    classic = meta.get("CAMERA", "").strip().lower() in ("classic", "old", "purana") or _classic_env()
+    if not classic:                                 # every video opens on its own kind of first shot
+        first = next((ln for ln in scenes[0]["lines"] if ln[0] == "say" and ln[1] != "NARRATOR"), None)
+        camera_words = set(SHOTS) | {"zoom", "reveal"}
+        if first and len(first[3]) >= 18 and not any(w in camera_words for w in first[2]):   # (not on quick banter)
+            pick = OPENINGS[zlib.crc32(("open|" + (meta.get("HOOK") or "reel")).encode("utf-8")) % len(OPENINGS)]
+            if pick != "plain":
+                first[2].append(pick)
 
     # ---- build timelines ----
     out_scenes = []
@@ -1164,7 +1176,7 @@ def parse_script(text):
         out_scenes.append(item)
 
     vary_cast(cast)
-    if not (meta.get("CAMERA", "").strip().lower() in ("classic", "old", "purana") or _classic_env()):
+    if not classic:
         vary_bodies(cast)                           # (`CAMERA: classic`: everybody as before)
     hook = meta.get("HOOK") or ""
     if not hook:
@@ -1216,6 +1228,27 @@ def parse_script(text):
         if flat:
             warnings.append("STYLE 2.5d: %s 2.5D me flat dikhegi (baaki har jagah 2.5D me gehraai ke saath banti hai)"
                             % ", ".join(flat))
+    th = theme.resolve(meta.get("COLOR")) if meta.get("COLOR") else None
+    if meta.get("COLOR") and not th and meta["COLOR"].strip().lower() != "auto":
+        warnings.append("COLOR %r: %s ya auto likho" % (meta["COLOR"], ", ".join(theme.THEMES)))
+    if not classic:                                 # every video its own colours (the hook card, the CTA, the picture)
+        theme.apply(scene, th or theme.auto(hook))
+    if meta.get("COVER"):                           # the big words on the cover picture (default: the hook)
+        scene["cover"] = meta["COVER"].strip()
+    if meta.get("HANDLE"):                          # @page in a corner of every frame
+        handle = meta["HANDLE"].strip()
+        handle = handle if handle.startswith("@") else "@" + handle
+        scene["handle"] = handle
+        scene["overlays"].append({"text": handle, "style": "tag", "size": 28, "max_w": 520, "pos": [42, 1120],
+                                  "rotate": 90, "from": 0.0, "anim": "none", "alpha": 0.7, "handle": True})
+    cs = (meta.get("CTA_STYLE") or "").strip().lower()
+    if cs:                                          # CTA_STYLE: card (end card) | sticker | caption
+        cs = {"end": "card", "endcard": "card", "chhota": "sticker", "small": "sticker", "off": "caption",
+              "none": "caption", "nahi": "caption"}.get(cs, cs)
+        if cs in CTA_STYLES:
+            scene = apply_cta(scene, cs)
+        else:
+            warnings.append("CTA_STYLE %r: card, sticker ya caption likho" % meta["CTA_STYLE"])
     if meta.get("LOOP"):                                # LOOP: on = the reel runs round without a visible end
         v = meta["LOOP"].strip().lower()
         if v in ON_WORDS:

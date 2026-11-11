@@ -248,11 +248,13 @@ STYLES = {
 }
 
 
-def styled_box(text, style, s, color=None, size=None, max_w=None):
-    """Render text in a named style at output scale s. Returns RGBA image."""
+def styled_box(text, style, s, color=None, size=None, max_w=None, fg=None):
+    """Render text in a named style at output scale s. Returns RGBA image. color = the box, fg = the letters."""
     st = dict(STYLES.get(style, STYLES["caption_box"]))
     if color:
         st["bg"] = tuple(color) if isinstance(color, (list, tuple)) else st["bg"]
+    if fg and isinstance(fg, (list, tuple)):
+        st["fg"] = tuple(fg)
     if size:
         st["size"] = size
     if max_w:

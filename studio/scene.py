@@ -1343,6 +1343,49 @@ def apply_loop(scene):
     return scene
 
 
+CTA_STYLES = ("card", "sticker", "caption")
+CTA_STICKER_Y = 1440.0       # the small CTA sticker: low, clear of the speech bubbles, above Instagram's caption
+
+
+def apply_cta(scene, style):
+    """How the CTA ("Tag karo...") shows, on a copy: card = its own end card (as before), sticker = a small sticker
+    during the punch line (no extra seconds at the end), caption = only in the post caption."""
+    import copy
+    if style not in ("sticker", "caption"):
+        return scene
+    scene = copy.deepcopy(scene)
+    scs = scene.get("scenes") or [scene]
+    texts = []
+    for sc in scs:
+        for ev in sc.get("timeline", []):
+            o = ev.get("overlay")
+            if isinstance(o, dict) and o.get("cta"):
+                texts.append(str(o.get("text", "")))
+                for k in ("overlay", "sfx", "volume"):
+                    ev.pop(k, None)
+                ev["hold"] = min(float(ev.get("hold", 1.0)), 1.0)
+    if not texts:
+        return scene
+    if style == "sticker":
+        last = scs[-1]
+        says = [i for i, ev in enumerate(last.get("timeline", [])) if "say" in ev]
+        if says:                                    # on the punch line, until the end of the video
+            ev = last["timeline"][says[-1]]
+            color = (scene.get("meta") or {}).get("cta_color") or [236, 90, 70]
+            sticker = {"text": " ".join(texts), "style": "card", "size": 44, "max_w": 760, "color": color,
+                       "pos": [540, CTA_STICKER_Y], "cta_sticker": True}
+            if "overlay" in ev:                     # (a line can carry one overlay: put it on a wait right before)
+                last["timeline"].insert(says[-1], {"overlay": sticker})
+            else:
+                ev["overlay"] = sticker
+            return scene
+    post = scene.setdefault("post", {})
+    cap = str(post.get("caption") or "").strip()
+    extra = " ".join(t for t in texts if t and t not in cap)
+    post["caption"] = (cap + "\n" + extra).strip() if extra else cap
+    return scene
+
+
 def apply_options(scene, dialogue=None, hook=None):
     """The studio page's video options, on a copy of the scene.
     dialogue: bubble (speech bubbles) | subtitle (words at the bottom) | both | none (voice only).
