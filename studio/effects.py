@@ -20,7 +20,7 @@ import random
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
 
-from .text import font, text_block
+from .text import font, is_deva, text_block
 from .util import LH, LW, clamp, ease_out, ease_out_back
 
 ATTACHED = {"sweat", "anger", "sparkle", "dizzy", "question", "exclaim", "zzz", "hearts", "bulb",
@@ -83,7 +83,7 @@ class Patch:
         self.d.ellipse([a, b], fill=fill, outline=outline, width=self.W(w) if outline else 0)
 
     def text(self, x, y, txt, size, fill=(255, 255, 255, 255), stroke=6, stroke_fill=INK):
-        f = font(size * self.k)
+        f = font(size * self.k, "deva" if any(is_deva(ch) for ch in str(txt)) else "main")   # चमगादड़ on a board
         self.d.text(self.P(x, y), txt, font=f, fill=fill, anchor="mm", stroke_width=self.W(stroke),
                     stroke_fill=stroke_fill)
 

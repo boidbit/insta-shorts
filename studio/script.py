@@ -125,7 +125,7 @@ def parse_set(raw, placed):
     text = [w for w in rest if w.lower() not in known]
     sid = typ if typ not in placed else "%s%d" % (typ, sum(1 for k in placed if k.startswith(typ)) + 1)
     spec["id"] = sid                                # (also when a word is unknown: the piece is still placed)
-    if typ == "signboard" and text:
+    if typ in ("signboard", "blackboard") and text:
         spec["text"] = " ".join(text)
     elif text:
         return "place", spec, ["OBJ %s: %s samajh nahi aaye" % (typ, ", ".join(repr(w) for w in text))]
@@ -149,8 +149,12 @@ ROLE_LOOKS = {
     "teacher": "office_guy", "boss": "office_guy", "bachcha": "kid", "student": "kid",
     "pujari": "pandit", "panditji": "pandit", "policewala": "police", "inspector": "police", "havaldar": "police",
     "daroga": "police", "dactor": "doctor", "chaiwale": "chaiwala", "groom": "dulha", "bride": "dulhan",
+    "netaji": "neta", "mantri": "neta", "politician": "neta", "sarpanch": "neta", "mla": "neta",
+    "kaidi": "chor", "prisoner": "chor", "thief": "chor", "sasu": "saas", "saasu": "saas", "bhabhi": "bahu",
+    "patni": "bahu", "biwi": "bahu", "headmaster": "principal", "barber": "nai", "hajjam": "nai",
 }
-FEMALE_LOOKS = {"girl", "college_girl", "aunty", "dadi", "kid_girl", "office_girl", "madam", "dulhan"}
+FEMALE_LOOKS = {"girl", "college_girl", "aunty", "dadi", "kid_girl", "office_girl", "madam", "dulhan", "nurse",
+                "saas", "bahu"}
 PITCHES = ["+0Hz", "+14Hz", "-8Hz", "+24Hz", "-14Hz"]
 BUILDS = ("slim", "normal", "chubby")
 GENDER_WORDS = ("female", "woman", "ladki", "aurat", "male", "man", "ladka", "aadmi")

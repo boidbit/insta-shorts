@@ -433,12 +433,103 @@ def _s_applause():
     return _place(2.6, parts)
 
 
+def _s_cooker():
+    """Pressure cooker whistle: hiss building up, then the shrill whistle (synthesized, royalty free)."""
+    t = _t(1.6)
+    hiss = _bp(_noise(1.6, 21), 3200, 1.5) * np.minimum(1, t / 0.5) * 0.35
+    tw = _t(0.9)
+    f = 1650 + 120 * np.sin(2 * np.pi * 7 * tw) + 260 * np.minimum(1, tw / 0.15)
+    whistle = (0.45 * _sweep(f, 0.9) + 0.25 * _sweep(f * 2.01, 0.9)) * np.minimum(1, tw / 0.06) * np.minimum(1, (0.9 - tw) / 0.12)
+    whistle += 0.3 * _bp(_noise(0.9, 22), 2400, 3) * np.minimum(1, tw / 0.06) * np.minimum(1, (0.9 - tw) / 0.12)
+    return _place(1.8, [(0.0, hiss), (0.75, whistle)])
+
+
+def _s_siren():
+    """Ambulance / police siren: two tones going up and down."""
+    t = _t(2.4)
+    f = 760 + 280 * (np.sin(2 * np.pi * 0.9 * t) > 0)
+    f = _lp(f.astype(float), 18)
+    y = 0.4 * (_sweep(f, 2.4) + 0.4 * _sweep(f * 2, 2.4) + 0.2 * _sweep(f * 3, 2.4))
+    return y * np.minimum(1, t / 0.05) * np.minimum(1, (2.4 - t) / 0.2)
+
+
+def _s_train_horn():
+    """A long train horn: a low chord of three notes."""
+    t = _t(1.8)
+    env = np.minimum(1, t / 0.08) * np.minimum(1, (1.8 - t) / 0.3)
+    y = sum(a * np.sign(np.sin(2 * np.pi * f * t)) for f, a in ((233, 0.18), (277, 0.15), (349, 0.12)))
+    return _lp(y, 1600) * env * 1.6
+
+
+def _s_dhol():
+    """Dhol: deep bass hits and sharp high slaps in a bhangra rhythm."""
+    def hit(f0, d, dec, seed):
+        tt = _t(d)
+        f = f0 * (1 + 0.6 * np.exp(-30 * tt))
+        return np.sin(2 * np.pi * np.cumsum(f) / SR) * _env(tt, 0.001, dec) + \
+            0.25 * _bp(_noise(d, seed), f0 * 4, 2) * _env(tt, 0.0005, dec * 3)
+    low, high = hit(70, 0.5, 8, 31) * 0.9, hit(330, 0.2, 22, 32) * 0.6
+    beat = 0.32
+    parts = []
+    for bar in range(2):
+        b0 = bar * beat * 4
+        parts += [(b0, low), (b0 + beat * 1.5, high), (b0 + beat * 2, low), (b0 + beat * 2.5, high),
+                  (b0 + beat * 3, high), (b0 + beat * 3.5, high)]
+    return _place(2.8, parts)
+
+
+def _s_shehnai():
+    """A shehnai-like reed phrase (wedding / sad moment), a few bent notes."""
+    notes = [(587, 0.35), (659, 0.3), (698, 0.5), (659, 0.3), (587, 0.7)]
+    parts, at = [], 0.0
+    for f0, d in notes:
+        tt = _t(d)
+        f = f0 * (1 + 0.012 * np.sin(2 * np.pi * 5.5 * tt)) * (1 - 0.02 * np.exp(-20 * tt))
+        ph = np.cumsum(f) / SR
+        y = 0.5 * np.sin(2 * np.pi * ph) + 0.35 * np.sin(4 * np.pi * ph) + 0.25 * np.sin(6 * np.pi * ph) + \
+            0.15 * np.sin(8 * np.pi * ph)
+        y *= np.minimum(1, tt / 0.04) * np.minimum(1, (d - tt) / 0.06)
+        parts.append((at, 0.5 * _lp(y, 3200)))
+        at += d * 0.95
+    return _place(at + 0.2, parts)
+
+
+def _s_baby_cry():
+    """A baby crying: wailing 'waa' cries rising and falling."""
+    parts = []
+    for i, (d, f0) in enumerate(((0.8, 420), (0.6, 460), (1.0, 440))):
+        tt = _t(d)
+        f = f0 * (1 + 0.25 * np.sin(np.pi * tt / d)) * (1 + 0.03 * np.sin(2 * np.pi * 9 * tt))
+        ph = np.cumsum(f) / SR
+        y = sum(a * np.sin(2 * np.pi * k * ph) for k, a in ((1, 0.5), (2, 0.4), (3, 0.3), (4, 0.15)))
+        y = _bp(y, 1100, 1.2) * 1.5 + 0.2 * y
+        y *= np.minimum(1, tt / 0.06) * np.minimum(1, (d - tt) / 0.15)
+        parts.append((sum(x for x, _ in ((0.8, 0), (0.6, 0), (1.0, 0))[:i]) + 0.15 * i, 0.45 * y))
+    return _place(2.9, parts)
+
+
+def _s_glass_break():
+    """Glass breaking: a sharp crack and tinkling pieces."""
+    t = _t(0.3)
+    crack = _hp(_noise(0.3, 41), 2500) * _env(t, 0.0003, 30) * 0.9
+    parts = [(0.0, crack)]
+    rng = np.random.RandomState(42)
+    for i in range(18):
+        tt = _t(0.25)
+        f = rng.uniform(2500, 6000)
+        tink = np.sin(2 * np.pi * f * tt) * _env(tt, 0.0005, rng.uniform(18, 40)) * rng.uniform(0.1, 0.3)
+        parts.append((0.03 + rng.uniform(0, 0.7) * (i / 18.0) ** 0.7, tink))
+    return _place(1.2, parts)
+
+
 SFX2 = {"slap": _s_slap, "punch": _s_punch, "knock": _s_knock, "doorbell": _s_doorbell, "ring": _s_ring,
         "vibrate": _s_vibrate, "horn": _s_horn, "footsteps": _s_footsteps, "scream": _s_scream,
         "heartbeat": _s_heartbeat, "record_scratch": _s_record_scratch, "sad_trombone": _s_sad_trombone,
         "rooster": _s_rooster, "thunder": _s_thunder, "wind": _s_wind, "crowd_cheer": _s_crowd_cheer,
         "bat_hit": _s_bat_hit, "crickets": _s_crickets, "drumroll": _s_drumroll, "cash": _s_cash,
-        "whistle": _s_whistle, "tick": _s_tick, "applause": _s_applause}
+        "whistle": _s_whistle, "tick": _s_tick, "applause": _s_applause, "cooker": _s_cooker, "siren": _s_siren,
+        "train_horn": _s_train_horn, "dhol": _s_dhol, "shehnai": _s_shehnai, "baby_cry": _s_baby_cry,
+        "glass_break": _s_glass_break}
 SFX_NAMES = ("pop", "boing", "whoosh", "ding", "thud", "clap", "beep", "laugh_track") + tuple(SFX2)
 
 

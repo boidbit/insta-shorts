@@ -51,6 +51,15 @@ SPEC = {
     "plant": (110, 380, 20, False, None, False),
     "box": (110, 200, 20, False, None, False),
     "bucket": (80, 160, 20, False, None, False),
+    "khaat": (430, 330, 30, False, 205, False),          # charpai: sit or lie on it like a bed
+    "matka": (80, 330, 20, False, None, False),
+    "chulha": (130, 360, 20, False, None, False),        # mud stove, the fire flickers (`OBJ: chulha off` = cold)
+    "blackboard": (230, 860, 20, False, None, False),    # on a stand: `OBJ: blackboard center चमगादड़` writes on it
+    "drip": (90, 960, 20, False, None, False),           # hospital glucose stand
+    "wheelchair": (170, 470, 20, False, 205, False),
+    "cooler": (160, 560, 20, False, None, False),
+    "washing_machine": (160, 470, 20, False, None, False),   # `OBJ: washing_machine on` spins and shakes
+    "mirror": (120, 800, 20, False, None, False),
 }
 
 ALL = set(SPEC)
@@ -385,6 +394,135 @@ def d_bucket(o, st, t, ob):
     o.ellipse(0, -150, 70, 14, (130, 190, 240, 255))
 
 
+def d_khaat(o, st, t, ob):
+    o.shadow(420)
+    for lx in (-410, 382):                                      # turned wooden legs
+        o.rect(lx, -250, lx + 28, 0, WOOD_D)
+        o.ellipse(lx + 14, -120, 20, 14, WOOD, INK, 3)
+    rope = (222, 196, 136, 255)
+    o.poly([(-400, -300), (400, -300), (424, -236), (-424, -236)], rope)        # the woven top
+    for i in range(-8, 9):                                      # the criss-cross of the rope
+        x = i * 46
+        o.line([(x - 22, -298), (x + 22, -238)], (186, 156, 96, 255), 3)
+        o.line([(x + 22, -298), (x - 22, -238)], (186, 156, 96, 255), 3)
+    o.poly([(-400, -300), (400, -300), (424, -236), (-424, -236)], None, INK, 5)
+    o.rect(-436, -240, 436, -208, WOOD)                         # the side rail
+
+
+def d_matka(o, st, t, ob):
+    o.shadow(70, 12)
+    o.poly([(-60, 0), (60, 0), (46, -40), (-46, -40)], (90, 70, 50, 255))   # a little stand
+    clay = (194, 104, 66, 255)
+    o.ellipse(0, -150, 78, 100, clay)
+    o.line([(-60, -170), (60, -170)], (150, 76, 46, 255), 5)
+    o.rect(-34, -268, 34, -236, clay)
+    o.ellipse(0, -268, 42, 10, (150, 76, 46, 255))
+    o.rect(-20, -320, 20, -268, (206, 208, 216, 255))         # a steel glass upside down on the mouth
+
+
+def d_chulha(o, st, t, ob):
+    o.shadow(120, 14)
+    mud = (178, 120, 82, 255)
+    o.poly([(-120, 0), (120, 0), (104, -170), (-104, -170)], mud)
+    o.ellipse(0, -60, 50, 50, (40, 26, 22, 255))               # the fire mouth
+    if st not in ("off", "closed"):
+        for i, (dx, h) in enumerate(((-18, 70), (0, 96), (18, 66))):
+            k = 1 + 0.18 * math.sin(t * 13 + i * 2.1)
+            o.poly([(dx - 18, -40), (dx + 18, -40), (dx + 4 * math.sin(t * 9 + i), -40 - h * k)],
+                   ((255, 170, 60, 255), (255, 226, 110, 255), (255, 140, 50, 255))[i], None)
+        o.ellipse(0, -60, 90, 70, (255, 180, 80, 40), None)
+    o.ellipse(0, -176, 96, 18, (120, 110, 104, 255))            # a pot on top
+    o.poly([(-80, -176), (80, -176), (70, -250), (-70, -250)], (60, 56, 60, 255))
+    for x in (-70, 0, 70):                                      # sticks of firewood
+        o.line([(x - 10, 6), (x + 40, -30)], (110, 80, 54, 255), 10)
+
+
+def d_blackboard(o, st, t, ob):
+    leg = (130, 90, 56, 255)
+    o.line([(-150, 0), (-110, -840)], leg, 14)                  # the easel
+    o.line([(150, 0), (110, -840)], leg, 14)
+    o.line([(0, -40), (0, -820)], leg, 12)
+    o.rect(-220, -820, 220, -360, (150, 104, 66, 255), INK, 8)
+    o.rect(-200, -800, 200, -380, (36, 52, 46, 255), INK, 3)
+    txt = str(ob.get("text", ""))
+    if txt:
+        size = min(110, 640 / max(3, len(txt)))
+        o.text(0, -590, txt, size, (240, 240, 232, 255))
+    o.rect(-120, -372, -60, -360, (240, 240, 232, 255), None)   # chalk on the ledge
+
+
+def d_drip(o, st, t, ob):
+    steel = (170, 172, 180, 255)
+    for dx in (-70, 0, 70):                                     # wheeled base
+        o.line([(0, -20), (dx, 0)], steel, 8)
+        o.ellipse(dx, 0, 9, 9, (50, 50, 56, 255))
+    o.line([(0, -20), (0, -900)], steel, 9)
+    o.line([(-60, -900), (60, -900)], steel, 7)
+    o.poly([(-50, -890), (-10, -890), (-12, -740), (-48, -740)], (226, 240, 250, 255))     # the bottle
+    o.rect(-46, -820, -14, -748, (200, 230, 246, 255), None)
+    level = -820 + (t * 3) % 60                                 # the level drops slowly
+    o.line([(-44, level), (-16, level)], (150, 200, 230, 255), 3)
+    o.line([(-30, -740), (-30, -700), (40, -560), (60, -380)], (160, 200, 220, 255), 4)
+    drop = -730 + (t * 160) % 30
+    o.ellipse(-30, drop, 4, 6, (150, 200, 240, 255), None)
+
+
+def d_wheelchair(o, st, t, ob):
+    o.shadow(150, 16)
+    o.ellipse(-30, -150, 150, 150, None, (60, 62, 70, 255), 12)            # the big wheel
+    for a in range(0, 180, 30):
+        r = math.radians(a)
+        o.line([(-30 - 140 * math.cos(r), -150 - 140 * math.sin(r)), (-30 + 140 * math.cos(r), -150 + 140 * math.sin(r))],
+               (150, 152, 160, 255), 3)
+    o.ellipse(140, -30, 30, 30, (60, 62, 70, 255))                         # the small wheel
+    o.rect(-120, -230, 150, -190, (40, 90, 160, 255))                       # the seat
+    o.rect(-140, -460, -100, -200, (40, 90, 160, 255))                      # the back
+    o.line([(-120, -460), (-170, -470)], (60, 62, 70, 255), 10)             # handle
+    o.line([(150, -190), (170, -40)], (150, 152, 160, 255), 8)              # foot rest
+    o.line([(150, -40), (200, -40)], (60, 62, 70, 255), 10)
+
+
+def d_cooler(o, st, t, ob):
+    o.shadow(150)
+    body = (236, 232, 222, 255)
+    o.rect(-150, -540, 150, -40, body)
+    o.rect(-150, -40, 150, 0, (120, 120, 126, 255))
+    o.rect(-120, -500, 120, -200, (70, 80, 90, 255))           # the grille
+    for y in range(-488, -200, 16):
+        o.line([(-120, y), (120, y)], (190, 196, 204, 255), 4)
+    o.ellipse(0, -350, 90, 90, None, (40, 44, 50, 255), 5)
+    o.rect(-120, -170, 120, -70, (210, 206, 196, 255))          # side pads
+    for x in range(-110, 120, 22):
+        o.line([(x, -168), (x, -72)], (180, 170, 150, 255), 3)
+
+
+def d_washing_machine(o, st, t, ob):
+    on = st == "on"
+    jig = 4 * math.sin(t * 40) if on else 0.0
+    o.shadow(150)
+    o.rect(-150 + jig, -460, 150 + jig, 0, (240, 242, 246, 255))
+    o.rect(-150 + jig, -460, 150 + jig, -390, (210, 214, 222, 255))
+    o.ellipse(70 + jig, -425, 16, 16, (90, 160, 220, 255))
+    o.ellipse(jig, -200, 110, 110, (180, 184, 192, 255))
+    o.ellipse(jig, -200, 86, 86, (120, 170, 220, 255))
+    if on:                                                       # clothes going round
+        for i, col in enumerate(((230, 80, 80, 255), (250, 210, 70, 255), (70, 150, 90, 255))):
+            a = t * 9 + i * 2.1
+            o.ellipse(jig + 40 * math.cos(a), -200 + 40 * math.sin(a), 30, 18, col, None)
+    o.ellipse(jig - 30, -240, 26, 14, (255, 255, 255, 140), None)
+
+
+def d_mirror(o, st, t, ob):
+    o.shadow(110, 14)
+    o.rect(-120, -260, 120, 0, WOOD)                            # dressing table
+    o.rect(-100, -220, 100, -140, WOOD_L)
+    o.ellipse(0, -180, 8, 8, INK)
+    o.ellipse(0, -530, 110, 270, WOOD_D)
+    o.ellipse(0, -530, 92, 252, (196, 222, 236, 255))
+    o.line([(-40, -680), (20, -740)], (255, 255, 255, 255), 8)
+    o.line([(-30, -620), (40, -700)], (255, 255, 255, 255), 5)
+
+
 DRAW = {k: globals()["d_" + k] for k in SPEC}
 
 
@@ -448,7 +586,7 @@ class Sets:
         hw, h_up, h_dn, _wall, _seat, _light = SPEC[typ]
         sc = float(ob.get("scale", 1.0))
         x, y, dirn, dist = self.pos(ob["id"], t)
-        animated = typ in ("clock", "fan", "tv", "tree", "bush", "phone")
+        animated = typ in ("clock", "fan", "tv", "tree", "bush", "phone", "chulha", "drip", "washing_machine")
         key = (ob["id"], st) if not animated else None
         if key and key in self._cache:
             return self._cache[key]

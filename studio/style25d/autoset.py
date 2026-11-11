@@ -241,7 +241,7 @@ def _front_plant(k, seed):
     return cv
 
 
-NO_FRONT_PLANT = {"cinema", "hospital", "haunted_house", "graveyard"}
+NO_FRONT_PLANT = {"cinema", "hospital", "haunted_house", "graveyard", "jail"}
 
 
 def build_auto(place, s, zmax=1.0, time=None):

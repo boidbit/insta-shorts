@@ -763,6 +763,136 @@ def police_station(s):
     return g.done()
 
 
+def jail(s):
+    """Inside a lockup: a high barred window (with a bit of sky and a tree outside), the prisoner's concrete bench,
+    days scratched into the wall, and the barred cell door on the right."""
+    g = G(s, color=(176, 170, 150))
+    g.rect(0, 0, LW, 1280, (176, 170, 150))
+    g.rect(0, 860, LW, 1280, (96, 110, 124))                   # dark painted lower wall
+    g.line([(0, 860), (LW, 860)], INK, 5)
+    rnd = random.Random(21)
+    for _ in range(9):                                          # damp stains
+        x, y = rnd.randint(40, 760), rnd.randint(120, 820)
+        g.circle(x, y, rnd.randint(24, 60), (166, 160, 140))
+    x0, y0, x1, y1 = 360, 300, 660, 520                        # the high window
+    g.rect(x0 - 14, y0 - 14, x1 + 14, y1 + 14, (90, 90, 96), INK, 6)
+    g.punch(x0, y0, x1, y1)
+    with g.on("window"):
+        g.rect(x0, y0, x1, y1, (170, 214, 238))
+        g.circle(x0 + 210, y1 - 30, 70, (96, 160, 92))
+        g.rect(x0 + 200, y1 - 30, x0 + 216, y1, (110, 80, 54))
+    g.note_window(x0, y0, x1, y1)
+    for x in range(x0 + 30, x1, 40):
+        g.line([(x, y0), (x, y1)], (60, 60, 66), 9)
+    g.line([(x0, (y0 + y1) / 2), (x1, (y0 + y1) / 2)], (60, 60, 66), 9)
+    g.rect(40, 1060, 430, 1110, (150, 150, 146), INK, 5)       # concrete bench
+    g.rect(40, 1110, 430, 1280, (120, 120, 118), INK, 5)
+    g.rect(60, 760, 250, 780, (110, 80, 54), INK, 4)            # shelf with a steel mug and a plate
+    g.rect(90, 700, 140, 760, (196, 198, 206), INK, 4)
+    g.line([(140, 716), (156, 716), (156, 744), (140, 744)], INK, 4)
+    g.rect(170, 744, 240, 760, (196, 198, 206), INK, 3)
+    for i in range(4):                                          # days scratched into the wall
+        for j in range(4):
+            x = 470 + i * 70 + j * 12
+            g.line([(x, 640), (x, 700)], (120, 112, 96), 4)
+        g.line([(462 + i * 70, 690), (512 + i * 70, 650)], (120, 112, 96), 4)
+    g.rect(780, 180, LW, 1280, (64, 66, 72))                    # the corridor behind the cell door
+    for x in range(800, LW + 40, 56):
+        g.line([(x, 180), (x, 1290)], (150, 152, 160), 16)
+        g.line([(x - 4, 180), (x - 4, 1290)], (200, 202, 210), 4)
+    for y in (220, 740, 1240):
+        g.line([(780, y), (LW, y)], (150, 152, 160), 18)
+    g.rect(820, 700, 880, 790, (120, 100, 60), INK, 4)          # the lock
+    g.rect(0, 1280, LW, LH, (140, 140, 136))
+    for (ax, ay, bx, by) in ((120, 1400, 260, 1460), (260, 1460, 300, 1560), (700, 1360, 820, 1420)):
+        g.line([(ax, ay), (bx, by)], (110, 110, 108), 3)
+    g.line([(0, 1280), (LW, 1280)], INK, 5)
+    return g.done()
+
+
+def gaon(s):
+    """A village courtyard (aangan) by day: a mud house with a tiled roof and dung cakes on the wall, a washing
+    line, a neem tree with a chabutra round it, a hand pump, fields and trees far away."""
+    g = G(s)
+    _sky(g, (128, 196, 242), (236, 240, 228), 1000)
+    with g.on("sky"):
+        g.circle(830, 260, 70, (255, 230, 140))
+    with g.on("far"):                                           # 2.5D: the fields and a line of trees far away
+        g.rect(0, 930, LW, 1240, (166, 196, 108))
+        for y in range(960, 1240, 40):
+            g.line([(0, y), (LW, y + 10)], (146, 176, 92), 4)
+        rnd = random.Random(5)
+        for x in range(-20, LW + 40, 90):
+            g.circle(x + rnd.randint(-10, 10), 930 - rnd.randint(0, 30), rnd.randint(40, 70), (92, 140, 80))
+        g.poly([(600, 935), (660, 880), (720, 935)], (170, 110, 80))                # a far hut
+        g.rect(612, 935, 708, 990, (196, 160, 120))
+    g.poly([(-30, 600), (240, 430), (520, 600)], (176, 82, 60), INK, 6)            # the house: tiled roof
+    for i in range(1, 6):
+        y = 600 - i * 30
+        g.line([(-30 + i * 46, y), (520 - i * 46, y)], (150, 66, 50), 4)
+    g.rect(0, 600, 480, 1240, (204, 160, 112), INK, 6)
+    g.rect(170, 820, 320, 1240, (70, 46, 34), INK, 6)           # doorway with a curtain
+    g.poly([(176, 826), (314, 826), (300, 1000), (190, 1000)], (200, 60, 70))
+    g.rect(360, 700, 450, 790, (90, 70, 50), INK, 5)            # small window
+    g.line([(405, 700), (405, 790)], INK, 4)
+    for (cx, cy) in ((50, 700), (110, 690), (60, 780), (120, 770), (80, 860)):      # dung cakes drying
+        g.circle(cx, cy, 24, (120, 90, 60), INK, 3)
+    g.line([(480, 760), (760, 720)], (60, 50, 40), 3)           # washing line with clothes
+    for i, (col, w) in enumerate((((230, 120, 60), 60), ((90, 140, 200), 50), ((240, 220, 100), 70))):
+        x = 520 + i * 80
+        y = 760 - (x - 480) * 40 / 280.0
+        g.rect(x, y, x + w, y + 110, col, INK, 3)
+    g.rect(890, 640, 940, 1170, (110, 80, 54), INK, 6)          # the neem tree...
+    for (cx, cy, r) in ((860, 520, 150), (1000, 560, 140), (930, 420, 150), (800, 640, 100), (1040, 680, 100)):
+        g.circle(cx, cy, r, (86, 150, 74), INK, 5)
+    g.rect(760, 1150, 1080, 1240, (196, 176, 150), INK, 5)      # ...with a chabutra round it
+    g.rect(760, 1130, 1080, 1150, (216, 196, 170), INK, 4)
+    g.rect(610, 1000, 640, 1240, (60, 90, 70), INK, 5)          # hand pump
+    g.line([(625, 1000), (700, 960)], (60, 90, 70), 10)
+    g.line([(640, 1060), (672, 1072)], (60, 90, 70), 10)
+    g.rect(0, 1240, LW, LH, (214, 180, 130))                    # the beaten earth of the courtyard
+    rnd = random.Random(8)
+    for _ in range(26):
+        x, y = rnd.randint(0, LW), rnd.randint(1270, LH - 20)
+        g.circle(x, y, rnd.randint(4, 9), (190, 156, 110))
+    for x in (40, 360, 700, 1020):
+        g.line([(x, 1260), (x - 10, 1230), (x + 4, 1258), (x + 14, 1232), (x + 10, 1262)], (110, 150, 80), 4)
+    g.line([(0, 1240), (LW, 1240)], INK, 5)
+    return g.done()
+
+
+def school_ground(s):
+    """The school ground by day: the two-storey school building (yellow, blue windows, a red-tiled roof edge)
+    across the playground, a big tree with a chabutra, the dusty ground."""
+    g = G(s)
+    _sky(g, (120, 190, 240), (230, 240, 248), 1000)
+    with g.on("far"):                                           # 2.5D: the school building across the ground
+        g.rect(40, 560, 1040, 1100, (240, 214, 140), INK, 5)
+        g.rect(20, 520, 1060, 566, (206, 106, 70), INK, 5)
+        g.rect(40, 820, 1040, 846, (226, 130, 80), INK, 4)      # the floor band between the storeys
+        for y0 in (610, 880):
+            for x in range(80, 1000, 120):
+                g.rect(x, y0, x + 70, y0 + 140, (60, 120, 190), INK, 4)
+                g.line([(x + 35, y0), (x + 35, y0 + 140)], (40, 90, 150), 3)
+        g.rect(500, 960, 580, 1100, (120, 80, 50), INK, 4)      # the main door
+        for x in range(60, 1030, 30):                           # corridor railing upstairs
+            g.line([(x, 790), (x, 820)], (60, 120, 190), 3)
+        g.line([(40, 790), (1040, 790)], (60, 120, 190), 5)
+    with g.on("mid"):
+        g.rect(0, 1040, LW, 1110, (226, 210, 180), INK, 4)     # the boundary wall
+    g.rect(150, 700, 200, 1180, (110, 80, 54), INK, 6)          # a big tree on the left...
+    for (cx, cy, r) in ((120, 600, 150), (260, 640, 130), (180, 500, 140), (40, 700, 100), (300, 740, 90)):
+        g.circle(cx, cy, r, (92, 156, 80), INK, 5)
+    g.rect(40, 1160, 320, 1230, (196, 176, 150), INK, 5)        # ...with a chabutra
+    g.rect(0, 1110, LW, LH, (214, 186, 140))                    # the dusty ground
+    rnd = random.Random(4)
+    for _ in range(30):
+        x, y = rnd.randint(0, LW), rnd.randint(1140, LH - 20)
+        g.circle(x, y, rnd.randint(3, 8), (194, 164, 120))
+    g.line([(0, 1110), (LW, 1110)], INK, 5)
+    return g.done()
+
+
 def cinema(s):
     g = G(s, color=(30, 24, 36))
     g.rect(0, 0, LW, LH, (30, 24, 36))
@@ -809,7 +939,8 @@ LOCATIONS = {
     "library": library, "coaching": coaching, "mandap": mandap, "party": party, "festival_street": festival_street,
     "cricket_ground": cricket_ground, "gym": gym, "jungle": jungle, "haunted_house": haunted_house,
     "graveyard": graveyard, "beach": beach, "mountain_road": mountain_road, "desert": desert, "hospital": hospital,
-    "police_station": police_station, "cinema": cinema, "bank": bank,
+    "police_station": police_station, "cinema": cinema, "bank": bank, "jail": jail, "gaon": gaon,
+    "school_ground": school_ground,
 }
 # floor line (y where the floor/ground starts) used for depth scaling
 LOC_HORIZON = {
@@ -818,7 +949,8 @@ LOC_HORIZON = {
     "office": 1270, "meeting_room": 1260, "exam_hall": 1180, "library": 1290, "coaching": 1290, "mandap": 1280,
     "party": 1290, "festival_street": 1240, "cricket_ground": 900, "gym": 1280, "jungle": 1300,
     "haunted_house": 1300, "graveyard": 1260, "beach": 1260, "mountain_road": 1300, "desert": 1250,
-    "hospital": 1280, "police_station": 1280, "cinema": 1320, "bank": 1280,
+    "hospital": 1280, "police_station": 1280, "cinema": 1320, "bank": 1280, "jail": 1280, "gaon": 1240,
+    "school_ground": 1110,
 }
 
 

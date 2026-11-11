@@ -958,7 +958,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 ob = set_by_id[ev["on"]]
                 x0, y0 = c.pos_at(t)
                 dx = float(ev.get("on_dx", 0))
-                if ob.get("type") == "bed" and ev.get("action", "") in ("lie_down", "lie", "sleep_lie", "rofl"):
+                if ob.get("type") in ("bed", "khaat") and ev.get("action", "") in ("lie_down", "lie", "sleep_lie", "rofl"):
                     head = 1 if ob.get("flip") else -1           # head on the pillow end
                     dx = dx or -head * 400 * float(ob.get("scale", 1.0))
                     c.events.append({"t": t, "dir": head})

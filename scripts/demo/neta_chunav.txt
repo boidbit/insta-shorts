@@ -1,0 +1,19 @@
+HOOK: Neta ji ka chunav 🗳️😂
+CAST: N = neta, D = dada, C = chor
+SCENE: gaon | Gaon me chunav
+OBJ: khaat center
+OBJ: blackboard far_left वोट दो
+OBJ: matka far_right
+D -> sit khaat
+N (proud, namaste, dhol): Dada ji, is baar vote mujhe dena! | दादा जी, इस बार वोट मुझे देना!
+D (sly): Pichhli baar ki sadak kahan hai? | पिछली बार की सड़क कहाँ है?
+N (nervous): Sadak... agle chunav me! | सड़क... अगले चुनाव में!
+SCENE: jail | Agle din...
+C (grin): Aaiye neta ji, swagat hai! | आइए नेता जी, स्वागत है!
+N -> enter back siren
+N (shock): Main to bas sadak dhoondh raha tha! | मैं तो बस सड़क ढूँढ रहा था!
+C (sly): Yahan sab yahi kehte hain. | यहाँ सब यही कहते हैं।
+N -> facepalm
+CTA: Tag karo apne area ke neta ko 👇
+CAPTION: Chunav se jail tak ka safar 😂
+HASHTAGS: #neta #chunav #desicomedy #funny
