@@ -72,6 +72,10 @@ PRESET_PLACES = {
     "market": [dict(x=x + 160, y=1296, px=150, m=0.8, looks=PLACES["market"][0]["looks"],
                     roles=PLACES["market"][0]["roles"]) for x in (20, 380, 740)],
 }
+# the hand-made hospital, bank, police station, court and canteen (style25d.scenery_civic) keep their counters where
+# the 2D picture has them, as pieces the people are depth-sorted with: only where the person stands
+PRESET_PLACES.update({p: [{k: v for k, v in c.items() if k != "shapes"} for c in PLACES[p]]
+                      for p in ("hospital", "bank", "police_station", "court", "canteen")})
 
 
 def painted(place, mode):

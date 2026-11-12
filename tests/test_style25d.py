@@ -45,7 +45,8 @@ class StyleWordsTests(unittest.TestCase):
         self.assertEqual(styles.preset_for(one_scene("living_room", "2.5d")), "room_25d")
         self.assertEqual(styles.preset_for(one_scene("classroom", "2.5d")), "classroom_25d")
         self.assertEqual(styles.preset_for(one_scene("office", "2.5d")), "office_25d")
-        self.assertEqual(styles.preset_for(one_scene("hospital", "2.5d")), "auto:hospital")  # made automatically
+        self.assertEqual(styles.preset_for(one_scene("hospital", "2.5d")), "hospital_25d")
+        self.assertEqual(styles.preset_for(one_scene("graveyard", "2.5d")), "auto:graveyard")  # made automatically
         self.assertIsNone(styles.preset_for(one_scene("plain", "2.5d")))                     # stays flat
         self.assertIsNone(styles.preset_for(one_scene("kitchen")))           # 2d
 
@@ -147,7 +148,9 @@ class RenderTests(unittest.TestCase):
         for place, preset in (("office", "office_25d"), ("meeting_room", "meeting_25d"), ("jungle", "jungle_25d"),
                               ("haunted_house", "haunted_25d"), ("bedroom", "bedroom_25d"),
                               ("street", "street_25d"), ("bus_stop", "busstop_25d"), ("market", "market_25d"),
-                              ("festival_street", "festival_25d"), ("railway", "railway_25d"), ("gaon", "gaon_25d")):
+                              ("festival_street", "festival_25d"), ("railway", "railway_25d"), ("gaon", "gaon_25d"),
+                              ("hospital", "hospital_25d"), ("bank", "bank_25d"), ("police_station", "police_25d"),
+                              ("court", "court_25d"), ("canteen", "canteen_25d"), ("dhaba", "dhaba_25d")):
             r = Renderer(one_scene(place, "2.5d"), self.W, use_tts=False)
             self.assertEqual(r.bd25.preset, preset)
             self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.4).tobytes(), place)    # screens, fan, leaves, bats
@@ -184,6 +187,22 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(r.plan.counter_mode, "preset")
         self.assertTrue(r.plan.counters)
         self.assertEqual(len([sp for sp in r.bd25.layered.sprites if sp.name == "counter"]), 3)
+
+    def test_counter_sets(self):
+        """In the hand-made hospital, bank, police station, court and canteen the person of the place stands behind
+        their counter (the same spot as in 2D) and the counter is a piece the people are sorted with."""
+        for place, cast, n in (("hospital", "A = receptionist, B = uncle", 1), ("bank", "A = cashier, B = aunty", 1),
+                               ("police_station", "A = police, B = boy", 1), ("court", "A = judge, B = boy gawah", 3),
+                               ("canteen", "A = chaiwala, B = college_boy", 1)):
+            s = ("HOOK: x\nSTYLE: 2.5d\nCAST: %s\nSCENE: %s\nB (angry): Suniye! | सुनिए\nA (smile): Ji? | जी\n"
+                 "CTA: tag\n") % (cast, place)
+            sc, _w = script.parse_script(s)
+            r = make_video(sc, self.W, use_tts=False)
+            r = getattr(r, "parts", [r])[0]
+            self.assertEqual(r.plan.counter_mode, "preset", place)
+            self.assertTrue(r.plan.counters, place)
+            self.assertEqual(len([sp for sp in r.bd25.layered.sprites if sp.name == "counter"]), n, place)
+            self.assertEqual(r.frame(1.0).size, (self.W, self.W * 16 // 9), place)
 
     def test_premium_sets_move(self):
         r = Renderer(one_scene("room", "2.5d"), self.W, use_tts=False)

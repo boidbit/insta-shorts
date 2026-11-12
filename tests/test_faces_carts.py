@@ -11,7 +11,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from studio import counters, objects, vehicles                        # noqa: E402
+from studio import counters, objects, styles, vehicles                # noqa: E402
 from studio.backgrounds import Background, TRAFFIC_NEW                # noqa: E402
 from studio.characters import (FACE_PARTS, FACE_WORDS, HAIR_STYLES, LOOKS, MARKS, build_character,   # noqa: E402
                                face_word)
@@ -278,15 +278,28 @@ class Counters25D(unittest.TestCase):
     """The same in the 2.5D style: a place split into layers gets its counters cut out of the layer the people stand
     in; the hand-made gali set (chai_tapri, kirana) already has its chai counter as a depth-sorted piece."""
 
+    TEXT = ("HOOK: h\nCAST: J = judge, A = boy\nSCENE: court\nJ (angry): Order! | ऑर्डर!\n"
+            "A: Main nirdosh hoon | मैं निर्दोष हूँ\nSTYLE: 2.5d\n")
+
     def test_auto_place(self):
-        text = ("HOOK: h\nCAST: J = judge, A = boy\nSCENE: court\nJ (angry): Order! | ऑर्डर!\n"
-                "A: Main nirdosh hoon | मैं निर्दोष हूँ\nSTYLE: 2.5d\n")
-        sc, _ = parse_script(text)
+        from unittest import mock
+        with mock.patch.dict(styles.PLACES_25D):       # (every counter place has a hand-made set now: take it away)
+            del styles.PLACES_25D["court"]
+            sc, _ = parse_script(self.TEXT)
+            r = make_video(sc, 216, use_tts=False)
+            part = getattr(r, "parts", [r])[0]
+            self.assertEqual(part.plan.counter_mode, "auto")
+            self.assertEqual(part.plan.counters, [0])
+            self.assertTrue(any(sp.name == "counter" for sp in part.bd25.layered.sprites))
+            self.assertLess(part.plan.chars["J"].draw_pos(1.0)[1], 1000)
+            self.assertEqual(r.frame(1.0).size, (216, 384))
+
+    def test_hand_made_court(self):
+        sc, _ = parse_script(self.TEXT)
         r = make_video(sc, 216, use_tts=False)
         part = getattr(r, "parts", [r])[0]
-        self.assertEqual(part.plan.counter_mode, "auto")
-        self.assertEqual(part.plan.counters, [0])
-        self.assertTrue(any(sp.name == "counter" for sp in part.bd25.layered.sprites))
+        self.assertEqual(part.plan.counter_mode, "preset")
+        self.assertEqual(part.plan.counters, [0])                  # the judge behind his bench, as in 2D
         self.assertLess(part.plan.chars["J"].draw_pos(1.0)[1], 1000)
         self.assertEqual(r.frame(1.0).size, (216, 384))
 

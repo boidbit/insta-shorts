@@ -275,7 +275,7 @@
           imaaratein, khidki ka nazara alag parat me; roshni aur parchhai logon pe bhi). ✨ wali jagahein haath se bane
           premium sets hain: <b>rasoi (kitchen), gali (gully / chai_tapri / kirana), chhat (terrace), ghar ka kamra
           (room / living_room), bedroom, classroom (school), office, meeting_room, jungle, haunted_house, street, bus_stop,
-          market, festival_street, railway, gaon</b>. Sirf apni photo, plain aur night_road flat rehti hain.</span>
+          market, festival_street, railway, gaon, hospital, bank, police_station, court, canteen, dhaba</b>. Sirf apni photo, plain aur night_road flat rehti hain.</span>
       </div>
       <div class="tabs" role="tablist">
         <button class="tab" role="tab" data-mode="script" aria-selected="true">📝 Apni script</button>
@@ -897,9 +897,9 @@ function ideaWithSettings(idea, b) {
 }
 // Video style. Places with a hand-made (premium) 2.5D set: same list as studio/styles.py PLACES_25D (a test keeps
 // them equal). Every other place gets its depth automatically in 2.5D.
-const STYLE_PLACES = ["bedroom", "bus_stop", "chai_tapri", "classroom", "festival_street", "gaon", "gully",
-  "haunted_house", "jungle", "kirana", "kitchen", "living_room", "market", "meeting_room", "office", "railway",
-  "room", "school", "street", "terrace"];
+const STYLE_PLACES = ["bank", "bedroom", "bus_stop", "canteen", "chai_tapri", "classroom", "court", "dhaba",
+  "festival_street", "gaon", "gully", "haunted_house", "hospital", "jungle", "kirana", "kitchen", "living_room",
+  "market", "meeting_room", "office", "police_station", "railway", "room", "school", "street", "terrace"];
 // The script's own `STYLE:` line: "2d" / "2.5d", or "" when it has none.
 function styleOf(text) {
   const m = (text || "").match(/^\s*STYLE\s*:\s*([\w.]+)/im);

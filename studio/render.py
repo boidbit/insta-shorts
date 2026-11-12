@@ -1238,7 +1238,8 @@ class Renderer(Output):
             sprites = [sp for sp in (self.bd25.layered.sprites if self.bd25 is not None else [])
                        if sp.name in ("counter", "tapri")]
             if sprites:                             # 2.5D: the counter piece the people are sorted with
-                im = sprites[0].im
+                i = (getattr(self.plan, "counters", None) or [0])[0]
+                im = sprites[i if not self._auto25 and i < len(sprites) else 0].im   # (a hand-made set: all of them)
             elif self.bg.static is not None and getattr(self.plan, "counters", None):
                 from . import counters
                 place = self.plan.background.get("type") if isinstance(self.plan.background, dict) else None
