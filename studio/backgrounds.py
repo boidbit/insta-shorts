@@ -607,6 +607,61 @@ AMBIENT = {
     "bus_stop": [("cloud", 220, 11, 1.0), ("cloud", 460, 7, 0.7), ("birds", 360, 55, 2), ("traffic", 1470, 0.42, 7.5)],
     "school": [("birds", 110, 48, 2)],
 }
+# the new camera: the traffic is in proportion to the people (a car on the far lane is about half a person tall, not
+# a toy), each with a driver at the wheel; ("traffic", y, scale, period, driven)
+TRAFFIC_NEW = {"street": ("traffic", 1600, 1.3, 8.0, True), "bus_stop": ("traffic", 1580, 1.2, 7.0, True)}
+TRAFFIC_KINDS = ("car", "auto", "truck", "car", "bike")
+TRAFFIC_COLORS = {"car": [(200, 50, 50), (240, 240, 236), (60, 100, 190), (160, 164, 172)]}
+
+
+# where the driver's head is in each vehicle (object units: x, y of the head's middle, radius)
+DRIVER_AT = {"car": (60, -182, 30), "auto": (72, -250, 32), "truck": (178, -208, 28), "bike": (-34, -296, 34)}
+_driven = {}
+
+
+def driven_sprite(kind, s, color=None):
+    """A vehicle of the background traffic with somebody driving it (a head in the window, a rider on the bike)."""
+    from . import objects
+    key = (kind, round(s, 4), tuple(color) if color else None)
+    if key in _driven:
+        return _driven[key]
+    im0, anchor, wheels = objects.sprite(kind, s, color)
+    extra = int(round(140 * s))                         # room above for the rider's head
+    im = Image.new("RGBA", (im0.width, im0.height + extra), (0, 0, 0, 0))
+    im.paste(im0, (0, extra))
+    anchor = (anchor[0], anchor[1] + extra)
+    wheels = [(x, y + extra, r) for x, y, r in wheels]
+
+    def P(ox, oy):
+        return anchor[0] + ox * s, anchor[1] + oy * s
+
+    d = ImageDraw.Draw(im)
+    lw = max(1, int(round(4 * s)))
+    shirt = (70, 110, 170)
+    hx, hy, hr = DRIVER_AT.get(kind, (0, -200, 30))
+    if kind == "bike":                                  # the rider: leg to the foot peg, body, arm to the handlebar
+        d.line([P(-80, -140), P(4, -128), P(36, -66)], fill=(50, 54, 70), width=max(2, int(26 * s)))
+        d.polygon([P(-104, -150), P(-60, -262), P(-16, -262), P(-44, -142)], fill=shirt, outline=INK)
+        d.line([P(-34, -246), P(40, -214), P(100, -200)], fill=shirt, width=max(2, int(20 * s)))
+    elif kind in ("car", "auto"):                       # shoulders in the window
+        x0, y0 = P(hx - 34, hy + hr - 4)
+        x1, y1 = P(hx + 34, hy + hr + 46)
+        d.rounded_rectangle([x0, y0, x1, y1], radius=max(1, int(12 * s)), fill=shirt, outline=INK, width=lw)
+    cx, cy = P(hx, hy)
+    r = hr * s
+    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(176, 120, 84), outline=INK, width=lw)
+    if kind == "bike":                                  # a helmet
+        d.chord([cx - r * 1.1, cy - r * 1.15, cx + r * 1.1, cy + r * 0.9], 160, 380, fill=(220, 40, 40), outline=INK,
+                width=lw)
+    else:                                               # hair
+        d.chord([cx - r, cy - r, cx + r, cy + r * 0.3], 180, 360, fill=(40, 40, 46))
+    if kind in objects.SPLIT:                           # the windows go over the head
+        front, fa, _w = objects.sprite(kind, s, color, "front")
+        if front is not None:
+            im.paste(front, (int(round(anchor[0] - fa[0])), int(round(anchor[1] - fa[1]))), front)
+    out = (im, anchor, wheels)
+    _driven[key] = out
+    return out
 
 
 def _cloud_sprite(s, scale):
@@ -628,6 +683,8 @@ class Background:
         self.kind = spec.get("type", "plain")
         self.scroll = float(spec.get("scroll", 0.0))   # logical px per second
         self.ambient = AMBIENT.get(self.kind, []) if spec.get("ambient", True) else []
+        if self.ambient and not spec.get("classic") and self.kind in TRAFFIC_NEW:
+            self.ambient = [TRAFFIC_NEW[self.kind] if a[0] == "traffic" else a for a in self.ambient]
         self._clouds = {}
         self.static = None
         self.parallax = float(spec.get("parallax", 1.0))   # 0 = all layers move with the ground
@@ -640,7 +697,7 @@ class Background:
             self.kind = vkind
             v = vehicles.VEHICLES[vkind]
             view = vehicles.VIEW_WORDS.get(str(spec.get("view", "")).lower(), v["view"])
-            sky, wides = vehicles.outside(view, s, spec.get("time"))
+            sky, wides = vehicles.outside(view, s, spec.get("time"), vkind)
             self.static = sky if sky.size == (out_w, out_h) else sky.resize((out_w, out_h), Image.LANCZOS)
             self.scroll = float(spec.get("scroll", v["speed"]))
             for im, mult in wides:
@@ -767,15 +824,21 @@ class Background:
 
     def _draw_traffic(self, img, t, item, s):
         from . import objects                      # (objects imports this module, so import lazily)
-        _k, y, scale, period = item
+        _k, y, scale, period = item[:4]
+        driven = len(item) > 4 and item[4]
         cycle, ct = int(t // period), t % period
         crossing = period * 0.62
         if ct > crossing:
             return
-        kinds = ("car", "auto", "scooter", "truck")
-        kind = kinds[cycle % len(kinds)]
         right = cycle % 2 == 0
-        im, (ax, ay), wheels = objects.sprite(kind, s * scale)
+        if driven:
+            kind = TRAFFIC_KINDS[cycle % len(TRAFFIC_KINDS)]
+            cols = TRAFFIC_COLORS.get(kind)
+            im, (ax, ay), wheels = driven_sprite(kind, s * scale, cols[(cycle // 2) % len(cols)] if cols else None)
+        else:
+            kinds = ("car", "auto", "scooter", "truck")
+            kind = kinds[cycle % len(kinds)]
+            im, (ax, ay), wheels = objects.sprite(kind, s * scale)
         p = ct / crossing
         x = (-ax + p * (self.out_w + 2 * im.width)) if right else (self.out_w + im.width - p * (self.out_w + 2 * im.width))
         if not right:

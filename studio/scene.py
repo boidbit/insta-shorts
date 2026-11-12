@@ -230,7 +230,7 @@ def compile_obj(plan, spec, t, warnings=None):
     o = plan.objects.get(kind)
     at = spec.get("at")
     spot = objects.SPOTS.get(at) if isinstance(at, str) else (float(at) if at is not None else None)
-    dur = float(spec.get("dur", 1.8 if kind in objects.VEHICLES else 1.0))
+    dur = float(spec.get("dur", objects.ENTER_DUR.get(kind, 1.8 if kind in objects.VEHICLES else 1.0)))
     vehicle = kind in objects.VEHICLES
     if o is None:
         rest = spot if spot is not None else objects.SPOTS["center"]

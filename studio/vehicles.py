@@ -30,7 +30,13 @@ VIEW_WORDS = {"city": "city", "shehar": "city", "sheher": "city", "gaon": "gaon"
               "highway": "highway", "pahad": "pahad", "mountain": "pahad", "mountains": "pahad", "samundar": "samundar",
               "sea": "samundar", "clouds": "clouds", "baadal": "clouds", "badal": "clouds", "tunnel": "tunnel"}
 SEATS = tuple(v["seat"] for v in VEHICLES.values())
-FLOOR_Y = 1250
+# Real-world proportions at the people's scale (a seated person is ~540 logical px from the seat to the top of the
+# head, ~6 px a cm): the wall stands right behind the seats, a window starts at a seated person's chest and ends a
+# little above the head, so a head sits in the window like it does on a real train / bus / plane.
+FLOOR_Y = 1610
+BANDS = {"train": (900, 1320), "bus": (740, 1270), "metro": (740, 1250), "plane": (942, 1178),
+         "car": (890, 1250), "auto": (880, 1340)}        # the window band (top, bottom) of each vehicle
+VIEW_CENTER = 575                                         # the views are drawn around this height, then moved
 # speeds of the outside layers relative to the ground speed, back to front
 LAYER_SPEEDS = (0.05, 0.3, 1.0)
 
@@ -71,9 +77,12 @@ def _wide(s, tint):
 TILES = (-LW, 0, LW, 2 * LW)
 
 
-def _sky(s, top, bottom):
+def _sky(s, top, bottom, dy=0):
     g = G(s)
     g.vgrad(0, LH, top, bottom)
+    if dy:                                          # the windows sit lower: the gradient follows them down
+        g.rect(0, 0, LW, dy, top)
+        g.vgrad(dy, LH, top, bottom)
     return g.done()
 
 
@@ -99,12 +108,22 @@ def _night_layer(im, amount=0.6):
     return out
 
 
-def outside(view, s, time=None):
-    """(sky picture, [(wide RGBA layer, speed)...]) of the view out of the windows."""
+def outside(view, s, time=None, kind=None):
+    """(sky picture, [(wide RGBA layer, speed)...]) of the view out of the windows of `kind` (moved into its band)."""
+    band = BANDS.get(kind)
+    dy = (band[0] + band[1]) / 2.0 - VIEW_CENTER if band else 0.0
+    sky, layers = _outside(view, s, time, dy)
+    if dy:
+        layers = [(_lift(l, -dy * s), sp) for l, sp in layers]
+    return sky, layers
+
+
+def _outside(view, s, time, dy):
     night = time == "night"
     rnd = random.Random(zlib.crc32(view.encode()) % 1000)
     if view == "clouds":
-        sky = _sky(s, (40, 96, 190) if not night else (8, 12, 40), (170, 214, 248) if not night else (40, 40, 90))
+        sky = _sky(s, (40, 96, 190) if not night else (8, 12, 40), (170, 214, 248) if not night else (40, 40, 90),
+                   dy)
         far, near = _wide(s, (255, 255, 255)), _wide(s, (255, 255, 255))
         for ox in TILES:
             for (x, y, r) in ((120, 640, 60), (430, 520, 80), (760, 700, 70), (980, 560, 50)):
@@ -116,7 +135,7 @@ def outside(view, s, time=None):
         layers = [(far.done(), 0.12), (_blur_x(near.done(), 3), 0.55)]
         return sky, [(_night_layer(l) if night else l, sp) for l, sp in layers]
     if view == "tunnel":
-        sky = _sky(s, (22, 22, 28), (34, 34, 40))
+        sky = _sky(s, (22, 22, 28), (34, 34, 40), dy)
         mid, near = _wide(s, (60, 60, 66)), _wide(s, (255, 214, 120))
         for ox in TILES:
             for x in range(0, LW, 180):
@@ -131,7 +150,7 @@ def outside(view, s, time=None):
             "highway": ((130, 190, 238), (226, 236, 240)), "pahad": ((110, 170, 230), (226, 238, 248)),
             "samundar": ((110, 180, 236), (232, 242, 246))}
     top, bottom = ((14, 18, 50), (54, 50, 96)) if night else tops[view]
-    sky = _sky(s, top, bottom)
+    sky = _sky(s, top, bottom, dy)
     far, mid, near = _wide(s, (150, 170, 190)), _wide(s, (120, 140, 120)), _wide(s, (40, 44, 40))
     for ox in TILES:
         if view == "city":
@@ -258,100 +277,123 @@ def _fan(g, x, y):
     g.line([(x, y - 22), (x, y - 70)], INK + (255,), 6)
 
 
+def _stitches(g, y0, y1, col, step=90):
+    for y in range(y0 + step // 2, y1, step):
+        g.line([(0, y), (LW, y)], col, 3)
+
+
 def inside(kind, s):
-    """The vehicle's inside as an RGBA picture with see-through windows (the view shows through them)."""
+    """The vehicle's inside as an RGBA picture with see-through windows (the view shows through them). The wall stands
+    right behind the seats and the windows sit at a seated person's head (see BANDS)."""
     g = _canvas(s)
     A = 255
+    top, bot = BANDS[kind]
     if kind == "train":                                         # an Indian sleeper coach
         wall, low = (150, 192, 206), (92, 130, 160)
         g.rect(0, 0, LW, FLOOR_Y, wall + (A,))
-        g.rect(0, 860, LW, FLOOR_Y, low + (A,))
-        g.rect(0, 0, LW, 190, (226, 228, 222, A))
-        for x in (270, 810):
-            _fan(g, x, 120)
-        g.rect(380, 30, 700, 52, (255, 255, 236, A), INK + (A,), 3)                 # the tubelight
-        g.rect(0, 220, LW, 290, (60, 92, 150, A), INK + (A,), 5)                     # the upper berth
-        for x in (20, 1040):
-            g.line([(x, 190), (x, 220)], (90, 90, 96, A), 6)
-        g.rrect(120, 160, 330, 220, 16, (150, 60, 50, A), INK + (A,), 4)              # luggage on it
-        g.rrect(760, 170, 920, 220, 14, (60, 90, 70, A), INK + (A,), 4)
-        for (x0, x1) in ((110, 470), (610, 970)):
-            g.rrect(x0 - 18, 362, x1 + 18, 818, 26, (210, 212, 216, A), INK + (A,), 6)
-            _hole(g, x0, 380, x1, 800, 18)
-            _glare(g, x0, 380, x1, 800)
-            for y in range(430, 800, 75):                                            # window bars
+        g.rect(0, bot + 20, LW, FLOOR_Y, low + (A,))
+        g.rect(0, 0, LW, 300, (226, 228, 222, A))                                   # the roof
+        g.line([(0, 300), (LW, 300)], INK + (A,), 4)
+        g.rect(380, 300, 700, 326, (255, 255, 236, A), INK + (A,), 3)               # the tubelight
+        for x in (190, 890):
+            _fan(g, x, 400)
+        for x in (20, 1040):                                                        # the chains of the upper berth
+            g.line([(x, 300), (x, 600)], (90, 90, 96, A), 6)
+        g.rrect(110, 500, 330, 604, 16, (150, 60, 50, A), INK + (A,), 4)              # luggage on the upper berth
+        g.rrect(330, 530, 440, 604, 12, (230, 190, 90, A), INK + (A,), 4)
+        g.rrect(760, 520, 930, 604, 14, (60, 90, 70, A), INK + (A,), 4)
+        g.rect(0, 600, LW, 668, (60, 92, 150, A), INK + (A,), 5)                     # the upper berth
+        for (x0, x1) in ((90, 510), (570, 990)):
+            g.rrect(x0 - 18, top - 18, x1 + 18, bot + 18, 26, (210, 212, 216, A), INK + (A,), 6)
+            _hole(g, x0, top, x1, bot, 18)
+            _glare(g, x0, top, x1, bot)
+            for y in range(top + 60, bot, 70):                                       # window bars
                 g.line([(x0, y), (x1, y)], (196, 198, 204, A), 9)
-            g.rect(x0 + 60, 830, x1 - 60, 856, (120, 90, 60, A), INK + (A,), 4)          # the little table
-        g.rect(520, 330, 560, 360, (200, 40, 40, A), INK + (A,), 3)                    # the alarm chain
-        g.line([(540, 360), (540, 440)], (120, 120, 126, A), 4)
+            g.rect(x0 + 70, bot + 22, x1 - 70, bot + 50, (120, 90, 60, A), INK + (A,), 4)   # the little table
+        g.rect(520, top - 70, 560, top - 40, (200, 40, 40, A), INK + (A,), 3)          # the alarm chain
+        g.line([(540, top - 40), (540, top + 40)], (120, 120, 126, A), 4)
         _floor(g, (118, 120, 120))
     elif kind in ("bus", "metro"):
         metro = kind == "metro"
         wall, low = ((228, 230, 234), (176, 180, 188)) if metro else ((232, 220, 190), (70, 110, 150))
         g.rect(0, 0, LW, FLOOR_Y, wall + (A,))
-        g.rect(0, 800, LW, FLOOR_Y, low + (A,))
-        g.rect(0, 0, LW, 150, (214, 216, 220, A) if metro else (210, 200, 176, A))
-        g.rect(80, 40, 1000, 62, (255, 255, 240, A), INK + (A,), 3)                    # ceiling lights
+        g.rect(0, bot + 16, LW, FLOOR_Y, low + (A,))
+        g.rect(0, 0, LW, 400, (214, 216, 220, A) if metro else (210, 200, 176, A))  # the roof
+        g.line([(0, 400), (LW, 400)], INK + (A,), 4)
+        g.rect(80, 372, 1000, 396, (255, 255, 240, A), INK + (A,), 3)                  # ceiling lights
         bands = ((30, 500), (580, 1050)) if metro else ((30, 360), (380, 700), (720, 1050))
         for (x0, x1) in bands:
-            g.rrect(x0 - 10, 350, x1 + 10, 770, 14, (60, 62, 66, A), INK + (A,), 5)
-            _hole(g, x0 + 6, 366, x1 - 6, 754, 10)
-            _glare(g, x0 + 6, 366, x1 - 6, 754)
-        g.line([(0, 240), (LW, 240)], (190, 192, 198, A), 12)                          # the grab rail
+            g.rrect(x0 - 10, top - 16, x1 + 10, bot + 16, 14, (60, 62, 66, A), INK + (A,), 5)
+            _hole(g, x0 + 6, top, x1 - 6, bot, 10)
+            _glare(g, x0 + 6, top, x1 - 6, bot)
+            if not metro:                                                             # a bus window slides
+                g.line([((x0 + x1) // 2, top), ((x0 + x1) // 2, bot)], (60, 62, 66, A), 8)
+        rail = 520 if metro else 560
+        g.line([(0, rail), (LW, rail)], (190, 192, 198, A), 12)                        # the grab rail
         for x in range(90, LW, 150):                                                    # hanging handles
-            g.line([(x, 246), (x, 300)], (60, 60, 66, A), 6)
-            g.ellipse(x - 20, 296, x + 20, 336, None, (60, 60, 66, A), 7)
+            g.line([(x, rail + 6), (x, rail + 70)], (60, 60, 66, A), 6)
+            g.ellipse(x - 20, rail + 66, x + 20, rail + 106, None, (60, 60, 66, A), 7)
         if metro:
-            g.rect(80, 300, 1000, 336, (250, 250, 250, A), INK + (A,), 3)              # the route map
-            g.line([(110, 318), (970, 318)], (220, 60, 60, A), 6)
+            g.rect(80, 630, 1000, 676, (250, 250, 250, A), INK + (A,), 3)              # the route map
+            g.line([(110, 653), (970, 653)], (220, 60, 60, A), 6)
             for x in range(130, 970, 95):
-                g.circle(x, 318, 9, (255, 255, 255, A), (220, 60, 60, A), 4)
+                g.circle(x, 653, 9, (255, 255, 255, A), (220, 60, 60, A), 4)
             for x in (300, 780):                                                        # poles
-                g.rect(x, 150, x + 16, FLOOR_Y, (200, 202, 208, A), INK + (A,), 3)
+                g.rect(x, 400, x + 16, FLOOR_Y, (200, 202, 208, A), INK + (A,), 3)
         else:
-            g.rect(470, 280, 610, 320, (250, 220, 70, A), INK + (A,), 3)               # a sign
-            g.circle(1030, 300, 14, (220, 40, 40, A), INK + (A,), 3)                  # the stop bell
+            g.rect(470, 440, 610, 480, (250, 220, 70, A), INK + (A,), 3)               # a sign
+            g.circle(1030, top - 50, 14, (220, 40, 40, A), INK + (A,), 3)              # the stop bell
         _floor(g, (150, 152, 156) if metro else (62, 64, 68))
     elif kind == "plane":
         wall = (236, 232, 222)
         g.rect(0, 0, LW, FLOOR_Y, wall + (A,))
-        g.rrect(-40, 60, LW + 40, 300, 40, (222, 222, 218, A), INK + (A,), 5)          # overhead bins
+        g.rect(0, 0, LW, 380, (226, 224, 216, A))                                       # the ceiling
+        g.rrect(-40, 380, LW + 40, 690, 40, (222, 222, 218, A), INK + (A,), 5)          # overhead bins
         for x in range(180, LW, 260):
-            g.line([(x, 70), (x, 296)], (180, 180, 178, A), 4)
-            g.rect(x - 70, 250, x - 30, 270, (120, 120, 120, A))
-        g.rrect(470, 316, 610, 360, 10, (40, 40, 44, A), INK + (A,), 3)                 # the seat-belt sign
-        g.rect(492, 326, 520, 350, (250, 210, 80, A))
-        g.rect(540, 326, 588, 350, (250, 210, 80, A))
+            g.line([(x, 390), (x, 686)], (180, 180, 178, A), 4)
+            g.rect(x - 70, 640, x - 30, 660, (120, 120, 120, A))
+        g.rrect(470, 712, 610, 756, 10, (40, 40, 44, A), INK + (A,), 3)                 # the seat-belt sign
+        g.rect(492, 722, 520, 746, (250, 210, 80, A))
+        g.rect(540, 722, 588, 746, (250, 210, 80, A))
+        g.line([(0, bot + 90), (LW, bot + 90)], (214, 210, 200, A), 6)                  # the side panel's edge
         for cx in (220, 540, 860):
-            g.ellipse(cx - 92, 420, cx + 92, 700, (210, 208, 200, A), INK + (A,), 6)
-            _hole(g, cx - 70, 440, cx + 70, 680, oval=True)
-            g.rect(cx - 70, 440, cx + 70, 480, (200, 200, 196, A))                    # the blind, half down
-            g.line([(cx - 70, 480), (cx + 70, 480)], INK + (A,), 3)
+            g.ellipse(cx - 92, top - 22, cx + 92, bot + 22, (210, 208, 200, A), INK + (A,), 6)
+            _hole(g, cx - 70, top, cx + 70, bot, oval=True)
+            g.rect(cx - 70, top, cx + 70, top + 50, (200, 200, 196, A))               # the blind, half down
+            g.line([(cx - 70, top + 50), (cx + 70, top + 50)], INK + (A,), 3)
         _floor(g, (64, 82, 140))
     elif kind == "car":
         g.rect(0, 0, LW, FLOOR_Y, (90, 90, 96, A))
-        g.rect(0, 0, LW, 260, (204, 200, 190, A))                                       # roof lining
-        g.poly([(40, 300), (480, 300), (500, 760), (40, 760)], (40, 40, 44, A))
-        g.poly([(580, 300), (1040, 300), (1040, 760), (560, 760)], (40, 40, 44, A))
-        _hole(g, 64, 320, 468, 742)
-        _hole(g, 592, 320, 1020, 742)
-        _glare(g, 64, 320, 468, 742)
-        _glare(g, 592, 320, 1020, 742)
-        g.rect(500, 280, 560, 800, (30, 30, 34, A))                                     # the middle pillar
-        g.rect(0, 800, LW, 840, (70, 70, 76, A))
-        g.rect(120, 900, 300, 930, (150, 150, 156, A), INK + (A,), 3)                    # door handles
-        g.rect(680, 900, 860, 930, (150, 150, 156, A), INK + (A,), 3)
+        g.rect(0, 0, LW, top - 40, (204, 200, 190, A))                                  # the roof lining
+        g.rect(0, top - 120, LW, top - 40, (190, 186, 176, A))
+        g.circle(540, 420, 34, (250, 246, 220, A), INK + (A,), 4)                         # the cabin light
+        for x0 in (190, 760):                                                           # grab handles over the doors
+            g.rrect(x0, top - 104, x0 + 130, top - 80, 10, (150, 146, 136, A), INK + (A,), 3)
+        g.poly([(40, top - 30), (480, top - 30), (500, bot + 18), (40, bot + 18)], (40, 40, 44, A))
+        g.poly([(580, top - 30), (1040, top - 30), (1040, bot + 18), (560, bot + 18)], (40, 40, 44, A))
+        _hole(g, 64, top - 10, 468, bot)
+        _hole(g, 592, top - 10, 1020, bot)
+        _glare(g, 64, top - 10, 468, bot)
+        _glare(g, 592, top - 10, 1020, bot)
+        g.rect(500, top - 60, 560, bot + 60, (30, 30, 34, A))                           # the middle pillar
+        g.rect(0, bot + 40, LW, bot + 80, (70, 70, 76, A))                              # the door's top
+        g.rect(120, bot + 130, 300, bot + 160, (150, 150, 156, A), INK + (A,), 3)        # door handles
+        g.rect(680, bot + 130, 860, bot + 160, (150, 150, 156, A), INK + (A,), 3)
         _floor(g, (40, 40, 44))
     elif kind == "auto":
-        g.rect(0, 0, LW, 230, (30, 30, 32, A))                                          # the black canopy
-        g.rect(0, 200, LW, 240, (240, 200, 40, A))
-        g.rect(0, 860, LW, FLOOR_Y, (40, 120, 70, A))                                   # green body below
-        g.rect(0, 860, LW, 880, (240, 200, 40, A))
-        g.rect(0, 240, 50, 860, (30, 30, 32, A))
-        g.rect(LW - 50, 240, LW, 860, (30, 30, 32, A))
-        _hole(g, 50, 240, LW - 50, 860)                                                 # open sides: no glass
-        g.line([(50, 330), (LW - 50, 330)], (200, 202, 208, A), 10)                     # the grab bar
-        g.rrect(60, 600, 200, 700, 12, (20, 20, 22, A), INK + (A,), 3)                  # the fare meter
-        g.rect(80, 620, 180, 660, (230, 60, 40, A))
+        g.rect(0, 0, LW, top, (30, 30, 32, A))                                          # the black canopy
+        _stitches(g, 0, top - 60, (52, 52, 56, A))
+        g.rect(0, top - 40, LW, top, (240, 200, 40, A))
+        g.rrect(800, 200, 1000, 290, 14, (20, 20, 22, A), (70, 70, 76, A), 4)            # the music speaker
+        for x in (850, 950):
+            g.circle(x, 245, 30, (60, 60, 66, A), INK + (A,), 3)
+        g.rect(0, bot, LW, FLOOR_Y, (40, 120, 70, A))                                   # green body below
+        g.rect(0, bot, LW, bot + 20, (240, 200, 40, A))
+        g.rect(0, top, 50, bot, (30, 30, 32, A))
+        g.rect(LW - 50, top, LW, bot, (30, 30, 32, A))
+        _hole(g, 50, top, LW - 50, bot)                                                 # open sides: no glass
+        g.line([(50, top + 80), (LW - 50, top + 80)], (200, 202, 208, A), 10)           # the grab bar
+        g.rrect(60, top + 120, 200, top + 220, 12, (20, 20, 22, A), INK + (A,), 3)      # the fare meter
+        g.rect(80, top + 140, 180, top + 180, (230, 60, 40, A))
         _floor(g, (34, 34, 36))
     return g.done()

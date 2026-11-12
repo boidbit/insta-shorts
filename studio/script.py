@@ -68,7 +68,8 @@ import re
 import zlib
 
 from . import actions, audio, decor, gemini_music, objects, rides, styles, theme, vehicles
-from .characters import (ACCESSORIES, EXPRESSIONS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, LOOKS, OUTFITS, PALETTE,
+from .characters import (ACCESSORIES, EXPRESSIONS, FACE_PARTS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, HAIR_WORDS,
+                         LOOKS, MARKS, OUTFITS, PALETTE, face_word,
                          SKIN_TONES)
 from .util import asset_path
 from .scene import (CTA_STYLES, DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLOTS, apply_cta, apply_loop, chat_length,
@@ -173,8 +174,14 @@ ROLE_LOOKS = {
     "makaan_malik": "landlord", "malik": "landlord", "youtuber": "influencer", "vlogger": "influencer",
     "milkman": "doodhwala", "ticket_checker": "tt", "ghost": "bhoot", "hostess": "air_hostess",
     "busconductor": "conductor",
+    "kulche_wala": "kulchewala", "matar_kulche_wala": "kulchewala", "kulchawala": "kulchewala",
+    "thele_wala": "thelewala", "thelawala": "thelewala", "thela_wala": "thelewala", "rehriwala": "thelewala",
+    "rehri_wala": "thelewala", "rehdiwala": "thelewala", "chaatwala": "thelewala", "momowala": "thelewala",
+    "golgappewala": "thelewala", "panipuriwala": "thelewala", "phalwala": "thelewala", "fruitwala": "thelewala",
+    "foodblogger": "food_blogger", "food_vlogger": "food_blogger", "foodie": "food_blogger",
+    "food_bloggerni": "food_blogger_girl", "vloggerni": "food_blogger_girl", "youtuber_girl": "food_blogger_girl",
 }
-FEMALE_LOOKS = {"air_hostess", "girl", "college_girl", "aunty", "dadi", "kid_girl", "office_girl", "madam", "dulhan", "nurse",
+FEMALE_LOOKS = {"food_blogger_girl", "air_hostess", "girl", "college_girl", "aunty", "dadi", "kid_girl", "office_girl", "madam", "dulhan", "nurse",
                 "saas", "bahu"}
 PITCHES = ["+0Hz", "+14Hz", "-8Hz", "+24Hz", "-14Hz"]
 BUILDS = ("slim", "normal", "chubby")
@@ -194,7 +201,8 @@ def vocab():
     return {
         "places": sorted(BACKGROUNDS),
         "looks": sorted(LOOKS), "roles": sorted(ROLE_LOOKS),
-        "extras": sorted(set(ACCESSORIES) | set(HAIR_STYLES) | set(OUTFITS) | set(SKIN_TONES) | set(BUILDS)
+        "extras": sorted(set(ACCESSORIES) | set(HAIR_STYLES) | set(HAIR_WORDS) | set(OUTFITS) | set(SKIN_TONES)
+                         | set(BUILDS)
                          | set(BUILD_WORDS) | set(HEIGHT_WORDS)
                          | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS) | set(FACE_WORDS)),
         "expressions": sorted(EXPRESSIONS), "actions": sorted(actions.ACTIONS),
@@ -214,6 +222,9 @@ def vocab():
         "framings": sorted(FRAMINGS), "angle_words": sorted(ANGLE_WORDS + OTS_WORDS),
         # the page's Builder pickers
         "role_looks": sorted([r, l] for r, l in ROLE_LOOKS.items()), "hair": list(HAIR_STYLES),
+        "face_parts": {k: [[v, face_word(k, v)] for v in vals] for k, vals in FACE_PARTS.items()},
+        "thela_words": sorted(objects.THELA_WORDS),
+        "marks": list(MARKS),
         "skin": list(SKIN_TONES), "outfits": list(OUTFITS), "colors": sorted(PALETTE), "accessories": list(ACCESSORIES),
         "builds": list(BUILDS),
     }
@@ -248,6 +259,8 @@ def cast_spec(words, index, unknown=None):
             acc.append(w)
         elif w in HAIR_STYLES:
             spec["hair"] = w
+        elif w in HAIR_WORDS:                          # do_choti, takla...
+            spec["hair"] = HAIR_WORDS[w]
         elif w in OUTFITS:
             spec["outfit"] = w
         elif w in SKIN_TONES:
@@ -258,8 +271,12 @@ def cast_spec(words, index, unknown=None):
             spec["build"] = BUILD_WORDS[w]
         elif w in HEIGHT_WORDS:                        # tall / lamba / nata
             spec["height"] = HEIGHT_WORDS[w]
-        elif w in FACE_WORDS:                          # round_face, big_eyes, button_nose, thick_brows...
-            spec[FACE_WORDS[w][0]] = FACE_WORDS[w][1]
+        elif w in FACE_WORDS:                          # round_face, big_eyes, button_nose, thick_brows, mole...
+            key_, val_ = FACE_WORDS[w]
+            if key_ == "marks":
+                spec["marks"] = sorted(set(spec.get("marks", [])) | {val_})
+            else:
+                spec[key_] = val_
         elif w in ("female", "woman", "ladki", "aurat"):
             female = True
         elif w in ("male", "man", "ladka", "aadmi"):
@@ -298,6 +315,45 @@ SHIRT_ORDER = ("blue", "mustard", "red", "teal", "purple", "orange", "green", "m
 def _classic_env():
     from .scene import camera_style
     return camera_style({}) == "classic"
+
+
+OLD_LOOKS = ("dada", "dadi", "principal", "landlord", "neta", "saas", "pandit")
+LIP_CYCLE = {True: ("full", "normal", "full", "thin"), False: ("normal", "thin", "normal", "smirk", "full")}
+EAR_CYCLE = ("normal", "big", "normal", "small", "normal")
+
+
+def vary_faces(cast):
+    """Every person gets a few small things of their own on top of the face shape, eyes, nose and brows: their lips,
+    ears, lashes (women), lines on the face (the old), now and then a mole, dimples or freckles. What the script
+    or the look already says is kept. (`CAMERA: classic`: not used, the faces stay as they were.)"""
+    i = 0
+    for name, spec in cast.items():
+        if spec.get("hidden") or spec.get("kind"):
+            continue
+        look = spec.get("look", "boy")
+        base = LOOKS.get(look, {})
+        female = look in FEMALE_LOOKS or str(spec.get("voice", {}).get("name", "")).startswith("hi-IN-Swara")
+        h = zlib.crc32(("face|" + name).encode("utf-8"))
+
+        def put(key, val):
+            if key not in spec and key not in base and val not in (None, "normal"):
+                spec[key] = val
+        put("lips", LIP_CYCLE[female][(i + h) % len(LIP_CYCLE[female])])
+        put("ears", EAR_CYCLE[(i * 2 + h) % len(EAR_CYCLE)])
+        if female:
+            put("lashes", True)
+        marks = list(spec.get("marks", base.get("marks", [])))
+        if look in OLD_LOOKS and "age_lines" not in marks:
+            marks.append("age_lines")
+        extra = ("mole", "dimple", None, "freckles", None, None, "dimple")[(h >> 4) % 7]
+        if extra == "freckles" and look in OLD_LOOKS:
+            extra = None
+        if extra and extra not in marks and "marks" not in spec:
+            marks.append(extra)
+        if marks and "marks" not in spec:
+            spec["marks"] = marks
+        i += 1
+    return cast
 
 
 def vary_bodies(cast):
@@ -736,6 +792,8 @@ def parse_obj(rest):
             spec["front"] = True
         elif w in ("big", "small"):
             spec["scale"] = 1.35 if w == "big" else 0.7
+        elif spec["kind"] == "thela" and objects.thela_kind(w):     # `OBJ: thela kulche enter left`
+            spec["kind"] = objects.thela_kind(w)
         elif w in PALETTE:
             spec["color"] = w
         else:
@@ -834,6 +892,38 @@ def unflatten(text):
     return (t, True) if t.count("\n") > text.strip().count("\n") else (text, False)
 
 
+SAVED_FILE = "characters.json"
+SAVED_RE = re.compile(r"@([A-Za-z_][\w]*)")
+
+
+def saved_characters(path=None):
+    """Your saved characters, {name: "cast words"}, from characters.json (or $STUDIO_CHARACTERS):
+    {"raju": "uncle mohawk handlebar_moustache big_ears", "pinky": "girl bob lashes mole"}. A missing file = none."""
+    import json
+    path = path or os.environ.get("STUDIO_CHARACTERS") or asset_path(SAVED_FILE)
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {str(k).strip().lstrip("@").lower(): " ".join(v) if isinstance(v, list) else str(v)
+            for k, v in data.items()}
+
+
+def expand_saved(words, saved, warnings):
+    """`R = @raju` -> R = the words saved for raju (an unknown name is dropped with a warning)."""
+    def sub(m):
+        name = m.group(1).lower()
+        if name in saved:
+            return " " + saved[name] + " "
+        warnings.append("@%s: ye saved character nahi mila. Page par 💾 se save karo, ya characters.json me likho "
+                        "(\"%s\": \"uncle mohawk big_ears\")" % (m.group(1), name))
+        return " "
+    return SAVED_RE.sub(sub, words)
+
+
 def parse_script(text):
     """Return (scene dict, warnings)."""
     text, flat = unflatten(text)
@@ -879,6 +969,8 @@ def parse_script(text):
                 for part in re.split(r",\s*(?=[A-Za-z_]\w*\s*=)", val):
                     if "=" in part:
                         n, w = part.split("=", 1)
+                        if "@" in w:                # a saved character: `R = @raju` (+ more words if you like)
+                            w = expand_saved(w, saved_characters(), warnings)
                         add_cast(n.strip(), _words(w))
             elif key == "SCENE":
                 bg, _, rest = val.partition("|")
@@ -1252,6 +1344,7 @@ def parse_script(text):
     vary_cast(cast)
     if not classic:
         vary_bodies(cast)                           # (`CAMERA: classic`: everybody as before)
+        vary_faces(cast)
     hook = meta.get("HOOK") or ""
     if not hook:
         warnings.append("no HOOK: line - the first second has no hook text")

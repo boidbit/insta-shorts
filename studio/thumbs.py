@@ -26,12 +26,50 @@ def thumb(spec):
     return out
 
 
+def face_chart():
+    """One picture of every face-card choice, each labelled with the word that goes in the script
+    (assets/faces/chart.png, shown on the page's face card)."""
+    from PIL import ImageDraw
+    from .characters import FACE_PARTS, HAIR_STYLES, MARKS, face_word
+    from .text import font
+    items = []
+    girl_parts = {"lips", "eyes"}
+    for part, vals in FACE_PARTS.items():
+        for v in vals:
+            base = {"look": "college_girl" if part in girl_parts else "boy"}
+            if part == "moustache" and v == "none":
+                base = {"look": "police"}
+            items.append((face_word(part, v), dict(base, **{part: v})))
+    for m in MARKS:
+        items.append((m, {"look": "dada" if m == "age_lines" else "boy", "marks": [m]}))
+    items += [("blush", {"look": "girl", "cheeks": "blush"}), ("lashes", {"look": "girl", "lashes": True})]
+    for h in HAIR_STYLES:
+        items.append((h, {"look": "college_girl" if h in ("long", "braid", "bun", "ponytail", "bob", "two_plaits",
+                                                         "side_braid", "curly_open") else "boy", "hair": h}))
+    cols, cw, ch, lab = 8, 120, 150, 24
+    rows = (len(items) + cols - 1) // cols
+    sheet = Image.new("RGB", (cols * cw, rows * (ch + lab)), (244, 246, 250))
+    d = ImageDraw.Draw(sheet)
+    for i, (word, spec) in enumerate(items):
+        x, y = (i % cols) * cw, (i // cols) * (ch + lab)
+        im = thumb(spec)
+        sheet.paste(im, (x, y), im)
+        f = font(13 if len(word) < 15 else 10.5, "main")
+        d.text((x + cw / 2, y + ch + lab / 2), word, font=f, fill=(30, 30, 40), anchor="mm")
+    return sheet
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     for look in sorted(LOOKS):
         path = os.path.join(OUT, look + ".png")
         thumb({"look": look}).save(path, optimize=True)
         print(path)
+    faces = os.path.join(ROOT, "assets", "faces")
+    os.makedirs(faces, exist_ok=True)
+    path = os.path.join(faces, "chart.png")
+    face_chart().quantize(colors=128).save(path, optimize=True)
+    print(path)
 
 
 if __name__ == "__main__":
