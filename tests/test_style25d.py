@@ -145,7 +145,9 @@ class RenderTests(unittest.TestCase):
 
     def test_the_new_premium_sets(self):
         for place, preset in (("office", "office_25d"), ("meeting_room", "meeting_25d"), ("jungle", "jungle_25d"),
-                              ("haunted_house", "haunted_25d"), ("bedroom", "bedroom_25d")):
+                              ("haunted_house", "haunted_25d"), ("bedroom", "bedroom_25d"),
+                              ("street", "street_25d"), ("bus_stop", "busstop_25d"), ("market", "market_25d"),
+                              ("festival_street", "festival_25d"), ("railway", "railway_25d"), ("gaon", "gaon_25d")):
             r = Renderer(one_scene(place, "2.5d"), self.W, use_tts=False)
             self.assertEqual(r.bd25.preset, preset)
             self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.4).tobytes(), place)    # screens, fan, leaves, bats
@@ -165,12 +167,32 @@ class RenderTests(unittest.TestCase):
         sc = dict(one_scene("office", "2.5d"), dress="auto")              # the hand-made set: dressed already
         self.assertFalse([o for o in Renderer(sc, self.W, use_tts=False).plan.sets if o.get("decor")])
 
+    def test_road_sets_keep_their_traffic(self):
+        """The hand-made street and bus stop still have the place's own cars, clouds and birds; the bazaar's
+        sabziwala stands behind his stall's counter."""
+        for place in ("street", "bus_stop"):
+            names = [ly.name for ly in Renderer(one_scene(place, "2.5d"), self.W, use_tts=False).bd25.layered.back]
+            self.assertIn("ambient", names, place)
+            self.assertIn("sky_life", names, place)
+        names = [ly.name for ly in Renderer(one_scene("market", "2.5d"), self.W, use_tts=False).bd25.layered.back]
+        self.assertNotIn("ambient", names)
+        s = ("HOOK: x\nSTYLE: 2.5d\nCAST: A = sabziwala, B = aunty\nSCENE: market\n"
+             "B (angry): Tamatar itne mehenge? | टमाटर\nA (smile): Aunty, sone ke hain! | आंटी\nCTA: tag\n")
+        sc, _w = script.parse_script(s)
+        r = make_video(sc, self.W, use_tts=False)
+        r = getattr(r, "parts", [r])[0]
+        self.assertEqual(r.plan.counter_mode, "preset")
+        self.assertTrue(r.plan.counters)
+        self.assertEqual(len([sp for sp in r.bd25.layered.sprites if sp.name == "counter"]), 3)
+
     def test_premium_sets_move(self):
         r = Renderer(one_scene("room", "2.5d"), self.W, use_tts=False)
         self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.03).tobytes())       # the fan turns, the TV flickers
 
     def test_auto_place_at_night_and_in_a_close_shot(self):
-        for place in ("street", "hostel"):
+        auto = [p for p in json.loads(re.search(r'id="vocab">(.*?)</script>', PAGE, re.S).group(1))["places"]
+                if (styles.preset_for(one_scene(p, "2.5d")) or "").startswith("auto:")]
+        for place in auto[:2]:                                    # (the places still made automatically)
             sc = one_scene(place, "2.5d")
             sc["background"] = dict(sc["background"], time="night")
             r = Renderer(dict(sc, angle=3), self.W, use_tts=False)

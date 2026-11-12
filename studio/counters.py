@@ -68,6 +68,9 @@ _TAPRI = dict(x=990, y=1290, px=235, m=1.0)
 PRESET_PLACES = {
     "chai_tapri": [dict(_TAPRI, looks=PLACES["chai_tapri"][0]["looks"], roles=PLACES["chai_tapri"][0]["roles"])],
     "kirana": [dict(_TAPRI, looks=PLACES["kirana"][0]["looks"], roles=PLACES["kirana"][0]["roles"])],
+    # the hand-made bazaar (style25d.scenery_road.market_25d): three stalls whose counters are depth-sorted pieces
+    "market": [dict(x=x + 160, y=1296, px=150, m=0.8, looks=PLACES["market"][0]["looks"],
+                    roles=PLACES["market"][0]["roles"]) for x in (20, 380, 740)],
 }
 
 

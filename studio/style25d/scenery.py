@@ -792,11 +792,17 @@ PRESETS = {
     "jungle_25d": _lazy("scenery_more", "jungle_25d"),
     "haunted_25d": _lazy("scenery_more", "haunted_25d"),
     "bedroom_25d": _lazy("scenery_more", "bedroom_25d"),
+    "street_25d": _lazy("scenery_road", "street_25d"),
+    "busstop_25d": _lazy("scenery_road", "busstop_25d"),
+    "market_25d": _lazy("scenery_road", "market_25d"),
+    "festival_25d": _lazy("scenery_town", "festival_25d"),
+    "railway_25d": _lazy("scenery_town", "railway_25d"),
+    "gaon_25d": _lazy("scenery_town", "gaon_25d"),
 }
 
 
 # ------------------------------------------------------------------ the studio's 2.5d set
-SUNLIT = {"sunlight", "dust", "chalk dust"}         # light layers that come from the sun (they fade at night)
+SUNLIT = {"sunlight", "dust", "chalk dust", "leaf_shade"}         # light layers that come from the sun (they fade at night)
 
 
 def _fade(im, f):

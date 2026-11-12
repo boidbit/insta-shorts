@@ -30,16 +30,26 @@ PLACES_25D = {
     "jungle": "jungle_25d",
     "haunted_house": "haunted_25d",
     "bedroom": "bedroom_25d",
+    "street": "street_25d",
+    "bus_stop": "busstop_25d",
+    "market": "market_25d",
+    "festival_street": "festival_25d",
+    "railway": "railway_25d",
+    "gaon": "gaon_25d",
 }
 # sets with writing on them (shop signs, menus, boards) are never mirrored for a reverse shot (the text would read
 # backwards). The 2d look mirrors every place, as it always has.
-NO_MIRROR = {"gali_25d", "classroom_25d", "office_25d", "meeting_25d"} | {
+NO_MIRROR = {"gali_25d", "classroom_25d", "office_25d", "meeting_25d", "street_25d", "busstop_25d", "market_25d",
+             "festival_25d", "railway_25d"} | {
     "auto:" + p for p in ("bus_stop", "railway", "canteen", "exam_hall", "library", "coaching", "party", "gym",
                           "hospital", "police_station", "bank")}
+# hand-made outdoor sets that keep their place's moving life (traffic on the road, clouds, birds)
+KEEP_AMBIENT = {"street_25d", "busstop_25d"}
 # the light each preset is painted in; another SCENE time (night, rain...) re-lights it
 NATIVE_TIME = {"kitchen_25d": "day", "gali_25d": "sunset", "diwali_rooftop": "night", "room_25d": "day",
                "classroom_25d": "day", "office_25d": "day", "meeting_25d": "day", "jungle_25d": "day",
-               "haunted_25d": "night", "bedroom_25d": "day"}
+               "haunted_25d": "night", "bedroom_25d": "day", "street_25d": "day", "busstop_25d": "day",
+               "market_25d": "day", "festival_25d": "night", "railway_25d": "day", "gaon_25d": "day"}
 
 
 def normalize(value):

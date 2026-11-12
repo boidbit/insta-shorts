@@ -474,9 +474,14 @@ class Renderer(Output):
         cams = [sg[3] for sg in self.plan.cam_segments] + ([1.05] if self.plan.shakes else [])
         zmax = self.plan.angle["zoom"] * max([1.0] + cams)
         extra = []
-        if preset.startswith("auto:") and self.bg.ambient:
+        bg = self.bg if preset.startswith("auto:") else None
+        if preset in styles.KEEP_AMBIENT:               # a hand-made road / outdoor set: the place's own traffic,
+            spec = self.plan.background                 # clouds and birds still pass (only those are drawn from it)
+            if getattr(self.plan, "camera", "") != "cine" and isinstance(spec, dict):
+                spec = dict(spec, classic=True)
+            bg = Background(spec, self.bg.out_w, self.bg.out_h)
+        if bg is not None and bg.ambient:
             from .style25d.scenery import Layer
-            bg = self.bg
 
             def ambient(kinds):
                 def draw(_im, t):
