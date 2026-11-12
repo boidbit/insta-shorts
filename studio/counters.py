@@ -61,6 +61,7 @@ PLACES = {
                     roles=("phalwala", "fruitwala") + SHOP_ROLES) for x in (20, 380, 740)],
 }
 COUNTER_PLACES = tuple(PLACES)
+LW_HALF = 540.0
 # 2.5D: chai_tapri and kirana are the hand-made gali set, whose chai counter is already a piece the people are
 # depth-sorted with (style25d.scenery_gali._tapri): only where the person stands there (no shapes to cut out).
 _TAPRI = dict(x=990, y=1290, px=235, m=1.0)
@@ -141,8 +142,24 @@ def place_behind(plan, place, cine, mode="2d", mirror=True):
         if who is not None:
             free.remove(spot)
             assign(who, spot)
+    _by_the_cart(plan, taken, spots)
     _make_room(plan, taken)
     return used
+
+
+def _by_the_cart(plan, behind, spots):
+    """A customer stands at the open end of a parked thela (not in the middle of the road, not in front of the
+    seller): the same place in every shot, so nobody jumps when the camera cuts."""
+    cart = next((sp[1] for sp in spots if sp[0] == "obj" and sp[1].kind in objects.THELAS), None)
+    if cart is None or not behind:
+        return
+    side = -1.0 if cart.rest >= LW_HALF else 1.0
+    half = objects.SPRITE_LEN.get(cart.kind, 560) * 0.5 * cart.scale * 0.78
+    front = sorted((c for c in plan.chars.values() if c.name not in behind and not c.spec.get("hidden")
+                    and not c.spec.get("kind") and c.spec.get("view") != "back" and not _walks(c)),
+                   key=lambda c_: c_.x * -side)
+    for i, c in enumerate(front):
+        c.x = min(max(cart.rest + side * (half + 40.0 + 230.0 * i), 110.0), 970.0)
 
 
 def _walks(c):
@@ -169,6 +186,8 @@ def _behind_object(c, o):
     """Behind a thela / counter / table. A cart that is pushed in: its seller pushes it (at the handle), then steps
     round behind it."""
     k, dy = BEHIND_OBJ
+    k *= getattr(o, "depth_k", 1.0)                 # a cart parked a step back: its seller as far back as it
+    dy = (o.y + dy + 20.0) - c.y                    # just behind the cart, whatever line the shot puts people on
     half = objects.SPRITE_LEN.get(o.kind, 440) * 0.5 * o.scale * 0.9
     variant = "sabzi" if o.kind == "thela" else o.kind[6:] if o.kind.startswith("thela_") else None
     flipped = bool(o.flips and o.flips[-1][1])

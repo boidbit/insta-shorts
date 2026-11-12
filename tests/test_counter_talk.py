@@ -132,17 +132,26 @@ class Stalls(unittest.TestCase):
         self.assertEqual(warns, [])
         return [compile_scene(s_, use_tts=False) for s_ in split_scenes(sc)]
 
-    def test_the_kulchewala_brings_his_thela_into_every_shot(self):
+    def test_one_set_no_teleport(self):
+        # an AI writes CUT after CUT; across a counter the studio films it itself: one set, people stay put
         plans = self.shots("HOOK: h\nCAST: A = food_blogger, B = kulchewala\nSCENE: gully sunset\n"
                            "A: Hello dosto! | हेलो दोस्तों!\nCUT ots\nB: Bees saal se yahin hoon | बीस साल से यहीं हूँ\n"
-                           "CUT\nA: Wah! | वाह!\nSTYLE: 2.5d\n")
-        for p in plans:
-            self.assertIn("thela_kulche", p.objects)
-        ots = plans[1]
-        b, back = ots.chars["B"], ots.chars["A"]
-        self.assertIsNotNone(getattr(b, "behind", None))                # behind his thela, over the shoulder too
-        self.assertEqual(back.spec.get("view"), "back")
-        self.assertGreater(abs(back.x - b.x), 300)                       # the shoulder is not in front of him
+                           "CUT\nA: Arre bhai, wah! | अरे भाई, वाह!\nSTYLE: 2.5d\n")
+        self.assertEqual(len(plans), 1)                                 # the CUTs went
+        p = plans[0]
+        cart, a, b = p.objects["thela_kulche"], p.chars["A"], p.chars["B"]
+        self.assertTrue(cart.visible(0.0))                              # there from the first frame
+        self.assertNotEqual(cart.rest, 540.0)                           # parked at the side, not mid-road
+        self.assertLess(cart.y, 1680.0)
+        self.assertLess(b.draw_pos(0.0)[1], cart.y)                     # the seller behind it
+        self.assertGreater(abs(a.x - b.x), 300)                         # the blogger at its open end
+        kinds = [s_["kind"] for s_ in p.counter_shots]
+        self.assertEqual(kinds[0], "vlog")                              # "Hello dosto": to his camera
+        self.assertIn("ots", kinds)
+        self.assertEqual(p.counter_shots[-1]["kind"], "reverse")       # "Arre bhai": to the seller
+        for sh in p.counter_shots:                                     # nobody jumps between shots
+            ov = sh["ov"].get("B", {})
+            self.assertNotIn("x", ov)
 
     def test_whose_stall(self):
         p = self.shots("HOOK: h\nCAST: T = thelewala, B = boy\nSCENE: street\nB: Bhaiya golgappe khilao | भैया गोलगप्पे खिलाओ\n"

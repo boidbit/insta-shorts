@@ -248,7 +248,7 @@ THELA = {   # variant: (sign, sign colour, sign text colour, tarp colour)
     "pav_bhaji": ("PAV BHAJI", (240, 120, 40), (255, 255, 255), (220, 90, 40)),
     "chole_bhature": ("CHOLE BHATURE", (250, 230, 150), (170, 60, 20), (190, 60, 50)),
 }
-THELA_SPOT = {"sabzi": -40, "fruits": 0, "kulche": 130, "chaat": 90, "momos": 100, "golgappe": 20, "chai": 100,
+THELA_SPOT = {"sabzi": -40, "fruits": 0, "kulche": 80, "chaat": 90, "momos": 100, "golgappe": 20, "chai": 100,
               "ganna": 40, "bhutta": 100, "gola": 70, "pav_bhaji": 20, "chole_bhature": 170}
 THELA_WORDS = {"sabzi": "sabzi", "sabji": "sabzi", "vegetables": "sabzi", "veg": "sabzi", "fruits": "fruits",
                "fruit": "fruits", "phal": "fruits", "kulche": "kulche", "kulcha": "kulche", "matar_kulche": "kulche",

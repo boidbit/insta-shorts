@@ -763,11 +763,29 @@ SELLER_STALL = {"kulchewala": "thela_kulche", "chaiwala": "thela_chai", "sabziwa
                 "halwai": "counter_mithai", "dukaandaar": "counter", "chemist": "counter_medical"}
 
 
+PARKED = {"y": 1540.0, "scale": 0.82}      # a thela parked by the side of the road / lane: a step back from the people
+PARK_X = {None: 700.0, "center": 700.0, "right": 700.0, "left": 380.0}
+
+
+def _seller_of(names, place, cast):
+    """The person of these who sells / works behind a counter here, or None."""
+    from . import counters
+    for n in names:
+        spec = cast.get(n, {})
+        if spec.get("look") in SELLER_STALL or spec.get("behind") is True:
+            return n
+        if any(counters._wants(spec, info) for info in counters.PLACES.get(place, [])):
+            return n
+    return None
+
+
 def bring_stalls(scenes, cast):
-    """Every shot of a place (the SCENE and its CUTs) gets the same thela / shop counter: the one a line put there
-    (`OBJ: thela kulche center`, carried into the later shots), else the stall of the place's seller (a kulchewala
-    without a thela is just a man standing in a lane). Not where the place has its own counter (chai_tapri, kirana,
-    market...), in the shops (they have theirs) or inside a vehicle."""
+    """A place with a seller is one fixed set, filmed by the studio:
+    - the CUTs a writer put into a conversation across a counter are taken out (the studio cuts it like a film
+      itself: the people stay where they are, only the camera changes);
+    - every shot of the place keeps its thela / counter: the one a line put there, else the seller's own (a
+      kulchewala without a thela is just a man in a lane), parked by the side of the road, not in the middle.
+    Not where the place has its own counter (chai_tapri, kirana, market...), in the shops or inside a vehicle."""
     from . import counters
     groups = {}
     for sc in scenes:
@@ -775,32 +793,51 @@ def bring_stalls(scenes, cast):
     for shots in groups.values():
         bg = shots[0].get("background") or {}
         place = bg.get("type") if isinstance(bg, dict) else bg
-        if place in counters.PLACES or place in SHOP_PLACES or vehicles.resolve(place):
+        if vehicles.resolve(place):
             continue
+        names = []
+        for sc in shots:
+            for ln in sc["lines"]:
+                if ln[0] in ("say", "do") and ln[1] in cast and ln[1] not in names \
+                        and not cast[ln[1]].get("hidden") and not cast[ln[1]].get("kind"):
+                    names.append(ln[1])
+        seller = _seller_of(names, place, cast)
+        if seller is not None and len(names) > 1 and len(shots) > 1 and not any(sc.get("pan") for sc in shots[1:]):
+            first = shots[0]                        # one set, one take: the studio does the cutting
+            for sc in shots[1:]:
+                first["lines"] += sc["lines"]
+                scenes.remove(sc)
+            first.pop("framing", None)
+            first.pop("reverse", None)
+            first.pop("back", None)
+            shots = [first]
+        if place in counters.PLACES or place in SHOP_PLACES or any(sc.get("pan") for sc in shots):
+            continue                                # (a one-take walk into the place keeps its own timing)
 
         def counter_line(sc):
             return next((ln for ln in sc["lines"] if ln[0] == "obj"
                          and objects.resolve_kind(ln[1].get("kind", "")) in objects.COUNTERS), None)
+
+        def park(spec):                             # a thela stands by the side of the road
+            if objects.resolve_kind(spec.get("kind", "")) in objects.THELAS and not spec.get("enter") \
+                    and spec.get("at") in PARK_X and "y" not in spec:
+                spec["at"] = PARK_X[spec.get("at")]
+                spec.update(PARKED)
+            return spec
         first = next((i for i, sc in enumerate(shots) if counter_line(sc)), None)
         if first is not None:                       # the writer's own: parked in the later shots too
-            spec = counter_line(shots[first])[1]
+            spec = park(counter_line(shots[first])[1])
             if spec.get("exit"):
                 continue
             keep = {"kind": spec["kind"], "at": spec.get("at") or spec.get("go") or "center", "carried": True}
-            for k in ("color", "scale", "front"):
+            for k in ("color", "scale", "front", "y"):
                 if k in spec:
                     keep[k] = spec[k]
             for sc in shots[first + 1:]:
                 if not counter_line(sc):
                     sc["lines"].insert(0, ("obj", dict(keep)))
             continue
-        names = []
-        for sc in shots:
-            for ln in sc["lines"]:
-                if ln[0] in ("say", "do") and ln[1] in cast and ln[1] not in names:
-                    names.append(ln[1])
-        seller = next((n for n in names if cast[n].get("look") in SELLER_STALL), None)
-        if seller is None:
+        if seller is None or cast[seller].get("look") not in SELLER_STALL:
             continue
         kind = SELLER_STALL[cast[seller]["look"]]
         if kind is None:                            # thelewala: what do the lines talk about? (chaat, momos...)
@@ -808,7 +845,7 @@ def bring_stalls(scenes, cast):
             kind = next((objects.thela_kind(w) for w in re.findall(r"[a-z_]+", said.lower())
                          if objects.thela_kind(w)), "thela")
         for sc in shots:
-            sc["lines"].insert(0, ("obj", {"kind": kind, "at": "center", "auto": True}))
+            sc["lines"].insert(0, ("obj", park({"kind": kind, "at": "center", "auto": True})))
 
 
 def resolve_background(raw):

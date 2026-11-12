@@ -13,6 +13,11 @@ scene is cut into shots:
 Every person keeps looking at the one they talk to. The renderer applies a shot: a fixed camera, people moved /
 turned / hidden for its duration (Char.ov), the place blurred and the counter edge in front for a reverse shot."""
 
+import re
+
+# a line said to the audience (a vlogger to his camera): that one looks at us, every other line at the seller
+AUDIENCE = re.compile(r"\b(dosto|doston|dost log|guys|friends|viewers|subscribe|subscriber|followers|"
+                      r"like karo|like kar do|comment karo|share karo)\b", re.I)
 HEAD_FROM_FEET = 704.0      # a person of scale 1: from the feet up to the middle of the head
 HEAD_R = 103.0              # ... and the head's radius
 OPEN = 1.4                  # seconds the opening wide shot holds the first line before the first cut
@@ -52,7 +57,11 @@ def plan_shots(plan, own_camera=False):
     # the cuts: the opening, then a shot for every change of speaker
     first = speech[0]["start"]
     open_end = min(plan.duration, max(1.6, first + OPEN))
-    cuts = [(0.0, "open", None)]
+    opener = speech[0]
+    if chars[opener["who"]] in fronts and AUDIENCE.search(str(opener.get("text", ""))):
+        cuts = [(0.0, "vlog", opener["who"])]       # a vlogger opens to his camera: that is the first shot
+    else:
+        cuts = [(0.0, "open", None)]
     turns = {}
     for sp in speech:
         t0 = max(sp["start"] - 0.04, open_end)
@@ -61,6 +70,8 @@ def plan_shots(plan, own_camera=False):
         who = sp["who"]
         if who == seller.name:
             kind = "ots"
+        elif chars[who] in fronts and AUDIENCE.search(str(sp.get("text", ""))):
+            kind = "vlog"                           # said to the audience (his own camera): he looks at us
         elif chars[who] in fronts:
             n = turns.get(who, 0)
             turns[who] = n + 1
@@ -82,7 +93,7 @@ def plan_shots(plan, own_camera=False):
             continue
         mid = min(t1, plan.duration) * 0.5 + t0 * 0.5
         talker = chars.get(who) if who else main
-        if kind != "open" and any(_moving(c, t0, t1) for c in [seller] + fronts):
+        if kind not in ("open", "vlog") and any(_moving(c, t0, t1) for c in [seller] + fronts):
             shots.append(dict(t0=t0, t1=t1, kind="free"))           # somebody walks: the normal camera
             continue
         shots.append(_shot(kind, t0, t1, mid, seller, talker if talker in fronts else main, fronts, obj))
@@ -100,7 +111,13 @@ def _shot(kind, t0, t1, t, seller, cust, fronts, obj):
     side = _side(cust, seller)                     # where the customer is, seen from the counter
     face_seller = "right" if side < 0 else "left"
     ov, hide, extra = {}, [], {}
-    if kind == "open":                             # wide: the customers' backs to us, the seller facing us
+    if kind == "vlog":                             # to his own camera: the vlogger faces us, the stall behind him
+        ov[cust.name] = dict(view="front", facing="front", look_x=0.0)
+        ov[seller.name] = dict(facing="left" if side < 0 else "right", look_x=side * 0.8)
+        z = 1.12                                   # wide enough for the stall and its seller behind him
+        cam = (z, cx_ + (sx - cx_) * 0.5, min(cy_, sy) + 1920.0 / z * 0.18)
+        hide = [c.name for c in fronts if c is not cust]
+    elif kind == "open":                           # wide: the customers' backs to us, the seller facing us
         for c in fronts:
             ov[c.name] = dict(view="back")
         ov[seller.name] = dict(facing="front", look_x=-side * 0.8)
@@ -124,8 +141,7 @@ def _shot(kind, t0, t1, t, seller, cust, fronts, obj):
         hide = [seller.name] + [c.name for c in fronts if c is not cust]
         extra = dict(blur=True, edge=True, hide_objects=[obj.kind] if obj is not None else [], no_floor=True)
     else:                                          # profile two-shot: the customer turned to the seller
-        gap = 230.0 * max(sk, 0.6)
-        x = getattr(seller, "behind_x", seller.x) + side * (gap + 190.0 * ck)
+        x = cust.draw_pos(t)[0]                    # where they stand (the same in every shot)
         ov[cust.name] = dict(view="side", facing=face_seller, x=x, y=cust.draw_pos(t)[1], k=ck)
         ov[seller.name] = dict(facing="left" if side < 0 else "right", look_x=side * 0.8)
         hide = [c.name for c in fronts if c is not cust]

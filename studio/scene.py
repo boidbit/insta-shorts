@@ -236,8 +236,11 @@ def compile_obj(plan, spec, t, warnings=None):
         rest = spot if spot is not None else objects.SPOTS["center"]
         color = color_of(spec["color"]) if spec.get("color") else None
         base = (objects.REF_SCALE * plan.world / objects.PERSON_R[kind]) if kind in objects.PERSON_R else plan.world
+        stall = kind in objects.THELAS or kind in objects.SHOP_COUNTERS
+        t_make = 0.0 if stall and not spec.get("enter") else t     # a parked stall is just there from the first frame
         o = SceneObj(kind, color, base * float(spec.get("scale", 1.0)), float(spec.get("y", OBJ_Y.get(kind, 1680.0))),
-                     bool(spec.get("front")), t, rest)
+                     bool(spec.get("front")), t_make, rest)
+        o.depth_k = float(spec.get("scale", 1.0))           # (parked a step back, it is drawn a little smaller)
         plan.objects[kind] = o
         side = spec.get("enter")
         if side in objects.OFFSCREEN:
