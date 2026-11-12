@@ -1,0 +1,18 @@
+HOOK: Bhaiya, ek plate dena 😂
+CAST: F = food_blogger, K = kulchewala, C = chaiwala
+SCENE: street
+OBJ: thela kulche center
+F (excited): Bhaiya, ek plate matar kulche, extra spicy! | भैया, एक प्लेट मटर कुलचे, एक्स्ट्रा स्पाइसी!
+K (proud): Chalees saal se yahin bana raha hoon. | चालीस साल से यहीं बना रहा हूँ।
+F (point): Toh aaj ka secret batao! | तो आज का सीक्रेट बताओ!
+K (sly): Secret ye hai, camera band karo. | सीक्रेट ये है, कैमरा बंद करो।
+F (shock, boing): Arre bhaiya! | अरे भैया!
+K (laugh): Mazak tha, khao! | मज़ाक था, खाओ!
+SCENE: chai_tapri | Thodi der baad... ☕
+F (excited): Ek cutting chai, review ke liye! | एक कटिंग चाय, रिव्यू के लिए!
+C (smug): Review baad me, pehle das rupaye. | रिव्यू बाद में, पहले दस रुपये।
+F (shock): Yahan bhi?! | यहाँ भी?!
+C (laugh): Yahan bhi! | यहाँ भी!
+CTA: Apne foodie dost ko tag karo 👇
+CAPTION: Har food blogger ki kahani 😂☕
+HASHTAGS: #foodblogger #matarkulche #chai #desicomedy #streetfood

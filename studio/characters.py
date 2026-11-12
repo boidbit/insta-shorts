@@ -1239,6 +1239,11 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         facing = int(max(-1, min(1, round(p["head_facing"]))))
     face_f = p.get("_facing_f") if p.get("head_facing") is None else None   # smoothed turn (renderer)
 
+    if o.get("view") == "side":                     # seen from the side (turned to somebody): studio.profile
+        from .profile import draw_side
+        return draw_side(o, p, cols, expr, mouth_open, t, x0, ground_y, k, blink=blink, prop=prop, talking=talking,
+                         tear_phase=tear_phase, f=-1 if o.get("facing") == "left" else 1)
+
     hc = sk["hc"]
     ht = d2r(p["head_tilt"])
 

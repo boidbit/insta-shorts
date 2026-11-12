@@ -196,9 +196,11 @@ HEIGHT_WORDS = {"tall": "tall", "lamba": "tall", "lambi": "tall", "nata": "short
 BODIES = (("normal", "normal"), ("tall", "slim"), ("short", "chubby"), ("tall", "normal"), ("normal", "slim"),
           ("short", "normal"), ("normal", "chubby"))
 GENDER_WORDS = ("female", "woman", "ladki", "aurat", "male", "man", "ladka", "aadmi")
+TURN_WORDS = {"side": "side", "profile": "side", "mud": "side", "mudke": "side", "saamne": "front",
+              "samne": "front", "seedha": "front"}
 MOVE_WORDS = ("enter", "exit", "walk", "left", "right", "center", "up", "down", "up_left", "up_right", "fast",
               "pump", "swing", "cheer", "disco", "shake", "drop", "noprop", "interrupt", "beech_me",
-              "freeze", "slowmo", "slow_motion", "zoom", "reveal")
+              "freeze", "slowmo", "slow_motion", "zoom", "reveal") + tuple(TURN_WORDS)
 
 
 def vocab():
@@ -563,6 +565,8 @@ def _stage(tokens, ev, scene_cast, who):
         elif w in FX and not (w in actions.ACTIONS or w in EXPRESSIONS):
             fxn = FX_ALIASES.get(w, w)
             ev.setdefault("fx", []).append(fxn if fxn != "glow_eyes" else {"type": "glow_eyes", "dur": 3.0})
+        elif w in TURN_WORDS:                       # side: turned to the one they talk to (profile); saamne: back
+            ev["view"] = TURN_WORDS[w]
         elif w == "shake":
             ev["camera"] = dict(ev.get("camera", {}), shake=0.6)
         elif w == "freeze":                         # the picture stops (grey) with a record scratch

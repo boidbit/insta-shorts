@@ -3,7 +3,7 @@ import math
 import os
 import sys
 
-from . import audio, counters, decor, effects, elevenlabs_tts, gemini_tts, objects, rides, styles, vehicles
+from . import audio, counter_shots, counters, decor, effects, elevenlabs_tts, gemini_tts, objects, rides, styles, vehicles
 from .characters import assign_faces, color_of, resolve_spec
 from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, ease_out, ease_out_back, lerp
 
@@ -92,7 +92,7 @@ BURST_ACTIONS = {"jump": 0.95, "celebrate": 1.6, "fist_pump": 1.2, "jumping_jack
                  "shy": 1.4, "facepalm": 1.6, "dizzy": 1.6}
 
 CHAR_ATTRS = ("action", "expression", "prop", "label", "look", "facing", "style", "point", "dir",
-              "lean", "speed", "intensity", "hands", "tint", "on", "visible")
+              "lean", "speed", "intensity", "hands", "tint", "on", "visible", "view")
 
 
 OBJ_Y = {"truck": 1640.0, "auto": 1650.0, "car": 1640.0, "scooter": 1660.0, "cow": 1690.0, "dustbin": 1690.0,
@@ -345,7 +345,11 @@ class Char:
             self._rf = (t, rides.frame(self, t))
         return self._rf[1]
 
+    ov = None               # a shot of a counter conversation puts this person somewhere else for a moment
+
     def draw_pos(self, t):
+        if self.ov is not None and "x" in self.ov:
+            return self.ov["x"], self.ov["y"]
         rf = self.ride_frame(t)
         if rf:
             return rf["x"], rf["y"]
@@ -353,6 +357,8 @@ class Char:
         return x, y + self.depth_at(t)[1]
 
     def draw_scale(self, t):
+        if self.ov is not None and "k" in self.ov:
+            return self.ov["k"]
         rf = self.ride_frame(t)
         if rf:
             return rf["scale"]
@@ -371,7 +377,7 @@ class Char:
         st = dict(action="idle", action_t0=0.0, expression=self.spec.get("expression", self.look_face or "neutral"),
                   prop=self.spec.get("prop", self.look_prop), label=None, look=self.spec.get("look"),
                   facing=self.spec.get("facing", "front"), visible=self.spec.get("visible", True), on=None,
-                  speed=1.0, intensity=1.0, opts={}, talking=None)
+                  speed=1.0, intensity=1.0, opts={}, talking=None, view=None)
         for ev in self.events:
             if ev["t"] > t + 1e-9:
                 break
@@ -381,7 +387,7 @@ class Char:
                 st["speed"], st["intensity"] = 1.0, 1.0
                 st["opts"] = {}
                 st["on"] = ev.get("on")
-            for key in ("expression", "prop", "label", "look", "facing", "visible"):
+            for key in ("expression", "prop", "label", "look", "facing", "visible", "view"):
                 if key in ev:
                     st[key] = ev[key]
             for key in ("speed", "intensity"):
@@ -1220,6 +1226,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         stand_up_in_frame(chars, set_by_id)
     plan.camera, plan.rolls, plan.drift = ("cine" if cine else "classic"), [], False
     plan.auto_react = bool(meta.get("auto_react", True))
+    own_camera_ = bool(cam_events) or bool(shot_events) or not meta.get("auto_camera", True)   # (directed by the script)
     if meta.get("auto_camera", True) and not cam_events and plan.framing == "medium":     # wide / inside are composed shots
         if cine:
             auto_camera_cine(plan, chars, cam_events, shakes, plan.rolls)
@@ -1252,6 +1259,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         z, cx, cy, was = tz, tc[0], tc[1], follow
     plan.cam_segments = segs
     plan.shakes = shakes
+    # a conversation across a counter: cut like a film (over the shoulder / the reverse shot / a side two-shot)
+    plan.counter_shots = counter_shots.plan_shots(plan, own_camera_)
 
     # ---- audio ----
     m = scene.get("music") or meta.get("music")

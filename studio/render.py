@@ -487,6 +487,10 @@ class Renderer(Output):
         z, cx, cy, dx, dy = camera_at(self.plan, t)
         if self.cam_override:
             (z, cx, cy), dx, dy = self.cam_override, 0.0, 0.0
+        else:
+            shot = self._shot_at(t)
+            if shot is not None:                    # a counter conversation's shot: its own fixed camera
+                (z, cx, cy), dx, dy = shot["cam"], 0.0, 0.0
         if dx or dy:
             z = max(z, 1.05)
         s = self.s
@@ -578,11 +582,11 @@ class Renderer(Output):
             w, h = 22 * s * o.scale, 7 * s * o.scale
             d.rectangle([px * s - w, py * s - h, px * s + w, py * s + h], fill=col, outline=(26, 26, 30))
 
-    def _draw_objects(self, img, t, front):
+    def _draw_objects(self, img, t, front, skip=()):
         """Set objects (vehicles, bins, bags...): `front` ones over the characters, the rest behind them.
-        (A `front` vehicle with somebody in it is drawn later, together with its riders.)"""
+        (A `front` vehicle with somebody in it is drawn later, together with its riders.) skip: kinds left out."""
         for o in self.plan.objects.values():
-            if not o.visible(t):
+            if not o.visible(t) or o.kind in skip:
                 continue
             riders = self._riders_of(o, t)
             if o.front and riders:                  # drawn together with its riders, over everybody
@@ -1072,6 +1076,8 @@ class Renderer(Output):
         pose = self._apply_crouch(pose)
         singing = action in actions.SING_ACTIONS and not st["talking"]
         self._smooth_gaze(c, t, E, pose)        # eyes and face glide to a new target; a new face hides in a blink
+        if c.ov and "look_x" in c.ov:           # a shot keeps them looking at the one they talk to
+            pose["look_x"] = c.ov["look_x"]
         mouth_open = 0.0
         chewing = False
         if st["talking"]:
@@ -1083,6 +1089,15 @@ class Renderer(Output):
         blink = self._blinking(c, t) or pose.pop("_face_change", False)
         spec = dict(c.spec)
         spec["facing"] = st["facing"]
+        if st.get("view") == "side" and not c.spec.get("kind") and not rf:   # `A -> side`: turned to the other one
+            spec["view"] = "side"
+            if spec["facing"] == "front":
+                other = self._partner(c, t, x)
+                spec["facing"] = "left" if other is not None and other < x else "right"
+        if c.ov:                                    # this shot turns them (back to us / to the side / to someone)
+            for key in ("view", "facing"):
+                if key in c.ov:
+                    spec[key] = c.ov[key]
         prop = st["prop"] or ("mic" if singing else None) or pose.get("prop")
         if st["prop"] == "" or pose.get("hide_prop"):
             prop = None
@@ -1143,16 +1158,69 @@ class Renderer(Output):
             layer = shading.volume(layer, self.s * P["k"], ldir, self._tint25)
         return layer, (ox - int(round(LW * self.s)), oy), P
 
+    def _shot_at(self, t):
+        """The shot of a counter conversation at time t (studio.counter_shots), or None."""
+        for sh in getattr(self.plan, "counter_shots", None) or ():
+            if sh["t0"] <= t < sh["t1"]:
+                return sh if sh["kind"] != "free" else None
+        return None
+
     def story_frame(self, t, hide=(), bare=False, clean=False):
         """The picture at story time t. hide = names left out; bare = no lens vignette, captions, fades or whip
         streak (a part of the one-take walk between two places, put together by Sequence); clean = no speech
         bubbles or name tags either (the cover picture)."""
+        shot = self._shot_at(t)
+        if shot is None:
+            return self._story_frame(t, hide, bare, clean, None)
+        chars = self.plan.chars.values()
+        for c in chars:                             # this shot moves / turns / hides people for a moment
+            c.ov = shot["ov"].get(c.name)
+        try:
+            hide = tuple(hide) + tuple(n for n, o in shot["ov"].items() if o.get("hidden"))
+            return self._story_frame(t, hide, bare, clean, shot)
+        finally:
+            for c in chars:
+                c.ov = None
+
+    def _counter_edge(self):
+        """The counter's top, blurred, for the bottom of a reverse shot (the camera looks over it)."""
+        if getattr(self, "_edge", None) is not None:
+            return self._edge
+        from PIL import ImageFilter
+        s, im = self.s, None
+        seller = next((c for c in self.plan.chars.values() if getattr(c, "behind", None) is not None), None)
+        b = getattr(seller, "behind", None)
+        if b is not None and not isinstance(b, dict):
+            im, (_ax, ay), _w = objects.sprite(b.kind, s * b.scale, b.color)
+            if im is not None:                      # the top of the cart / counter and what is on it (not its sign)
+                top = -232.0 if b.kind.startswith("thela") else -226.0
+                k_ = s * b.scale
+                im = im.crop((0, max(0, int(ay + (top - 150) * k_)), im.width, int(ay + (top + 60) * k_)))
+        elif isinstance(b, dict) and self.bg.static is not None and getattr(self.plan, "counters", None):
+            from . import counters
+            place = self.plan.background.get("type") if isinstance(self.plan.background, dict) else None
+            pieces = counters.counter_overlays(place, self.plan.counters[:1], self.bg.static, self.bg.out_w / float(LW))
+            im = pieces[0][1] if pieces else None
+        if im is None:
+            im = Image.new("RGBA", (int(900 * s), int(160 * s)), (150, 104, 66, 255))
+        im = ImageOps.mirror(im.convert("RGBA"))
+        pad = int(30 * s)
+        big = Image.new("RGBA", (im.width + 2 * pad, im.height + 2 * pad), (0, 0, 0, 0))
+        big.paste(im, (pad, pad), im)
+        self._edge = big.filter(ImageFilter.GaussianBlur(max(2.0, 7 * s)))
+        return self._edge
+
+    def _story_frame(self, t, hide, bare, clean, shot):
         plan, s = self.plan, self.s
         img = self._background(t)
-        self._draw_objects(img, t, False)
+        if shot is not None and shot.get("blur"):  # the reverse shot: the other side of the place, out of focus
+            from PIL import ImageFilter
+            img = ImageOps.mirror(img).filter(ImageFilter.GaussianBlur(max(2.0, 9 * s)))
+        skip = set(shot.get("hide_objects", ())) if shot else set()
+        self._draw_objects(img, t, False, skip)
         light = self._light_level(t)
-        for im_, (px_, py_) in self.sets.wall(t, power=light >= 0.5):     # doors, windows, clocks, fans...
-            img.paste(im_, (px_, py_), im_)
+        for im_, (px_, py_) in ([] if skip or (shot and shot.get("blur")) else self.sets.wall(t, power=light >= 0.5)):
+            img.paste(im_, (px_, py_), im_)     # doors, windows, clocks, fans...
         order = sorted((c for c in plan.chars.values() if not c.spec.get("hidden") and c.name not in hide),
                        key=lambda c: (c.draw_pos(t)[1], c.draw_pos(t)[0]))
         anchors = {}
@@ -1187,10 +1255,11 @@ class Renderer(Output):
 
         # everybody except the riders of a vehicle that is in front; then front objects; then those vehicles with their riders
         in_front = [c for c in order if self._front_rider(c, t)]
-        floor = sorted(self.sets.floor(t) + self._foreground(t)
-                       + [(o.y, None, o, 0) for o in plan.objects.values()     # a thela / counter somebody stands behind
-                          if getattr(o, "depth_sort", False) and not o.front and o.visible(t)],
-                       key=lambda f: f[0])   # set pieces and the place's own front props (bed, sofa, tree, street
+        floor = [] if shot and shot.get("no_floor") else sorted(
+            self.sets.floor(t) + self._foreground(t)
+            + [(o.y, None, o, 0) for o in plan.objects.values()     # a thela / counter somebody stands behind
+               if getattr(o, "depth_sort", False) and not o.front and o.visible(t) and o.kind not in skip],
+            key=lambda f: f[0])   # set pieces and the place's own front props (bed, sofa, tree, street
         # poles...) depth-sorted with the people
 
         def put(f):
@@ -1210,7 +1279,13 @@ class Renderer(Output):
                 draw_char(c)
         for f in floor[fi:]:
             put(f)
-        self._draw_objects(img, t, True)
+        self._draw_objects(img, t, True, skip)
+        if shot is not None and shot.get("edge"):  # the reverse shot: the counter's edge blurred in front of us
+            z, vl, vt, vw, vh = self._cam_view(t)
+            edge = self._counter_edge()
+            w_ = int(vw * 1.3)
+            e2 = edge.resize((w_, max(1, int(edge.height * w_ / edge.width))), Image.BILINEAR)
+            img.paste(e2, (int(vl + vw / 2 - w_ / 2), int(vt + vh - e2.height * 0.62)), e2)
         for o in plan.objects.values():
             riders = [c for c in in_front if c.ride_frame(t)["obj"] is o]
             if riders and o.visible(t):

@@ -255,6 +255,17 @@ Asli zindagi jaisa: **bechne wala thele / counter ke peeche, grahak ya food blog
 - **Naye thele:** chai (ketli + glass), ganna (ganne ka juice), bhutta, gola (barf ka gola), pav_bhaji, chole_bhature. **Naye log:** `dukaandaar` (lala, shopkeeper), `halwai` (mithaiwala), `chemist` (medicalwala), `clerk` (cashier, babu, munshi), `judge` (judge_sahab).
 - **2.5D me bhi:** jagah me bane counter 2.5D ki layers me se kaat ke lagte hain (court, bank, hospital, canteen, police_station, market); `chai_tapri` aur `kirana` 2.5D me gali wala set hain, wahan chaiwala / dukaandaar gali ke chai counter ke peeche khada hota hai. `CAMERA: classic` me pehle jaisa.
 
+### Counter pe baatcheet: film jaise shots 🎬 (aur side pose)
+
+Jab koi counter / thele ke peeche khade insaan se baat karta hai, naya camera use film ki tarah kaat-ta hai (sab apne aap):
+- **Shuru (wide):** grahak ki **peeth camera ki taraf**, wo counter ki taraf dekh raha hai; dukaandaar hamari taraf.
+- **Dukaandaar bole:** **kandhe ke upar se** shot: grahak ka sir kone me bada, dukaandaar counter ke peeche.
+- **Grahak bole:** **ulti taraf se** shot (camera counter ki jagah se): grahak hamari taraf dekhta hai, jo ab bilkul natural hai; peeche jagah dhundli, aage counter ka kinara dhundla.
+- **Kabhi-kabhi (thela / dukaan ka counter paas ho):** dono ka **side shot**: grahak side se (profile) dukaandaar ki taraf muda hua, dukaandaar ka sir aur aankhein grahak ki taraf.
+- Script me apni camera (`zoom`, `reveal`, `CUT ...`) ho to wahi chalti hai. `CAMERA: classic` me pehle jaisa.
+
+**Side pose (profile) kahin bhi:** line me `side` (ya `profile`, `mud`) = wo insaan side se dikhta hai, us taraf muda jisse baat kar raha hai: `A (side, smile): Ek baat bolun?`. `saamne` = wapas seedha. Saare log, kapde, baal, chashma, topi, haath ki cheezein side se bhi bante hain; side me chalna, ishaara karna, baithna (taangein aage) bhi.
+
 ### Har character ka apna chehra: Face card 🙂
 
 Har character ka chehra alag hota hai (studio khud deta hai), aur ab har hissa khud bhi chun sakte ho. Page pe 🎭 builder me har character ke neeche **"🙂 Face card"** kholo: chehra / jaw, aankhein, naak, bhaunhein, hont, kaan, dadhi, moonchh ke dropdown + gulabi gaal, palkein, jhurriyan, til, dimple, freckles. Neeche likha aata hai ki script me kaunse shabd jayenge; "📖 Har option kaisa dikhta hai" me sab options ki photo (`assets/faces/chart.png`).
