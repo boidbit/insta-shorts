@@ -36,7 +36,7 @@ WALL_SLOTS = {
 }
 INDOOR = set(WALL_SLOTS) | {"bathroom", "exam_hall", "cinema", "court", "salon", "mall", "dhaba"}
 NO_AUTO = {"kitchen", "room", "living_room", "classroom", "school", "terrace", "gully", "chai_tapri", "kirana",
-           "jail", "train", "bus", "metro", "plane", "car", "auto"}     # rich already / no wall to dress
+           "jail", "train", "bus", "metro", "plane", "car", "auto", "court"}     # rich already / no wall to dress
 AUTO_POOL = ("poster", "calendar", "photo_frame", "wall_shelf", "ac", "clock", "plant")
 FLOOR_X = (90, 990)
 

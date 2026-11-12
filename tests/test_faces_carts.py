@@ -65,7 +65,7 @@ class RealSizes(unittest.TestCase):
 
 class Carts(unittest.TestCase):
     def test_every_cart_draws_with_wheels(self):
-        self.assertEqual(len(objects.THELAS), 6)
+        self.assertEqual(len(objects.THELAS), 12)
         for k in objects.THELAS:
             im, _anchor, wheels = objects.sprite(k, 0.3)
             self.assertIsNotNone(im)

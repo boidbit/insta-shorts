@@ -165,7 +165,7 @@ ROLE_LOOKS = {
     "behen": "college_girl", "sister": "college_girl", "beti": "college_girl", "didi": "college_girl",
     "teacher": "office_guy", "boss": "office_guy", "bachcha": "kid", "student": "kid",
     "pujari": "pandit", "panditji": "pandit", "policewala": "police", "inspector": "police", "havaldar": "police",
-    "daroga": "police", "dactor": "doctor", "chaiwale": "chaiwala", "groom": "dulha", "bride": "dulhan",
+    "daroga": "police", "dactor": "doctor", "groom": "dulha", "bride": "dulhan",
     "netaji": "neta", "mantri": "neta", "politician": "neta", "sarpanch": "neta", "mla": "neta",
     "kaidi": "chor", "prisoner": "chor", "thief": "chor", "sasu": "saas", "saasu": "saas", "bhabhi": "bahu",
     "patni": "bahu", "biwi": "bahu", "headmaster": "principal", "barber": "nai", "hajjam": "nai",
@@ -180,6 +180,11 @@ ROLE_LOOKS = {
     "golgappewala": "thelewala", "panipuriwala": "thelewala", "phalwala": "thelewala", "fruitwala": "thelewala",
     "foodblogger": "food_blogger", "food_vlogger": "food_blogger", "foodie": "food_blogger",
     "food_bloggerni": "food_blogger_girl", "vloggerni": "food_blogger_girl", "youtuber_girl": "food_blogger_girl",
+    "shopkeeper": "dukaandaar", "dukandar": "dukaandaar", "dukaandar": "dukaandaar", "lala": "dukaandaar",
+    "lalaji": "dukaandaar", "kiranawala": "dukaandaar", "mobilewala": "dukaandaar", "mithaiwala": "halwai",
+    "medicalwala": "chemist", "pharmacist": "chemist", "cashier": "clerk", "babu": "clerk", "munshi": "clerk",
+    "judge_sahab": "judge", "jaj": "judge", "receptionist": "office_girl", "thanedaar": "police",
+    "gawah": "boy", "witness": "boy", "canteenwala": "chaiwala", "chaiwale": "chaiwala",
 }
 FEMALE_LOOKS = {"food_blogger_girl", "air_hostess", "girl", "college_girl", "aunty", "dadi", "kid_girl", "office_girl", "madam", "dulhan", "nurse",
                 "saas", "bahu"}
@@ -204,7 +209,7 @@ def vocab():
         "extras": sorted(set(ACCESSORIES) | set(HAIR_STYLES) | set(HAIR_WORDS) | set(OUTFITS) | set(SKIN_TONES)
                          | set(BUILDS)
                          | set(BUILD_WORDS) | set(HEIGHT_WORDS)
-                         | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS) | set(FACE_WORDS)),
+                         | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS) | set(FACE_WORDS) | set(BEHIND_WORDS)),
         "expressions": sorted(EXPRESSIONS), "actions": sorted(actions.ACTIONS),
         "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS), "fx": sorted(FX),
         "times": sorted(TIMES + WEATHER), "pan_words": list(PAN_WORDS),
@@ -223,7 +228,7 @@ def vocab():
         # the page's Builder pickers
         "role_looks": sorted([r, l] for r, l in ROLE_LOOKS.items()), "hair": list(HAIR_STYLES),
         "face_parts": {k: [[v, face_word(k, v)] for v in vals] for k, vals in FACE_PARTS.items()},
-        "thela_words": sorted(objects.THELA_WORDS),
+        "thela_words": sorted(set(objects.THELA_WORDS) | set(objects.SHOP_WORDS)),
         "marks": list(MARKS),
         "skin": list(SKIN_TONES), "outfits": list(OUTFITS), "colors": sorted(PALETTE), "accessories": list(ACCESSORIES),
         "builds": list(BUILDS),
@@ -241,6 +246,10 @@ ANIMAL_WORDS = {"dog": "dog", "kutta": "dog", "doggy": "dog", "cat": "cat", "bil
                 "tota": "parrot", "totaa": "parrot", "monkey": "monkey", "bandar": "monkey"}
 
 
+BEHIND_WORDS = {"peeche": True, "piche": True, "behind": True, "counter_peeche": True, "aage": False,
+                "front_side": False}
+
+
 def cast_spec(words, index, unknown=None):
     """'aunty chubby glasses maroon female' -> character spec (with a voice).
     Words that mean nothing here are added to `unknown`."""
@@ -255,6 +264,12 @@ def cast_spec(words, index, unknown=None):
             spec["look"] = w
         elif w in ROLE_LOOKS and "look" not in spec:
             spec["look"] = ROLE_LOOKS[w]
+            if w not in LOOKS:
+                spec["role"] = w                       # (a cashier / receptionist / gawah goes behind their counter)
+        elif w in ROLE_LOOKS and w not in LOOKS:       # `W = girl gawah`: the look stays, the role is kept
+            spec["role"] = w
+        elif w in BEHIND_WORDS:                        # peeche: behind the nearest counter / thela; aage: in front
+            spec["behind"] = BEHIND_WORDS[w]
         elif w in ACCESSORIES:
             acc.append(w)
         elif w in HAIR_STYLES:
@@ -728,10 +743,17 @@ def pan_traveler(prev, who=None):
     return {"who": who, "dir": "right"} if who else None
 
 
+PLACE_WORDS = {"sweet_shop": "mithai_shop", "halwai_shop": "mithai_shop", "mithai_ki_dukaan": "mithai_shop",
+               "mobile_store": "mobile_shop", "phone_shop": "mobile_shop", "chemist": "medical_store",
+               "pharmacy": "medical_store", "medical": "medical_store", "dawai_ki_dukaan": "medical_store"}
+from .places_plus import SHOPS as SHOP_PLACES   # noqa: E402  (a shop brings its counter: `SCENE: mithai_shop`)
+
+
 def resolve_background(raw):
     """`street` / `gali` (= assets/backgrounds/gali.png) / `assets/backgrounds/x.jpg` -> (background dict, warning)."""
     name = raw.strip()
     low = name.lower().replace(" ", "_")
+    low = PLACE_WORDS.get(low, low)
     if low in BACKGROUNDS:
         return {"type": low}, None
     words = name.lower().split()
@@ -794,6 +816,8 @@ def parse_obj(rest):
             spec["scale"] = 1.35 if w == "big" else 0.7
         elif spec["kind"] == "thela" and objects.thela_kind(w):     # `OBJ: thela kulche enter left`
             spec["kind"] = objects.thela_kind(w)
+        elif spec["kind"] == "counter" and objects.counter_kind(w):  # `OBJ: counter mithai center`
+            spec["kind"] = objects.counter_kind(w)
         elif w in PALETTE:
             spec["color"] = w
         else:
@@ -997,6 +1021,8 @@ def parse_script(text):
                     cur["pan"] = pan
                 if bg.get("type") == "jail":
                     cur["sets"] = {"jail_door": dict(JAIL_DOOR)}
+                if bg.get("type") in SHOP_PLACES:   # the shop's counter, its shopkeeper goes behind it
+                    cur["lines"].append(("obj", {"kind": SHOP_PLACES[bg["type"]], "at": "center", "auto": True}))
             else:
                 meta[key] = val
             continue
@@ -1103,6 +1129,8 @@ def parse_script(text):
             spec, probs = parse_obj(m.group(1))
             warnings += probs
             if spec:
+                if spec.get("kind") in objects.SHOP_COUNTERS:     # your own counter replaces the shop's own one
+                    cur["lines"] = [ln for ln in cur["lines"] if not (ln[0] == "obj" and ln[1].get("auto"))]
                 cur["lines"].append(("obj", spec))
             continue
         m = re.match(r"^(?:wait\s*([\d.]+)|\.\.\.+)$", line, re.I)

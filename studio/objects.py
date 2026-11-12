@@ -30,9 +30,7 @@ PERSON_R = {"truck": 0.21, "auto": 0.34, "car": 0.27, "bike": 0.35, "scooter": 0
 SPRITE_LEN = {"truck": 640, "auto": 380, "car": 520, "bike": 340, "scooter": 300, "cycle": 340,
               "cow": 430, "dustbin": 170, "bags": 280, "table": 380}
 # a thela is drawn at 250 units a metre and a person (~1.7 m) is ~800 units: 0.95 * 250 / (800 / 1.7) = 0.5
-for _k in ("thela", "thela_kulche", "thela_fruits", "thela_chaat", "thela_momos", "thela_golgappe"):
-    PERSON_R[_k], SPRITE_LEN[_k] = 0.5, 560
-ENTER_DUR = {k: 2.6 for k in PERSON_R if k.startswith("thela")}     # a pushed cart rolls in slowly
+# (the carts and the shop counters are added below, where they are drawn)
 REF_SCALE = 0.95                                 # a typical character's scale
 SPOTS = {"left": 270.0, "center": 540.0, "right": 810.0}      # where an object rests (x of its middle)
 OFFSCREEN = {"left": -480.0, "right": 1560.0}
@@ -243,11 +241,24 @@ THELA = {   # variant: (sign, sign colour, sign text colour, tarp colour)
     "chaat": ("CHAAT CORNER", (240, 120, 40), (255, 255, 255), (240, 150, 40)),
     "momos": ("STEAM MOMOS", (200, 30, 40), (255, 240, 200), (200, 40, 50)),
     "golgappe": ("GOLGAPPE", (250, 230, 120), (40, 90, 40), (240, 200, 40)),
+    "chai": ("GARAM CHAI", (250, 210, 70), (150, 40, 30), (150, 90, 50)),
+    "ganna": ("GANNE KA JUICE", (110, 180, 70), (255, 255, 255), (70, 150, 60)),
+    "bhutta": ("BHUTTA", (250, 220, 90), (120, 70, 20), (60, 120, 70)),
+    "gola": ("BARF KA GOLA", (90, 170, 230), (255, 255, 255), (230, 80, 140)),
+    "pav_bhaji": ("PAV BHAJI", (240, 120, 40), (255, 255, 255), (220, 90, 40)),
+    "chole_bhature": ("CHOLE BHATURE", (250, 230, 150), (170, 60, 20), (190, 60, 50)),
 }
+THELA_SPOT = {"sabzi": -40, "fruits": 0, "kulche": 130, "chaat": 90, "momos": 100, "golgappe": 20, "chai": 100,
+              "ganna": 40, "bhutta": 100, "gola": 70, "pav_bhaji": 20, "chole_bhature": 170}
 THELA_WORDS = {"sabzi": "sabzi", "sabji": "sabzi", "vegetables": "sabzi", "veg": "sabzi", "fruits": "fruits",
                "fruit": "fruits", "phal": "fruits", "kulche": "kulche", "kulcha": "kulche", "matar_kulche": "kulche",
                "chaat": "chaat", "tikki": "chaat", "momos": "momos", "momo": "momos", "golgappe": "golgappe",
-               "golgappa": "golgappe", "panipuri": "golgappe", "pani_puri": "golgappe", "puchka": "golgappe"}
+               "golgappa": "golgappe", "panipuri": "golgappe", "pani_puri": "golgappe", "puchka": "golgappe",
+               "chai": "chai", "chay": "chai", "tea": "chai", "ganna": "ganna", "ganne": "ganna", "juice": "ganna",
+               "sugarcane": "ganna", "bhutta": "bhutta", "corn": "bhutta", "makka": "bhutta", "gola": "gola",
+               "barf_gola": "gola", "ice_gola": "gola", "kulfi": "gola", "pav_bhaji": "pav_bhaji",
+               "pavbhaji": "pav_bhaji", "chole_bhature": "chole_bhature", "chole": "chole_bhature",
+               "bhature": "chole_bhature"}
 
 
 def _pile(p, x0, x1, y, r, col, rows=2, dark=None):
@@ -336,15 +347,149 @@ def _thela(s, c, variant="sabzi"):
             p.ellipse(x - 20, y - 46, x + 20, y - 12, (250, 246, 232), INK, 3)
         p.rect(200, y - 70, 222, y, (210, 40, 30), INK, 3)                           # red chutney bottle
     elif variant == "golgappe":
-        p.rect(-206, y - 130, -10, y, (200, 230, 246, 150), INK, 4)                  # the glass box of puris
-        for row in range(4):
+        p.rect(-206, y - 104, -10, y, (200, 230, 246, 150), INK, 4)                  # the glass box of puris
+        for row in range(3):
             for i in range(6):
                 p.circle(-182 + i * 32 + (row % 2) * 12, y - 18 - row * 28, 14, (226, 176, 90), INK, 2)
-        p.line([(-180, y - 120), (-150, y - 20)], (255, 255, 255, 180), 4)
-        p.ellipse(40, y - 120, 200, y + 4, steel, INK, 5)                            # the pot of pani
-        p.ellipse(52, y - 128, 188, y - 100, (110, 170, 90), INK, 3)
-        p.line([(150, y - 116), (210, y - 190)], (150, 150, 156), 7)                 # the ladle
+        p.line([(-180, y - 96), (-150, y - 20)], (255, 255, 255, 180), 4)
+        p.ellipse(60, y - 96, 210, y + 4, steel, INK, 5)                             # the pot of pani
+        p.ellipse(72, y - 104, 198, y - 78, (110, 170, 90), INK, 3)
+        p.line([(160, y - 92), (214, y - 160)], (150, 150, 156), 7)                  # the ladle
+    elif variant == "chai":
+        p.rect(-200, y - 46, -60, y, (60, 60, 66), INK, 4)                           # the stove
+        p.ellipse(-196, y - 150, -64, y - 40, (196, 198, 206), INK, 5)               # the big kettle
+        p.line([(-64, y - 110), (-24, y - 132)], INK, 9)                             # its spout
+        p.line([(-170, y - 150), (-150, y - 176), (-110, y - 176), (-90, y - 150)], INK, 6)
+        for (x, yy) in ((-140, -190), (-110, -214)):                                  # steam
+            p.circle(x, y + yy, 16, (255, 255, 255, 160), None)
+        for i in range(6):                                                           # glasses of chai
+            x = 0 + i * 36
+            p.poly([(x, y - 46), (x + 26, y - 46), (x + 23, y), (x + 3, y)], (236, 240, 240), INK, 3)
+            p.poly([(x + 3, y - 36), (x + 23, y - 36), (x + 21, y - 2), (x + 5, y - 2)], (178, 112, 62), None)
+        p.rect(186, y - 40, 222, y, (240, 200, 120), INK, 3)                         # a tin of rusks
+    elif variant == "ganna":                                                         # the sugarcane crusher
+        p.rect(-200, y - 150, -40, y, (40, 120, 70), INK, 5)
+        p.circle(-120, y - 136, 54, (60, 60, 66), INK, 6)                            # the big wheel
+        for a in range(0, 360, 60):
+            r = math.radians(a)
+            p.line([(-120, y - 136), (-120 + 48 * math.cos(r), y - 136 + 48 * math.sin(r))], (120, 120, 126), 6)
+        for i in range(3):                                                           # sugarcane sticks
+            p.line([(150 + i * 22, y), (166 + i * 22, y - 170)], (150, 170, 80), 12)
+            p.line([(154 + i * 22, y - 80), (170 + i * 22, y - 80)], (100, 120, 50), 4)
+        for x in (10, 56):                                                           # glasses of juice
+            p.poly([(x, y - 60), (x + 30, y - 60), (x + 26, y), (x + 4, y)], (180, 210, 110), INK, 3)
+    elif variant == "bhutta":                                                        # corn roasting on coals
+        p.rect(-210, y - 40, -20, y, (60, 60, 66), INK, 4)
+        for x in range(-196, -30, 26):
+            p.circle(x + 12, y - 44, 11, (240, 110, 40), None)
+        for i in range(4):
+            x = -190 + i * 44
+            p.ellipse(x, y - 76, x + 36, y - 46, (240, 200, 70), INK, 3)
+        for i in range(5):                                                           # a pile of corn
+            x = 20 + i * 40
+            p.ellipse(x, y - 34, x + 34, y, (230, 200, 80), INK, 3)
+            p.poly([(x + 4, y - 4), (x + 17, y - 40), (x + 30, y - 4)], (110, 170, 80), None)
+        p.circle(190, y - 60, 22, (240, 240, 236), INK, 3)                           # nimbu-masala bowl
+        p.circle(190, y - 60, 10, (240, 220, 80), None)
+    elif variant == "gola":                                                          # the ice block, coloured syrups
+        p.rect(-200, y - 110, -60, y, (220, 240, 250), INK, 5)
+        p.line([(-180, y - 90), (-90, y - 40)], (255, 255, 255), 6)
+        for i, col in enumerate(((230, 40, 60), (250, 140, 40), (60, 170, 80), (80, 120, 220), (230, 200, 40))):
+            x = -20 + i * 40                                                         # syrup bottles
+            p.rect(x, y - 66, x + 28, y, col + (220,), INK, 3)
+            p.rect(x + 8, y - 80, x + 20, y - 66, (240, 240, 240), INK, 2)
+        for i, col in enumerate(((230, 40, 60), (80, 120, 220))):                     # two golas on sticks
+            x = 186 + i * 30
+            p.line([(x, y), (x, y - 50)], (150, 110, 70), 5)
+            p.ellipse(x - 16, y - 92, x + 16, y - 46, col, INK, 3)
+    elif variant == "pav_bhaji":
+        p.ellipse(-214, y - 40, 40, y - 4, (40, 40, 44), INK, 5)                      # the huge flat tawa
+        p.ellipse(-180, y - 40, -10, y - 16, (210, 90, 50), None)                    # the bhaji
+        p.circle(-150, y - 36, 10, (250, 240, 200), None)                             # a lump of butter
+        for i in range(4):                                                           # pav
+            x = 70 + i * 38
+            p.ellipse(x, y - 40, x + 36, y - 6, (230, 170, 90), INK, 3)
+        p.ellipse(70, y - 64, 220, y - 40, steel, INK, 3)                             # onions and lemon
+        p.ellipse(90, y - 66, 200, y - 52, (200, 110, 170), None)
+    elif variant == "chole_bhature":
+        p.ellipse(-206, y - 110, -40, y + 4, (60, 60, 66), INK, 5)                   # the kadhai
+        p.ellipse(-196, y - 116, -50, y - 88, (230, 170, 70), INK, 3)                # a bhatura puffing up in it
+        p.ellipse(10, y - 70, 150, y + 2, (176, 120, 70), INK, 4)                    # the pot of chole
+        p.ellipse(18, y - 78, 142, y - 54, (170, 110, 60), INK, 3)
+        for (x, yy) in ((40, -70), (80, -76), (110, -68)):
+            p.circle(x, y + yy, 6, (120, 70, 40), None)
+        for i in range(3):                                                           # a stack of bhature
+            p.ellipse(160, y - 22 - i * 10, 226, y - i * 10, (240, 200, 120), INK, 3)
     return p, [(-150, -64, 64), (150, -64, 64)]
+
+
+# ---------------------------------------------------------------- a shop counter (a person stands behind it)
+# 250 units a metre: 1.7 m long, a metre high, a glass case on top; `OBJ: counter mithai center`
+SHOP = {    # variant: (front text, front colour, text colour)
+    "general": ("GENERAL STORE", (176, 124, 78), (255, 240, 200)),
+    "mithai": ("MITHAI", (230, 120, 40), (255, 255, 255)),
+    "mobile": ("MOBILE", (40, 90, 170), (255, 255, 255)),
+    "medical": ("MEDICAL", (40, 140, 90), (255, 255, 255)),
+    "bakery": ("BAKERY", (200, 120, 160), (255, 255, 255)),
+    "kapde": ("KAPDE", (150, 60, 120), (255, 240, 200)),
+}
+SHOP_WORDS = {"general": "general", "kirana": "general", "dukaan": "general", "dukan": "general", "shop": "general",
+              "mithai": "mithai", "sweets": "mithai", "halwai": "mithai", "mobile": "mobile", "phone": "mobile",
+              "medical": "medical", "dawai": "medical", "chemist": "medical", "bakery": "bakery", "cake": "bakery",
+              "kapde": "kapde", "kapda": "kapde", "clothes": "kapde"}
+
+
+def _counter(s, c, variant="general"):
+    text, front, txt_c = SHOP[variant]
+    front = c if c else front
+    p = Pen(s, 440, 330)
+    top = -226                                                                       # 0.9 m: a person shows above it
+    p.rect(-212, top + 20, 212, 0, front)                                            # the front
+    p.rect(-200, top + 40, 200, top + 96, shade(front, 1.18), INK, 3)                # the name strip
+    p.text(0, top + 68, text, 30 if len(text) > 8 else 38, txt_c)
+    for x in (-150, -50, 50, 150):                                                   # panels below
+        p.rect(x - 44, top + 114, x + 44, -20, shade(front, 0.9), INK, 3)
+    p.rect(-220, top, 220, top + 22, (110, 80, 50))                                  # the counter top
+    p.rect(-210, top - 64, 210, top, (200, 230, 246, 140), INK, 4)                   # the glass case
+    y = top - 4
+    if variant == "mithai":
+        for row in range(2):
+            for i in range(7):
+                x = -186 + i * 56
+                col = ((250, 210, 80), (240, 150, 60), (250, 250, 240), (200, 120, 70))[(i + row) % 4]
+                p.circle(x + 16, y - 14 - row * 28, 12, col, INK, 2)
+    elif variant == "mobile":
+        for i in range(6):
+            x = -186 + i * 64
+            p.rrect(x, y - 52, x + 30, y - 4, 6, (40, 44, 52), INK, 3)
+            p.rect(x + 4, y - 46, x + 26, y - 12, ((120, 190, 235), (240, 140, 160), (150, 220, 160))[i % 3], None)
+    elif variant == "medical":
+        for i in range(8):
+            x = -190 + i * 48
+            p.rect(x, y - 44, x + 34, y - 4, ((250, 250, 250), (240, 220, 120), (200, 230, 250))[i % 3], INK, 2)
+            p.rect(x + 6, y - 34, x + 28, y - 26, ((220, 60, 60), (60, 140, 220), (60, 160, 90))[i % 3], None)
+    elif variant == "bakery":
+        p.ellipse(-190, y - 46, -70, y - 4, (250, 240, 230), INK, 3)                 # a cake
+        p.ellipse(-180, y - 52, -80, y - 34, (240, 150, 180), INK, 3)
+        p.circle(-130, y - 56, 7, (220, 40, 60), None)
+        for i in range(5):                                                           # buns and rusks
+            x = -40 + i * 46
+            p.ellipse(x, y - 34, x + 40, y - 4, (220, 160, 80), INK, 3)
+    elif variant == "kapde":
+        for i in range(5):                                                           # folded clothes
+            x = -190 + i * 78
+            for j in range(3):
+                col = ((200, 60, 80), (60, 120, 200), (240, 200, 60), (90, 160, 90), (150, 90, 180))[(i + j) % 5]
+                p.rect(x, y - 18 - j * 18, x + 66, y - 2 - j * 18, col, INK, 2)
+    else:                                                                            # jars, packets, a scale
+        for i in range(4):
+            x = -190 + i * 70
+            p.rrect(x, y - 54, x + 50, y - 4, 10, (236, 236, 230), INK, 3)
+            p.circle(x + 25, y - 28, 13, ((250, 200, 60), (230, 120, 80), (140, 90, 60), (250, 250, 250))[i], None)
+        p.line([(110, y - 60), (190, y - 60)], INK, 5)
+        p.ellipse(100, y - 30, 140, y - 18, (196, 198, 206), INK, 3)
+        p.ellipse(160, y - 30, 200, y - 18, (196, 198, 206), INK, 3)
+    return p, []
 
 
 OBJECTS = {            # kind: (drawer, default colour, default scale, spins its wheels)
@@ -363,17 +508,34 @@ for _v, (_sign, _sc, _tc, _tarp) in THELA.items():       # thela (sabzi), thela_
     OBJECTS["thela" if _v == "sabzi" else "thela_" + _v] = (
         (lambda v: (lambda s, c: _thela(s, c, v)))(_v), _tarp, 1.0)
 THELAS = tuple(k for k in OBJECTS if k.startswith("thela"))
+for _v in SHOP:                                           # counter (general), counter_mithai, counter_mobile...
+    OBJECTS["counter" if _v == "general" else "counter_" + _v] = ((lambda v: (lambda s, c: _counter(s, c, v)))(_v),
+                                                                  None, 1.0)
+SHOP_COUNTERS = tuple(k for k in OBJECTS if k.startswith("counter"))
+# a thela and a counter are drawn at 250 units a metre and a person (~1.7 m) is ~800 units: 0.95 * 250 / 470 = 0.5
+for _k in THELAS + SHOP_COUNTERS:
+    PERSON_R[_k], SPRITE_LEN[_k] = 0.5, 560 if _k in THELAS else 440
+ENTER_DUR = {k: 2.6 for k in THELAS}                      # a pushed cart rolls in slowly
+COUNTERS = THELAS + SHOP_COUNTERS + ("table",)            # things a person can stand behind
 ALIASES = {"garbage_truck": "truck", "kachra_gaadi": "truck", "gaadi": "truck", "rickshaw": "auto", "gai": "cow",
            "motorcycle": "bike", "bullet": "bike", "bicycle": "cycle", "dustbin": "dustbin", "bin": "dustbin", "thaila": "bags", "kachra": "bags",
            "rehri": "thela", "rehdi": "thela", "redi": "thela", "cart": "thela", "thelaa": "thela",
            "kulche_thela": "thela_kulche", "fruit_thela": "thela_fruits", "chaat_thela": "thela_chaat",
-           "momos_thela": "thela_momos", "golgappe_thela": "thela_golgappe", "sabzi_thela": "thela"}
+           "momos_thela": "thela_momos", "golgappe_thela": "thela_golgappe", "sabzi_thela": "thela",
+           "chai_thela": "thela_chai", "juice_thela": "thela_ganna", "dukaan": "counter", "dukan": "counter",
+           "shop_counter": "counter"}
 
 
 def thela_kind(variant):
     """`kulche` -> "thela_kulche" (None if the word is not a cart)."""
     v = THELA_WORDS.get(str(variant).lower())
     return None if v is None else ("thela" if v == "sabzi" else "thela_" + v)
+
+
+def counter_kind(variant):
+    """`mithai` -> "counter_mithai" (None if the word is not a shop)."""
+    v = SHOP_WORDS.get(str(variant).lower())
+    return None if v is None else ("counter" if v == "general" else "counter_" + v)
 VEHICLES = ("truck", "auto", "car", "scooter", "bike", "cycle")
 SPLIT = ("truck", "auto", "car")               # drawn in two parts so a driver can show through the windows
 

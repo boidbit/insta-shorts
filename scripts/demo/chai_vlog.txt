@@ -1,0 +1,17 @@
+HOOK: Food blogger ka asli test 😂
+CAST: F = food_blogger, K = thelewala, H = halwai
+SCENE: street
+OBJ: thela chai enter left
+F (excited): Doston, aaj milte hain sabse famous chai wale se! | दोस्तों, आज मिलते हैं सबसे फ़ेमस चाय वाले से!
+K (proud): Bees saal se ek hi chai, ek hi daam! | बीस साल से एक ही चाय, एक ही दाम!
+F (point): Toh bhaiya, ek chai camera ke liye! | तो भैया, एक चाय कैमरे के लिए!
+K (sly): Camera chai nahi peeta, das rupaye nikaalo. | कैमरा चाय नहीं पीता, दस रुपये निकालो।
+F (shock, boing): Arre! | अरे!
+SCENE: mithai_shop | Thodi der baad... 🍬
+F (excited): Ab chalte hain mithai ki dukaan! | अब चलते हैं मिठाई की दुकान!
+H (smug): Pehle bata do, review achha doge na? | पहले बता दो, रिव्यू अच्छा दोगे ना?
+F (nervous): Haan haan, bilkul! | हाँ हाँ, बिल्कुल!
+H (laugh): Toh jalebi free! | तो जलेबी फ्री!
+CTA: Apne foodie dost ko tag karo 👇
+CAPTION: Har food blogger ki kahani 😂☕🍬
+HASHTAGS: #foodblogger #chaiwala #mithai #desicomedy #streetfood

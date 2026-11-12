@@ -3,7 +3,7 @@ import math
 import os
 import sys
 
-from . import audio, decor, effects, elevenlabs_tts, gemini_tts, objects, rides, vehicles
+from . import audio, counters, decor, effects, elevenlabs_tts, gemini_tts, objects, rides, styles, vehicles
 from .characters import assign_faces, color_of, resolve_spec
 from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, ease_out, ease_out_back, lerp
 
@@ -1199,6 +1199,11 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         c.events = [e for e in c.events if "_settle_from" not in e or not any(
             e2 is not e and "action" in e2 and e["_settle_from"] < e2["t"] <= e["t"] for e2 in c.events)]
         c.speech.sort(key=lambda s_: s_["start"])
+
+    # ---- counters: the seller behind his thela, the shopkeeper behind the counter, the judge behind the bench ----
+    place_ = plan.background.get("type") if isinstance(plan.background, dict) else plan.background
+    flat_ = styles.scene_style(scene) != "2.5d" or place_ in styles.FLAT_IN_25D
+    plan.counters = counters.place_behind(plan, place_, cine, flat_)
 
     # ---- duration ----
     if meta.get("duration"):

@@ -243,6 +243,18 @@ Ek SCENE ke andar line: `DRESS: shaadi` (genda maala + lights + "Shaadi Mubarak"
 
 `delivery_boy` (laal topi, dibba), `driver` (autowala, cabwala), `conductor`, `watchman` (guard, chowkidar; topi, danda), `landlord` (makaan_malik), `influencer` (youtuber, vlogger; kaala chashma, phone), `doodhwala` (doodh ki kenn), `tt` (train ka ticket checker), `bhoot` (ghost; safed chehra, shaitani muskaan), `pilot`, `air_hostess`, `kulchewala`, `thelewala`, `food_blogger`, `food_blogger_girl`.
 
+### Counter ke peeche, grahak aage 🧑‍🍳 (thela, dukaan, tapri, court...)
+
+Asli zindagi jaisa: **bechne wala thele / counter ke peeche, grahak ya food blogger aage**. Studio ye apne aap karta hai:
+- **Thela:** `OBJ: thela kulche center` + `kulchewala` / `thelewala` / `chaiwala` → wo thele ke peeche khada hota hai, thela uske pairon ke aage. `enter left` ho to wo thela **dhakel ke laata hai** (handle pe), phir ghoom ke peeche chala jaata hai.
+- **Dukaan ka counter:** `OBJ: counter mithai center` (general, mithai, mobile, medical, bakery, kapde) → `dukaandaar`, `halwai`, `chemist` peeche.
+- **Nayi dukaanein:** `SCENE: mithai_shop` (sweet_shop), `SCENE: mobile_shop`, `SCENE: medical_store` (chemist, pharmacy): counter apne aap lagta hai, dukaandaar uske peeche.
+- **Jagah me bane counter:** `chai_tapri` (chaiwala), `kirana` (dukaandaar / lala), `bank` (cashier, `clerk`), `hospital` (receptionist), `court` (`judge` bench ke peeche, **gawah** witness box me, munshi table pe), `canteen` (chaiwala), `police_station` (police desk ke peeche), `market` (teen stall: sabziwala, thelewala...). Wo insaan utna hi door aur utna hi bada dikhta hai jitna painting me counter.
+- **Khud chuno:** CAST me `peeche` = sabse paas wale counter ke peeche (`B = boy peeche`), `aage` = aage hi rahe. Jo insaan chal ke aata hai (enter / walk) wo apne raaste chalta hai.
+- Aage khada grahak agar bechne wale ke theek saamne ho to thoda side ho jaata hai.
+- **Naye thele:** chai (ketli + glass), ganna (ganne ka juice), bhutta, gola (barf ka gola), pav_bhaji, chole_bhature. **Naye log:** `dukaandaar` (lala, shopkeeper), `halwai` (mithaiwala), `chemist` (medicalwala), `clerk` (cashier, babu, munshi), `judge` (judge_sahab).
+- `CAMERA: classic` me pehle jaisa. 2.5D me thela / counter wala hissa chalta hai; jagah me bane counter abhi sirf 2D me.
+
 ### Har character ka apna chehra: Face card 🙂
 
 Har character ka chehra alag hota hai (studio khud deta hai), aur ab har hissa khud bhi chun sakte ho. Page pe 🎭 builder me har character ke neeche **"🙂 Face card"** kholo: chehra / jaw, aankhein, naak, bhaunhein, hont, kaan, dadhi, moonchh ke dropdown + gulabi gaal, palkein, jhurriyan, til, dimple, freckles. Neeche likha aata hai ki script me kaunse shabd jayenge; "📖 Har option kaisa dikhta hai" me sab options ki photo (`assets/faces/chart.png`).

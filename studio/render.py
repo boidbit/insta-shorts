@@ -361,6 +361,13 @@ class Renderer(Output):
             bg_spec = dict(bg_spec, classic=True)          # CAMERA: classic keeps the old drawings
         self.bg = Background(bg_spec, int(self.W * ang["zoom"] + 0.5), int(self.H * ang["zoom"] + 0.5))
         self.bd25 = self._backdrop25(preset, scene) if preset else None
+        used = getattr(self.plan, "counters", None)
+        if used and self.bg.static is not None and self.bd25 is None:
+            from . import counters                   # the painted counter's front, over whoever stands behind it
+            place = bg_spec.get("type") if isinstance(bg_spec, dict) else bg_spec
+            for d, im, x, y in counters.counter_overlays(place, used, self.bg.static, self.bg.out_w / float(LW)):
+                self.bg.fg.append((d, im, x, y, None))
+            self.bg.fg.sort(key=lambda f: f[0])
         self._view25_t, self._view25_v = None, None
         self.overlay_layer = OverlayLayer(self.s)
         self.fx = Effects(self.plan.effects, self.s, self.W, self.H, self.plan.fps)
@@ -570,6 +577,8 @@ class Renderer(Output):
             if o.front and riders:                  # drawn together with its riders, over everybody
                 continue
             if o.front != front:
+                continue
+            if not front and getattr(o, "depth_sort", False):     # somebody stands behind it: drawn by depth
                 continue
             self._paste_object(img, o, t, "back" if (riders and o.kind in objects.SPLIT) else "all")
             if o.kind == "cycle":
@@ -1167,20 +1176,29 @@ class Renderer(Output):
 
         # everybody except the riders of a vehicle that is in front; then front objects; then those vehicles with their riders
         in_front = [c for c in order if self._front_rider(c, t)]
-        floor = sorted(self.sets.floor(t) + self._foreground(t), key=lambda f: f[0])   # set pieces and the place's
-        # own front props (bed, sofa, tree, street poles...) depth-sorted with the people
+        floor = sorted(self.sets.floor(t) + self._foreground(t)
+                       + [(o.y, None, o, 0) for o in plan.objects.values()     # a thela / counter somebody stands behind
+                          if getattr(o, "depth_sort", False) and not o.front and o.visible(t)],
+                       key=lambda f: f[0])   # set pieces and the place's own front props (bed, sofa, tree, street
+        # poles...) depth-sorted with the people
+
+        def put(f):
+            if f[1] is None:
+                self._paste_object(img, f[2], t, "all")
+            else:
+                img.paste(f[1], (f[2], f[3]), f[1])
         fi = 0
         for c in order:
             while fi < len(floor) and floor[fi][0] <= c.draw_pos(t)[1]:
-                img.paste(floor[fi][1], (floor[fi][2], floor[fi][3]), floor[fi][1])
+                put(floor[fi])
                 fi += 1
             if c not in in_front and c.state_at(t).get("visible", True):
                 for m in self.mascots:              # the easter egg peeks out from behind this person
                     if m["who"] == c.name and m["t0"] <= t <= m["t1"]:
                         self._draw_mascot(img, c, t, m)
                 draw_char(c)
-        for _d, im_, px_, py_ in floor[fi:]:
-            img.paste(im_, (px_, py_), im_)
+        for f in floor[fi:]:
+            put(f)
         self._draw_objects(img, t, True)
         for o in plan.objects.values():
             riders = [c for c in in_front if c.ride_frame(t)["obj"] is o]

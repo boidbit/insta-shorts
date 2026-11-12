@@ -393,6 +393,100 @@ def mall(s):
     return g.done()
 
 
+# ------------------------------------------------------------------ shops (the counter comes as a set object)
+def _shop_room(g, wall, floor, y_floor=1280):
+    g.vgrad(0, y_floor, wall, tuple(max(0, c - 18) for c in wall))
+    g.rect(0, 0, LW, 100, tuple(min(255, c + 12) for c in wall))
+    for x in (200, 760):                                                                  # tube lights
+        g.rect(x, 110, x + 160, 128, (255, 255, 240), INK, 3)
+    g.rect(0, y_floor, LW, LH, floor)
+    for i, y in enumerate(range(y_floor + 60, LH, 110)):
+        g.line([(0, y), (LW, y)], tuple(max(0, c - 22) for c in floor), 3 + i)
+    g.line([(0, y_floor), (LW, y_floor)], INK, 5)
+
+
+def mithai_shop(s):
+    """A sweet shop: shelves of sweet boxes, glass jars of laddoos, a board of today's sweets, lights."""
+    g = G(s, color=(246, 226, 190))
+    _shop_room(g, (246, 226, 190), (200, 170, 130))
+    _sign(g, 200, 150, 880, 260, "MITHAI BHANDAR", (200, 40, 50), (255, 230, 120))
+    _string_lights(g, 0, LW, 280, 40, 16, seed=12)
+    for (x0, x1) in ((40, 500), (580, 1040)):                                             # shelves of boxes
+        g.rect(x0, 400, x1, 1000, (150, 104, 66), INK, 6)
+        g.rect(x0 + 14, 414, x1 - 14, 986, (120, 84, 56))
+        for r, y in enumerate((540, 700, 860)):
+            g.rect(x0 + 14, y, x1 - 14, y + 10, (150, 104, 66))
+            for k in range(5):
+                bx = x0 + 30 + k * 90
+                col = ((240, 120, 50), (230, 60, 90), (250, 200, 60), (240, 240, 230), (90, 160, 90))[(k + r) % 5]
+                g.rect(bx, y - 90, bx + 70, y, col, INK, 3)
+                g.rect(bx + 10, y - 60, bx + 60, y - 50, (255, 255, 255))
+    for i, col in enumerate(((250, 200, 60), (240, 150, 60), (250, 250, 240))):           # jars of laddoos on top
+        x = 120 + i * 140
+        g.rrect(x, 330, x + 90, 400, 14, (220, 236, 244), INK, 3)
+        for k in range(3):
+            g.circle(x + 24 + k * 22, 378, 12, col, INK, 2)
+    g.rrect(700, 300, 1000, 400, 10, (40, 70, 60), INK, 5)                                # today's special
+    _txt(g, 850, 350, "AAJ: RASGULLA", 30, (255, 255, 255))
+    return g.done()
+
+
+def mobile_shop(s):
+    """A mobile phone shop: a wall of phones, an offer poster, earphones hanging, a TV playing an ad."""
+    g = G(s, color=(230, 238, 248))
+    _shop_room(g, (230, 238, 248), (190, 196, 206))
+    _sign(g, 220, 150, 860, 260, "MOBILE POINT", (30, 80, 170), (255, 255, 255))
+    g.rect(60, 330, 620, 1000, (250, 250, 252), INK, 6)                                   # the wall of phones
+    for r in range(4):
+        for k in range(6):
+            x, y = 90 + k * 88, 360 + r * 156
+            g.rrect(x, y, x + 60, y + 118, 10, (40, 44, 52), INK, 3)
+            g.rect(x + 6, y + 10, x + 54, y + 100, ((120, 190, 235), (240, 140, 160), (150, 220, 160),
+                                                     (250, 210, 120))[(k + r) % 4])
+    g.rect(680, 330, 1020, 560, (40, 40, 44), INK, 6)                                     # the TV ad
+    g.rect(696, 346, 1004, 544, (90, 160, 240))
+    _txt(g, 850, 445, "5G SALE", 52, (255, 255, 255))
+    g.rect(700, 620, 1000, 820, (250, 220, 70), INK, 5)                                   # the offer poster
+    _txt(g, 850, 690, "50% OFF", 50, (200, 30, 40))
+    _txt(g, 850, 760, "EMI 0%", 34, (40, 40, 44))
+    for k in range(5):                                                                     # earphones on hooks
+        x = 700 + k * 64
+        g.line([(x, 860), (x, 880)], INK, 4)
+        g.line([(x - 14, 880), (x - 18, 960), (x, 990), (x + 18, 960), (x + 14, 880)], (240, 240, 240), 4)
+    return g.done()
+
+
+def medical_store(s):
+    """A chemist's shop: a green cross, shelves full of medicine boxes, a fridge, a weighing machine."""
+    g = G(s, color=(236, 246, 240))
+    _shop_room(g, (236, 246, 240), (206, 214, 210))
+    _sign(g, 200, 150, 760, 260, "MEDICAL STORE", (30, 130, 80), (255, 255, 255))
+    g.rect(840, 150, 900, 270, (40, 170, 90))                                             # the green cross
+    g.rect(810, 180, 930, 240, (40, 170, 90))
+    g.rect(40, 330, 760, 1010, (240, 240, 236), INK, 6)                                   # shelves of medicines
+    for r, y in enumerate((470, 620, 770, 920)):
+        g.rect(54, y, 746, y + 10, (190, 190, 186))
+        x = 70
+        k = 0
+        while x < 720:
+            w = 40 + (k * 13 + r * 7) % 30
+            h = 60 + (k * 11 + r * 5) % 50
+            col = ((250, 250, 250), (220, 236, 250), (250, 236, 210), (230, 250, 230))[(k + r) % 4]
+            g.rect(x, y - h, x + w, y, col, INK, 2)
+            g.rect(x + 6, y - h + 12, x + w - 6, y - h + 22, ((220, 60, 60), (60, 140, 220), (60, 160, 90))[k % 3])
+            x += w + 8
+            k += 1
+    g.rect(800, 420, 1040, 1010, (250, 250, 252), INK, 6)                                 # the fridge
+    g.rect(816, 436, 1024, 994, (210, 236, 250))
+    _txt(g, 920, 480, "INSULIN", 28, (30, 80, 140))
+    for y in (560, 700, 840):
+        g.line([(816, y), (1024, y)], (170, 190, 210), 4)
+    return g.done()
+
+
 RICH = {"street": street, "market": market, "office": office, "hospital": hospital}
-NEW = {"court": court, "dhaba": dhaba, "salon": salon, "mall": mall}
-HORIZON = {"court": 1270, "dhaba": 1260, "salon": 1280, "mall": 1300}
+SHOPS = {"mithai_shop": "counter_mithai", "mobile_shop": "counter_mobile", "medical_store": "counter_medical"}
+NEW = {"court": court, "dhaba": dhaba, "salon": salon, "mall": mall, "mithai_shop": mithai_shop,
+       "mobile_shop": mobile_shop, "medical_store": medical_store}
+HORIZON = {"court": 1270, "dhaba": 1260, "salon": 1280, "mall": 1300, "mithai_shop": 1280, "mobile_shop": 1280,
+           "medical_store": 1280}
