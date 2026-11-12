@@ -240,6 +240,67 @@ console.log(JSON.stringify(cardsToScript(m)));""", None)
                               "HASHTAGS: #x\nCOVER: z\n")
 
 
+@unittest.skipUnless(shutil.which("node"), "node is not installed")
+class Simple(unittest.TestCase):
+    """The lighter Builder: the whole talk typed at once, a new person by name, things that suit the place."""
+
+    def test_the_whole_talk_at_once(self):
+        start = "HOOK: Nizam 1 acha developer hai\nCAST: A = chaiwala, C = mla\nSCENE: office evening\nCTA: tag karo\n"
+        out = run_js("""
+const m = scriptToCards(DATA.start);
+const r = addDialogue(m.items, DATA.talk);
+console.log(JSON.stringify({ r, script: cardsToScript(m) }));""", {"start": start, "talk": "\n".join([
+            "Chaiwala: Aao bhai log, chai pilata hu",
+            "MLA (khush): Waah Nizam bhai, garma garam chai!",
+            "",
+            "Guard: Sahab, gaadi aa gayi",
+            "MLA ka PA (gussa): Jaldi chalo!",
+            "C -> exit right fast",
+            "bas yahi line bina naam ke",
+            "CAPTION: MLA aur chai",
+        ])})
+        self.assertEqual(out["r"]["people"], ["Guard", "MLAKaPA"])
+        self.assertEqual(out["r"]["raw"], ["bas yahi line bina naam ke"])
+        self.assertEqual(out["script"], "\n".join([
+            "HOOK: Nizam 1 acha developer hai",
+            "CAST: A = chaiwala, C = mla, Guard = guard, MLAKaPA = clerk",          # "MLA ka PA": a PA (clerk)
+            "SCENE: office evening",
+            "A: Aao bhai log, chai pilata hu",                     # Chaiwala -> the chaiwala (A), by role
+            "C (smile): Waah Nizam bhai, garma garam chai!",       # MLA -> C; khush -> smile
+            "Guard: Sahab, gaadi aa gayi",                         # a new name: a new person, role from the name
+            "MLAKaPA (angry): Jaldi chalo!",
+            "C -> exit right fast",
+            "bas yahi line bina naam ke",                          # kept as it is (a kachhi line)
+            "CTA: tag karo",
+            "CAPTION: MLA aur chai",
+            "",
+        ]))
+
+    def test_a_new_person_and_roles_from_names(self):
+        out = run_js("""
+const m = scriptToCards("");
+const a = addChar(m.items, "Guard"), b = addChar(m.items, "Sharma ji"), c = addChar(m.items, "Pinky"), d = addChar(m.items, "Guard");
+console.log(JSON.stringify({ ids: [a.id, b.id, c.id, d.id], roles: [a.f.role, b.f.role, c.f.role, d.f.role],
+  who: [castMatch(m.items, "guard"), castMatch(m.items, "sharma ji"), castMatch(m.items, "Narrator"), castMatch(m.items, "nobody")] }));""", None)
+        self.assertEqual(out["ids"], ["Guard", "SharmaJi", "Pinky", "Guard2"])
+        self.assertEqual(out["roles"][0], "guard")
+        self.assertIn(out["roles"][2], ("college_boy", "college_girl"))
+        self.assertEqual(out["who"], ["Guard", "SharmaJi", "NARRATOR", ""])
+
+    def test_things_that_suit_the_place(self):
+        out = run_js("""
+const [office, officeRest] = objectsFor("office"), [gully] = objectsFor("gully");
+const m = scriptToCards("SCENE: office\\nA: hi\\nSCENE: gully\\nB: bye\\n");
+console.log(JSON.stringify({ office, officeRest, gully, at: [placeAt(m.items, 1), placeAt(m.items, 3), placeAt(m.items, 4)] }));""", None)
+        self.assertIn("table", out["office"])
+        self.assertIn("chair", out["office"])
+        self.assertFalse([o for o in out["office"] if "thela" in o or "gaadi" in o or o in ("cow", "truck")])
+        self.assertIn("kachra_gaadi", out["officeRest"])                 # still there, under "Baaki sab"
+        self.assertIn("thela_kulche", out["gully"])
+        self.assertNotIn("fridge", out["gully"])
+        self.assertEqual(out["at"], ["office", "gully", "gully"])
+
+
 class Page(unittest.TestCase):
     def test_the_tab_and_its_box(self):
         self.assertIn('data-mode="cards"', PAGE)

@@ -61,12 +61,18 @@ AI key ke saath chalana: `GEMINI_API_KEY=xxxx python -m studio.web` (key: aistud
 
 ### 🧩 Builder tab: script ko cards me banao (format yaad rakhne ki zarurat nahi)
 
-Page pe teesra tab **"🧩 Builder"**: wahi script, par dropdown aur dabbon me. Har card = script ki ek line.
+Page pe teesra tab **"🧩 Builder"**: wahi script, par dabbon me. Har card = script ki ek line.
 
-- **Upar (🎬 Shuruaat):** Hook, Jagah (photo ke saath; samay: din / raat / sunset…; upar likha title jaise "3 ghante baad… ⏰") aur Characters (naam, role ki photo, baal, kapde, colour, body, extra, 🙂 Face card, 💾 Save, ⭐ saved `@naam`). Character ka naam badlo to uski saari lines bhi badal jaati hain.
-- **💬 Lines:** har line ka card: **kaun** bolta hai ▼ · **feeling** (😠 😲 😱 😏 😂 😢 🤔 😍 😈 😄 📢 💀, ➕ aur; ek line me ek feeling, studio ek hi lagata hai) · **Hinglish** text · **🎬 action** ▼ (optional). Text khali = sirf action (`P -> facepalm`). ⚙️ me 🔍 zoom, 🐢 slowmo aur "aur shabd" (prop, awaaz, effect: `phone, boing, sweat`). ⬆ ⬇ se upar-neeche, ✕ se hatao.
-- **➕ cards:** ➕ Line · 🏠 Nayi jagah (`SCENE`) · 🛒 Thela / object (`OBJ`) · 📱 Screen card (notification, loading, counter, time card, chapter, end card) · ✏️ Kachhi line (koi bhi line, jaisi likhni ho).
-- **Neeche (🏁 Aakhir me):** CTA, caption, hashtags. Script ki baaki settings (MUSIC, COVER, LOOP…) apne dabbe me, jaisi thi waisi.
+- **Upar (🎬 Shuruaat):** Hook, Jagah (photo ke saath; samay: din / raat / sunset…; upar likha title jaise "3 ghante baad… ⏰") aur Characters. ➕ Character dabao aur naam ya role likho (Guard, PA, Sharma ji, Mummy): role naam se apne aap. Character pe ✏️ = role (type karke dhoondho: "gua" → guard), baal, kapde, colour, body, 🙂 Face card, 💾 Save; ⭐ saved `@naam`. Naam badlo to uski saari lines bhi badal jaati hain.
+- **✍️ Saari baat ek saath likho / paste karo:** sabse aasaan. Har line `Naam: baat` (feeling chaho to `MLA (gussa): ...`):
+  ```
+  Chaiwala: Aao bhai log, chai pilata hu
+  MLA (khush): Waah Nizam bhai, garma garam chai!
+  Guard: Sahab, gaadi aa gayi
+  ```
+  "➕ Cards banao" → har line ka card. Naam ya role se sahi aadmi (MLA → jo character mla hai); naya naam (Guard) = naya aadmi apne aap. Poori script paste karo to Builder usi se bhar jaata hai.
+- **💬 Har line ek chhoti chat-row:** `[chehra] Kaun ▼  🙂  ⋯` + Hinglish text. Kaun ▼ me "➕ Naya aadmi…" bhi hai. 🙂 ya ⋯ dabao to khulta hai: feeling (😠 😲 😱 😏 😂 😢 🤔 😍 😈 😄 📢 💀, ➕ aur; ek line me ek), 🎬 action, 🔍 zoom, 🐢 slowmo, aur shabd (`phone, boing, sweat`), ⬆ ⬇ ✕. Text khali = sirf action (`P -> facepalm`).
+- **Neeche:** ➕ Line, aur "➕ Aur…" me: 🏠 Nayi jagah (`SCENE`) · 🪑 Cheez / 🛒 Thela (`OBJ`: jagah ke hisaab se list; office me table, kursi…, gali me thela; baaki sab "Baaki sab" me) · 📱 Screen card · ✏️ Kachhi line. Phir CTA, caption, hashtags. Script ki baaki settings (MUSIC, COVER, LOOP…) apne dabbe me, jaisi thi waisi.
 - **Do-taraf:** "📝 Apni script" aur "🧩 Builder" ek hi script dikhate hain. ChatGPT / Gemini wali script paste karo → Builder kholo → cards ban jaate hain; card badlo → script badal jaati hai. Jo card nahi badla uski line bilkul waisi hi rehti hai (ek akshar bhi nahi badalta), aur jo line cards ko samajh na aaye wo "kachhi line" ban ke waisi hi rehti hai: kuch khota nahi.
 - CUT (shot) ka dropdown nahi: camera shot apne aap chunta hai. AI script ke CUT "✂️" patti ki tarah dikhte hain (hatao to camera khud chunega). Devanagari bhi apne aap (upar dekho); text badlo to us line ki purani Devanagari hat jaati hai aur video banate waqt nayi banti hai.
 - Jagah ki photos: `assets/places/<jagah>.jpg` (`python -m studio.thumbs` se banti hain).

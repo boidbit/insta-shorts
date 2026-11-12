@@ -186,6 +186,20 @@
   .lkind { font-size: 12px; color: var(--muted); font-weight: 600; }
   .lact { flex: 1 1 140px; min-width: 0; }
   .addbar { display: flex; flex-wrap: wrap; gap: 6px; }
+  .addbar .big { flex: 1 1 140px; font-weight: 600; }
+  .addbar select { flex: 1 1 140px; }
+  .lcard .lrow > select { flex: 0 1 auto; max-width: 160px; min-width: 0; }
+  .lcard .lrow > .lact { flex: 1 1 150px; max-width: none; }
+  .lcard img.lav { width: 26px; height: 33px; object-fit: contain; flex: none; }
+  .ltags { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feel.face { font-size: 20px; border-color: var(--line); }
+  .feel.face:not(.on) { opacity: .55; }
+  .lcard.open { border-color: var(--ink); }
+  .cbox.write > summary { cursor: pointer; font-weight: 600; }
+  .ladv .feels { flex: none; }
+  .chelp.ok { color: var(--ok); margin-top: 6px; }
+  .cbox.write textarea { margin-top: 6px; }
+  input.bad { border-color: var(--err); }
   .chelp { font-size: 13px; color: var(--muted); margin: 0; }
   @media (max-width: 640px) { .cards select, .cards input, .cards textarea { font-size: 16px; } }   /* no zoom-in on iPhone */
   .setup label { max-width: 100%; }
@@ -1166,6 +1180,76 @@ function freeId(items, base) {      // "A", "B"... or Papa, Papa2: a name no cha
   for (const L of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") if (!used.has(L)) return L;
   return "X" + used.size;
 }
+const ROLE_WORDS = () => [...new Set([...V.roles, ...V.looks, ...V.animals])];
+// a role from a name: "Guard" -> guard, "PA" -> clerk, "Nizam bhai" -> bhai; else a young boy / girl in turns
+const ROLE_GUESS = { pa: "clerk", assistant: "clerk", secretary: "clerk", peon: "clerk", chaprasi: "clerk", manager: "boss",
+  sahab: "boss", saheb: "boss", bodyguard: "guard", gunman: "guard", constable: "policewala", sipahi: "policewala",
+  chamcha: "clerk", karyakarta: "clerk", reporter: "influencer", patrakar: "influencer" };
+function roleFor(name, n = 0) {
+  const ws = name.trim().toLowerCase().split(/\s+/).map((w) => w.replace(/\W/g, ""));
+  const hit = ws.slice().reverse().find((w) => ROLE_GUESS[w] && (SET.roles.has(ROLE_GUESS[w]) || SET.looks.has(ROLE_GUESS[w])));
+  return hit ? ROLE_GUESS[hit] : ws.find((w) => ROLE_LOOK[w] || SET.looks.has(w) || SET.animals.has(w)) || (n % 2 ? "college_girl" : "college_boy");
+}
+function addChar(items, name, role) {   // a new character (on the CAST line): its name in the lines
+  const cast = ensureItem(items, "CAST");
+  const c = { id: freeId(items, name ? ident(name) : ""), f: { role: role || roleFor(name || "", cast.chars.length), rest: [] } };
+  cast.chars.push(c);
+  touch(cast);
+  return c;
+}
+// who a written name is: a character's name, or its role (MLA -> the character who is an mla), narrator, all; "" = nobody
+function castMatch(items, name) {
+  const key = name.trim().toLowerCase(), flat = key.replace(/\s+/g, "");
+  if (/^(narrator|vo|narration|voiceover|voice_over)$/.test(key)) return "NARRATOR";
+  if (key === "all" || key === "sab") return "ALL";
+  const cast = items.find((it) => it.k === "cast"), chars = cast ? cast.chars : [];
+  const c = chars.find((x) => x.id.toLowerCase() === flat) || chars.find((x) => (x.f.role || "") === flat) ||
+            chars.find((x) => x.saved === flat);
+  return c ? c.id : "";
+}
+// "✍️ Ek saath likho": typed / pasted lines -> cards after the story. "MLA (gussa): baat" goes to the MLA (a new name
+// becomes a new character, its role from the name); HOOK / CTA / CAPTION / HASHTAGS fill their boxes; a line that is
+// not "Naam: baat" stays as a kachhi line. Returns {lines, people: [new ids], raw: [lines not understood]}.
+function addDialogue(items, text) {
+  const fresh = [], people = [], raw = [];
+  for (const line of text.replace(/\r\n?/g, "\n").split("\n").map((l) => l.trim()).filter(Boolean)) {
+    const it = parseLine(line);
+    if (it.k === "head") { if (it.key.toUpperCase() !== "STYLE") Object.assign(touch(ensureItem(items, it.key.toUpperCase())), { value: it.value }); continue; }
+    if (it.k === "cast") {
+      for (const c of it.chars) if (!castMatch(items, c.id)) { const cast = ensureItem(items, "CAST"); cast.chars.push(c); touch(cast); people.push(c.id); }
+      continue;
+    }
+    if (it.k === "line") {
+      let id = castMatch(items, it.who);
+      if (!id) { id = addChar(items, it.who).id; people.push(id); }
+      it.who = id;
+      it.acting = it.acting.map((w) => EMO[w.toLowerCase()] || w);
+      if (!it.acting.length && it.text && autoEmotion(it.text)) it.acting = [autoEmotion(it.text)];
+      touch(it);
+    }
+    if (it.k === "raw") raw.push(line);
+    fresh.push(it);
+  }
+  items.splice(storyEnd(items), 0, ...fresh);
+  return { lines: fresh.length, people, raw };
+}
+// the place a card is in (the last SCENE above it, else the first one) and the things that suit it
+const OUTDOOR = new Set(["street", "gully", "market", "bus_stop", "chai_tapri", "festival_street", "gaon", "night_road",
+  "school_ground", "railway", "beach", "mountain_road", "desert", "jungle", "cricket_ground", "graveyard", "dhaba", "kirana"]);
+const STREET_THINGS = /thela|rehri|rehdi|redi|^cart$|^auto$|bike|bicycle|bullet|^car$|cycle|gaadi|motorcycle|rickshaw|scooter|truck|kachra|garbage|^cow$|^gai$|dukaan|dukan/;
+const OUT_TOO = ["bench", "dustbin", "bin", "fence", "bush", "khaat", "matka", "table", "chair", "bags", "box", "bucket", "plant"];
+function placeAt(items, i) {
+  for (let j = Math.min(i, items.length) - 1; j >= 0; j--) if (items[j].k === "scene" && items[j].place) return items[j].place;
+  const s = items.find((it) => it.k === "scene" && it.place);
+  return s ? s.place : "";
+}
+const isOutdoor = (place) => !place || OUTDOOR.has(place) || SET.vehicles.has(place);
+function objectsFor(place) {        // [things for this place, the rest]
+  const all = [...new Set([...V.objects, ...V.sets])].sort();
+  const fit = isOutdoor(place) ? (o) => STREET_THINGS.test(o) || OUT_TOO.includes(o)
+    : (o) => !STREET_THINGS.test(o) && !["bush", "fence"].includes(o);
+  return [all.filter(fit), all.filter((o) => !fit(o))];
+}
 // ---------------------------------------------------------------- builder end
 
 // ---------------------------------------------------------------- make a reel
@@ -1718,11 +1802,18 @@ function charRow(c, cast, i) {
     return d;
   };
   if (c.saved) return fold([img, el("div", { className: "fields" }, [name, el("span", { className: "lkind", textContent: `⭐ @${c.saved} (saved)` }), del])]);
-  const roles = [...new Set([...V.roles, ...V.looks, ...V.animals])];
-  const role = el("select", { title: "Kaun hai (role / look)" }, [...(c.f.role ? [] : [opt("", "— role —")]), ...roles.map((r) => opt(r))]);
-  if (c.f.role && !roles.includes(c.f.role)) role.append(opt(c.f.role));
-  role.value = c.f.role || "";
-  role.addEventListener("change", () => { c.f.role = role.value; img.src = `assets/looks/${lookOf(role.value)}.png`; img.style.visibility = ""; changed(); });
+  const roles = ROLE_WORDS();
+  const role = el("input", { type: "text", value: c.f.role || "", placeholder: "Role: type karo (guard, mla, dost…)",
+    title: "Kaun hai: likhna shuru karo, list se chuno" });
+  role.setAttribute("list", "cardRoles");
+  role.addEventListener("change", () => {
+    const v = role.value.trim().toLowerCase().replace(/\s+/g, "_");
+    if (!roles.includes(v)) { role.classList.add("bad"); role.title = `"${role.value}" role nahi hai: list me se chuno`; return; }
+    role.classList.remove("bad");
+    c.f.role = v; role.value = v;
+    img.src = `assets/looks/${lookOf(v)}.png`; img.style.visibility = "";
+    changed();
+  });
   const fields = [
     ["hair", pick(V.hair, c.f.hair, "Baal: auto")], ["skin", pick(V.skin, c.f.skin, "Rang: auto")],
     ["outfit", pick(V.outfits, c.f.outfit, "Kapde: auto")], ["color", pick(V.colors, c.f.color, "Colour: auto")],
@@ -1742,11 +1833,8 @@ function charRow(c, cast, i) {
 function castBox() {
   const cast = castOf();
   const add = btn("➕ Character", "Naya character", () => {
-    const it = ensureItem(cards.items, "CAST");
-    const c = { id: freeId(cards.items), f: { role: ["papa", "beta", "mummy", "dost", "dadi"][it.chars.length] || "boy", rest: [] } };
-    it.chars.push(c);
-    openChars.add(c);
-    touch(it); cardsChanged(); renderCards();
+    const c = askNewPerson();
+    if (c) { openChars.add(c); renderCards(); }
   });
   const all = savedChars(), names = Object.keys(all).sort();
   const star = el("select", { title: "Aapke save kiye characters" },
@@ -1760,6 +1848,29 @@ function castBox() {
   });
   return el("div", {}, [...(cast ? cast.chars.map((c, i) => charRow(c, cast, i)) : []), el("div", { className: "brow" }, [add, star])]);
 }
+// a new person: name or role in one box ("Guard", "MLA ka PA", "Sharma ji"); the role comes from the name
+function askNewPerson() {
+  const ans = prompt("Naya aadmi: naam ya role likho\n(jaise Guard, PA, Dost, Sharma ji, Mummy)", "");
+  if (!ans || !ans.trim()) return null;
+  const c = addChar(cards.items, ans.trim());
+  cardsChanged();
+  return c;
+}
+function whoSelect(value, onPick) {        // Kaun ▼: the cast, narrator, everyone, ➕ a new person
+  const cast = castOf(), ids = cast ? cast.chars.map((c) => c.id) : [];
+  const label = (id) => { const r = roleOf(charOf(id)); return id.toLowerCase() === r.replace(/_/g, "") ? id : `${id} · ${r}`; };
+  const s = el("select", { title: "Kaun bolta hai" }, [...ids.map((id) => opt(id, label(id))),
+    opt("NARRATOR", "🎙️ Narrator"), opt("ALL", "👥 Sab"), opt("+", "➕ Naya aadmi…")]);
+  if (value && ![...s.options].some((o) => o.value === value)) s.append(opt(value, value + " (CAST me nahi)"));
+  s.value = value;
+  s.addEventListener("change", () => {
+    if (s.value !== "+") return onPick(s.value, false);
+    const c = askNewPerson();
+    if (!c) { s.value = value; return; }
+    onPick(c.id, true);
+  });
+  return s;
+}
 function tools(i) {
   const move = (dir) => () => { if (moveItem(cards.items, i, dir)) { cardsChanged(); renderCards(); } };
   return el("div", { className: "ltools" }, [btn("⬆", "Upar", move(-1)), btn("⬇", "Neeche", move(1)),
@@ -1771,16 +1882,30 @@ function tick(label, on, fn) {
   return el("label", {}, [b, label]);
 }
 function lineCard(it, i) {
-  const card = el("div", { className: "lcard" + (it.text ? "" : " act") });
+  const open = openAdv.has(it);
+  const card = el("div", { className: "lcard" + (it.text ? "" : " act") + (open ? " open" : "") });
   const redraw = () => { const n = lineCard(it, i); card.replaceWith(n); cardEls.set(it, n); n.querySelectorAll("textarea").forEach(grow); };
   const edit = (fn) => { fn(); touch(it); cardsChanged(); };
-  const cast = castOf(), ids = cast ? cast.chars.map((c) => c.id) : [];
-  const who = el("select", { title: "Kaun bolta hai" }, [...ids.map((id) => opt(id, `${id} · ${roleOf(charOf(id))}`)),
-    opt("NARRATOR", "🎙️ Narrator"), opt("ALL", "👥 Sab")]);
-  if (it.who && ![...who.options].some((o) => o.value === it.who)) who.append(opt(it.who, it.who + " (CAST me nahi)"));
-  who.value = it.who;
-  who.addEventListener("change", () => { edit(() => { it.who = who.value; }); redraw(); });
+  const toggle = () => { if (openAdv.has(it)) openAdv.delete(it); else openAdv.add(it); redraw(); };
+  const who = whoSelect(it.who, (v, fresh) => { edit(() => { it.who = v; }); if (fresh) renderCards(); else redraw(); });
   const p = actingParts(it.acting), feel = p.feel >= 0 ? feelOf(it.acting[p.feel]) : "";
+  const act = p.action >= 0 ? it.acting[p.action] : "";
+  const extras = p.extra.map((k) => it.acting[k]), cams = p.cam.map((k) => it.acting[k].toLowerCase());
+  const tags = [act && "🎬 " + act, cams.includes("zoom") && "🔍", cams.some((c) => c.startsWith("slow")) && "🐢",
+    extras.length && "+" + extras.length].filter(Boolean).join(" ");
+  const face = btn(feel ? (FEEL_WORD[feel] ? FEEL_WORD[feel][0] : "🎭") : "🙂", feel ? `Feeling: ${feel} (badlo)` : "Feeling chuno",
+    toggle, "feel face" + (feel ? " on" : ""));
+  const txt = field("", it.text, "Kya bolta hai? (Hinglish)  ·  khali = sirf action", (v) => {
+    edit(() => { it.text = v.trim(); it.dev = ""; });
+    dev.textContent = it.text ? "🔤 Devanagari video banate waqt apne aap banegi" : "";
+    card.classList.toggle("act", !it.text);
+  }, 1);
+  const dev = el("div", { className: "ldev", textContent: it.dev ? "🔤 " + it.dev : "" });
+  card.append(el("div", { className: "lrow" }, [lookImg(roleOf(charOf(it.who)), "lav"), who,
+    el("span", { className: "ltags", textContent: tags }), face,
+    btn(open ? "▲" : "⋯", "Feeling, action, upar-neeche, hatao", toggle, "small advb")]), txt, dev);
+  if (!open) return card;
+  // the open panel
   const chips = EMO_CHIPS.map(([icon, w]) => {
     const on = feel === (EMO[w] || w);
     return btn(icon, w, () => { edit(() => { it.acting = setFeel(it.acting, on ? "" : w); }); redraw(); }, "feel" + (on ? " on" : ""));
@@ -1789,39 +1914,20 @@ function lineCard(it, i) {
   const more = el("select", { className: "feel", title: "Aur feelings" }, [opt("", "➕ aur"),
     ...V.expressions.map((e) => opt(e, (FEEL_WORD[e] ? FEEL_WORD[e][0] + " " : "") + e))]);
   more.addEventListener("change", () => { if (more.value) { edit(() => { it.acting = setFeel(it.acting, more.value); }); redraw(); } });
-  const txt = field("", it.text, "Kya bolta hai? (Hinglish)  ·  khali = sirf action", (v) => {
-    edit(() => { it.text = v.trim(); it.dev = ""; });
-    dev.textContent = it.text ? "🔤 Devanagari video banate waqt apne aap banegi" : "";
-    card.classList.toggle("act", !it.text);
-  }, 2);
-  const dev = el("div", { className: "ldev", textContent: it.dev ? "🔤 " + it.dev : "" });
-  const act = p.action >= 0 ? it.acting[p.action] : "";
   const acts = [...ENTRY_ACTS, ...V.actions.filter((a) => !ENTRY_ACTS.includes(a)).sort()];
-  const actSel = el("select", { className: "lact", title: "Action (optional)" }, [opt("", "🎬 Action —"), ...acts.map((a) => opt(a))]);
+  const actSel = el("select", { className: "lact", title: "Action (optional)" }, [opt("", "🎬 Action: koi nahi"), ...acts.map((a) => opt(a))]);
   if (act && !acts.includes(act)) actSel.append(opt(act));
   actSel.value = act;
   actSel.addEventListener("change", () => { edit(() => { it.acting = setAction(it.acting, actSel.value); }); redraw(); });
-  const extras = p.extra.map((k) => it.acting[k]), cams = p.cam.map((k) => it.acting[k].toLowerCase());
-  const n = extras.length + cams.length;
-  const adv = el("div", { className: "ladv" + (openAdv.has(it) ? "" : " hidden") }, [
-    el("div", { className: "lrow" }, [
-      tick("🔍 Zoom (chehre pe)", cams.includes("zoom"), (on) => { edit(() => { it.acting = setCam(it.acting, "zoom", on); }); redraw(); }),
-      tick("🐢 Slowmo", cams.some((c) => c.startsWith("slow")), (on) => { edit(() => { it.acting = setCam(it.acting, "slowmo", on); }); redraw(); }),
-    ]),
-    field("➕ Aur shabd (prop, awaaz, effect): phone, boing, sweat…", extras.join(", "), "phone, boing", (v) => {
-      edit(() => { it.acting = setExtras(it.acting, v); });
-      const q = actingParts(it.acting), m = q.extra.length + q.cam.length;
-      advb.textContent = "⚙️" + (m ? " " + m : "");
-    }),
-  ]);
-  const advb = btn("⚙️" + (n ? " " + n : ""), "Advanced: zoom, slowmo, aur shabd", () => {
-    if (openAdv.has(it)) openAdv.delete(it); else openAdv.add(it);
-    adv.classList.toggle("hidden");
-  }, "small advb");
-  card.append(
-    el("div", { className: "lrow" }, [el("div", { className: "lwho" }, [lookImg(roleOf(charOf(it.who))), who]),
-      el("div", { className: "feels" }, [...chips, more])]),
-    txt, dev, el("div", { className: "lrow" }, [actSel, advb, tools(i)]), adv);
+  card.append(el("div", { className: "ladv" }, [
+    el("div", { className: "feels" }, [...chips, more]),
+    el("div", { className: "lrow" }, [actSel,
+      tick("🔍 Zoom", cams.includes("zoom"), (on) => { edit(() => { it.acting = setCam(it.acting, "zoom", on); }); redraw(); }),
+      tick("🐢 Slowmo", cams.some((c) => c.startsWith("slow")), (on) => { edit(() => { it.acting = setCam(it.acting, "slowmo", on); }); redraw(); })]),
+    field("➕ Aur shabd (prop, awaaz, effect): phone, boing, sweat…", extras.join(", "), "phone, boing",
+      (v) => edit(() => { it.acting = setExtras(it.acting, v); })),
+    el("div", { className: "lrow" }, [el("span", { className: "chelp", textContent: "Ye line:" }), tools(i)]),
+  ]));
   return card;
 }
 function headRow(kind, i) { return el("div", { className: "lrow" }, [el("span", { className: "lkind", textContent: kind }), tools(i)]); }
@@ -1834,13 +1940,15 @@ function itemCard(it, i) {
   }
   if (it.k === "scene") return el("div", { className: "lcard" }, [headRow("🏠 Nayi jagah", i), placeBox(() => it)]);
   if (it.k === "obj") {
-    const objs = [...new Set([...V.objects, ...V.sets])].sort();
-    const sel = el("select", { title: "Thela / object" }, [opt("", "— kya rakhna hai —"), ...objs.map((o) => opt(o))]);
-    if (it.what && !objs.includes(it.what)) sel.append(opt(it.what));
+    const place = placeAt(cards.items, i), [fit, rest] = objectsFor(place);
+    const sel = el("select", { title: "Kya rakhna hai" }, [opt("", "— kya rakhna hai —"),
+      el("optgroup", { label: place ? `${PLACE_NAMES[place] || place} ke liye` : "Sab" }, fit.map((o) => opt(o))),
+      el("optgroup", { label: "Baaki sab" }, rest.map((o) => opt(o)))]);
+    if (it.what && !fit.includes(it.what) && !rest.includes(it.what)) sel.append(opt(it.what));
     sel.value = it.what;
     sel.addEventListener("change", () => { it.what = sel.value; touched(); });
-    return el("div", { className: "lcard" }, [headRow("🛒 Thela / object", i), sel,
-      field("", it.rest, "Kahan / kaisa: left, center, right, enter left, kulche…", (v) => { it.rest = v.trim(); touched(); })]);
+    return el("div", { className: "lcard" }, [headRow(isOutdoor(place) ? "🛒 Thela / cheez" : "🪑 Cheez", i), sel,
+      field("", it.rest, "Kahan / kaisa: left, center, right, enter left…", (v) => { it.rest = v.trim(); touched(); })]);
   }
   if (it.k === "screen") {
     const KEY = it.key.toUpperCase();
@@ -1866,7 +1974,7 @@ function addCard(make) {
     const it = make();
     if (it.k === "scene" && !cards.items.some((x) => x.k === "scene")) {     // no place yet: that is the top box
       ensureItem(cards.items, "SCENE"); renderCards();
-      const s = $("cards").querySelector(".cplace select"); if (s) { s.scrollIntoView({ block: "center" }); s.focus(); }
+      const s = $("cards").querySelector(".cplace"); if (s) s.scrollIntoView({ block: "center" });
       return;
     }
     cards.items.splice(storyEnd(cards.items), 0, it);
@@ -1874,30 +1982,67 @@ function addCard(make) {
     const node = cardEls.get(it);
     if (node) {
       node.scrollIntoView({ block: "center", behavior: "smooth" });
-      const f = node.querySelector(["obj", "scene"].includes(it.k) ? "select" : "textarea, input[type=text]");
+      const f = ["obj", "scene"].includes(it.k) ? null : node.querySelector("textarea, input[type=text]");
       if (f) f.focus();
     }
   };
+}
+// "✍️ Ek saath likho": the whole talk typed or pasted at once ("MLA: Waah!" lines) -> cards
+let writeNote = "";
+function writeBox(open) {
+  const ta = el("textarea", { rows: 4, placeholder: "Chaiwala: Aao bhai log, chai pilata hu\nMLA (khush): Waah Nizam bhai, garma garam chai!\nGuard: Sahab, gaadi aa gayi" });
+  const go = btn("➕ Cards banao", "In lines ke cards banao", () => {
+    const text = ta.value.trim();
+    if (!text) return;
+    if (/^\s*(HOOK|CAST)\s*:/im.test(text) && /^\s*[A-Za-z][\w ]*\s*(\([^)]*\))?\s*:/m.test(text) &&
+        confirm("Ye poori script lag rahi hai. Builder isi script se bhar du? (abhi wale cards hat jaayenge)")) {
+      drafts.script = text.replace(/\r\n?/g, "\n") + "\n"; writeNote = "✅ Poori script aa gayi"; loadCards(); showLint(); return;
+    }
+    const r = addDialogue(cards.items, text);
+    cardsChanged();
+    writeNote = `✅ ${r.lines} line jud gayi` + (r.people.length ? ` · naye log: ${r.people.join(", ")} (upar Characters me badal sakte ho)` : "") +
+      (r.raw.length ? ` · ${r.raw.length} line "Naam: baat" jaisi nahi thi, kachhi line bani` : "");
+    renderCards();
+    const last = $("cards").querySelectorAll(".lcard");
+    if (last.length) last[last.length - 1].scrollIntoView({ block: "center", behavior: "smooth" });
+  });
+  const note = writeNote ? el("p", { className: "chelp ok", textContent: writeNote }) : "";
+  writeNote = "";
+  return el("div", {}, [el("details", { className: "cbox write", open }, [
+    el("summary", { textContent: "✍️ Saari baat ek saath likho / paste karo" }),
+    el("p", { className: "chelp", textContent: "Har line: Naam: baat. Feeling chaho to (gussa), (hasi)… Naya naam = naya aadmi apne aap (Guard, PA, Sharma ji). Devanagari ki zarurat nahi." }),
+    ta, el("div", { className: "lrow" }, [go])]), note]);
+}
+function addBar() {                         // ➕ Line, and the rarer cards in one menu
+  const outdoor = isOutdoor(placeAt(cards.items, storyEnd(cards.items)));
+  const kinds = {
+    scene: ["🏠 Nayi jagah", () => ({ k: "scene", key: "SCENE", place: "", words: [], title: "" })],
+    obj: [outdoor ? "🛒 Thela / cheez rakho" : "🪑 Cheez rakho (table, kursi…)", () => ({ k: "obj", key: "OBJ", what: "", rest: "" })],
+    screen: ["📱 Screen card (notification, loading…)", () => ({ k: "screen", key: "NOTIFY", value: "" })],
+    raw: ["✏️ Kachhi line (jaisi likhni ho)", () => ({ k: "raw", text: "" })],
+  };
+  const more = el("select", { className: "small", title: "Aur cards" },
+    [opt("", "➕ Aur…"), ...Object.entries(kinds).map(([k, [label]]) => opt(k, label))]);
+  more.addEventListener("change", () => { const k = more.value; more.value = ""; if (k) addCard(kinds[k][1])(); });
+  return el("div", { className: "addbar" }, [
+    btn("➕ Line", "Nayi line (dialogue ya action)", addCard(() => ({ k: "line", who: nextWho(), acting: [], text: "", dev: "" })), "small big"),
+    more]);
 }
 function renderCards() {
   cardEls = new Map();
   const items = cards.items, list = listIndexes(items), settings = items.map((it, i) => i).filter((i) => isSetting(items[i]));
   const lines = list.map((i) => { const n = itemCard(items[i], i); cardEls.set(items[i], n); return n; });
   $("cards").replaceChildren(
+    el("datalist", { id: "cardRoles" }, ROLE_WORDS().map((r) => opt(r))),
     el("div", { className: "cbox" }, [el("h4", { textContent: "🎬 Shuruaat" }),
       headField("HOOK", "🎣 Hook (pehli second ka bada text)", "Jaise: Dadi ko mila naya smartphone 😂"),
       el("div", { className: "cfield" }, ["🏠 Jagah"]),
       placeBox((make) => items.find((it) => it.k === "scene") || (make ? ensureItem(cards.items, "SCENE") : null)),
       el("div", { className: "cfield" }, ["🎭 Characters"]), castBox()]),
     el("h4", { className: "lkind", textContent: `💬 Lines (${list.length})` }),
-    ...(lines.length ? lines : [el("p", { className: "chelp", textContent: "Abhi koi line nahi. Neeche ➕ Line dabao." })]),
-    el("div", { className: "addbar" }, [
-      btn("➕ Line", "Nayi line (dialogue ya action)", addCard(() => ({ k: "line", who: nextWho(), acting: [], text: "", dev: "" }))),
-      btn("🏠 Nayi jagah", "Kahani nayi jagah pe chale", addCard(() => ({ k: "scene", key: "SCENE", place: "", words: [], title: "" }))),
-      btn("🛒 Thela / object", "Thela, gaadi, table, sofa...", addCard(() => ({ k: "obj", key: "OBJ", what: "", rest: "" }))),
-      btn("📱 Screen card", "Notification, loading, counter, time card...", addCard(() => ({ k: "screen", key: "NOTIFY", value: "" }))),
-      btn("✏️ Kachhi line", "Koi bhi line jaise script me likhte ho", addCard(() => ({ k: "raw", text: "" }))),
-    ]),
+    writeBox(!list.length),
+    ...lines,
+    addBar(),
     el("div", { className: "cbox" }, [el("h4", { textContent: "🏁 Aakhir me" }),
       headField("CTA", "📣 CTA (aakhri card)", DEFAULT_CTA),
       headField("CAPTION", "📝 Caption (post ke liye)", "Har ghar ki dadi aur naya phone 😂📱"),
