@@ -150,7 +150,10 @@ class RenderTests(unittest.TestCase):
                               ("street", "street_25d"), ("bus_stop", "busstop_25d"), ("market", "market_25d"),
                               ("festival_street", "festival_25d"), ("railway", "railway_25d"), ("gaon", "gaon_25d"),
                               ("hospital", "hospital_25d"), ("bank", "bank_25d"), ("police_station", "police_25d"),
-                              ("court", "court_25d"), ("canteen", "canteen_25d"), ("dhaba", "dhaba_25d")):
+                              ("court", "court_25d"), ("canteen", "canteen_25d"), ("dhaba", "dhaba_25d"),
+                              ("mithai_shop", "mithai_25d"), ("mobile_shop", "mobile_25d"),
+                              ("medical_store", "medical_25d"), ("salon", "salon_25d"), ("mall", "mall_25d"),
+                              ("cinema", "cinema_25d")):
             r = Renderer(one_scene(place, "2.5d"), self.W, use_tts=False)
             self.assertEqual(r.bd25.preset, preset)
             self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.4).tobytes(), place)    # screens, fan, leaves, bats

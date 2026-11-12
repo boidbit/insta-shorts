@@ -42,12 +42,18 @@ PLACES_25D = {
     "court": "court_25d",
     "canteen": "canteen_25d",
     "dhaba": "dhaba_25d",
+    "mithai_shop": "mithai_25d",
+    "mobile_shop": "mobile_25d",
+    "medical_store": "medical_25d",
+    "salon": "salon_25d",
+    "mall": "mall_25d",
+    "cinema": "cinema_25d",
 }
 # sets with writing on them (shop signs, menus, boards) are never mirrored for a reverse shot (the text would read
 # backwards). The 2d look mirrors every place, as it always has.
 NO_MIRROR = {"gali_25d", "classroom_25d", "office_25d", "meeting_25d", "street_25d", "busstop_25d", "market_25d",
              "festival_25d", "railway_25d", "hospital_25d", "bank_25d", "police_25d", "court_25d", "canteen_25d",
-             "dhaba_25d"} | {
+             "dhaba_25d", "mithai_25d", "mobile_25d", "medical_25d", "salon_25d", "mall_25d", "cinema_25d"} | {
     "auto:" + p for p in ("bus_stop", "railway", "canteen", "exam_hall", "library", "coaching", "party", "gym",
                           "hospital", "police_station", "bank")}
 # hand-made outdoor sets that keep their place's moving life (traffic on the road, clouds, birds)
@@ -58,7 +64,8 @@ NATIVE_TIME = {"kitchen_25d": "day", "gali_25d": "sunset", "diwali_rooftop": "ni
                "haunted_25d": "night", "bedroom_25d": "day", "street_25d": "day", "busstop_25d": "day",
                "market_25d": "day", "festival_25d": "night", "railway_25d": "day", "gaon_25d": "day",
                "hospital_25d": "day", "bank_25d": "day", "police_25d": "day", "court_25d": "day", "canteen_25d": "day",
-               "dhaba_25d": "sunset"}
+               "dhaba_25d": "sunset", "mithai_25d": "day", "mobile_25d": "day", "medical_25d": "day",
+               "salon_25d": "day", "mall_25d": "day", "cinema_25d": "night"}
 
 
 def normalize(value):
