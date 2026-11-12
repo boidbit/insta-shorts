@@ -38,6 +38,7 @@
   .ghpanel label { flex: 1 1 140px; }
   .ghpanel input { width: 100%; }
   .grid { display: grid; grid-template-columns: 1fr 330px; gap: 20px; align-items: start; }
+  .grid > * { min-width: 0; }      /* a long row (builder selects) must not push the page wider than the phone */
   @media (max-width: 840px) { .grid { grid-template-columns: 1fr; } }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 20px; }
   .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
@@ -133,6 +134,11 @@
   details.face .ticks label { display: inline-flex; gap: 4px; align-items: center; }
   details.face .fwords { font-size: 0.8em; color: var(--muted, #667); margin-top: 6px; word-break: break-word; }
   details.face img.chart { width: 100%; height: auto; margin-top: 6px; border-radius: 6px; }
+  @media (max-width: 520px) {      /* phone: the picture on top, two choices a row */
+    .crow { flex-direction: column; align-items: stretch; }
+    .crow img { align-self: center; }
+    .crow .fields, details.face .fgrid { grid-template-columns: 1fr 1fr; }
+  }
   .brow label.grow { flex: 1 1 220px; min-width: 0; }
   .brow label.grow input { flex: 1; min-width: 0; width: 100%; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
@@ -1310,7 +1316,8 @@ const PROMPT_MODULES = {
   pan: { label: "ek-take", re: /\b(bhaag|bhaga|bhago|chase|peecha|peeche|raste|rasta|nikal|nikla|jail|escape|daud|safar|pahunch)\w*/i },
   cards: { label: "screen cards", re: /\b(notification|message|salary|bank|loading|counter|baad|later|chapter|light|andhera|bijli|upi|paytm)\b/i },
   camera: { label: "camera tricks", re: /\b(slow|freeze|flashback|entry|entrance|interrupt|beech me)\b/i },
-  looks: { label: "kapde/chehra", re: /\b(baal|hair|ganja|bald|dadhi|beard|chashma|kapde|dress|chehra|lamba|mota|patla|nata|moti|patli)\b/i },
+  looks: { label: "kapde/chehra", re: /(@\w|\b(baal|hair|ganja|bald|dadhi|beard|moonchh|mooch|moustache|chashma|kapde|dress|chehra|face|aankh|til|choti|lamba|mota|patla|nata|moti|patli)\b)/i },
+  food: { label: "thela/food", re: /\b(thela|thele|rehri|rehdi|kulche|kulcha|chaat|momos?|golgapp\w*|panipuri|pani puri|food|blogger|vlog\w*|youtuber|sabzi|fruit\w*)\b/i },
   dress: { label: "sajawat", re: /\b(shaadi|shadi|wedding|birthday|bday|party|new year|15 august|26 january|monsoon|baarish|barish|cricket|exam|sajawat|decoration)\b/i },
   dark: { label: "dark comedy", re: /\b(dark|maut|death|marna|mar gaya|mar gayi|bhoot|ghost|emi|loan|karza|qarz|funeral|shamshan|yamraj)\b/i },
 };

@@ -678,15 +678,17 @@ def _draw_prop2(S, prop, hand, d, n, pt):
         brass = (214, 162, 60)
         S.poly(closed_ellipse(hand[0], hand[1] - 34, 34, 30, 24), brass, INK, 5)
         S.poly([ab(-16, -64), ab(16, -64), ab(22, -80), ab(-22, -80)], brass, INK, 4)
-    elif prop == "vlog_cam":                  # a small camera on a stick held up, a mic with a fluffy cover on top
-        S.line([ab(0, 14), ab(0, -150)], 10, (40, 40, 46))
-        rect(-44, -206, 44, -150, (40, 42, 48))
-        S.dot(ab(0, -178), 17, (24, 24, 28), (150, 150, 160), 4)
-        rect(44, -204, 92, -164, (120, 190, 235), 4)                      # the flipped-out screen
-        S.dot(ab(80, -196), 5, (230, 40, 40))                              # REC
-        S.line([ab(-30, -218), ab(26, -218)], 14, (60, 60, 66))
-        for x in (-30, -16, -2, 12, 26):                                    # the dead-cat fur
-            S.line([ab(x, -228), ab(x + 4, -238)], 4, (110, 104, 96))
+    elif prop == "vlog_cam":                  # a small camera on a stick held up and out to the side (away from
+        sd = 1 if hand[0] >= 0 else -1        # the face), a mic with a fluffy cover on top
+        cx = sd * 96
+        S.line([ab(0, 14), ab(cx, -120)], 10, (40, 40, 46))
+        rect(cx - 40, -176, cx + 40, -122, (40, 42, 48))
+        S.dot(ab(cx, -149), 16, (24, 24, 28), (150, 150, 160), 4)
+        rect(cx + sd * 40, -174, cx + sd * 84, -136, (120, 190, 235), 4)   # the flipped-out screen
+        S.dot(ab(cx + sd * 74, -166), 5, (230, 40, 40))                    # REC
+        S.line([ab(cx - 26, -188), ab(cx + 24, -188)], 14, (60, 60, 66))
+        for x in (-26, -13, 0, 13, 24):                                     # the dead-cat fur
+            S.line([ab(cx + x, -197), ab(cx + x + 4, -207)], 4, (110, 104, 96))
     elif prop == "vlog_mic":                  # a hand mic with a coloured cube (the channel's logo)
         S.line([pt(-14, 0), pt(52, 0)], 12, (36, 36, 40))
         S.dot(pt(70, 0), 24, (70, 70, 76), INK, 5)

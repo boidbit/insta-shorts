@@ -1,0 +1,19 @@
+HOOK: Food blogger vs Kulche wala 😂
+CAST: K = kulchewala handlebar_moustache big_ears, F = food_blogger, G = food_blogger_girl mole
+SCENE: street
+OBJ: thela kulche enter left
+F (excited): Hello doston! Aaj khayenge famous matar kulche! | हेलो दोस्तों! आज खाएंगे फ़ेमस मटर कुलचे!
+K (proud): Bhaiya, chalees saal se yahin khada hoon. | भैया, चालीस साल से यहीं खड़ा हूँ।
+F (point): Toh bataiye, secret kya hai? | तो बताइए, सीक्रेट क्या है?
+K (sly): Pehle camera band karo, tab kulche milenge. | पहले कैमरा बंद करो, तब कुलचे मिलेंगे।
+F (shock, boing): Kya?! | क्या?!
+G (smile): Bhaiya, do plate. Main live hoon! | भैया, दो प्लेट। मैं लाइव हूँ!
+K -> facepalm
+SCENE: train pahad | Agle din, train me... 🚆
+F (excited): Doston, aaj train me review karenge! | दोस्तों, आज ट्रेन में रिव्यू करेंगे!
+K (smug, vlog_mic): Hello doston! Mera bhi channel hai ab. | हेलो दोस्तों! मेरा भी चैनल है अब।
+F (shock, boing): Aap?! Yahan bhi?! | आप?! यहाँ भी?!
+K (laugh): Subscribe karo, kulche free! | सब्सक्राइब करो, कुलचे फ्री!
+CTA: Apne foodie dost ko tag karo 👇
+CAPTION: Har food blogger ki kahani 😂🍛
+HASHTAGS: #foodblogger #matarkulche #desicomedy #streetfood #funny

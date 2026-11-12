@@ -217,6 +217,16 @@ Page pe ye dono video options me hain. Approve karne pe page `LOOP: on` / `MASCO
 - **Awaaz:** train, engine, plane cabin ki apni awaaz.
 - **Log apne aap seat pe baithe hote hain** (train me berth, bus/metro/plane/car/auto ki apni seat). Baithe-baithe bolte, ishaara karte, khaate, phone chalate hain; `run`, `walk`, `jump` jaisa action karein to uth jaate hain. TT, conductor aur air hostess khade rehte hain.
 - **Nazara aur samay:** `SCENE: train gaon night`, `SCENE: bus city`, `SCENE: car samundar`. Nazare: city, gaon, highway, pahad, samundar, clouds (plane), tunnel (metro). Har gaadi ka apna default hai (train → gaon, metro → tunnel, plane → clouds...).
+- **Asli jaisa naap:** deewar seat ke theek peeche hai aur khidki baithe aadmi ki chhaati se shuru ho kar sir ke thoda upar khatam hoti hai, jaise asli train / bus / plane me: baithe logon ka sir khidki ke beech me dikhta hai (pehle khidkiyan bahut upar thi).
+
+### Sadak ki gaadiyan asli size ki 🚗
+
+Naye camera me `street` aur `bus_stop` pe guzarti gaadiyan (car, auto, truck, bike) logon ke hisaab se badi hain (car ki chhat ek aadmi ke kandhe tak) aur har gaadi me driver baitha hai. `OBJ: car ...` wali gaadiyan pehle se asli naap me thi. `CAMERA: classic` me purani chhoti gaadiyan.
+
+### Thela / rehri: matar kulche, chaat, momos, golgappe 🛒
+
+`OBJ: thela kulche left` = thele pe matar kulche (bada patila, kulche ki thappi, pyaaz). Thele: **sabzi** (sirf `thela`), **fruits** (taraazu ke saath), **kulche**, **chaat** (tawa pe tikki), **momos** (steamer + bhaap), **golgappe** (kaanch ka dabba + paani ka matka). `rehri`, `rehdi`, `cart` bhi chalta hai; `OBJ: thela chaat enter left` = thela dheere se dhakel ke andar aata hai (pahiye ghoomte hain), `exit right` / `go center` bhi.
+Log: `kulchewala` (matar kulche wala; banyan, ghani moonchh, plate), `thelewala` (rehriwala, chaatwala, momowala, golgappewala, phalwala), `food_blogger` (man bun, halki dadhi, **haath me camera stick pe + mic**, `vlog_cam`), `food_blogger_girl` (bob cut, haath me **logo wala mic**, `vlog_mic`). Example: `scripts/demo/kulche_vlog.txt`.
 
 ### Jagah sajao: `DRESS` 🎉
 
@@ -231,7 +241,19 @@ Ek SCENE ke andar line: `DRESS: shaadi` (genda maala + lights + "Shaadi Mubarak"
 
 ### Naye log 👥
 
-`delivery_boy` (laal topi, dibba), `driver` (autowala, cabwala), `conductor`, `watchman` (guard, chowkidar; topi, danda), `landlord` (makaan_malik), `influencer` (youtuber, vlogger; kaala chashma, phone), `doodhwala` (doodh ki kenn), `tt` (train ka ticket checker), `bhoot` (ghost; safed chehra, shaitani muskaan), `pilot`, `air_hostess`.
+`delivery_boy` (laal topi, dibba), `driver` (autowala, cabwala), `conductor`, `watchman` (guard, chowkidar; topi, danda), `landlord` (makaan_malik), `influencer` (youtuber, vlogger; kaala chashma, phone), `doodhwala` (doodh ki kenn), `tt` (train ka ticket checker), `bhoot` (ghost; safed chehra, shaitani muskaan), `pilot`, `air_hostess`, `kulchewala`, `thelewala`, `food_blogger`, `food_blogger_girl`.
+
+### Har character ka apna chehra: Face card 🙂
+
+Har character ka chehra alag hota hai (studio khud deta hai), aur ab har hissa khud bhi chun sakte ho. Page pe 🎭 builder me har character ke neeche **"🙂 Face card"** kholo: chehra / jaw, aankhein, naak, bhaunhein, hont, kaan, dadhi, moonchh ke dropdown + gulabi gaal, palkein, jhurriyan, til, dimple, freckles. Neeche likha aata hai ki script me kaunse shabd jayenge; "📖 Har option kaisa dikhta hai" me sab options ki photo (`assets/faces/chart.png`).
+- **Aankhein:** `almond_eyes`, `round_eyes`, `sleepy_eyes`, `narrow_eyes`, `big_eyes`, `small_eyes`, `lashes` (palkein) · **bhaunhein:** `thick_brows`, `thin_brows`, `unibrow` (judi hui)
+- **Hont:** `thin_lips`, `full_lips`, `smirk_lips` (tedhi muskaan), `lipstick` · **kaan:** `big_ears`, `small_ears` · **gaal:** `blush`
+- **Nishaan:** `age_lines` (jhurriyan), `mole` (til), `dimple`, `freckles`
+- **Dadhi:** `stubble` (halki), `goatee`, `full_beard`, `no_beard` · **moonchh:** `thin_moustache`, `thick_moustache`, `handlebar_moustache`, `no_moustache`; `clean_shaven` = dono hatao. (Ab dadhi pe mooh dikhta hai, pehle poori dadhi mooh dhak deti thi.)
+- **Jaw:** `pointed_jaw` (V), `wide_jaw` (chauda) · **naye baal:** `bob`, `two_plaits` (do choti, ribbon ke saath), `side_braid`, `mohawk`, `man_bun`, `curly_open`
+- Na chuno to naye camera me har insaan ko apni chhoti cheezein milti hain: hont aur kaan alag, auraton ki palkein, buzurgon ki jhurriyan, kabhi til / dimple / freckles. `CAMERA: classic` me sab pehle jaise.
+
+**Character save karo (`@naam`):** face card bana ke **💾 Save** dabao → character is phone/browser me save. Baad me "⭐ Saved character jodo" se wapas lao, ya script me seedha `CAST: R = @raju` likho (chaho to aur shabd bhi: `R = @raju angry`... sirf CAST words). Page bhejne se pehle `@raju` ko uske shabdon se badal deta hai; galat naam ho to checker batata hai. Command line pe yahi `characters.json` se: `{"raju": "uncle mohawk handlebar_moustache big_ears"}` (ya `STUDIO_CHARACTERS=path`).
 
 ### Har video alag dikhe 🎨 (rang, pehla shot, cover, handle)
 
@@ -337,9 +359,9 @@ Ready looks: `boy, girl, college_boy, college_girl, uncle, aunty, dada, dadi, ki
 "R": { "look": "uncle", "outfit": "kurta", "color": "saffron", "accessories": ["turban", "beard"], "build": "chubby" }
 ```
 
-- `skin`: fair, wheatish, brown, dark · `hair`: short, side_part, spiky, curly, balding, bald, long, braid, bun, ponytail · `hair_color`: black, brown, grey, white, henna
+- `skin`: fair, wheatish, brown, dark · `hair`: short, side_part, spiky, curly, balding, bald, long, braid, bun, ponytail, bob, two_plaits, side_braid, mohawk, man_bun, curly_open · `hair_color`: black, brown, grey, white, henna
 - `outfit`: tshirt, shirt, kurta, salwar (dupatta ke saath), saree, uniform, blazer, vest · `color` / `accent` (dupatta, blouse, tie) / `pants` / `shoes` (black, white, chappal)
-- **Chehra** (face): `face` oval, round, long, square · `eyes` dot, big, small · `nose` hook, button, long, big · `brows` normal, thick, thin. Script me CAST words: `round_face big_eyes button_nose thick_brows`. Na likho to studio har character ko apna alag chehra deta hai (pehla character classic chehra), aur ek jaise do characters (do `college_boy`) ko alag baal, rang (skin) aur shirt ka colour.
+- **Chehra** (face): `face` oval, round, long, square, pointed, wide · `eyes` dot, big, small, almond, round, sleepy, narrow · `nose` hook, button, long, big · `brows` normal, thick, thin, unibrow · `lips` normal, thin, full, smirk · `ears` normal, big, small · `beard` none, stubble, goatee, full · `moustache` none, thin, normal, thick, handlebar · `marks` [age_lines, mole, dimple, freckles] · `cheeks` blush · `lashes` true (upar "Face card" dekho). Script me CAST words: `round_face big_eyes button_nose thick_brows`. Na likho to studio har character ko apna alag chehra deta hai (pehla character classic chehra), aur ek jaise do characters (do `college_boy`) ko alag baal, rang (skin) aur shirt ka colour.
 - **Lambai aur wazan**: sab ek jaise nahi lagte: studio har video me logon ko alag body deta hai (koi lamba-patla, koi nata-mota...). Khud chunna ho to CAST me `mota / moti` (chubby), `patla / patli` (slim), `lamba / lambi` (tall), `nata / nati` (short; `short` akela baal ka style hai). JSON: `"height": "tall" | "short"`, `"build"`. `CAMERA: classic` me sab pehle jaise.
 - `build`: slim, normal, chubby · `scale` (bachche ~0.72) · `accessories`: glasses, cap, turban, moustache, beard, bindi, tilak, earrings
 - 17 expressions, 17 actions (walk, talk, dance, point, laugh, shock, jump, wave, clap, cry, fall, facepalm, shrug, sway, sleep...)
