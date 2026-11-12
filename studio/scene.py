@@ -1180,8 +1180,10 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 cam_hold.append((t - 0.01, t + float(cam.get("back") or 1.0) + 0.3))
             elif cam.get("reveal"):                 # start close, pull back to the whole place
                 who_ = cam["reveal"] if isinstance(cam["reveal"], str) else None
-                shot_events.append({"t": t, "zoom": float(cam.get("from", 1.8)), "focus": who_, "dur": 0.001})
-                shot_events.append({"t": t + 0.002, "zoom": 1.0, "dur": float(cam.get("dur", 1.6))})
+                shot_events.append({"t": t, "zoom": float(cam.get("from", 1.8)), "focus": who_, "dur": 0.001,
+                                    "auto": bool(cam.get("auto"))})
+                shot_events.append({"t": t + 0.002, "zoom": 1.0, "dur": float(cam.get("dur", 1.6)),
+                                    "auto": bool(cam.get("auto"))})
                 cam_hold.append((t - 0.06, t + float(cam.get("dur", 1.6)) + 0.1))
             elif "zoom" in cam or "focus" in cam:
                 cam_events.append(cam)
@@ -1226,7 +1228,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         stand_up_in_frame(chars, set_by_id)
     plan.camera, plan.rolls, plan.drift = ("cine" if cine else "classic"), [], False
     plan.auto_react = bool(meta.get("auto_react", True))
-    own_camera_ = bool(cam_events) or bool(shot_events) or not meta.get("auto_camera", True)   # (directed by the script)
+    own_camera_ = bool(cam_events) or any(not e_.get("auto") for e_ in shot_events) \
+        or not meta.get("auto_camera", True)        # directed by the script (not the studio's own opening)
     if meta.get("auto_camera", True) and not cam_events and plan.framing == "medium":     # wide / inside are composed shots
         if cine:
             auto_camera_cine(plan, chars, cam_events, shakes, plan.rolls)

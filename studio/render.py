@@ -1183,11 +1183,12 @@ class Renderer(Output):
                 c.ov = None
 
     def _counter_edge(self):
-        """The counter's top, blurred, for the bottom of a reverse shot (the camera looks over it)."""
+        """The counter's top, blurred, for the bottom of a reverse shot (the camera looks over it from behind, so
+        only its top and what stands on it: no sign or writing, which would read backwards)."""
         if getattr(self, "_edge", None) is not None:
             return self._edge
-        from PIL import ImageFilter
-        s, im = self.s, None
+        from PIL import ImageEnhance, ImageFilter
+        s, im, flip = self.s, None, False
         seller = next((c for c in self.plan.chars.values() if getattr(c, "behind", None) is not None), None)
         b = getattr(seller, "behind", None)
         if b is not None and not isinstance(b, dict):
@@ -1196,18 +1197,34 @@ class Renderer(Output):
                 top = -232.0 if b.kind.startswith("thela") else -226.0
                 k_ = s * b.scale
                 im = im.crop((0, max(0, int(ay + (top - 150) * k_)), im.width, int(ay + (top + 60) * k_)))
-        elif isinstance(b, dict) and self.bg.static is not None and getattr(self.plan, "counters", None):
-            from . import counters
-            place = self.plan.background.get("type") if isinstance(self.plan.background, dict) else None
-            pieces = counters.counter_overlays(place, self.plan.counters[:1], self.bg.static, self.bg.out_w / float(LW))
-            im = pieces[0][1] if pieces else None
+                flip = True
+        elif isinstance(b, dict):
+            sprites = [sp for sp in (self.bd25.layered.sprites if self.bd25 is not None else [])
+                       if sp.name in ("counter", "tapri")]
+            if sprites:                             # 2.5D: the counter piece the people are sorted with
+                im = sprites[0].im
+            elif self.bg.static is not None and getattr(self.plan, "counters", None):
+                from . import counters
+                place = self.plan.background.get("type") if isinstance(self.plan.background, dict) else None
+                pieces = counters.counter_overlays(place, self.plan.counters[:1], self.bg.static,
+                                                   self.bg.out_w / float(LW))
+                im = pieces[0][1] if pieces else None
+            if im is not None:
+                bb = im.getchannel("A").getbbox()
+                if bb:
+                    im = im.crop((bb[0], bb[1], bb[2], bb[1] + max(4, int((bb[3] - bb[1]) * 0.42))))
         if im is None:
             im = Image.new("RGBA", (int(900 * s), int(160 * s)), (150, 104, 66, 255))
-        im = ImageOps.mirror(im.convert("RGBA"))
+        im = im.convert("RGBA")
+        if flip:
+            im = ImageOps.mirror(im)
+        a = im.getchannel("A")
+        im = ImageEnhance.Brightness(im.convert("RGB")).enhance(0.86).convert("RGBA")   # its back is in shade
+        im.putalpha(a)
         pad = int(30 * s)
         big = Image.new("RGBA", (im.width + 2 * pad, im.height + 2 * pad), (0, 0, 0, 0))
         big.paste(im, (pad, pad), im)
-        self._edge = big.filter(ImageFilter.GaussianBlur(max(2.0, 7 * s)))
+        self._edge = big.filter(ImageFilter.GaussianBlur(max(2.0, 8 * s)))
         return self._edge
 
     def _story_frame(self, t, hide, bare, clean, shot):

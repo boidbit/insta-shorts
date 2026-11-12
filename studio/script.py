@@ -577,8 +577,13 @@ def _stage(tokens, ev, scene_cast, who):
             ev["slowmo"] = {"rate": 0.4, "dur": 1.0}
         elif w == "zoom":                           # snap zoom onto this face for the line
             ev["camera"] = dict(ev.get("camera", {}), punch=who if who in scene_cast else None)   # stays close
-        elif w == "reveal":                         # start close on the face, pull back to the whole place
+        elif w in ("reveal", "open_reveal"):        # start close on the face, pull back to the whole place
             ev["camera"] = dict(ev.get("camera", {}), reveal=who if who in scene_cast else True)
+            if w == "open_reveal":                  # (the studio's own opening, not the writer's camera)
+                ev["camera"]["auto"] = True
+        elif w == "open_close":                     # the studio's own opening: the first line close
+            w = "close"
+            ev["shot"] = "close"
         elif w in ("interrupt", "beech_me"):        # B (interrupt, angry): ... cuts A off mid-sentence
             ev["interrupt"] = True
         elif w in SHOTS:
@@ -1166,8 +1171,8 @@ def parse_script(text):
         camera_words = set(SHOTS) | {"zoom", "reveal"}
         if first and len(first[3]) >= 18 and not any(w in camera_words for w in first[2]):   # (not on quick banter)
             pick = OPENINGS[zlib.crc32(("open|" + (meta.get("HOOK") or "reel")).encode("utf-8")) % len(OPENINGS)]
-            if pick != "plain":
-                first[2].append(pick)
+            if pick != "plain":                     # (marked as the studio's own: it gives way to a directed scene)
+                first[2].append("open_" + pick)
 
     # ---- build timelines ----
     out_scenes = []

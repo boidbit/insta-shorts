@@ -101,3 +101,24 @@ class CounterTalk(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StudioOpening(unittest.TestCase):
+    def test_the_studios_own_opening_gives_way(self):
+        # every video gets an opening of its own (plain / reveal / close, by its hook): a counter scene keeps its shots
+        for hook in ("Cutting chai", "Kulche ka review", "Bhaiya ek plate", "Order order", "Chai pe charcha"):
+            plan, _ = plan_of(TALK.replace("HOOK: Kulche ka review", "HOOK: " + hook))
+            self.assertTrue(plan.counter_shots, hook)
+        plan, _ = plan_of(TALK.replace("F (excited):", "F (excited, reveal):"))
+        self.assertEqual(plan.counter_shots, [])                           # the writer's own reveal: their camera
+
+    def test_in_25d(self):
+        sc, _ = parse_script(TALK + "STYLE: 2.5d\n")
+        r = make_video(sc, 216, use_tts=False)
+        part = getattr(r, "parts", [r])[0]
+        self.assertTrue(part.bd25 is not None and part.plan.counter_shots)
+        for sh in part.plan.counter_shots:
+            self.assertEqual(r.frame(min(sh["t0"] + 0.3, part.plan.duration - 0.1)).size, (216, 384))
+        sc, _ = parse_script("HOOK: h\nCAST: A = boy, B = girl\nSCENE: room\nA (side): Suno | सुनो\nB: Haan | हाँ\n"
+                             "STYLE: 2.5d\n")
+        self.assertEqual(make_video(sc, 216, use_tts=False).frame(0.8).size, (216, 384))
