@@ -154,6 +154,17 @@ class RenderTests(unittest.TestCase):
             sc["background"] = dict(sc["background"], time="night")
             self.assertEqual(Renderer(sc, self.W, use_tts=False).frame(1.0).size, r.frame(1.0).size)
 
+    def test_2d_never_uses_the_hand_made_sets(self):
+        """2D stays as it always was: the 2.5D sets (and their rules) only come with STYLE 2.5d."""
+        for place in list(styles.PLACES_25D) + ["hospital", "street"]:
+            r = Renderer(one_scene(place), self.W, use_tts=False)
+            self.assertIsNone(r.bd25, place)
+        sc = one_scene("office")
+        sc["dress"] = "auto"                                              # 2D office: still dressed up as before
+        self.assertTrue([o for o in Renderer(sc, self.W, use_tts=False).plan.sets if o.get("decor")])
+        sc = dict(one_scene("office", "2.5d"), dress="auto")              # the hand-made set: dressed already
+        self.assertFalse([o for o in Renderer(sc, self.W, use_tts=False).plan.sets if o.get("decor")])
+
     def test_premium_sets_move(self):
         r = Renderer(one_scene("room", "2.5d"), self.W, use_tts=False)
         self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.03).tobytes())       # the fan turns, the TV flickers
