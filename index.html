@@ -889,9 +889,7 @@ function buildScript(text, b, style = "2d") {
     if (key === "all" || key === "sab") return "ALL";
     let c = cast.find((x) => x.key === key || x.id.toLowerCase() === key.replace(/\s+/g, ""));
     if (!c) {
-      const first = key.split(/\s+/)[0];
-      const role = ROLE_LOOK[first] || SET.looks.has(first) ? first
-        : (cast.filter((x) => x.auto).length % 2 ? "college_girl" : "college_boy");
+      const role = roleFor(key, cast.filter((x) => x.auto).length);
       c = { key, id: ident(raw), words: role, auto: true };
       cast.push(c);
     }
@@ -1186,9 +1184,12 @@ const ROLE_GUESS = { pa: "clerk", assistant: "clerk", secretary: "clerk", peon: 
   sahab: "boss", saheb: "boss", bodyguard: "guard", gunman: "guard", constable: "policewala", sipahi: "policewala",
   chamcha: "clerk", karyakarta: "clerk", reporter: "influencer", patrakar: "influencer" };
 function roleFor(name, n = 0) {
-  const ws = name.trim().toLowerCase().split(/\s+/).map((w) => w.replace(/\W/g, ""));
+  const ws = name.trim().toLowerCase().split(/[\s_-]+/).map((w) => w.replace(/\W/g, "")).filter(Boolean);
+  const known = (w) => ROLE_LOOK[w] || SET.looks.has(w) || SET.animals.has(w);
+  const whole = [ws.join("_"), ws.join("")].find(known);
+  if (whole) return whole;
   const hit = ws.slice().reverse().find((w) => ROLE_GUESS[w] && (SET.roles.has(ROLE_GUESS[w]) || SET.looks.has(ROLE_GUESS[w])));
-  return hit ? ROLE_GUESS[hit] : ws.find((w) => ROLE_LOOK[w] || SET.looks.has(w) || SET.animals.has(w)) || (n % 2 ? "college_girl" : "college_boy");
+  return hit ? ROLE_GUESS[hit] : ws.find(known) || (n % 2 ? "college_girl" : "college_boy");
 }
 function addChar(items, name, role) {   // a new character (on the CAST line): its name in the lines
   const cast = ensureItem(items, "CAST");
@@ -1663,6 +1664,7 @@ const PROMPT_MODULES = {
   looks: { label: "kapde/chehra", re: /(@\w|\b(baal|hair|ganja|bald|dadhi|beard|moonchh|mooch|moustache|chashma|kapde|dress|chehra|face|aankh|til|choti|lamba|mota|patla|nata|moti|patli)\b)/i },
   food: { label: "thela/dukaan", re: /\b(thela|thele|rehri|rehdi|kulche|kulcha|chaat|momos?|golgapp\w*|panipuri|pani puri|food|blogger|vlog\w*|youtuber|sabzi|fruit\w*|chai|ganna|juice|bhutta|gola|kulfi|pav bhaji|chole|bhature|dukaan|dukan|shop|counter|mithai|halwai|mobile|medical|chemist|dawai|judge|court|adalat|bank|cashier|reception)\b/i },
   dress: { label: "sajawat", re: /\b(shaadi|shadi|wedding|birthday|bday|party|new year|15 august|26 january|monsoon|baarish|barish|cricket|exam|sajawat|decoration)\b/i },
+  sets: { label: "ghar ka saamaan", re: /\b(sofa|bed|palang|khaat|charpai|chair|kursi|stool|desk|almari|cupboard|fridge|tv|lamp|tubelight|fan|pankha|clock|ghadi|door|darwaza|window|khidki|painting|plant|ped|tree|bush|rock|fence|stairs|seedhi|box|bucket|balti|matka|chulha|drip|wheelchair|cooler|washing|mirror|sheesha|signboard|blackboard|jail)\b/i },
   dark: { label: "dark comedy", re: /\b(dark|maut|death|marna|mar gaya|mar gayi|bhoot|ghost|emi|loan|karza|qarz|funeral|shamshan|yamraj)\b/i },
 };
 function promptModules(idea) {
@@ -1678,7 +1680,9 @@ function trimPrompt(text, keep) {
 async function copyPrompt(style) {
   const files = style === "2.5d" ? ["SCRIPT_PROMPT.md", "SCRIPT_PROMPT_25D.md"] : ["SCRIPT_PROMPT.md"];
   try {
-    const idea = ideaWithSettings(mode === "idea" ? $("text").value.trim() : drafts.idea.trim(), builder);
+    const raw = mode === "idea" ? $("text").value.trim() : drafts.idea.trim();
+    const fixed = mode === "idea" && $("builder").open && settingsLines(builder, builderCast(builder)).length > 0;
+    const idea = fixed ? ideaWithSettings(raw, builder) : raw;
     const keep = promptModules(idea);
     const parts = [];
     for (const f of files) parts.push(trimPrompt((await (await fetch(f, { cache: "no-store" })).text()), keep).trim());
@@ -1688,7 +1692,8 @@ async function copyPrompt(style) {
     const extra = [...keep].map((k) => (PROMPT_MODULES[k] ? PROMPT_MODULES[k].label : k)).join(", ");
     $("promptNote").classList.remove("hidden");
     $("promptNote").textContent = (style === "2.5d" ? "2.5D" : "2D") + " prompt copy ho gaya (" + Math.round(full.length / 100) / 10 +
-      "k akshar" + (extra ? "; saath me: " + extra : "; sirf zaroori hissa") + "). Us AI me paste karo (aakhri line " +
+      "k akshar" + (extra ? "; saath me: " + extra : "; sirf zaroori hissa") +
+      (fixed ? "; 🎭 jagah/characters bhi: " + settingsLines(builder, builderCast(builder)).join(", ") : "") + "). Us AI me paste karo (aakhri line " +
       "me apna idea likho) → jo script mile wo \"📝 Apni script\" tab me paste karo → upar wala checker dekho → Approve." +
       (style === "2.5d" ? " (Script me STYLE: 2.5d line hogi, to Style apne aap 2.5D ho jayega.)" : "") +
       " Loop, mascot, style, dialogue jaise options prompt me nahi, neeche video options me chuno.";

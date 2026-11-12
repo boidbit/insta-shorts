@@ -135,7 +135,7 @@ class PromptTests(unittest.TestCase):
     def test_the_short_prompt_is_much_shorter(self):
         core = director.prompt_text(self.TEXT, keep=())
         full = director.prompt_text(self.TEXT)
-        self.assertLess(len(core), 14000)
+        self.assertLess(len(core), 21500)        # the writer craft + two example scripts (Nov 2026) live in the core
         self.assertLess(len(core), 0.8 * len(full))
         self.assertNotIn("<!--", core + full)
         for must in ("HOOK:", "Story facts first", "ALREADY in their place", "- ONE expression:"):
