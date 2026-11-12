@@ -787,6 +787,11 @@ PRESETS = {
     "gali_25d": _lazy("scenery_gali", "gali_25d"),
     "room_25d": _lazy("scenery_home", "room_25d"),
     "classroom_25d": _lazy("scenery_home", "classroom_25d"),
+    "office_25d": _lazy("scenery_office", "office_25d"),
+    "meeting_25d": _lazy("scenery_office", "meeting_25d"),
+    "jungle_25d": _lazy("scenery_more", "jungle_25d"),
+    "haunted_25d": _lazy("scenery_more", "haunted_25d"),
+    "bedroom_25d": _lazy("scenery_more", "bedroom_25d"),
 }
 
 

@@ -939,7 +939,11 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     # ---- set pieces (door, bed, sofa, fan...) ----
     plan.sets = []
     bgd = scene.get("background") if isinstance(scene.get("background"), dict) else {"type": scene.get("background")}
-    dress = decor.pieces_for(bgd.get("type"), scene.get("dress"), scene.get("dress_seed", 0))   # walls dressed up
+    want = scene.get("dress")
+    pre = styles.preset_for(scene)
+    if want == "auto" and pre and not pre.startswith("auto:"):
+        want = None                                 # a hand-made 2.5D set is dressed already (its walls are full)
+    dress = decor.pieces_for(bgd.get("type"), want, scene.get("dress_seed", 0))   # walls dressed up
     for i, ob in enumerate(list(scene.get("sets", [])) + dress):
         ob = dict(ob)
         ob.setdefault("id", "%s%d" % (ob.get("type", "set"), i + 1))

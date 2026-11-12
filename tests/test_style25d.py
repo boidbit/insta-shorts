@@ -44,7 +44,8 @@ class StyleWordsTests(unittest.TestCase):
         self.assertEqual(styles.preset_for(one_scene("chai_tapri", "2.5d")), "gali_25d")
         self.assertEqual(styles.preset_for(one_scene("living_room", "2.5d")), "room_25d")
         self.assertEqual(styles.preset_for(one_scene("classroom", "2.5d")), "classroom_25d")
-        self.assertEqual(styles.preset_for(one_scene("office", "2.5d")), "auto:office")      # made automatically
+        self.assertEqual(styles.preset_for(one_scene("office", "2.5d")), "office_25d")
+        self.assertEqual(styles.preset_for(one_scene("hospital", "2.5d")), "auto:hospital")  # made automatically
         self.assertIsNone(styles.preset_for(one_scene("plain", "2.5d")))                     # stays flat
         self.assertIsNone(styles.preset_for(one_scene("kitchen")))           # 2d
 
@@ -135,15 +136,30 @@ class RenderTests(unittest.TestCase):
             r = Renderer(dict(one_scene(place, "2.5d"), angle=1), self.W, use_tts=False)   # angle 1 = a mirrored shot
             self.assertTrue(r.plan.angle["mirror"])
             self.assertFalse(r._view25(1.0)["mirror"], place)
-        r = Renderer(dict(one_scene("office", "2.5d"), angle=1), self.W, use_tts=False)
-        self.assertTrue(r._view25(1.0)["mirror"])                    # no writing: the reverse shot is mirrored
+        for place in ("beach", "jungle"):                             # no writing: the reverse shot is mirrored
+            r = Renderer(dict(one_scene(place, "2.5d"), angle=1), self.W, use_tts=False)
+            self.assertTrue(r._view25(1.0)["mirror"], place)
+        for place in ("office", "meeting_room"):                      # (their boards and the TV have writing)
+            r = Renderer(dict(one_scene(place, "2.5d"), angle=1), self.W, use_tts=False)
+            self.assertFalse(r._view25(1.0)["mirror"], place)
+
+    def test_the_new_premium_sets(self):
+        for place, preset in (("office", "office_25d"), ("meeting_room", "meeting_25d"), ("jungle", "jungle_25d"),
+                              ("haunted_house", "haunted_25d"), ("bedroom", "bedroom_25d")):
+            r = Renderer(one_scene(place, "2.5d"), self.W, use_tts=False)
+            self.assertEqual(r.bd25.preset, preset)
+            self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.4).tobytes(), place)    # screens, fan, leaves, bats
+            self.assertFalse([o for o in r.plan.sets if o.get("decor")], place)           # no auto posters on it
+            sc = one_scene(place, "2.5d")
+            sc["background"] = dict(sc["background"], time="night")
+            self.assertEqual(Renderer(sc, self.W, use_tts=False).frame(1.0).size, r.frame(1.0).size)
 
     def test_premium_sets_move(self):
         r = Renderer(one_scene("room", "2.5d"), self.W, use_tts=False)
         self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.03).tobytes())       # the fan turns, the TV flickers
 
     def test_auto_place_at_night_and_in_a_close_shot(self):
-        for place in ("street", "bedroom"):
+        for place in ("street", "hostel"):
             sc = one_scene(place, "2.5d")
             sc["background"] = dict(sc["background"], time="night")
             r = Renderer(dict(sc, angle=3), self.W, use_tts=False)
