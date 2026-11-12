@@ -362,12 +362,18 @@ class Renderer(Output):
         self.bg = Background(bg_spec, int(self.W * ang["zoom"] + 0.5), int(self.H * ang["zoom"] + 0.5))
         self.bd25 = self._backdrop25(preset, scene) if preset else None
         used = getattr(self.plan, "counters", None)
-        if used and self.bg.static is not None and self.bd25 is None:
+        mode = getattr(self.plan, "counter_mode", "2d")
+        place = bg_spec.get("type") if isinstance(bg_spec, dict) else bg_spec
+        if used and mode == "2d" and self.bg.static is not None and self.bd25 is None:
             from . import counters                   # the painted counter's front, over whoever stands behind it
-            place = bg_spec.get("type") if isinstance(bg_spec, dict) else bg_spec
             for d, im, x, y in counters.counter_overlays(place, used, self.bg.static, self.bg.out_w / float(LW)):
                 self.bg.fg.append((d, im, x, y, None))
             self.bg.fg.sort(key=lambda f: f[0])
+        elif used and mode == "auto" and self.bd25 is not None:
+            from . import counters                   # 2.5D: cut out of the layer the people stand in
+            layer = next((ly for ly in self.bd25.layered.back if ly.name == "set"), None)
+            if layer is not None:
+                self.bd25.layered.sprites += counters.counter_sprites(place, used, layer.im, layer.k)
         self._view25_t, self._view25_v = None, None
         self.overlay_layer = OverlayLayer(self.s)
         self.fx = Effects(self.plan.effects, self.s, self.W, self.H, self.plan.fps)
@@ -508,6 +514,11 @@ class Renderer(Output):
         """The place's foreground props, placed like the background of this shot (angle zoom / mirror)."""
         if self.bd25 is not None and not self._auto25:
             return self.bd25.floor_items(self._view25(t))
+        if self.bd25 is not None and self.bd25.layered.sprites:      # auto 2.5D: its counters, then the place's props
+            return self.bd25.floor_items(self._view25(t)) + self._foreground_flat(t)
+        return self._foreground_flat(t)
+
+    def _foreground_flat(self, t):
         items = self.bg.foreground(t)
         ang = self.plan.angle
         z = ang["zoom"]

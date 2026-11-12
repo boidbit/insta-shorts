@@ -60,8 +60,22 @@ PLACES = {
                     x=x + 160, y=1296, px=150, m=0.8, looks=("sabziwala", "thelewala", "dukaandaar", "kulchewala"),
                     roles=("phalwala", "fruitwala") + SHOP_ROLES) for x in (20, 380, 740)],
 }
-PLACE_ALIASES = {"classroom": None}
 COUNTER_PLACES = tuple(PLACES)
+# 2.5D: chai_tapri and kirana are the hand-made gali set, whose chai counter is already a piece the people are
+# depth-sorted with (style25d.scenery_gali._tapri): only where the person stands there (no shapes to cut out).
+_TAPRI = dict(x=990, y=1290, px=235, m=1.0)
+PRESET_PLACES = {
+    "chai_tapri": [dict(_TAPRI, looks=PLACES["chai_tapri"][0]["looks"], roles=PLACES["chai_tapri"][0]["roles"])],
+    "kirana": [dict(_TAPRI, looks=PLACES["kirana"][0]["looks"], roles=PLACES["kirana"][0]["roles"])],
+}
+
+
+def painted(place, mode):
+    """The painted counters of a place drawn in this mode: "2d" / "auto" (the place's own drawing, flat or split into
+    2.5D layers) or "preset" (a hand-made 2.5D set)."""
+    if mode == "preset":
+        return PRESET_PLACES.get(place, [])
+    return PLACES.get(place, []) if mode in ("2d", "auto") else []
 
 
 def person_scale(c):
@@ -85,10 +99,12 @@ def _wants(spec, who):
     return spec.get("look") in who.get("looks", ()) or spec.get("role") in who.get("roles", ())
 
 
-def place_behind(plan, place, cine, flat):
+def place_behind(plan, place, cine, mode="2d", mirror=True):
     """Put the seller / shopkeeper / judge (or whoever the script sent `peeche`) behind the counters of this shot.
-    plan: the compiled shot (chars, objects, angle, world). flat: the place is drawn flat (2D), so its painted
-    counters can be used. Returns the painted counters in use (indices into PLACES[place]) for the renderer."""
+    plan: the compiled shot (chars, objects, angle, world). mode: how the place is drawn ("2d", "auto" 2.5D layers,
+    "preset" hand-made 2.5D set, None = no painted counters). mirror: the set is mirrored for a reverse shot (a 2.5D
+    set with writing on it is not). Returns the painted counters in use (indices into painted(place, mode))."""
+    angle = dict(plan.angle or {}, mirror=bool(mirror and (plan.angle or {}).get("mirror")))
     if not cine or plan.framing in ("ots", "inside", "wide"):
         return []
     people = [c for c in plan.chars.values() if not c.spec.get("hidden") and not c.spec.get("kind")
@@ -100,9 +116,8 @@ def place_behind(plan, place, cine, flat):
                                                          ("table" if o.kind == "table" else None))
         if base:
             spots.append(("obj", o, OBJ_WHO[base], o.rest))
-    if flat:
-        for i, c in enumerate(PLACES.get(place, [])):
-            spots.append(("paint", i, c, frame_point(c["x"], c["y"], plan.angle)[0]))
+    for i, c in enumerate(painted(place, mode)):
+        spots.append(("paint", i, c, frame_point(c["x"], c["y"], angle)[0]))
     if not spots:
         return []
 
@@ -112,7 +127,7 @@ def place_behind(plan, place, cine, flat):
         if kind == "obj":
             _behind_object(c, ref)
         else:
-            _behind_painted(c, info, plan)
+            _behind_painted(c, info, plan, angle)
             used.append(ref)
 
     free = list(spots)
@@ -174,9 +189,9 @@ def _behind_object(c, o):
     o.depth_sort = True                             # drawn among the people by depth (over the one behind it)
 
 
-def _behind_painted(c, info, plan):
-    x, y = frame_point(info["x"], info["y"], plan.angle)
-    z = float(plan.angle.get("zoom", 1.0)) if plan.angle else 1.0
+def _behind_painted(c, info, plan, angle):
+    x, y = frame_point(info["x"], info["y"], angle)
+    z = float(angle.get("zoom", 1.0))
     k = person_scale(info) * z / max(plan.world, 1e-3)
     c.x = x
     c.depth.append((0.0, k, y - c.y, k, y - c.y, 0.01))
@@ -186,7 +201,8 @@ def _behind_painted(c, info, plan):
 
 def counter_overlays(place, used, static, s):
     """[(depth y, RGBA picture, x, y)]: the front of each painted counter in use, cut out of the place's own picture
-    (so it matches it exactly), to be drawn over whoever stands behind it. static: the place's picture at scale s."""
+    (so it matches it exactly), to be drawn over whoever stands behind it. static: the place's picture at scale s
+    (2D: the flat place; 2.5D: its "set" layer, the one the people stand in)."""
     from PIL import Image, ImageDraw
     out = []
     for i in used:
@@ -226,3 +242,11 @@ def counter_overlays(place, used, static, s):
         piece.putalpha(mask)
         out.append((c["y"] + 12, piece, x0, y0))     # (just in front of the person's feet)
     return out
+
+
+def counter_sprites(place, used, set_layer, k):
+    """2.5D (a place split into layers automatically): the same counter fronts, cut out of the set layer, as pieces
+    the people are depth-sorted with (style25d Sprite: picture, k px a unit, left / top in logical units)."""
+    from .style25d.scenery import Sprite
+    return [Sprite(im, k, x / float(k), y / float(k), d, "counter")
+            for d, im, x, y in counter_overlays(place, used, set_layer, k)]

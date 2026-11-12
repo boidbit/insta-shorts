@@ -253,7 +253,7 @@ Asli zindagi jaisa: **bechne wala thele / counter ke peeche, grahak ya food blog
 - **Khud chuno:** CAST me `peeche` = sabse paas wale counter ke peeche (`B = boy peeche`), `aage` = aage hi rahe. Jo insaan chal ke aata hai (enter / walk) wo apne raaste chalta hai.
 - Aage khada grahak agar bechne wale ke theek saamne ho to thoda side ho jaata hai.
 - **Naye thele:** chai (ketli + glass), ganna (ganne ka juice), bhutta, gola (barf ka gola), pav_bhaji, chole_bhature. **Naye log:** `dukaandaar` (lala, shopkeeper), `halwai` (mithaiwala), `chemist` (medicalwala), `clerk` (cashier, babu, munshi), `judge` (judge_sahab).
-- `CAMERA: classic` me pehle jaisa. 2.5D me thela / counter wala hissa chalta hai; jagah me bane counter abhi sirf 2D me.
+- **2.5D me bhi:** jagah me bane counter 2.5D ki layers me se kaat ke lagte hain (court, bank, hospital, canteen, police_station, market); `chai_tapri` aur `kirana` 2.5D me gali wala set hain, wahan chaiwala / dukaandaar gali ke chai counter ke peeche khada hota hai. `CAMERA: classic` me pehle jaisa.
 
 ### Har character ka apna chehra: Face card 🙂
 

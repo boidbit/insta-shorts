@@ -1202,8 +1202,10 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
 
     # ---- counters: the seller behind his thela, the shopkeeper behind the counter, the judge behind the bench ----
     place_ = plan.background.get("type") if isinstance(plan.background, dict) else plan.background
-    flat_ = styles.scene_style(scene) != "2.5d" or place_ in styles.FLAT_IN_25D
-    plan.counters = counters.place_behind(plan, place_, cine, flat_)
+    preset_ = styles.preset_for(scene)              # 2D / a flat place: None; 2.5D: "auto:<place>" or a hand-made set
+    plan.counter_mode = "2d" if not preset_ else ("auto" if preset_.startswith("auto:") else "preset")
+    plan.counters = counters.place_behind(plan, place_, cine, plan.counter_mode,
+                                          mirror=not preset_ or preset_ not in styles.NO_MIRROR)
 
     # ---- duration ----
     if meta.get("duration"):

@@ -16,6 +16,7 @@ from studio.backgrounds import Background, TRAFFIC_NEW                # noqa: E4
 from studio.characters import (FACE_PARTS, FACE_WORDS, HAIR_STYLES, LOOKS, MARKS, build_character,   # noqa: E402
                                face_word)
 from studio.scene import compile_scene, split_scenes                  # noqa: E402
+from studio.render import make_video                                   # noqa: E402
 from studio.script import parse_script, vocab                         # noqa: E402
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -271,3 +272,30 @@ class Counters(unittest.TestCase):
                       "CAMERA: classic\n")
         self.assertEqual(p.counters, [])
         self.assertAlmostEqual(p.chars["C"].draw_pos(1.0)[1], 1700, delta=1)
+
+
+class Counters25D(unittest.TestCase):
+    """The same in the 2.5D style: a place split into layers gets its counters cut out of the layer the people stand
+    in; the hand-made gali set (chai_tapri, kirana) already has its chai counter as a depth-sorted piece."""
+
+    def test_auto_place(self):
+        text = ("HOOK: h\nCAST: J = judge, A = boy\nSCENE: court\nJ (angry): Order! | ऑर्डर!\n"
+                "A: Main nirdosh hoon | मैं निर्दोष हूँ\nSTYLE: 2.5d\n")
+        sc, _ = parse_script(text)
+        r = make_video(sc, 216, use_tts=False)
+        part = getattr(r, "parts", [r])[0]
+        self.assertEqual(part.plan.counter_mode, "auto")
+        self.assertEqual(part.plan.counters, [0])
+        self.assertTrue(any(sp.name == "counter" for sp in part.bd25.layered.sprites))
+        self.assertLess(part.plan.chars["J"].draw_pos(1.0)[1], 1000)
+        self.assertEqual(r.frame(1.0).size, (216, 384))
+
+    def test_gali_chai_counter(self):
+        sc, _ = parse_script("HOOK: h\nCAST: C = chaiwala, B = boy\nSCENE: chai_tapri\nB: Ek chai | एक चाय\n"
+                             "C: Abhi lo | अभी लो\nSTYLE: 2.5d\n")
+        plan = compile_scene(split_scenes(sc)[0], use_tts=False)
+        self.assertEqual(plan.counter_mode, "preset")
+        self.assertEqual(plan.counters, [0])
+        tapri_ground = 1298                                       # style25d.scenery_gali._tapri's ground line
+        self.assertLess(plan.chars["C"].draw_pos(1.0)[1], tapri_ground)
+        self.assertAlmostEqual(plan.chars["C"].x, counters.PRESET_PLACES["chai_tapri"][0]["x"], delta=1)
