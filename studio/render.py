@@ -19,7 +19,7 @@ import zlib
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageOps
 
-from . import actions, audio, gemini_music, objects, rides, styles, theme, ui
+from . import actions, audio, gemini_music, objects, rides, sound, styles, theme, ui
 from .backgrounds import Background
 from .characters import LA, SH, TH, UA, DEFAULT_POSE, build_character, render_ops, skeleton
 from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_at, camera_roll, camera_whip,
@@ -270,6 +270,13 @@ class Output:
                            "volume=%.2f[f%d]" % (idx, amb["dur"], int(amb["start"] * 1000), amb["volume"], idx))
             fx_lbl.append("[f%d]" % idx)
             idx += 1
+        snd = getattr(self, "sound", None)
+        if snd and getattr(self, "with_sound", True):  # sound mode: the viral sound itself, from the first frame
+            cmd += ["-i", snd["path"]]
+            filters.append("[%d:a]aresample=44100,aformat=channel_layouts=mono,atrim=0:%.2f,volume=1.0[f%d]"
+                           % (idx, self.duration, idx))
+            fx_lbl.append("[f%d]" % idx)
+            idx += 1
         mus = None
         if self.music:
             if not self.music["generated"]:
@@ -404,8 +411,29 @@ class Renderer(Output):
         self._tint25 = tuple(self.bd25.light["ambient"]) if self.bd25 and self.bd25.light.get("ambient") else None
 
     # ------------------------------------------------------------ helpers
+    def _sound_env(self, sp):
+        src = sp.get("lip_src")
+        if src not in self._lip:
+            self._lip[src] = audio.lip_envelope(src, self.plan.fps)
+        return self._lip[src]
+
+    def _sound_gain(self, sp, env):
+        """Sound mode: each line's mouth as wide as its own voice allows (a soft voice still opens the mouth)."""
+        key = ("gain", id(sp))
+        if key not in self._lip:
+            fps = self.plan.fps
+            seg = env[max(0, int(sp["start"] * fps)):max(1, int(sp["end"] * fps))]
+            ref = float(np.percentile(seg, 90)) if len(seg) else 1.0
+            self._lip[key] = min(3.0, 0.9 / ref) if ref > 0.02 else 1.0
+        return self._lip[key]
+
     def _lip_open(self, sp, t):
         fps = self.plan.fps
+        if sp.get("lip_src"):                       # sound mode: the whole sound, at the video's own time
+            env = self._sound_env(sp)
+            if env is not None:
+                i = int(t * fps)
+                return min(1.0, float(env[i]) * self._sound_gain(sp, env)) if 0 <= i < len(env) else 0.0
         if sp.get("audio"):
             if id(sp) not in self._lip:
                 self._lip[id(sp)] = audio.lip_envelope(sp["audio"], fps)
@@ -422,13 +450,16 @@ class Renderer(Output):
     def _amp(self, sp, t):
         """How loud a line is around time t (0..1), smoothed over ~0.4 s: gestures follow the phrase, not every
         syllable (a hand that jumps on each syllable looks fake)."""
-        if sp.get("audio"):
-            if id(sp) not in self._lip:
-                self._lip[id(sp)] = audio.lip_envelope(sp["audio"], self.plan.fps)
-            env = self._lip[id(sp)]
+        if sp.get("audio") or sp.get("lip_src"):
+            if sp.get("lip_src"):
+                env, at = self._sound_env(sp), t
+            else:
+                if id(sp) not in self._lip:
+                    self._lip[id(sp)] = audio.lip_envelope(sp["audio"], self.plan.fps)
+                env, at = self._lip[id(sp)], t - sp["start"]
             if env is not None and len(env):
                 fps = self.plan.fps
-                i = int((t - sp["start"]) * fps)
+                i = int(at * fps)
                 seg = env[max(0, i - int(0.35 * fps)):max(1, i + 2)]
                 return float(sum(seg) / len(seg)) if len(seg) else 0.0
         return 0.5 + 0.2 * math.sin(t * 2.1) * math.sin(t * 0.9 + 1.0)
@@ -1657,6 +1688,7 @@ class Sequence(Output):
         self.sfx = [dict(fx, t=fx["t"] + o) for p, o in zip(self.parts, self.offsets) for fx in p.sfx]
         self.ambience = [dict(a, start=a["start"] + o) for p, o in zip(self.parts, self.offsets) for a in p.ambience]
         self.music = compile_music(scene.get("music") or meta.get("music"), self.duration)
+        self.sound = scene.get("_sound")
         self.overlays = static_overlays(scene)
         self.overlay_layer = OverlayLayer(self.s)
         self.fade_in, self.fade_out = float(meta.get("fade_in", 0)), float(meta.get("fade_out", 0))
@@ -1765,6 +1797,9 @@ def make_video(scene, width=1080, use_tts=True, fps=None, tts_provider=None, dia
     """loop: True = LOOP mode (the reel runs round without a seam); mascot: bhoot | billi | chooha | off (hidden
     easter egg). Both also come from the script (`LOOP: on`, `MASCOT: billi`) / the scene ("loop", "mascot")."""
     scene = gemini_music.prepare(scene, use_tts)        # `MUSIC: gemini ...`: the song (or the beat if Gemini cannot)
+    scene = sound.prepare(scene, use_tts)               # `SOUND: ...`: the lines timed to a viral sound (its voice)
+    if scene.get("_sound"):
+        use_tts, hook = False, (None if hook == "first" else hook)    # the sound starts with the first frame
     if dialogue or hook:
         scene = apply_options(scene, dialogue, hook)
     if style:                                       # "2d" / "2.5d" from the command line / web page wins
@@ -1838,7 +1873,24 @@ def main(argv=None):
         print("saved", out)
         return
     out = args.out or os.path.join("out", name + ".mp4")
+    if getattr(r, "sound", None):                   # sound mode: the Instagram copy (no sound) + one with it
+        insta = os.path.splitext(out)[0] + ".insta.mp4"
+        r.with_sound = False
+        r.render_video(insta)
+        with_sound(insta, r.sound["path"], out)
+        print("saved %s (with the sound) and %s (for Instagram: add the sound there)" % (out, insta))
+        return
     r.render_video(out)
+
+
+def with_sound(video, sound_path, out):
+    """The video + the sound mixed in from 0:00 (video copied as it is)."""
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", video, "-i", sound_path, "-filter_complex",
+           "[1:a]aresample=44100,aformat=channel_layouts=stereo[s];[0:a][s]amix=inputs=2:normalize=0:duration=first,"
+           "alimiter=limit=0.95[a]", "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k",
+           "-movflags", "+faststart", out]
+    if subprocess.run(cmd).returncode:
+        raise SystemExit("ffmpeg could not add the sound")
 
 
 if __name__ == "__main__":

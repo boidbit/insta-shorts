@@ -77,6 +77,33 @@ Page pe teesra tab **"🧩 Builder"**: wahi script, par dabbon me. Har card = sc
 - CUT (shot) ka dropdown nahi: camera shot apne aap chunta hai. AI script ke CUT "✂️" patti ki tarah dikhte hain (hatao to camera khud chunega). Devanagari bhi apne aap (upar dekho); text badlo to us line ki purani Devanagari hat jaati hai aur video banate waqt nayi banti hai.
 - Jagah ki photos: `assets/places/<jagah>.jpg` (`python -m studio.thumbs` se banti hain).
 
+### 🎵 Viral sound se reel (sound mode)
+
+Instagram ka koi trending / viral sound lo, characters usi pe bolenge (lip-sync). Script me nayi baat nahi likhni: joke aapki situation hai ("POV: jab mummy ne report card dekha").
+
+1. "📝 Apni script" ya "🧩 Builder" tab me **"🎵 Viral sound se reel"** kholo → sound file chuno (mp3, m4a, ya screen-recording ki mp4) → chaho to hissa (Shuru / Aakhir, 30 sec tak sabse achha) aur situation likho → **"Sound bhejo"**.
+2. ~1 minute: Gemini sound sunta hai (aapki `GEMINI_API_KEY` se) aur draft Builder me aata hai: kaun bolta hai (awaaz se role: mummy, beta, boss…), har line ke shabd, feeling, action, aur har line ka time (`@1.8`). Saath me 3 situation ke idea.
+3. Cards me badlo (role, jagah, hook, feeling) → **Approve**. Wahi sound dobara video ke saath jaata hai (is browser me save rehta hai).
+4. Do video milti hain: **🔊 sound ke saath** (sirf check karne ke liye) aur **📤 Instagram ke liye (bina sound)**. Upload karte waqt Instagram me wahi sound library se **0:00** se lagao: reel us sound ke page pe aati hai (trend ka fayda) aur sound wale ka credit / copyright Instagram sambhalta hai. Sound wali file upload mat karo.
+
+Script me ye aisa dikhta hai (khud bhi likh sakte ho):
+```
+HOOK: POV: Report card wala din 😭
+SOUND: sound-ab12cd 0:05-0:20
+CAST: A = mummy, B = beta
+SCENE: living_room
+A (angry, point, @0.5): Ye kya hai? Ye report card hai ya mazaak?
+B (nervous, @4.6): Mummy, wo... teacher ne galti se kam number de diye.
+A -> facepalm
+CTA_STYLE: caption
+```
+- `SOUND: <naam ya file> [shuru-aakhir]`: page ka sound (`sound-…`) ya repo ki file (`assets/music/x.mp3`, command line ke liye).
+- `@1.8` / `@0:03.2` = sound me ye line kab bolti hai. Thoda aage-peeche ho to studio usse awaaz shuru hone wali jagah pe chipka deta hai. Na likho to thehraav (pause) se andaaza lagata hai; line ke andar lamba thehraav ho to galti ho sakti hai, isliye time likhna behtar.
+- Studio ki apni awaaz band, Devanagari ki zarurat nahi. Munh sound ke hisaab se hilta hai (har line apni awaaz ke hisaab se).
+- Ek hi jagah, ek hi take: CUT, doosri SCENE, slowmo, freeze aur LOOP chhod diye jaate hain (sound bina ruke chalta hai). Camera khud bolne wale pe jaata hai. Max 3 characters.
+- Sound GitHub ko run ke saath jaata hai (page ka token sirf run chala sakta hai): isliye page use chhota karta hai (Opus, mono) aur ~30-40 sec tak ka hissa hi bhejta hai. Run ke log me sound nahi chhapta.
+- Command line: `python -m studio.script x.txt -o x.json && python -m studio.render x.json -o out/x.mp4` → `out/x.mp4` (sound ke saath) + `out/x.insta.mp4`. `python -m studio.sound analyze file.m4a` = Gemini ne kya suna (JSON).
+
 ## Script format (bina AI)
 
 ```

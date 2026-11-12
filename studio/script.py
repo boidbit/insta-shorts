@@ -75,7 +75,7 @@ from .util import asset_path
 from .scene import (CTA_STYLES, DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLOTS, apply_cta, apply_loop, chat_length,
                     mascot_kind)
 
-HEADERS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP",
+HEADERS = ("HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP",
            "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER")
 OPENINGS = ("plain", "reveal", "close")     # the first shot of a video: as it comes / starts on a face and pulls back /
                                             # a close-up (each video gets one, picked from its hook)
@@ -472,9 +472,47 @@ FEEL_WORDS = {
 }
 
 
+SOUND_RANGE = re.compile(r"^((?:\d+:)?\d+(?:\.\d+)?)\s*-\s*((?:\d+:)?\d+(?:\.\d+)?)$")
+
+
+def _secs(v):
+    m, _, s_ = v.rpartition(":")
+    return int(m or 0) * 60 + float(s_)
+
+
+def parse_sound(val):
+    """`SOUND: sound-ab12cd 0:05-0:20` / `SOUND: assets/music/x.mp3` -> ({"src", "start", "end"}, warning)."""
+    words = val.split()
+    if not words:
+        return None, "SOUND: ke baad sound ka naam likho (page pe 🎵 Sound se reel)"
+    spec = {"src": words[0], "start": 0.0, "end": None}
+    rest = " ".join(words[1:])
+    if rest:
+        m = SOUND_RANGE.match(rest.replace(" ", ""))
+        if not m:
+            return spec, "SOUND %r: hissa aise likho: 0:05-0:20 (shuru-aakhir)" % rest
+        spec["start"], spec["end"] = _secs(m.group(1)), _secs(m.group(2))
+        if spec["end"] <= spec["start"]:
+            return dict(spec, end=None), "SOUND: aakhir shuru ke baad hona chahiye (%s)" % rest
+    return spec, None
+
+
+SOUND_AT = re.compile(r"^@(?:(\d+):)?(\d+(?:\.\d+)?)$")
+
+
+def sound_time(word):
+    """'@1.8' -> 1.8, '@0:03.2' -> 3.2 (seconds into the SOUND), else None."""
+    m = SOUND_AT.match(word or "")
+    return None if not m else int(m.group(1) or 0) * 60 + float(m.group(2))
+
+
 def _stage(tokens, ev, scene_cast, who):
     """Apply bracket / arrow words to an event dict.
     Returns (move request or None, unknown words, words that were overridden)."""
+    at = [sound_time(w) for w in tokens if sound_time(w) is not None]
+    if at:                                          # (sound mode) when this line is said in the sound
+        ev["sound_at"] = at[0]
+        tokens = [w for w in tokens if sound_time(w) is None]
     tokens = [FEEL_WORDS.get(w, w) for w in tokens]
     if "gussa" in tokens and not any(w in EXPRESSIONS for w in tokens):
         tokens.append("angry")                      # (gussa) = the 💢 mark AND an angry face, as a writer means it
@@ -989,7 +1027,7 @@ def parse_chat(meta, title, msgs):
     return scene, warnings
 
 
-HEADER_WORDS = ("HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "OBJ",
+HEADER_WORDS = ("HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "OBJ",
                 "DRESS",
                 "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER",
                 "NARRATOR",
@@ -1064,6 +1102,13 @@ def parse_script(text):
     scenes = []
     warnings = []
     cur = None
+    sound_mode = bool(re.search(r"^\s*SOUND\s*:", text, re.M | re.I))     # a viral sound: one place, one take
+    told = set()
+
+    def once(key, msg):
+        if key not in told:
+            told.add(key)
+            warnings.append(msg)
 
     def new_scene(bg="room", title=None):
         sc = {"background": bg if isinstance(bg, dict) else {"type": bg}, "lines": [], "title": title}
@@ -1095,6 +1140,8 @@ def parse_script(text):
                         if "@" in w:                # a saved character: `R = @raju` (+ more words if you like)
                             w = expand_saved(w, saved_characters(), warnings)
                         add_cast(n.strip(), _words(w))
+            elif key == "SCENE" and sound_mode and cur is not None:
+                once("scene", "SOUND ke saath ek hi jagah: doosri SCENE line chhod di (sound bina ruke chalta hai)")
             elif key == "SCENE":
                 bg, _, rest = val.partition("|")
                 title, _, frame = rest.partition("|")
@@ -1137,6 +1184,9 @@ def parse_script(text):
                             "'< samne wala' / '> aap'): %r" % line[:40])
             continue
         m = re.match(r"^(?:CUT|SHOT)\b\s*:?\s*([\w\s,]*)$", line, re.I)
+        if m and sound_mode:                        # one take: the camera cuts to the speakers by itself
+            once("cut", "SOUND ke saath CUT ki zarurat nahi: camera khud har bolne wale pe jaata hai (CUT chhod diye)")
+            continue
         if m:                                       # a new shot in the same place: a hard cut, its own set of characters
             frame, reverse, back = "", False, None
             for w in re.split(r"[\s,]+", m.group(1).strip()):
@@ -1392,7 +1442,9 @@ def parse_script(text):
                     ev["on"] = seated[who]              # pointing, eating, on the phone... still seated
             if ln[0] == "say":
                 ev["say"], ev["speak"] = ln[3], ln[4] or ln[3]
-                if not ln[4] and not re.search(r"[ऀ-ॿ]", ln[3]):
+                if sound_mode:
+                    ev["tts"] = False                   # the SOUND is the voice
+                elif not ln[4] and not re.search(r"[ऀ-ॿ]", ln[3]):
                     warnings.append("no Devanagari for %r: made by the AI when the video is made (GEMINI_API_KEY), "
                                     "else the voice reads Roman letters" % ln[3][:30])
                 others = [o for o in order if o != who]
@@ -1506,6 +1558,13 @@ def parse_script(text):
         "post": {"caption": meta.get("CAPTION") or hook,
                  "hashtags": meta.get("HASHTAGS", "#desicomedy #funny #indianreels").split()},
     }
+    if sound_mode:
+        snd, warn = parse_sound(meta.get("SOUND", ""))
+        if warn:
+            warnings.append(warn)
+        if snd:
+            scene["sound"] = snd
+            music = None                            # the sound is the music too
     if music:
         scene["music"] = music
     if meta.get("STYLE"):
@@ -1546,7 +1605,9 @@ def parse_script(text):
             scene = apply_cta(scene, cs)
         else:
             warnings.append("CTA_STYLE %r: card, sticker ya caption likho" % meta["CTA_STYLE"])
-    if meta.get("LOOP"):                                # LOOP: on = the reel runs round without a visible end
+    if meta.get("LOOP") and sound_mode:
+        warnings.append("SOUND ke saath LOOP nahi chalta (sound apni lambai ka hai): LOOP chhod diya")
+    elif meta.get("LOOP"):                              # LOOP: on = the reel runs round without a visible end
         v = meta["LOOP"].strip().lower()
         if v in ON_WORDS:
             scene = apply_loop(scene)

@@ -1072,6 +1072,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 span, step = dur + 0.12, dur + gap
             sp = dict(who=c.name, text=text, start=t, end=t + span, audio=path, bubble=bubble,
                       shot=ev.get("shot"))
+            if ev.get("lip_src"):                   # sound mode: the mouth follows the SOUND at this time
+                sp["lip_src"] = ev["lip_src"]
             if frz is not None:
                 sp["frozen"] = True
             c.speech.append(sp)

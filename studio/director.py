@@ -94,7 +94,8 @@ class GeminiLLM:
     def __call__(self, system, messages, json_mode=True):
         body = {
             "systemInstruction": {"parts": [{"text": system}]},
-            "contents": [{"role": "model" if m["role"] == "assistant" else "user", "parts": [{"text": m["content"]}]}
+            "contents": [{"role": "model" if m["role"] == "assistant" else "user",       # a list = its own parts
+                          "parts": m["content"] if isinstance(m["content"], list) else [{"text": m["content"]}]}
                          for m in messages],
             "generationConfig": {"responseMimeType": "application/json" if json_mode else "text/plain",
                                  "maxOutputTokens": 8192, "temperature": self.temperature},

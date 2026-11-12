@@ -201,6 +201,12 @@
   .cbox.write textarea { margin-top: 6px; }
   input.bad { border-color: var(--err); }
   .chelp { font-size: 13px; color: var(--muted); margin: 0; }
+  .soundbox { margin-bottom: 10px; }
+  .soundbox > summary { cursor: pointer; font-weight: 600; }
+  .soundbox audio { width: 100%; margin-top: 8px; }
+  .soundbox .sndrange { margin-top: 6px; }
+  .soundbox .sndrange input { width: 90px; }
+  .vlabel { font-size: 13px; color: var(--muted); margin: 4px 0; }
   @media (max-width: 640px) { .cards select, .cards input, .cards textarea { font-size: 16px; } }   /* no zoom-in on iPhone */
   .setup label { max-width: 100%; }
   #token { width: 100%; }
@@ -292,6 +298,22 @@
         <p class="hint">Neeche ya to <b>idea</b> likho (AI inhi characters aur jagah ke saath script likhega), ya seedhe
           <b>dialogue</b>: har line <code>Naam: baat</code>, jaise <code>Papa: Sarkari gaadi se aana!</code>.
           Khali line = naya shot (na do to shot apne aap badalte hain). Devanagari likhne ki zarurat nahi.</p>
+      </details>
+      <details class="cbox soundbox hidden" id="soundBox">
+        <summary>🎵 Viral sound se reel <span class="hint">(Gemini sunke script banata hai)</span></summary>
+        <p class="chelp">Sound file chuno (mp3, m4a, ya screen-recording ki mp4). Gemini usme se shabd, kaun bol raha hai,
+          feeling aur har line ka time nikaal ke script banata hai; characters usi sound pe bolte hain. Reel do banti hain:
+          <b>sound ke saath</b> (check ke liye) aur <b>bina sound ke</b>: Instagram pe upload karte waqt wahi sound
+          Instagram ki library se <b>0:00</b> se lagao (trend ka fayda bhi, copyright bhi theek).</p>
+        <input type="file" id="sndFile" accept="audio/*,video/*">
+        <audio id="sndPlay" controls class="hidden"></audio>
+        <div class="lrow sndrange">
+          <label>Shuru (sec) <input type="number" id="sndFrom" min="0" step="0.1" value="0"></label>
+          <label>Aakhir (sec) <input type="number" id="sndTo" min="0" step="0.1"></label>
+        </div>
+        <label class="cfield">Kis situation pe? (optional) <input type="text" id="sndIdea" placeholder="Jaise: result wala din, office me boss"></label>
+        <button class="small wide" id="sndGo" type="button">🎵 Sound bhejo: Gemini sunega (~1 min)</button>
+        <p class="chelp" id="sndMsg"></p>
       </details>
       <div class="cards hidden" id="cards"></div>
       <textarea id="text" spellcheck="false"></textarea>
@@ -535,14 +557,15 @@ async function checkConnection(openOnFail = false) {
 // ---------------------------------------------------------------- script checker (mirrors studio/script.py)
 const V = JSON.parse($("vocab").textContent);
 const SET = Object.fromEntries(Object.entries(V).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, new Set(v)]));
-const HEADERS = new Set(["HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "DRESS", "OBJ", "LIGHTS", "LIGHT", "AMBIENCE",
+const HEADERS = new Set(["HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "DRESS", "OBJ", "LIGHTS", "LIGHT", "AMBIENCE",
   "NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD"]);
 const ON_WORDS = ["on", "yes", "haan", "true", "1"], OFF_WORDS = ["off", "no", "nahi", "false", "0", "none"];
 const MASCOTS = ["bhoot", "billi", "chooha", "ghost", "cat", "chuha", "mouse"];
 const words = (s) => s.toLowerCase().split(/[\s,|]+/).map((w) => w.replace(/^[\[\](){}'"]+|[\[\](){}'"]+$/g, "")).filter(Boolean);
 const short = (s) => (s.length > 45 ? s.slice(0, 45) + "…" : s);
 
-const FEEL = new Map(V.feel_words || []);         // happy -> smile, gussa -> angry... (studio/script.py FEEL_WORDS)
+const FEEL = new Map(V.feel_words || []);
+const SOUND_AT = /^@(\d+:)?\d+(\.\d+)?$/;         // happy -> smile, gussa -> angry... (studio/script.py FEEL_WORDS)
 function checkActing(tokens, cast) {
   tokens = tokens.map((w) => FEEL.get(w) || w);
   const unknown = [], acts = [], exprs = [];
@@ -551,6 +574,7 @@ function checkActing(tokens, cast) {
   const actionOnly = tokens.some((w2) => w2 === "point" || (SET.actions.has(w2) && !SET.expressions.has(w2) && !SET.sfx.has(w2)));
   for (let i = 0; i < tokens.length; i++) {
     const w = tokens[i], nxt = tokens[i + 1];
+    if (SOUND_AT.test(w)) continue;                       // @1.8: when the line is said in the SOUND (sound mode)
     if (SET.seat_actions.has(w) && SET.sets.has(nxt)) { acts.push(w); i++; continue; }      // sit sofa / lie_down bed
     if (w === "throw" && names.has(nxt)) { acts.push(w); i++; continue; }                     // throw B (a chappal flies at B)
     if (w === "ride") {                      // ride <vehicle> [back|driver]
@@ -642,6 +666,12 @@ function lintScript(text) {
       if (key === "CTA") cta = !!val;
       if (["NOTIFY", "NOTIFICATION", "LOADING", "TIMECARD", "CHAPTER", "ENDCARD"].includes(key)) {
         if (!val) out.push(`${key}: ke baad text likho`);
+        continue;
+      }
+      if (key === "SOUND") {
+        const [src, range] = [val.split(/\s+/)[0] || "", val.split(/\s+/).slice(1).join("")];
+        if (!src) out.push("SOUND: ke baad sound ka naam likho (🎵 Viral sound se reel)");
+        else if (range && !/^(\d+:)?\d+(\.\d+)?-(\d+:)?\d+(\.\d+)?$/.test(range)) out.push(`SOUND "${short(val)}": hissa aise likho: 0:05-0:20`);
         continue;
       }
       if (key === "CAMERA") {
@@ -742,7 +772,7 @@ function lintScript(text) {
     if ((m = line.match(/^([A-Za-z_]\w*)\s*(?:\(([^)]*)\))?\s*:\s*(.+)$/))) {
       if (!/^(narrator|vo|narration|voiceover|voice_over)$/i.test(m[1])) used.push(m[1]);   // a narrator needs no CAST entry
       const br = m[2] || "";
-      if (/[?!]/.test(br) || words(br).length > 5) out.push(`"${short(line)}": brackets me dialogue hai; brackets me sirf acting words (shock, point…)`);
+      if (/[?!]/.test(br) || words(br).filter((w) => !SOUND_AT.test(w)).length > 5) out.push(`"${short(line)}": brackets me dialogue hai; brackets me sirf acting words (shock, point…)`);
       else acting(br, line);
       const [roman, speak] = m[3].split("|");        // no "|" at all: the Devanagari is made when the video is made
       if (speak !== undefined && !/[ऀ-ॿ]/.test(speak)) out.push(`"${short(line)}": "|" ke baad Devanagari nahi hai (awaaz galat padhegi)`);
@@ -780,7 +810,7 @@ const EMO = { gussa: "angry", ghussa: "angry", hairan: "surprised", shock: "shoc
   khush: "smile", dukhi: "sad", udaas: "sad", neend: "sleepy", mar: "dead", chilla: "shout", aankh: "wink" };
 const EMO_CHIPS = [["😠", "gussa"], ["😲", "hairan"], ["😱", "shock"], ["😏", "akad"], ["😂", "hasi"], ["😢", "rona"],
   ["🤔", "soch"], ["😍", "pyaar"], ["😈", "chalak"], ["😄", "khush"], ["📢", "chilla"], ["💀", "mar"]];
-const HEADER_RE = /^(HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|OBJ|LIGHTS?|AMBIENCE|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)\s*:\s*(.*)$/i;
+const HEADER_RE = /^(HOOK|CAST|SOUND|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|OBJ|LIGHTS?|AMBIENCE|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)\s*:\s*(.*)$/i;
 const SAY_RE = /^([A-Za-z][\w ]{0,24}?)\s*(?:\(([^)]*)\))?\s*:\s*(\S.*)$/;
 const ACT_RE = /^([A-Za-z][\w ]{0,24}?)\s*->\s*(\S.*)$/;
 const DEFAULT_CTA = "Apne dost ko tag karo 👇";
@@ -958,7 +988,7 @@ function buildScript(text, b, style = "2d") {
 // Mirrors unflatten() in studio/script.py.
 function unflatten(text) {
   if ((text.match(/\n/g) || []).length >= 3 || !/\b(HOOK|CAST|SCENE)\s*:/.test(text)) return text;
-  const heads = "HOOK|CAST|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|OBJ|NARRATOR|LIGHTS|AMBIENCE|NOTIFY|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD";
+  const heads = "HOOK|CAST|SOUND|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|OBJ|NARRATOR|LIGHTS|AMBIENCE|NOTIFY|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD";
   let t = text.trim().replace(new RegExp(`\\s+(?=(?:${heads})\\s*:)`, "g"), "\n");
   t = t.replace(new RegExp(`\\s+(?=(?:CUT|SHOT)\\b(?:\\s+(?:${V.framings.join("|")}|reverse|over|[A-Z]\\w*))*\\s+[A-Z]\\w*\\s*[(:\\-])`, "g"), "\n");
   const cast = (t.match(/^CAST\s*:\s*(.*)$/m) || [, ""])[1];
@@ -1127,7 +1157,7 @@ function cardsToScript(model) {
 }
 const touch = (it) => { delete it.orig; return it; };
 // a settings line (shown in its own box, not among the story cards); LIGHTS is a story moment (bijli gayi), so not one
-const SETTING_RE = /^(CAST|MUSIC|TRANSITION|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|AMBIENCE)\s*:/i;
+const SETTING_RE = /^(CAST|SOUND|MUSIC|TRANSITION|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|AMBIENCE)\s*:/i;
 const isSetting = (it) => it.k === "raw" && SETTING_RE.test(it.text);
 const isStory = (it) => ["line", "cut", "screen", "obj", "scene"].includes(it.k) || (it.k === "raw" && !isSetting(it));
 const keyAt = (items, KEY) => items.findIndex((it) => (KEY === "SCENE" ? it.k === "scene" : (it.k === "head" || it.k === "cast") && it.key.toUpperCase() === KEY));
@@ -1259,6 +1289,7 @@ function setMode(m) {
   mode = m;
   document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.mode === m)));
   $("text").classList.toggle("hidden", m === "cards");
+  $("soundBox").classList.toggle("hidden", m === "idea");
   $("cards").classList.toggle("hidden", m !== "cards");
   if (m === "cards") loadCards(); else $("text").value = drafts[m];
   $("text").placeholder = m === "idea" ? "Idea yahan likho… (khali = AI khud soche)"
@@ -1276,7 +1307,7 @@ function setMode(m) {
   $("timeHint").textContent = m === "idea"
     ? "AI ko script likhne me ~1 minute lagta hai. Video tabhi banegi jab aap script approve karoge."
     : "GitHub pe video banne me ~4-6 minute lagte hain. Page band kar ke wapas aao to bhi progress yahin milegi.";
-  if (m !== "script") $("draftNote").classList.add("hidden");
+  if (m === "idea") $("draftNote").classList.add("hidden");
   if (m !== "idea") {                           // an AI draft / pasted script with a STYLE: line sets the picker
     const st = styleOf(scriptText());
     if (st && st !== currentStyle()) setStyle(st, true);
@@ -1300,7 +1331,7 @@ function showStatus(stage, frac) {
 
 // stage "script": AI writes a script (from the idea, or improves the script tab) -> shown for approval.
 // stage "video":  the (approved / own) script in the script tab -> video.
-async function start(stage) {
+async function start(stage, extra) {
   if (busy || !(await checkConnection(true))) return;
   const text = expandSaved(scriptText().trim(), savedChars()).text;     // @raju -> the saved words
   if (stage === "video" && !text) { showStatus("Script khali hai 🙂", 0); return; }
@@ -1308,15 +1339,30 @@ async function start(stage) {
     const w = showLint();
     if (w.length && !confirm("Script me " + w.length + " dikkat(ein) hain (neeche list dekho).\n\nPhir bhi video banau?")) return;
   }
-  const rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const rid = (extra && extra.rid) || Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const inputs = { stage, hook: $("hook").value, tone: $("tone").value, request_id: rid };
   if (currentStyle() === "2.5d") inputs.style = "2.5d";    // 2D sends nothing: works with older workflows too
-  if (stage === "script") {
+  if (stage === "sound") {
+    Object.assign(inputs, extra.inputs);
+  } else if (stage === "script") {
     if (mode === "idea") inputs.instruction = ideaWithSettings(text, builder); else inputs.script_text = text;
   } else {
     Object.assign(inputs, { script_text: withVideoOptions(text), width: $("width").value, voice: String($("voice").checked),
                             tts: $("tts").value,
                             dialogue: $("dialogue").value, intro: $("intro").value, draft_id: store.get("draft") });
+    const snd = soundFor(text);                    // a sound-mode script: its sound goes along (from this browser)
+    if (snd === null) {
+      showStatus("Sound nahi mila 🎵", 0);
+      $("errBox").textContent = "Script me SOUND line hai par wo sound is browser me save nahi hai. Upar 🎵 Viral sound " +
+        "se reel me wahi file dobara chuno aur bhejo (ya SOUND line hatao).";
+      return;
+    }
+    if (snd) inputs.sound = snd;
+  }
+  if (JSON.stringify(inputs).length > 64000) {    // GitHub takes at most ~64k characters of inputs
+    showStatus("Bahut bada 😅", 0);
+    $("errBox").textContent = "Sound + script GitHub ke liye bahut bade hain. Sound ka chhota hissa chuno (Shuru / Aakhir).";
+    return;
   }
   setBusy(true);
   $("errBox").textContent = ""; $("steps").replaceChildren(); $("runLink").classList.add("hidden");
@@ -1351,12 +1397,18 @@ function withVideoOptions(text) {
 
 async function showDraft(rid) {
   const rel = await gh(`${REPO()}/releases/tags/draft-${rid}`);
-  drafts.script = (rel.body || "").replace(/\r\n/g, "\n").trim() + "\n";
+  const [body, ideas] = (rel.body || "").replace(/\r\n/g, "\n").split("<!-- ideas -->");
+  drafts.script = body.trim() + "\n";
   store.set("draft", rid);
-  setMode("script");
+  const sound = /^\s*SOUND\s*:/im.test(drafts.script);
+  setMode(sound ? "cards" : "script");            // a sound draft opens as cards (who says which line, when)
   $("draftNote").innerHTML = DRAFT_NOTE;
+  if (ideas && ideas.trim()) {
+    $("draftNote").append(el("p", { textContent: "🎵 Gemini ke idea (hook / situation badalni ho to cards me badlo):" }),
+      el("pre", { className: "ideas", textContent: ideas.trim() }));
+  }
   $("draftNote").classList.remove("hidden");
-  $("text").focus();
+  if (!sound) $("text").focus();
 }
 
 function follow(rid, stage, startedAt) {
@@ -1399,7 +1451,7 @@ function follow(rid, stage, startedAt) {
           " (AI key wali galti ho to wahan likha hoga key kahan daalni hai).";
         return;
       }
-      if (stage === "script") {
+      if (stage === "script" || stage === "sound") {
         showStatus("Script taiyar ✍️ — padho aur approve karo", 1);
         await showDraft(rid);
         return;
@@ -1420,11 +1472,14 @@ function follow(rid, stage, startedAt) {
 function showRelease(rel) {
   const assets = rel.assets || [];
   const pngs = Object.fromEntries(assets.filter((a) => a.name.endsWith(".png")).map((a) => [a.name.replace(/\.png$/, ""), a]));
-  const vids = assets.filter((a) => a.name.endsWith(".mp4"));
+  const vids = assets.filter((a) => a.name.endsWith(".mp4"))
+    .sort((a, b) => a.name.endsWith(".insta.mp4") - b.name.endsWith(".insta.mp4"));   // with the sound first
+  const pair = vids.some((a) => a.name.endsWith(".insta.mp4"));
   $("ph").classList.add("hidden");
   $("result").classList.remove("hidden");
   $("videos").replaceChildren(...vids.map((a) => {
-    const base = a.name.replace(/\.mp4$/, "");
+    const insta = a.name.endsWith(".insta.mp4");
+    const base = a.name.replace(/(\.insta)?\.mp4$/, "");
     const v = el("video", { controls: true, playsInline: true, preload: "metadata", src: a.browser_download_url });
     const cover = pngs[base + ".cover"];
     if (cover || pngs[base]) v.poster = (cover || pngs[base]).browser_download_url;
@@ -1433,7 +1488,10 @@ function showRelease(rel) {
     if (cover) links.push(el("a", { href: cover.browser_download_url, target: "_blank", rel: "noopener",
                                     title: "Instagram pe upload karte waqt: Edit cover → Add from camera roll",
                                     textContent: "🖼️ Cover download" }));
-    return el("div", { style: "margin-bottom:14px" }, [v, el("div", { className: "btns" }, links)]);
+    const label = !pair ? [] : [el("p", { className: "vlabel", textContent: insta
+      ? "📤 Instagram ke liye (bina sound): upload karte waqt wahi sound Instagram ki library se 0:00 se lagao"
+      : "🔊 Sound ke saath (sirf check karne ke liye)" })];
+    return el("div", { style: "margin-bottom:14px" }, [...label, v, el("div", { className: "btns" }, links)]);
   }));
   $("post").value = (rel.body || "").trim();
 }
@@ -1896,8 +1954,10 @@ function lineCard(it, i) {
   const p = actingParts(it.acting), feel = p.feel >= 0 ? feelOf(it.acting[p.feel]) : "";
   const act = p.action >= 0 ? it.acting[p.action] : "";
   const extras = p.extra.map((k) => it.acting[k]), cams = p.cam.map((k) => it.acting[k].toLowerCase());
-  const tags = [act && "🎬 " + act, cams.includes("zoom") && "🔍", cams.some((c) => c.startsWith("slow")) && "🐢",
-    extras.length && "+" + extras.length].filter(Boolean).join(" ");
+  const when = extras.find((w) => SOUND_AT.test(w));        // sound mode: when it is said in the sound
+  const others = extras.filter((w) => w !== when);
+  const tags = [when && "⏱" + when.slice(1), act && "🎬 " + act, cams.includes("zoom") && "🔍",
+    cams.some((c) => c.startsWith("slow")) && "🐢", others.length && "+" + others.length].filter(Boolean).join(" ");
   const face = btn(feel ? (FEEL_WORD[feel] ? FEEL_WORD[feel][0] : "🎭") : "🙂", feel ? `Feeling: ${feel} (badlo)` : "Feeling chuno",
     toggle, "feel face" + (feel ? " on" : ""));
   const txt = field("", it.text, "Kya bolta hai? (Hinglish)  ·  khali = sirf action", (v) => {
@@ -2061,6 +2121,192 @@ function renderCards() {
   );
   requestAnimationFrame(() => $("cards").querySelectorAll("textarea").forEach(grow));
 }
+
+// ---------------------------------------------------------------- 🎵 a viral sound (sound mode)
+// The page's token can only start runs, so the sound travels inside the run's inputs (GitHub takes ~64k characters):
+// the chosen part is made small here (Opus, mono) and kept in this browser, so the video run gets it again.
+const SOUND_B64_MAX = 56000;
+let sndBuf = null;
+function soundFor(text) {                   // "" = not a sound-mode script, null = its sound is not in this browser
+  const m = (text || "").match(/^\s*SOUND\s*:\s*(sound-[a-z0-9]+)/im);
+  if (!m) return "";
+  try {
+    const s = JSON.parse(localStorage.getItem("dts_sound:" + m[1]) || "null");
+    return s ? `${m[1]};${s.ext};${s.b64}` : null;
+  } catch { return null; }
+}
+function keepSound(id, ext, b64) {
+  try {                                     // only the latest few: a phone's storage is small
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith("dts_sound:")).sort();
+    while (keys.length >= 4) localStorage.removeItem(keys.shift());
+    localStorage.setItem("dts_sound:" + id, JSON.stringify({ ext, b64, at: Date.now() }));
+    return true;
+  } catch { return false; }
+}
+// Ogg pages for Opus packets (RFC 7845): what ffmpeg and Gemini read as a normal .ogg file
+const OGG_CRC = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let r = i << 24;
+    for (let j = 0; j < 8; j++) r = (r & 0x80000000) ? ((r << 1) ^ 0x04c11db7) : (r << 1);
+    t[i] = r >>> 0;
+  }
+  return t;
+})();
+function oggPage(packets, granule, serial, seq, flags) {
+  const segs = [];
+  for (const p of packets) { let n = p.length; while (n >= 255) { segs.push(255); n -= 255; } segs.push(n); }
+  const b = new Uint8Array(27 + segs.length + packets.reduce((a, p) => a + p.length, 0)), dv = new DataView(b.buffer);
+  b.set([79, 103, 103, 83], 0);             // "OggS", version 0
+  b[5] = flags;
+  dv.setUint32(6, granule % 4294967296, true);
+  dv.setUint32(10, Math.floor(granule / 4294967296), true);
+  dv.setUint32(14, serial, true);
+  dv.setUint32(18, seq, true);
+  b[26] = segs.length;
+  b.set(segs, 27);
+  let o = 27 + segs.length;
+  for (const p of packets) { b.set(p, o); o += p.length; }
+  let c = 0;
+  for (const x of b) c = ((c << 8) ^ OGG_CRC[((c >>> 24) ^ x) & 0xff]) >>> 0;
+  dv.setUint32(22, c, true);
+  return b;
+}
+function oggOpus(chunks, head) {            // chunks: [{data: Uint8Array, samples: n at 48 kHz}]
+  const serial = 0x5d7a, pages = [];
+  let seq = 0;
+  if (!head) {                              // OpusHead: mono, 312 samples pre-skip, 48 kHz
+    head = new Uint8Array(19);
+    head.set([79, 112, 117, 115, 72, 101, 97, 100, 1, 1]);
+    new DataView(head.buffer).setUint16(10, 312, true);
+    new DataView(head.buffer).setUint32(12, 48000, true);
+  }
+  const preskip = new DataView(head.buffer, head.byteOffset).getUint16(10, true);
+  const vendor = new TextEncoder().encode("desi-toons");
+  const tags = new Uint8Array(8 + 4 + vendor.length + 4);
+  tags.set(new TextEncoder().encode("OpusTags"));
+  new DataView(tags.buffer).setUint32(8, vendor.length, true);
+  tags.set(vendor, 12);
+  pages.push(oggPage([head], 0, serial, seq++, 2), oggPage([tags], 0, serial, seq++, 0));
+  let granule = preskip, group = [], nseg = 0;
+  chunks.forEach((c, i) => {
+    const need = Math.floor(c.data.length / 255) + 1;
+    if (nseg + need > 255) { pages.push(oggPage(group, granule, serial, seq++, 0)); group = []; nseg = 0; }
+    group.push(c.data); nseg += need; granule += c.samples;
+    if (i === chunks.length - 1) pages.push(oggPage(group, granule, serial, seq++, 4));
+  });
+  return new Blob(pages, { type: "audio/ogg" });
+}
+async function decodeSound(file) {
+  const ctx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 48000);
+  return await ctx.decodeAudioData(await file.arrayBuffer());
+}
+async function mono48k(buf, from, to) {     // the chosen part, mono, 48 kHz
+  const n = Math.max(1, Math.round((to - from) * 48000));
+  const ctx = new OfflineAudioContext(1, n, 48000);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  src.start(0, from, to - from);
+  return await ctx.startRendering();
+}
+async function encodeSound(buf, from, to) {
+  const part = await mono48k(buf, from, to), pcm = part.getChannelData(0);
+  const secs = pcm.length / 48000;
+  const bitrate = Math.max(8000, Math.min(24000, Math.floor((SOUND_B64_MAX * 0.75 * 8) / secs / 1000) * 1000));
+  if ("AudioEncoder" in window) {           // WebCodecs: fast, exact size
+    const chunks = [];
+    let head = null;
+    const enc = new AudioEncoder({
+      output: (chunk, meta) => {
+        const d = new Uint8Array(chunk.byteLength);
+        chunk.copyTo(d);
+        chunks.push({ data: d, samples: Math.round((chunk.duration || 20000) * 48 / 1000) });
+        const desc = meta && meta.decoderConfig && meta.decoderConfig.description;
+        if (desc && !head) {
+          const h = new Uint8Array(desc.buffer ? desc.buffer.slice(desc.byteOffset || 0, (desc.byteOffset || 0) + desc.byteLength) : desc);
+          if (h.length >= 19 && String.fromCharCode(...h.slice(0, 8)) === "OpusHead") head = h;
+        }
+      },
+      error: (e) => { throw e; },
+    });
+    enc.configure({ codec: "opus", sampleRate: 48000, numberOfChannels: 1, bitrate });
+    for (let i = 0; i < pcm.length; i += 960) {
+      const frame = pcm.slice(i, i + 960);
+      enc.encode(new AudioData({ format: "f32-planar", sampleRate: 48000, numberOfFrames: frame.length,
+                                 numberOfChannels: 1, timestamp: Math.round(i / 48), data: frame }));
+    }
+    await enc.flush();
+    enc.close();
+    return { blob: oggOpus(chunks, head), ext: "ogg", bitrate };
+  }
+  // no WebCodecs: record it as it plays (takes as long as the sound)
+  const ctx = new AudioContext({ sampleRate: 48000 }), dest = ctx.createMediaStreamDestination();
+  const src = ctx.createBufferSource();
+  src.buffer = part;
+  src.connect(dest);
+  const type = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"].find((t) => MediaRecorder.isTypeSupported(t));
+  const rec = new MediaRecorder(dest.stream, { mimeType: type, audioBitsPerSecond: bitrate });
+  const parts = [];
+  rec.ondataavailable = (e) => parts.push(e.data);
+  const done = new Promise((ok) => { rec.onstop = ok; });
+  rec.start();
+  src.start();
+  src.onended = () => rec.stop();
+  await done;
+  ctx.close();
+  return { blob: new Blob(parts, { type }), ext: type.startsWith("audio/mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm", bitrate };
+}
+function b64(blob) {
+  return new Promise((ok, bad) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(",")[1] || "");
+    r.onerror = bad;
+    r.readAsDataURL(blob);
+  });
+}
+$("sndFile").addEventListener("change", async () => {
+  const f = $("sndFile").files[0];
+  sndBuf = null;
+  if (!f) return;
+  $("sndMsg").textContent = "Sound khol raha hoon…";
+  try {
+    sndBuf = await decodeSound(f);
+    $("sndPlay").src = URL.createObjectURL(f);
+    $("sndPlay").classList.remove("hidden");
+    $("sndFrom").value = 0;
+    $("sndTo").value = Math.min(sndBuf.duration, 30).toFixed(1);
+    $("sndMsg").textContent = `Sound ${sndBuf.duration.toFixed(1)} sec ka hai. Reel ke liye 30 sec tak ka hissa chuno.`;
+  } catch (e) {
+    $("sndMsg").textContent = "Ye file nahi khuli (" + e.message + "). mp3 / m4a / mp4 try karo.";
+  }
+});
+$("sndGo").addEventListener("click", async () => {
+  if (!sndBuf) { $("sndMsg").textContent = "Pehle sound file chuno 🎵"; return; }
+  const from = Math.max(0, parseFloat($("sndFrom").value) || 0);
+  const to = Math.min(sndBuf.duration, parseFloat($("sndTo").value) || sndBuf.duration);
+  if (to - from < 1) { $("sndMsg").textContent = "Hissa kam se kam 1 sec ka ho"; return; }
+  if (to - from > 45) { $("sndMsg").textContent = "45 sec tak ka hissa chuno (reel ke liye 30 sec tak sabse achha)"; return; }
+  $("sndGo").disabled = true;
+  $("sndMsg").textContent = "Sound chhota kar raha hoon…";
+  try {
+    const { blob, ext } = await encodeSound(sndBuf, from, to);
+    const data = await b64(blob);
+    if (data.length > SOUND_B64_MAX) throw new Error(`sound ${Math.round(data.length / 1000)}k hai, ${Math.round(SOUND_B64_MAX / 1000)}k tak chalta hai: chhota hissa chuno`);
+    const rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6), id = "sound-" + rid;
+    if (!keepSound(id, ext, data)) $("sndMsg").textContent = "⚠️ Browser me save nahi ho paya: video ke liye sound dobara chunna padega";
+    $("sndMsg").textContent = `Bhej raha hoon (${(blob.size / 1024).toFixed(0)} KB)…`;
+    await start("sound", { rid, inputs: { sound: `${id};${ext};${data}`, instruction: $("sndIdea").value.trim() } });
+    if (store.get("pending").includes(rid)) {        // sent: the status below follows it, the box can close
+      $("sndMsg").textContent = "✅ Bhej diya. Gemini sun raha hai: neeche status dekho, script ~1 min me cards me aayegi.";
+      $("soundBox").open = false;
+    }
+  } catch (e) {
+    $("sndMsg").textContent = "Sound nahi ban paya: " + e.message;
+  } finally {
+    $("sndGo").disabled = false;
+  }
+});
 
 // ---------------------------------------------------------------- style (2D / 2.5D)
 function currentStyle() {
