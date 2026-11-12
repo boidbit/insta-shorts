@@ -11,7 +11,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from studio import objects, vehicles                                  # noqa: E402
+from studio import counters, objects, vehicles                        # noqa: E402
 from studio.backgrounds import Background, TRAFFIC_NEW                # noqa: E402
 from studio.characters import (FACE_PARTS, FACE_WORDS, HAIR_STYLES, LOOKS, MARKS, build_character,   # noqa: E402
                                face_word)
@@ -212,3 +212,62 @@ class Page(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Counters(unittest.TestCase):
+    """People behind counters: sellers behind their carts, shopkeepers / judges behind theirs."""
+
+    def plan(self, text):
+        sc, warns = parse_script(text)
+        self.assertEqual(warns, [])
+        return compile_scene(split_scenes(sc)[0], use_tts=False)
+
+    def test_the_seller_stands_behind_his_cart(self):
+        p = self.plan("HOOK: h\nCAST: F = food_blogger, K = kulchewala\nSCENE: street\nOBJ: thela kulche center\n"
+                      "F: Hello | हेलो\nK: Aao | आओ\n")
+        cart, k, f = p.objects["thela_kulche"], p.chars["K"], p.chars["F"]
+        self.assertTrue(cart.depth_sort)
+        self.assertLess(k.draw_pos(1.0)[1], cart.y)                   # behind it (drawn before it)
+        self.assertGreater(f.draw_pos(1.0)[1], cart.y)                # the blogger in front
+        self.assertGreater(abs(f.x - k.x), 250)                       # and not right in front of him
+
+    def test_a_pushed_cart_comes_with_its_seller(self):
+        p = self.plan("HOOK: h\nCAST: K = thelewala, B = boy\nSCENE: street\nOBJ: thela chai enter left\n"
+                      "B: Chai! | चाय!\nK: Aaya | आया\n")
+        k, cart = p.chars["K"], p.objects["thela_chai"]
+        t0, t1 = cart.moves[0][:2]
+        self.assertLess(k.pos_at(t0)[0], 0)                            # off screen with the cart, at its handle
+        self.assertLess(k.draw_pos(t1 + 1.0)[1], cart.y)              # then behind it
+
+    def test_painted_counters_and_who_goes_there(self):
+        p = self.plan("HOOK: h\nCAST: J = judge, A = boy, W = girl gawah\nSCENE: court\nJ (angry): Order! | ऑर्डर!\n"
+                      "A: Main nirdosh hoon | मैं निर्दोष हूँ\nW: Maine dekha | मैंने देखा\n")
+        self.assertEqual(sorted(p.counters), [0, 1])                  # the bench and the witness box
+        self.assertLess(p.chars["J"].draw_pos(1.0)[1], 1000)          # up on the bench, far away
+        self.assertLess(p.chars["J"].draw_scale(1.0), p.chars["A"].draw_scale(1.0))
+        self.assertAlmostEqual(p.chars["A"].draw_pos(1.0)[1], 1700, delta=1)
+        im = Background({"type": "court"}, 216, 384).static
+        pieces = counters.counter_overlays("court", p.counters, im, 0.2)
+        self.assertEqual(len(pieces), 2)
+        self.assertTrue(all(pc[1].mode == "RGBA" for pc in pieces))
+
+    def test_peeche_and_aage(self):
+        p = self.plan("HOOK: h\nCAST: B = boy peeche, C = chaiwala aage\nSCENE: chai_tapri\nB: Hi | हाय\nC: Haan | हाँ\n")
+        self.assertLess(p.chars["B"].draw_pos(1.0)[1], 1400)          # the boy went behind the counter
+        self.assertAlmostEqual(p.chars["C"].draw_pos(1.0)[1], 1700, delta=1)    # the chaiwala stays in front
+
+    def test_shops_bring_their_counter(self):
+        p = self.plan("HOOK: h\nCAST: H = halwai, B = boy\nSCENE: sweet_shop\nB: Jalebi | जलेबी\nH: Lo | लो\n")
+        self.assertIn("counter_mithai", p.objects)
+        self.assertLess(p.chars["H"].draw_pos(1.0)[1], p.objects["counter_mithai"].y)
+        sc, _ = parse_script("HOOK: h\nCAST: H = halwai\nSCENE: mithai_shop\nOBJ: counter bakery left\nH: Lo | लो\n")
+        kinds = [e["obj"]["kind"] for e in sc["scenes"][0]["timeline"] if "obj" in e]
+        self.assertEqual(kinds, ["counter_bakery"])                   # your own counter replaces the shop's
+        for look in ("dukaandaar", "halwai", "chemist", "clerk", "judge"):
+            self.assertIn(look, LOOKS)
+
+    def test_classic_keeps_everybody_in_front(self):
+        p = self.plan("HOOK: h\nCAST: C = chaiwala, B = boy\nSCENE: chai_tapri\nB: Hi | हाय\nC: Haan | हाँ\n"
+                      "CAMERA: classic\n")
+        self.assertEqual(p.counters, [])
+        self.assertAlmostEqual(p.chars["C"].draw_pos(1.0)[1], 1700, delta=1)
