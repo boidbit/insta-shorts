@@ -156,7 +156,9 @@ class RenderTests(unittest.TestCase):
                               ("cinema", "cinema_25d"), ("balcony", "balcony_25d"), ("bathroom", "bathroom_25d"),
                               ("hostel", "hostel_25d"), ("library", "library_25d"), ("coaching", "coaching_25d"),
                               ("exam_hall", "exam_hall_25d"), ("gym", "gym_25d"), ("party", "party_25d"),
-                              ("jail", "jail_25d")):
+                              ("jail", "jail_25d"), ("beach", "beach_25d"), ("desert", "desert_25d"),
+                              ("mountain_road", "mountain_road_25d"), ("cricket_ground", "cricket_ground_25d"),
+                              ("school_ground", "school_ground_25d")):
             r = Renderer(one_scene(place, "2.5d"), self.W, use_tts=False)
             self.assertEqual(r.bd25.preset, preset)
             self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.4).tobytes(), place)    # screens, fan, leaves, bats
@@ -221,6 +223,13 @@ class RenderTests(unittest.TestCase):
             self.assertEqual(r.bd25.preset, "jail_25d")
             self.assertTrue([o for o in r.plan.sets if o.get("type") == "jail_door"])
             self.assertEqual(r.frame(1.0).size, (self.W, self.W * 16 // 9))
+
+    def test_every_place_has_a_hand_made_set(self):
+        """In 2.5D every studio place is now a hand-made set, except the vehicles and the flat ones (which stay as
+        they are) and the two religious places (mandap, graveyard), which are still made automatically."""
+        left = [p for p in script.vocab()["places"]
+                if p not in styles.PLACES_25D and p not in styles.FLAT_IN_25D]
+        self.assertEqual(sorted(left), ["graveyard", "mandap"])
 
     def test_premium_sets_move(self):
         r = Renderer(one_scene("room", "2.5d"), self.W, use_tts=False)

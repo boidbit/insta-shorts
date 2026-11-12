@@ -819,6 +819,11 @@ PRESETS = {
     "gym_25d": _lazy("scenery_rooms", "gym_25d"),
     "party_25d": _lazy("scenery_rooms", "party_25d"),
     "jail_25d": _lazy("scenery_rooms", "jail_25d"),
+    "beach_25d": _lazy("scenery_open", "beach_25d"),
+    "desert_25d": _lazy("scenery_open", "desert_25d"),
+    "mountain_road_25d": _lazy("scenery_open", "mountain_road_25d"),
+    "cricket_ground_25d": _lazy("scenery_open", "cricket_ground_25d"),
+    "school_ground_25d": _lazy("scenery_open", "school_ground_25d"),
 }
 
 
