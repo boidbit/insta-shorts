@@ -758,6 +758,59 @@ PLACE_WORDS = {"sweet_shop": "mithai_shop", "halwai_shop": "mithai_shop", "mitha
 from .places_plus import SHOPS as SHOP_PLACES   # noqa: E402  (a shop brings its counter: `SCENE: mithai_shop`)
 
 
+# a seller whose place has no counter of its own brings his stall (thelewala: the one his lines talk about)
+SELLER_STALL = {"kulchewala": "thela_kulche", "chaiwala": "thela_chai", "sabziwala": "thela", "thelewala": None,
+                "halwai": "counter_mithai", "dukaandaar": "counter", "chemist": "counter_medical"}
+
+
+def bring_stalls(scenes, cast):
+    """Every shot of a place (the SCENE and its CUTs) gets the same thela / shop counter: the one a line put there
+    (`OBJ: thela kulche center`, carried into the later shots), else the stall of the place's seller (a kulchewala
+    without a thela is just a man standing in a lane). Not where the place has its own counter (chai_tapri, kirana,
+    market...), in the shops (they have theirs) or inside a vehicle."""
+    from . import counters
+    groups = {}
+    for sc in scenes:
+        groups.setdefault(sc.get("place_no", id(sc)), []).append(sc)
+    for shots in groups.values():
+        bg = shots[0].get("background") or {}
+        place = bg.get("type") if isinstance(bg, dict) else bg
+        if place in counters.PLACES or place in SHOP_PLACES or vehicles.resolve(place):
+            continue
+
+        def counter_line(sc):
+            return next((ln for ln in sc["lines"] if ln[0] == "obj"
+                         and objects.resolve_kind(ln[1].get("kind", "")) in objects.COUNTERS), None)
+        first = next((i for i, sc in enumerate(shots) if counter_line(sc)), None)
+        if first is not None:                       # the writer's own: parked in the later shots too
+            spec = counter_line(shots[first])[1]
+            if spec.get("exit"):
+                continue
+            keep = {"kind": spec["kind"], "at": spec.get("at") or spec.get("go") or "center", "carried": True}
+            for k in ("color", "scale", "front"):
+                if k in spec:
+                    keep[k] = spec[k]
+            for sc in shots[first + 1:]:
+                if not counter_line(sc):
+                    sc["lines"].insert(0, ("obj", dict(keep)))
+            continue
+        names = []
+        for sc in shots:
+            for ln in sc["lines"]:
+                if ln[0] in ("say", "do") and ln[1] in cast and ln[1] not in names:
+                    names.append(ln[1])
+        seller = next((n for n in names if cast[n].get("look") in SELLER_STALL), None)
+        if seller is None:
+            continue
+        kind = SELLER_STALL[cast[seller]["look"]]
+        if kind is None:                            # thelewala: what do the lines talk about? (chaat, momos...)
+            said = " ".join(str(ln[3]) for sc in shots for ln in sc["lines"] if ln[0] == "say" and len(ln) > 3)
+            kind = next((objects.thela_kind(w) for w in re.findall(r"[a-z_]+", said.lower())
+                         if objects.thela_kind(w)), "thela")
+        for sc in shots:
+            sc["lines"].insert(0, ("obj", {"kind": kind, "at": "center", "auto": True}))
+
+
 def resolve_background(raw):
     """`street` / `gali` (= assets/backgrounds/gali.png) / `assets/backgrounds/x.jpg` -> (background dict, warning)."""
     name = raw.strip()
@@ -1173,6 +1226,9 @@ def parse_script(text):
             pick = OPENINGS[zlib.crc32(("open|" + (meta.get("HOOK") or "reel")).encode("utf-8")) % len(OPENINGS)]
             if pick != "plain":                     # (marked as the studio's own: it gives way to a directed scene)
                 first[2].append("open_" + pick)
+
+    if not classic:                                 # a seller brings his thela / counter; it stays through the CUTs
+        bring_stalls(scenes, cast)
 
     # ---- build timelines ----
     out_scenes = []

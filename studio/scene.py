@@ -1214,6 +1214,12 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.counter_mode = "2d" if not preset_ else ("auto" if preset_.startswith("auto:") else "preset")
     plan.counters = counters.place_behind(plan, place_, cine, plan.counter_mode,
                                           mirror=not preset_ or preset_ not in styles.NO_MIRROR)
+    seller_ = next((c_ for c_ in chars.values() if getattr(c_, "behind", None) is not None), None)
+    if plan.framing == "ots" and seller_ is not None:     # the shoulder in the corner away from the seller
+        side_ = "left" if getattr(seller_, "behind_x", seller_.x) > LW / 2.0 else "right"
+        for c_ in chars.values():
+            if c_.spec.get("view") == "back":
+                c_.x = OTS_BACK[side_]
 
     # ---- duration ----
     if meta.get("duration"):

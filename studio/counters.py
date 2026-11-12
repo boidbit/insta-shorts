@@ -105,7 +105,7 @@ def place_behind(plan, place, cine, mode="2d", mirror=True):
     "preset" hand-made 2.5D set, None = no painted counters). mirror: the set is mirrored for a reverse shot (a 2.5D
     set with writing on it is not). Returns the painted counters in use (indices into painted(place, mode))."""
     angle = dict(plan.angle or {}, mirror=bool(mirror and (plan.angle or {}).get("mirror")))
-    if not cine or plan.framing in ("ots", "inside", "wide"):
+    if not cine or plan.framing in ("inside", "wide"):   # (over the shoulder: the seller is still behind it)
         return []
     people = [c for c in plan.chars.values() if not c.spec.get("hidden") and not c.spec.get("kind")
               and c.spec.get("behind") is not False and not c.spec.get("view") == "back" and not c.rides]
@@ -155,7 +155,7 @@ def _make_room(plan, behind):
     backs = [getattr(plan.chars[n], "behind_x", plan.chars[n].x) for n in behind]
     gap = 380.0 * plan.world / 1.22                 # a person's width and a bit (bigger people need more room)
     for c in plan.chars.values():
-        if c.name in behind or c.spec.get("hidden") or _walks(c):
+        if c.name in behind or c.spec.get("hidden") or _walks(c) or c.spec.get("view") == "back":
             continue
         if all(abs(c.x - bx) >= gap for bx in backs):
             continue

@@ -122,3 +122,43 @@ class StudioOpening(unittest.TestCase):
         sc, _ = parse_script("HOOK: h\nCAST: A = boy, B = girl\nSCENE: room\nA (side): Suno | सुनो\nB: Haan | हाँ\n"
                              "STYLE: 2.5d\n")
         self.assertEqual(make_video(sc, 216, use_tts=False).frame(0.8).size, (216, 384))
+
+
+class Stalls(unittest.TestCase):
+    """A seller brings his stall (no OBJ line needed), and a thela stays in every CUT shot of its place."""
+
+    def shots(self, text):
+        sc, warns = parse_script(text)
+        self.assertEqual(warns, [])
+        return [compile_scene(s_, use_tts=False) for s_ in split_scenes(sc)]
+
+    def test_the_kulchewala_brings_his_thela_into_every_shot(self):
+        plans = self.shots("HOOK: h\nCAST: A = food_blogger, B = kulchewala\nSCENE: gully sunset\n"
+                           "A: Hello dosto! | हेलो दोस्तों!\nCUT ots\nB: Bees saal se yahin hoon | बीस साल से यहीं हूँ\n"
+                           "CUT\nA: Wah! | वाह!\nSTYLE: 2.5d\n")
+        for p in plans:
+            self.assertIn("thela_kulche", p.objects)
+        ots = plans[1]
+        b, back = ots.chars["B"], ots.chars["A"]
+        self.assertIsNotNone(getattr(b, "behind", None))                # behind his thela, over the shoulder too
+        self.assertEqual(back.spec.get("view"), "back")
+        self.assertGreater(abs(back.x - b.x), 300)                       # the shoulder is not in front of him
+
+    def test_whose_stall(self):
+        p = self.shots("HOOK: h\nCAST: T = thelewala, B = boy\nSCENE: street\nB: Bhaiya golgappe khilao | भैया गोलगप्पे खिलाओ\n"
+                       "T: Abhi lo | अभी लो\n")[0]
+        self.assertIn("thela_golgappe", p.objects)
+        p = self.shots("HOOK: h\nCAST: H = halwai, B = boy\nSCENE: street\nB: Jalebi | जलेबी\nH: Lo | लो\n")[0]
+        self.assertIn("counter_mithai", p.objects)
+        p = self.shots("HOOK: h\nCAST: C = chaiwala, B = boy\nSCENE: chai_tapri\nB: Chai | चाय\nC: Lo | लो\n")[0]
+        self.assertEqual(p.objects, {})                                  # the chai stall has its own counter
+        p = self.shots("HOOK: h\nCAST: B = kulchewala, A = boy\nSCENE: gully\nA: Kulche | कुलचे\nB: Lo | लो\n"
+                       "CAMERA: classic\n")[0]
+        self.assertEqual(p.objects, {})                                  # classic: as before
+
+    def test_a_written_thela_stays_through_the_cuts(self):
+        plans = self.shots("HOOK: h\nCAST: A = boy, B = thelewala\nSCENE: street\nOBJ: thela momos left\n"
+                           "A: Momos! | मोमोज़!\nCUT\nB: Lo | लो\nCUT reverse\nA: Wah | वाह\n")
+        for p in plans:
+            self.assertIn("thela_momos", p.objects)
+            self.assertEqual(len(p.objects), 1)
