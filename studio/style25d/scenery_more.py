@@ -14,7 +14,7 @@ import random
 
 from PIL import Image, ImageDraw
 
-from .scenery import Cv, Layer, Layered, fill_tex, mix, motes, mul, toward, vgrad
+from .scenery import Cv, Layer, Layered, fill_tex, mix, motes, mul, vgrad
 from .scenery_home import _box, _clock, _curtain, _leaves, _room_outside, _shadow, _window, fan
 from ..util import LH, LW
 

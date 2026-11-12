@@ -48,12 +48,22 @@ PLACES_25D = {
     "salon": "salon_25d",
     "mall": "mall_25d",
     "cinema": "cinema_25d",
+    "balcony": "balcony_25d",
+    "bathroom": "bathroom_25d",
+    "hostel": "hostel_25d",
+    "library": "library_25d",
+    "coaching": "coaching_25d",
+    "exam_hall": "exam_hall_25d",
+    "gym": "gym_25d",
+    "party": "party_25d",
+    "jail": "jail_25d",
 }
 # sets with writing on them (shop signs, menus, boards) are never mirrored for a reverse shot (the text would read
 # backwards). The 2d look mirrors every place, as it always has.
 NO_MIRROR = {"gali_25d", "classroom_25d", "office_25d", "meeting_25d", "street_25d", "busstop_25d", "market_25d",
              "festival_25d", "railway_25d", "hospital_25d", "bank_25d", "police_25d", "court_25d", "canteen_25d",
-             "dhaba_25d", "mithai_25d", "mobile_25d", "medical_25d", "salon_25d", "mall_25d", "cinema_25d"} | {
+             "dhaba_25d", "mithai_25d", "mobile_25d", "medical_25d", "salon_25d", "mall_25d", "cinema_25d",
+             "library_25d", "coaching_25d", "exam_hall_25d", "gym_25d", "party_25d"} | {
     "auto:" + p for p in ("bus_stop", "railway", "canteen", "exam_hall", "library", "coaching", "party", "gym",
                           "hospital", "police_station", "bank")}
 # hand-made outdoor sets that keep their place's moving life (traffic on the road, clouds, birds)
@@ -65,7 +75,9 @@ NATIVE_TIME = {"kitchen_25d": "day", "gali_25d": "sunset", "diwali_rooftop": "ni
                "market_25d": "day", "festival_25d": "night", "railway_25d": "day", "gaon_25d": "day",
                "hospital_25d": "day", "bank_25d": "day", "police_25d": "day", "court_25d": "day", "canteen_25d": "day",
                "dhaba_25d": "sunset", "mithai_25d": "day", "mobile_25d": "day", "medical_25d": "day",
-               "salon_25d": "day", "mall_25d": "day", "cinema_25d": "night"}
+               "salon_25d": "day", "mall_25d": "day", "cinema_25d": "night", "balcony_25d": "day",
+               "bathroom_25d": "day", "hostel_25d": "day", "library_25d": "day", "coaching_25d": "day",
+               "exam_hall_25d": "day", "gym_25d": "day", "party_25d": "day", "jail_25d": "day"}
 
 
 def normalize(value):

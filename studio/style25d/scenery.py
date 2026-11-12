@@ -810,6 +810,15 @@ PRESETS = {
     "salon_25d": _lazy("scenery_shops", "salon_25d"),
     "mall_25d": _lazy("scenery_shops", "mall_25d"),
     "cinema_25d": _lazy("scenery_shops", "cinema_25d"),
+    "balcony_25d": _lazy("scenery_rooms", "balcony_25d"),
+    "bathroom_25d": _lazy("scenery_rooms", "bathroom_25d"),
+    "hostel_25d": _lazy("scenery_rooms", "hostel_25d"),
+    "library_25d": _lazy("scenery_rooms", "library_25d"),
+    "coaching_25d": _lazy("scenery_rooms", "coaching_25d"),
+    "exam_hall_25d": _lazy("scenery_rooms", "exam_hall_25d"),
+    "gym_25d": _lazy("scenery_rooms", "gym_25d"),
+    "party_25d": _lazy("scenery_rooms", "party_25d"),
+    "jail_25d": _lazy("scenery_rooms", "jail_25d"),
 }
 
 

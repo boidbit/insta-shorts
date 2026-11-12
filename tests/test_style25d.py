@@ -153,7 +153,10 @@ class RenderTests(unittest.TestCase):
                               ("court", "court_25d"), ("canteen", "canteen_25d"), ("dhaba", "dhaba_25d"),
                               ("mithai_shop", "mithai_25d"), ("mobile_shop", "mobile_25d"),
                               ("medical_store", "medical_25d"), ("salon", "salon_25d"), ("mall", "mall_25d"),
-                              ("cinema", "cinema_25d")):
+                              ("cinema", "cinema_25d"), ("balcony", "balcony_25d"), ("bathroom", "bathroom_25d"),
+                              ("hostel", "hostel_25d"), ("library", "library_25d"), ("coaching", "coaching_25d"),
+                              ("exam_hall", "exam_hall_25d"), ("gym", "gym_25d"), ("party", "party_25d"),
+                              ("jail", "jail_25d")):
             r = Renderer(one_scene(place, "2.5d"), self.W, use_tts=False)
             self.assertEqual(r.bd25.preset, preset)
             self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.4).tobytes(), place)    # screens, fan, leaves, bats
@@ -206,6 +209,18 @@ class RenderTests(unittest.TestCase):
             self.assertTrue(r.plan.counters, place)
             self.assertEqual(len([sp for sp in r.bd25.layered.sprites if sp.name == "counter"]), n, place)
             self.assertEqual(r.frame(1.0).size, (self.W, self.W * 16 // 9), place)
+
+    def test_jail_door_on_the_hand_made_jail(self):
+        """The jail's barred door (open / broken) is still the set piece, over the same place as in 2D."""
+        for state in ("", " broken"):
+            s = ("HOOK: x\nSTYLE: 2.5d\nCAST: A = chor, B = police\nSCENE: jail\nOBJ: jail_door%s\n"
+                 "A (sad): Saheb! | साहब\nB (angry): Chup! | चुप\nCTA: tag\n") % state
+            sc, _w = script.parse_script(s)
+            r = make_video(sc, self.W, use_tts=False)
+            r = getattr(r, "parts", [r])[0]
+            self.assertEqual(r.bd25.preset, "jail_25d")
+            self.assertTrue([o for o in r.plan.sets if o.get("type") == "jail_door"])
+            self.assertEqual(r.frame(1.0).size, (self.W, self.W * 16 // 9))
 
     def test_premium_sets_move(self):
         r = Renderer(one_scene("room", "2.5d"), self.W, use_tts=False)

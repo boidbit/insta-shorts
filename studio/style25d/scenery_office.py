@@ -7,7 +7,6 @@ meeting_25d  a meeting room: a glass wall onto the open office (far layer), a wa
              a long table with its chairs along the back wall, pendant lamps, a laptop's glow, a blurred chair in
              front. (Both have writing on them, so a reverse shot never mirrors them.)
 """
-import math
 import random
 
 from PIL import Image
