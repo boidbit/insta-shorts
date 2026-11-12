@@ -59,6 +59,18 @@ Har video ke liye style chuno: GitHub Pages wale page pe sabse upar **Style: 2D 
 
 AI key ke saath chalana: `GEMINI_API_KEY=xxxx python -m studio.web` (key: aistudio.google.com → Get API key). Model badalna ho to `GEMINI_MODEL` / `DIRECTOR_MODEL`.
 
+### 🧩 Builder tab: script ko cards me banao (format yaad rakhne ki zarurat nahi)
+
+Page pe teesra tab **"🧩 Builder"**: wahi script, par dropdown aur dabbon me. Har card = script ki ek line.
+
+- **Upar (🎬 Shuruaat):** Hook, Jagah (photo ke saath; samay: din / raat / sunset…; upar likha title jaise "3 ghante baad… ⏰") aur Characters (naam, role ki photo, baal, kapde, colour, body, extra, 🙂 Face card, 💾 Save, ⭐ saved `@naam`). Character ka naam badlo to uski saari lines bhi badal jaati hain.
+- **💬 Lines:** har line ka card: **kaun** bolta hai ▼ · **feeling** (😠 😲 😱 😏 😂 😢 🤔 😍 😈 😄 📢 💀, ➕ aur; ek line me ek feeling, studio ek hi lagata hai) · **Hinglish** text · **🎬 action** ▼ (optional). Text khali = sirf action (`P -> facepalm`). ⚙️ me 🔍 zoom, 🐢 slowmo aur "aur shabd" (prop, awaaz, effect: `phone, boing, sweat`). ⬆ ⬇ se upar-neeche, ✕ se hatao.
+- **➕ cards:** ➕ Line · 🏠 Nayi jagah (`SCENE`) · 🛒 Thela / object (`OBJ`) · 📱 Screen card (notification, loading, counter, time card, chapter, end card) · ✏️ Kachhi line (koi bhi line, jaisi likhni ho).
+- **Neeche (🏁 Aakhir me):** CTA, caption, hashtags. Script ki baaki settings (MUSIC, COVER, LOOP…) apne dabbe me, jaisi thi waisi.
+- **Do-taraf:** "📝 Apni script" aur "🧩 Builder" ek hi script dikhate hain. ChatGPT / Gemini wali script paste karo → Builder kholo → cards ban jaate hain; card badlo → script badal jaati hai. Jo card nahi badla uski line bilkul waisi hi rehti hai (ek akshar bhi nahi badalta), aur jo line cards ko samajh na aaye wo "kachhi line" ban ke waisi hi rehti hai: kuch khota nahi.
+- CUT (shot) ka dropdown nahi: camera shot apne aap chunta hai. AI script ke CUT "✂️" patti ki tarah dikhte hain (hatao to camera khud chunega). Devanagari bhi apne aap (upar dekho); text badlo to us line ki purani Devanagari hat jaati hai aur video banate waqt nayi banti hai.
+- Jagah ki photos: `assets/places/<jagah>.jpg` (`python -m studio.thumbs` se banti hain).
+
 ## Script format (bina AI)
 
 ```

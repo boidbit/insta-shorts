@@ -1,6 +1,7 @@
-"""Small pictures of every look for the web page's character picker (assets/looks/<look>.png).
+"""Small pictures for the web page: every look for the character picker (assets/looks/<look>.png) and every place
+for the builder's place picker (assets/places/<place>.jpg).
 
-    python -m studio.thumbs          # after changing a look in characters.py
+    python -m studio.thumbs          # after changing a look in characters.py or a place
 """
 import os
 
@@ -11,6 +12,8 @@ from .util import ROOT
 
 OUT = os.path.join(ROOT, "assets", "looks")
 SIZE = (120, 150)                   # head and shoulders, transparent background
+PLACES_OUT = os.path.join(ROOT, "assets", "places")
+PLACE_SIZE = (108, 192)             # a small 9:16 picture of the empty place
 
 
 def thumb(spec):
@@ -59,6 +62,12 @@ def face_chart():
     return sheet
 
 
+def place_thumb(place):
+    from .backgrounds import Background
+    im = Background({"type": place}, 360, 640).frame(0.5).convert("RGB")
+    return im.resize(PLACE_SIZE, Image.LANCZOS)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     for look in sorted(LOOKS):
@@ -70,6 +79,12 @@ def main():
     path = os.path.join(faces, "chart.png")
     face_chart().quantize(colors=128).save(path, optimize=True)
     print(path)
+    from .script import BACKGROUNDS
+    os.makedirs(PLACES_OUT, exist_ok=True)
+    for place in BACKGROUNDS:
+        path = os.path.join(PLACES_OUT, place + ".jpg")
+        place_thumb(place).save(path, quality=80, optimize=True)
+        print(path)
 
 
 if __name__ == "__main__":
