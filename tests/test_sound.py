@@ -1,5 +1,5 @@
-"""Sound mode: a viral sound as a reel's voice (SOUND line, @times, lines timed to the sound, mouths from it, the video
-with and without it), the web page's sound (unpacked from the run's event), and the draft made from what Gemini hears.
+"""Sound mode: a viral sound as a reel's voice (SOUND line, @times, lines timed to the sound, mouths from it, the sound
+in the video), the web page's sound (unpacked from the run's event), and the script made from what Gemini hears.
 
     python -m unittest tests.test_sound
 """
@@ -142,7 +142,7 @@ class Timing(unittest.TestCase):
             sound.prepare(parse_script(script("sound-nahihai"))[0])
         self.assertIn("nahi mili", str(cm.exception))
 
-    def test_the_video_mixes_it_in_and_the_instagram_copy_leaves_it_out(self):
+    def test_the_video_has_the_sound_in_it(self):
         from studio.render import make_video
         v = make_video(parse_script(script(self.wav, (0.6, 3.1, 5.4, 8.2)))[0], 120)
         self.assertTrue(v.sound and os.path.isfile(v.sound["path"]))
@@ -179,7 +179,9 @@ class Page(unittest.TestCase):
     def test_the_workflow_listens_and_brings_the_sound_back(self):
         with open(os.path.join(ROOT, ".github", "workflows", "render.yml"), encoding="utf-8") as f:
             flow = f.read()
-        self.assertIn("options: [video, script, sound]", flow)
+        self.assertIn("options: [video, script, sound, sound_video]", flow)
+        self.assertIn("--no-ideas -o scenes/generated/web_script.txt", flow)        # straight to the video
+        self.assertIn('echo "<!-- script -->"', flow)                                # the reel brings its script back
         self.assertIn("      sound:\n", flow)
         self.assertIn('python -m studio.sound draft --event "$GITHUB_EVENT_PATH"', flow)
         self.assertIn('python -m studio.sound unpack --event "$GITHUB_EVENT_PATH"', flow)
@@ -187,7 +189,9 @@ class Page(unittest.TestCase):
         with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as f:
             page = f.read()
         self.assertIn('id="sndFile"', page)
-        self.assertIn('start("sound"', page)
+        self.assertIn('data-mode="sound"', page)                                    # its own tab
+        self.assertIn('start(review ? "sound" : "sound_video"', page)
+        self.assertIn('split("<!-- script -->")', page)
         self.assertIn("JSON.stringify(inputs).length > 64000", page)
 
 
@@ -220,6 +224,20 @@ class Draft(unittest.TestCase):
         _, warns = parse_script(text)
         self.assertEqual(warns, [])
 
+    def test_the_voice_s_emotion_becomes_acting(self):
+        info = json.loads(json.dumps(INFO))
+        info["lines"][0]["extras"] = ["shake", "boing", "fireworks_party"]
+        info["lines"][3]["extras"] = "close"
+        text, _ = sound.draft(info, "sound-abc123")
+        self.assertIn("A (point, angry, shake, boing, @0.5): Ye kya hai?", text)
+        self.assertIn("(excited, close, @4.0): Main bhi!", text)
+        self.assertEqual(parse_script(text)[1], [])
+
+    def test_only_music_makes_them_dance(self):
+        text, _ = sound.draft({"kind": "music", "speakers": [], "lines": []}, "sound-abc123")
+        self.assertIn("A -> dance excited", text)
+        self.assertEqual(parse_script(text)[1], [])
+
     def test_gemini_hears_the_file(self):
         seen = {}
 
@@ -236,7 +254,8 @@ class Draft(unittest.TestCase):
         self.assertEqual(seen["parts"][0]["inline_data"]["mime_type"], "audio/ogg")
         self.assertEqual(seen["parts"][0]["inline_data"]["data"], base64.b64encode(b"OggS").decode())
         ask = seen["parts"][1]["text"]
-        for must in ("ROLES:", "PLACES:", "FEELINGS:", "the user wants: office", '"start"', "Do not translate"):
+        for must in ("ROLES:", "PLACES:", "FEELINGS:", "EXTRAS:", "the user wants: office", '"start"', "Do not translate",
+                     '"shake" when the voice shouts'):
             self.assertIn(must, ask)
 
     def test_the_gemini_client_sends_audio_parts(self):

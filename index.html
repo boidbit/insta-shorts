@@ -202,7 +202,8 @@
   input.bad { border-color: var(--err); }
   .chelp { font-size: 13px; color: var(--muted); margin: 0; }
   .soundbox { margin-bottom: 10px; }
-  .soundbox > summary { cursor: pointer; font-weight: 600; }
+  .soundbox > h4 { margin: 0 0 6px; font-size: 15px; }
+  .soundbox .sndrev { margin-top: 8px; font-size: 14px; }
   .soundbox audio { width: 100%; margin-top: 8px; }
   .soundbox .sndrange { margin-top: 6px; }
   .soundbox .sndrange input { width: 90px; }
@@ -278,6 +279,7 @@
       <div class="tabs" role="tablist">
         <button class="tab" role="tab" data-mode="script" aria-selected="true">📝 Apni script</button>
         <button class="tab" role="tab" data-mode="cards" aria-selected="false">🧩 Builder</button>
+        <button class="tab" role="tab" data-mode="sound" aria-selected="false">🎵 Sound</button>
         <button class="tab second" role="tab" data-mode="idea" aria-selected="false">💡 Idea do (AI)</button>
       </div>
       <details class="builder" id="builder">
@@ -299,22 +301,21 @@
           <b>dialogue</b>: har line <code>Naam: baat</code>, jaise <code>Papa: Sarkari gaadi se aana!</code>.
           Khali line = naya shot (na do to shot apne aap badalte hain). Devanagari likhne ki zarurat nahi.</p>
       </details>
-      <details class="cbox soundbox hidden" id="soundBox">
-        <summary>🎵 Viral sound se reel <span class="hint">(Gemini sunke script banata hai)</span></summary>
-        <p class="chelp">Sound file chuno (mp3, m4a, ya screen-recording ki mp4). Gemini usme se shabd, kaun bol raha hai,
-          feeling aur har line ka time nikaal ke script banata hai; characters usi sound pe bolte hain. Reel do banti hain:
-          <b>sound ke saath</b> (check ke liye) aur <b>bina sound ke</b>: Instagram pe upload karte waqt wahi sound
-          Instagram ki library se <b>0:00</b> se lagao (trend ka fayda bhi, copyright bhi theek).</p>
+      <div class="cbox soundbox hidden" id="soundBox">
+        <h4>🎵 Kisi bhi sound se reel</h4>
+        <p class="chelp">Sound file chuno (mp3, m4a, ya screen-recording ki mp4). Gemini sunta hai: kya bola gaya,
+          kaun bol raha hai, kis emotion me. Characters usi sound pe, usi emotion me bolte hain, aur <b>sound video me hi
+          rehta hai</b> (baad me kuch nahi lagana).</p>
         <input type="file" id="sndFile" accept="audio/*,video/*">
         <audio id="sndPlay" controls class="hidden"></audio>
         <div class="lrow sndrange">
           <label>Shuru (sec) <input type="number" id="sndFrom" min="0" step="0.1" value="0"></label>
           <label>Aakhir (sec) <input type="number" id="sndTo" min="0" step="0.1"></label>
         </div>
-        <label class="cfield">Kis situation pe? (optional) <input type="text" id="sndIdea" placeholder="Jaise: result wala din, office me boss"></label>
-        <button class="small wide" id="sndGo" type="button">🎵 Sound bhejo: Gemini sunega (~1 min)</button>
+        <label class="cfield">Kis situation pe? (optional, khali = Gemini khud soche) <input type="text" id="sndIdea" placeholder="Jaise: result wala din, office me boss"></label>
+        <label class="sndrev"><input type="checkbox" id="sndReview"> Pehle script dikhao (cards me badal sako), phir video</label>
         <p class="chelp" id="sndMsg"></p>
-      </details>
+      </div>
       <div class="cards hidden" id="cards"></div>
       <textarea id="text" spellcheck="false"></textarea>
       <div class="chips" id="chips"><span class="hint">Line me jodo:</span></div>
@@ -493,6 +494,8 @@ const HINTS = {
   idea: "Bas idea likho, jaise: \"mummy ne doodh mangaya aur beta cricket khelne chala gaya\". Khali chhodo to AI khud topic chunega. (Repo me GEMINI_API_KEY ya ANTHROPIC_API_KEY secret chahiye.)",
   script: "Format: HOOK → CAST → SCENE → lines (A (acting): Roman | देवनागरी, ya B -> action) → CTA. Neeche wala checker " +
           "galti turant batata hai. Format yaad nahi? 📄 Example daalo, ya 🤖 prompt copy karke ChatGPT/Gemini se likhwao.",
+  sound: "Sound chuno → 🎬 dabao. ~3-6 minute me video: characters us sound ke bol aur emotion pe. 30 sec tak ka " +
+         "hissa sabse achha. Instagram pe ye video waise hi daal sakte ho (sound isme hai).",
   cards: "Har card = script ki ek line. Jo yahan badlo wo \"📝 Apni script\" me bhi badal jaata hai (aur ulta bhi). " +
          "Devanagari likhne ki zarurat nahi: video banate waqt apne aap banti hai. Shot (CUT) bhi apne aap badalte hain.",
 };
@@ -792,7 +795,7 @@ function showLint() {
     const fixed = unflatten($("text").value);
     if (fixed !== $("text").value) $("text").value = fixed;      // line breaks were lost: put them back
   }
-  if (mode === "idea" || !scriptText().trim()) { box.classList.add("hidden"); return []; }
+  if (mode === "idea" || mode === "sound" || !scriptText().trim()) { box.classList.add("hidden"); return []; }
   const w = lintScript(scriptText());
   box.classList.remove("hidden");
   box.className = "lint " + (w.length ? "bad" : "good");
@@ -1285,17 +1288,18 @@ function objectsFor(place) {        // [things for this place, the rest]
 
 // ---------------------------------------------------------------- make a reel
 function setMode(m) {
-  if (mode !== "cards") drafts[mode] = $("text").value;       // the 🧩 Builder tab edits drafts.script itself
+  if (mode !== "cards" && mode !== "sound") drafts[mode] = $("text").value;   // the Builder edits drafts.script itself
   mode = m;
   document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.mode === m)));
-  $("text").classList.toggle("hidden", m === "cards");
-  $("soundBox").classList.toggle("hidden", m === "idea");
+  $("text").classList.toggle("hidden", m === "cards" || m === "sound");
+  $("soundBox").classList.toggle("hidden", m !== "sound");
   $("cards").classList.toggle("hidden", m !== "cards");
-  if (m === "cards") loadCards(); else $("text").value = drafts[m];
+  $("promptBox").classList.toggle("hidden", m === "sound");
+  if (m === "cards") loadCards(); else if (m !== "sound") $("text").value = drafts[m];
   $("text").placeholder = m === "idea" ? "Idea yahan likho… (khali = AI khud soche)"
     : "Apni script yahan likho ya paste karo…\n\nHOOK: Dadi ko mila naya smartphone 😂\nCAST: D = dadi, P = beta\nSCENE: room\n" +
       "D (think, phone): Beta, photo kaise bhejte hain? | बेटा, फ़ोटो कैसे भेजते हैं?\nP -> facepalm\nCTA: Apni dadi ko tag karo 👇";
-  $("example").classList.toggle("hidden", m === "idea");
+  $("example").classList.toggle("hidden", m === "idea" || m === "sound");
   $("aiOpts").classList.toggle("hidden", m !== "idea");
   $("hint").textContent = HINTS[m];
   $("builder").classList.toggle("hidden", m !== "idea");
@@ -1307,8 +1311,8 @@ function setMode(m) {
   $("timeHint").textContent = m === "idea"
     ? "AI ko script likhne me ~1 minute lagta hai. Video tabhi banegi jab aap script approve karoge."
     : "GitHub pe video banne me ~4-6 minute lagte hain. Page band kar ke wapas aao to bhi progress yahin milegi.";
-  if (m === "idea") $("draftNote").classList.add("hidden");
-  if (m !== "idea") {                           // an AI draft / pasted script with a STYLE: line sets the picker
+  if (m === "idea" || m === "sound") $("draftNote").classList.add("hidden");
+  if (m === "script" || m === "cards") {        // an AI draft / pasted script with a STYLE: line sets the picker
     const st = styleOf(scriptText());
     if (st && st !== currentStyle()) setStyle(st, true);
   }
@@ -1342,7 +1346,7 @@ async function start(stage, extra) {
   const rid = (extra && extra.rid) || Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const inputs = { stage, hook: $("hook").value, tone: $("tone").value, request_id: rid };
   if (currentStyle() === "2.5d") inputs.style = "2.5d";    // 2D sends nothing: works with older workflows too
-  if (stage === "sound") {
+  if (stage === "sound" || stage === "sound_video") {     // the sound (and, straight to the video, the options)
     Object.assign(inputs, extra.inputs);
   } else if (stage === "script") {
     if (mode === "idea") inputs.instruction = ideaWithSettings(text, builder); else inputs.script_text = text;
@@ -1493,7 +1497,15 @@ function showRelease(rel) {
       : "🔊 Sound ke saath (sirf check karne ke liye)" })];
     return el("div", { style: "margin-bottom:14px" }, [...label, v, el("div", { className: "btns" }, links)]);
   }));
-  $("post").value = (rel.body || "").trim();
+  const [post, script] = (rel.body || "").replace(/\r\n/g, "\n").split("<!-- script -->");
+  $("post").value = post.trim();
+  if (script && script.trim()) {
+    $("videos").append(btn("✏️ Is video ki script badlo (Builder), phir dobara banao", "Script cards me kholo", () => {
+      drafts.script = script.trim() + "\n";
+      setMode("cards");
+      $("cards").scrollIntoView({ block: "start", behavior: "smooth" });
+    }, "small wide"));
+  }
 }
 
 // ---------------------------------------------------------------- gallery
@@ -1537,6 +1549,7 @@ $("save").addEventListener("click", async () => {
 });
 $("forget").addEventListener("click", () => { store.set("token", ""); checkConnection(); });
 $("go").addEventListener("click", () => {
+  if (mode === "sound") return sendSound();
   if (mode === "idea" && isDialogue($("text").value)) return dialogueToScript();
   start(mode === "idea" ? "script" : "video");
 });
@@ -1605,6 +1618,13 @@ const pick = (list, value, first) => {
   return s;
 };
 function goLabel() {
+  if (mode === "sound") {
+    $("go").textContent = $("sndReview").checked ? "📝 Sound se script banao" : "🎬 Video banao (is sound pe)";
+    $("timeHint").textContent = $("sndReview").checked
+      ? "Gemini ~1 minute me sunke script deta hai: cards me padho / badlo, phir Approve."
+      : "Gemini sunta hai, script likhta hai aur video banti hai: ~3-6 minute. Page band kar ke wapas aao to bhi progress yahin milegi.";
+    return;
+  }
   if (mode !== "idea") { $("go").textContent = "✅ Approve: Video banao 🎬"; return; }
   const dialogue = isDialogue($("text").value);
   $("go").textContent = dialogue ? "📝 Script banao (bina AI)" : "Script likho ✍️";
@@ -2281,32 +2301,41 @@ $("sndFile").addEventListener("change", async () => {
     $("sndMsg").textContent = "Ye file nahi khuli (" + e.message + "). mp3 / m4a / mp4 try karo.";
   }
 });
-$("sndGo").addEventListener("click", async () => {
+$("sndReview").addEventListener("change", goLabel);
+async function sendSound() {
+  if (busy) return;
   if (!sndBuf) { $("sndMsg").textContent = "Pehle sound file chuno 🎵"; return; }
   const from = Math.max(0, parseFloat($("sndFrom").value) || 0);
   const to = Math.min(sndBuf.duration, parseFloat($("sndTo").value) || sndBuf.duration);
   if (to - from < 1) { $("sndMsg").textContent = "Hissa kam se kam 1 sec ka ho"; return; }
   if (to - from > 45) { $("sndMsg").textContent = "45 sec tak ka hissa chuno (reel ke liye 30 sec tak sabse achha)"; return; }
-  $("sndGo").disabled = true;
+  $("go").disabled = true;
   $("sndMsg").textContent = "Sound chhota kar raha hoon…";
   try {
     const { blob, ext } = await encodeSound(sndBuf, from, to);
     const data = await b64(blob);
     if (data.length > SOUND_B64_MAX) throw new Error(`sound ${Math.round(data.length / 1000)}k hai, ${Math.round(SOUND_B64_MAX / 1000)}k tak chalta hai: chhota hissa chuno`);
     const rid = Date.now().toString(36) + Math.random().toString(36).slice(2, 6), id = "sound-" + rid;
-    if (!keepSound(id, ext, data)) $("sndMsg").textContent = "⚠️ Browser me save nahi ho paya: video ke liye sound dobara chunna padega";
+    const kept = keepSound(id, ext, data);
+    const review = $("sndReview").checked;
+    const inputs = { sound: `${id};${ext};${data}`, instruction: $("sndIdea").value.trim() };
+    if (!review) {                            // one run: Gemini listens, writes, the video is made (sound in it)
+      Object.assign(inputs, { width: $("width").value, voice: "false", dialogue: $("dialogue").value, intro: $("intro").value,
+                              script_text: withVideoOptions("").trim() });
+    }
     $("sndMsg").textContent = `Bhej raha hoon (${(blob.size / 1024).toFixed(0)} KB)…`;
-    await start("sound", { rid, inputs: { sound: `${id};${ext};${data}`, instruction: $("sndIdea").value.trim() } });
-    if (store.get("pending").includes(rid)) {        // sent: the status below follows it, the box can close
-      $("sndMsg").textContent = "✅ Bhej diya. Gemini sun raha hai: neeche status dekho, script ~1 min me cards me aayegi.";
-      $("soundBox").open = false;
+    await start(review ? "sound" : "sound_video", { rid, inputs });
+    if (store.get("pending").includes(rid)) {
+      $("sndMsg").textContent = (review ? "✅ Bhej diya: Gemini sun raha hai, script ~1 min me cards me aayegi." :
+        "✅ Bhej diya: Gemini sun raha hai, phir video banegi (neeche status).") +
+        (kept ? "" : " ⚠️ Sound browser me save nahi hua: dobara banane ke liye file phir chunni padegi.");
     }
   } catch (e) {
     $("sndMsg").textContent = "Sound nahi ban paya: " + e.message;
   } finally {
-    $("sndGo").disabled = false;
+    $("go").disabled = busy;
   }
-});
+}
 
 // ---------------------------------------------------------------- style (2D / 2.5D)
 function currentStyle() {

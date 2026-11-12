@@ -2,11 +2,10 @@
 
 The script names the sound (`SOUND: sound-ab12cd 0:05-0:20`, or a file path) and gives every line of it to a
 character, with the time it is said (`A (angry, @1.8): Ye kya hai?`). The studio does not speak: the sound is the
-voice, the lines are placed exactly where they are said in it, the mouths move with it, and the video is made twice:
-with the sound (to check it) and without it (Instagram: add the same sound there, from 0:00, so the reel joins the
-trend and the sound's owner keeps the credit).
+voice and stays in the video, the lines are placed exactly where they are said in it, the mouths move with it and the
+acting follows the voice (Gemini hears the words, who says them and how).
 
-    python -m studio.sound draft --event "$GITHUB_EVENT_PATH" --rid ab12cd -o draft.txt   # the web page's 🎵 button
+    python -m studio.sound draft --event "$GITHUB_EVENT_PATH" -o draft.txt   # the web page's 🎵 Sound tab
     python -m studio.sound unpack --event "$GITHUB_EVENT_PATH"                            # before a video is made
     python -m studio.sound analyze my_sound.m4a                                           # what Gemini hears (JSON)
 """
@@ -246,22 +245,36 @@ Return ONLY JSON:
                "role": "<one word from ROLES>"}],
  "lines": [{"start": 0.0, "end": 1.4, "speaker": "S1", "roman": "<exactly the words, Hinglish in Roman letters>",
             "devanagari": "<the same words in Devanagari>", "feeling": "<one word from FEELINGS>",
-            "action": "<one word from ACTIONS or empty>"}],
+            "action": "<one word from ACTIONS or empty>", "extras": ["<0-2 words from EXTRAS>"]}],
  "place": "<one word from PLACES>",
  "ideas": [{"hook": "<4-8 words, e.g. POV: ...>", "situation": "<the new situation on screen>", "place": "<PLACES>",
             "roles": {"S1": "<ROLES>", "S2": "<ROLES>"}, "caption": "<post caption>", "cta": "<tag karo ...>"}]}
 
 Rules: one entry in "lines" per sentence or short phrase as it is spoken, in order, with its real start / end time in
 seconds from the beginning of the audio (as exact as you can hear it). Do not translate, correct or shorten the words.
-Feelings from the voice (angry, shout, shock, laugh, cry, smug, sly, sad, nervous, excited...). At most 3 speakers.
+Feelings from the voice (angry, shout, shock, laugh, cry, smug, sly, sad, nervous, excited...); the action is a
+gesture that fits the words and the feeling. Extras follow the emotion: "shake" when the voice shouts or hits hard,
+"close" on the strongest / funniest line, a matching sound or effect (boing, thud, record_scratch, ding, sweat, anger,
+hearts, question...). Not on every line. At most 3 speakers. A song: one line per sung line, action "sing". Only music,
+no words: "lines" empty.
 Give 3 ideas: different everyday desi situations where this sound fits as a joke (office, ghar, school, shaadi, dost...)%s.
 
 ROLES: %s
 PLACES: %s
 FEELINGS: %s
 ACTIONS: %s
+EXTRAS: %s
 """ % ("%s", ", ".join(sorted(set(v["roles"]) | set(v["looks"]))), ", ".join(v["places"]),
-       ", ".join(v["expressions"]), ", ".join(sorted(set(v["actions"]))[:110]))
+       ", ".join(v["expressions"]), ", ".join(sorted(set(v["actions"]))[:110]), ", ".join(extra_words()))
+
+
+def extra_words():
+    """Words a line may get for its emotion: camera shake / close, a sound, an effect around the character."""
+    from .script import vocab
+    v = vocab()
+    return ["shake", "close", "zoom"] + sorted(set(v["sfx"])) + sorted(set(v["fx"]) & set(
+        ["sweat", "question", "exclaim", "anger", "hearts", "stars", "sparkle", "steam", "fire", "lightning", "bulb",
+         "tears_spray", "dizzy", "zzz", "pow", "confetti", "spotlight", "glow_eyes", "focus_lines"]))
 
 
 def analyze(path, context="", llm=None):
@@ -326,6 +339,7 @@ def draft(info, sound_id, context="", start=0.0, end=None):
     if start or end:
         fmt = lambda t: "%d:%04.1f" % (int(t // 60), t % 60)    # noqa: E731
         rng = " %s-%s" % (fmt(start or 0.0), fmt(end)) if end else " %s-9:59" % fmt(start)
+    extras_ok = set(extra_words())
     lines = []
     for ln in info.get("lines") or []:
         if not isinstance(ln, dict):
@@ -342,11 +356,22 @@ def draft(info, sound_id, context="", start=0.0, end=None):
             acting.append(act)
         if feel in feels and who != "NARRATOR":
             acting.append(feel)
+        ex = ln.get("extras") or []
+        for w in ([ex] if isinstance(ex, str) else ex)[:2]:         # the emotion: shake / close / a sound / an effect
+            w = str(w).strip().lower()
+            if w in extras_ok and w not in acting and (who != "NARRATOR" or w not in ("shake", "close", "zoom")):
+                acting.append(w)
         try:
             acting.append("@%.1f" % max(0.0, float(ln.get("start"))))
         except (TypeError, ValueError):
             pass
         lines.append("%s (%s): %s" % (who, ", ".join(acting), words) if acting else "%s: %s" % (who, words))
+    if not lines:                                     # only music (no words): everybody dances to it
+        moves = ["dance excited", "bhangra laugh", "thumka smug", "dance_walk grin"]
+        for n, letter in enumerate([c.split(" = ")[0] for c in cast] or ["A"]):
+            lines.append("%s -> %s" % (letter, moves[n % len(moves)]))
+        if not cast:
+            cast.append("A = college_boy")
     hook = _clean_words(idea.get("hook")) or _clean_words(info.get("summary"))[:50] or "Ye sound sun ke 😂"
     out = ["HOOK: " + hook, "SOUND: " + sound_id + rng]
     if cast:
@@ -376,6 +401,7 @@ def main(argv=None):
     d = sub.add_parser("draft", help="unpack + Gemini listens + a draft script for the page")
     d.add_argument("--event", required=True)
     d.add_argument("--context", default="")
+    d.add_argument("--no-ideas", action="store_true", help="only the script (straight to the video)")
     d.add_argument("-o", "--out", required=True)
     a = sub.add_parser("analyze", help="what Gemini hears in a sound file (JSON)")
     a.add_argument("file")
@@ -398,7 +424,7 @@ def main(argv=None):
     script, notes = draft(info, sid, args.context)
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
-        f.write(script + ("\n%s\n%s\n" % (IDEAS_MARK, notes) if notes else ""))
+        f.write(script + ("\n%s\n%s\n" % (IDEAS_MARK, notes) if notes and not args.no_ideas else ""))
     print(script)
     print(notes)
 

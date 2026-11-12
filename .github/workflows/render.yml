@@ -6,16 +6,18 @@ run-name: ${{ inputs.request_id && format('web-{0}-{1}', inputs.stage, inputs.re
 #                 pre-release "draft-<id>" for a human to read / edit / approve.
 #   stage=sound   Gemini listens to a viral sound sent by the web page (inputs.sound) and
 #                 writes a sound-mode draft script ("draft-<id>"), same as stage=script.
+#   stage=sound_video  the same, then straight on to the video (the sound stays in it):
+#                 release "reel-<id>" (its notes carry the script, to change and make again).
 #   stage=video   renders a video (from script_text, an AI idea, or a file) and
 #                 publishes it as release "reel-<id>". A sound-mode script gets the
-#                 page's sound again (inputs.sound) and two videos: with it / for Instagram.
+#                 page's sound again (inputs.sound).
 on:
   workflow_dispatch:
     inputs:
       stage:
-        description: "script = AI writes a script for approval, sound = Gemini listens to a sound (web page), video = make the video"
+        description: "script = AI writes a script for approval, sound = Gemini listens to a sound (web page), sound_video = listens and makes the video, video = make the video"
         type: choice
-        options: [video, script, sound]
+        options: [video, script, sound, sound_video]
         default: video
       instruction:
         description: "Idea for the AI (empty + count = AI picks topics). Needs an AI key secret."
@@ -120,7 +122,7 @@ jobs:
           cache: pip
 
       - name: System packages (ffmpeg, fonts, emoji)
-        if: env.STAGE == 'video'
+        if: env.STAGE == 'video' || env.STAGE == 'sound_video'
         timeout-minutes: 12      # a runner whose network is down must not hang the whole job for 40 minutes
         run: |
           # short network timeouts + a few tries: on a runner that cannot resolve the Ubuntu mirrors apt used to
@@ -143,11 +145,11 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Tests
-        if: env.STAGE == 'video'
+        if: env.STAGE == 'video' || env.STAGE == 'sound_video'
         run: python -m unittest discover -s tests
 
       - name: Cache generated voice lines
-        if: env.STAGE == 'video'
+        if: env.STAGE == 'video' || env.STAGE == 'sound_video'
         uses: actions/cache@v4
         with:
           path: .cache/tts
@@ -177,13 +179,20 @@ jobs:
           }
           LIST=""
           WRITER_STYLE="$STYLE"; [ "$WRITER_STYLE" = "auto" ] && WRITER_STYLE="2d"
-          if [ "$STAGE" = "sound" ]; then
+          if [ "$STAGE" = "sound" ] || [ "$STAGE" = "sound_video" ]; then
             # the sound is read from the event file (not from an env variable, so it stays out of this log)
             if [ -z "$GEMINI_API_KEY" ]; then
               echo "::error title=Gemini key nahi mili::Sound sunne ke liye GEMINI_API_KEY secret chahiye (Repo -> Settings -> Secrets and variables -> Actions)."
               exit 1
             fi
-            python -m studio.sound draft --event "$GITHUB_EVENT_PATH" --context "$INSTRUCTION" -o scenes/generated/draft.txt
+            if [ "$STAGE" = "sound" ]; then
+              python -m studio.sound draft --event "$GITHUB_EVENT_PATH" --context "$INSTRUCTION" -o scenes/generated/draft.txt
+            else                                    # straight to the video: the page's options ride in script_text
+              python -m studio.sound draft --event "$GITHUB_EVENT_PATH" --context "$INSTRUCTION" --no-ideas -o scenes/generated/web_script.txt
+              [ -n "$SCRIPT_TEXT" ] && printf '%s\n' "$SCRIPT_TEXT" >> scenes/generated/web_script.txt
+              python -m studio.script scenes/generated/web_script.txt -o scenes/generated/web.json
+              LIST="scenes/generated/web.json"
+            fi
           elif [ "$STAGE" = "script" ]; then
             need_ai
             TEXT="$SCRIPT_TEXT"; [ -z "$TEXT" ] && TEXT="$INSTRUCTION"
@@ -235,7 +244,7 @@ jobs:
           echo "Draft: $TAG" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Render
-        if: env.STAGE == 'video'
+        if: env.STAGE == 'video' || env.STAGE == 'sound_video'
         env:
           LIST: ${{ steps.pick.outputs.list }}
           WIDTH: ${{ inputs.width || '1080' }}
@@ -259,7 +268,7 @@ jobs:
           done
 
       - name: Upload videos
-        if: env.STAGE == 'video'
+        if: env.STAGE == 'video' || env.STAGE == 'sound_video'
         uses: actions/upload-artifact@v4
         with:
           name: videos
@@ -271,7 +280,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish as release (the web page plays it from here)
-        if: env.STAGE == 'video'
+        if: env.STAGE == 'video' || env.STAGE == 'sound_video'
         env:
           GH_TOKEN: ${{ github.token }}
           LIST: ${{ steps.pick.outputs.list }}
@@ -284,6 +293,9 @@ jobs:
           TITLE="$(python -c 'import sys; from studio.util import load_scene; s = load_scene(sys.argv[1]); print(s.get("hook") or s.get("vars", {}).get("hook") or "Reel")' "$first")"
           cat out/*.post.txt > notes.md 2>/dev/null || true
           [ -s notes.md ] || echo "$TITLE" > notes.md
+          if [ "$STAGE" = "sound_video" ] && [ -f scenes/generated/web_script.txt ]; then
+            { echo; echo "<!-- script -->"; cat scenes/generated/web_script.txt; } >> notes.md    # to change and make again
+          fi
           gh release create "$TAG" "${files[@]}" --title "$TITLE" --notes-file notes.md --target "$GITHUB_SHA" --latest=false
           echo "Release: $TAG" >> "$GITHUB_STEP_SUMMARY"
           # the approved draft has done its job

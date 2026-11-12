@@ -1845,6 +1845,8 @@ def main(argv=None):
                     help="LOOP mode: no end card, the last moment whips back into the first frame (watched twice)")
     ap.add_argument("--mascot", choices=["bhoot", "billi", "chooha", "off"], default=None,
                     help="hide a little mascot (easter egg) in the video; off = none even if the script asks")
+    ap.add_argument("--silent-copy", action="store_true",
+                    help="sound mode: also write <out>.insta.mp4 without the sound (to add it inside Instagram)")
     ap.add_argument("--hook", choices=HOOK_MODES, default=None, dest="hook_mode",
                     help="hook card: over (over the first line, default) | first (hook card, then the story) | off")
     args = ap.parse_args(argv)
@@ -1873,14 +1875,14 @@ def main(argv=None):
         print("saved", out)
         return
     out = args.out or os.path.join("out", name + ".mp4")
-    if getattr(r, "sound", None):                   # sound mode: the Instagram copy (no sound) + one with it
+    if getattr(r, "sound", None) and args.silent_copy:     # sound mode: also a copy without the sound
         insta = os.path.splitext(out)[0] + ".insta.mp4"
         r.with_sound = False
         r.render_video(insta)
         with_sound(insta, r.sound["path"], out)
-        print("saved %s (with the sound) and %s (for Instagram: add the sound there)" % (out, insta))
+        print("saved %s (with the sound) and %s (without it)" % (out, insta))
         return
-    r.render_video(out)
+    r.render_video(out)                             # (sound mode: the sound is in it, from the first frame)
 
 
 def with_sound(video, sound_path, out):
