@@ -371,6 +371,25 @@ Instagram grid me saari reels ek jaisi na lagein, isliye har video ka apna look 
 
 `side_eye` (aankh ke kone se judge karna), `stare` (ghoorna: mummy-papa wala), `eye_roll` (aankh ghumana), `drool` (khaana dekh ke laar), `money_eyes` (aankhon me ₹), `embarrassed` (laal gaal + maathe pe paseene ki boond). Hinglish me bhi: `ghoorna`, `judging`, `laar`, `paisa` / `lalach`, `sharminda`. Page ke Builder me inke chips bhi hain (👀 🤤 🤑 😅).
 
+### Desi gestures 🙏 (naye actions)
+
+| Action | Kya karta hai |
+|---|---|
+| `touch_feet` (`pair_chhoona`) | jhuk ke saamne wale ke pair chhoona |
+| `bless` (`aashirwad`) | jhuke hue sar pe haath |
+| `kaan_pakad` (`sorry`, `uthak_baithak`) | dono kaan pakad ke uthak-baithak |
+| `kaan_kheench` | saamne wale ka kaan kheenchna (mummy / master ji) |
+| `ghoorna` | haath baandh ke ghoorna (chehra `stare` apne aap) |
+| `eye_roll`, `finger_wag` (`na_na`) | aankh ghumana, ungli hila ke "na na na" |
+| `pinch_cheeks` (`gaal_kheench`) | rishtedaar aunty ka gaal kheenchna |
+| `check_watch` (`ghadi`) | ghadi pe ungli: "late ho gaya" |
+| `selfie`, `scroll`, `video_call` | phone wali zindagi |
+| `eat_hands` (`haath_se_khana`), `fan_self` (`garmi`), `swat` (`machhar`) | thali se khaana, pankha jhalna, hawa me machhar maarna |
+| `knock` (`khatkhata`), `ring_bell` (`ghanti`) | darwaza khatkhatana, ghanti bajana |
+| `propose` (`kneel`), `cry_hug`, `pull_chair` (`kursi_kheench`) | ghutne pe propose, ro ke gale lagna, kursi kheenchne wala prank |
+
+Script me: `B -> touch_feet` phir `A -> bless`; `A (kaan_pakad, embarrassed): Sorry mummy! | सॉरी मम्मी!`.
+
 ### Har jagah ka apna look 🎬 (`LOOK`) aur har video me ek ajeeb cheez 👀 (`MYSTERY`)
 
 **Look (colour grading):** ab har jagah apne rang me aati hai, apne aap. Kuch likhna nahi.

@@ -469,7 +469,7 @@ def ots_back(sc, before, order, cast):
 # plain words a writer (or a chat AI) often uses for a feeling or an action -> the studio's own word, so a script
 # written with "happy", "gussa", "running" still acts (the writer prompt then needs fewer rules)
 FEEL_WORDS = {
-    "ghoorna": "stare", "ghoor": "stare", "staring": "stare", "judging": "side_eye", "sideeye": "side_eye",
+    "staring": "stare", "judging": "side_eye", "sideeye": "side_eye",
     "laar": "drool", "drooling": "drool", "lalach": "money_eyes", "paisa": "money_eyes", "sharminda": "embarrassed",
     "happy": "smile", "khush": "smile", "cheerful": "smile", "smiling": "smile", "gusse": "angry", "ghussa": "angry",
     "naraz": "angry", "naraaz": "angry", "irritated": "angry", "annoyed": "angry", "frustrated": "angry",
