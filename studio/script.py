@@ -67,7 +67,7 @@ import os
 import re
 import zlib
 
-from . import actions, audio, decor, gemini_music, objects, rides, styles, theme, vehicles
+from . import actions, audio, crowd, decor, drive, gemini_music, objects, rides, styles, theme, vehicles
 from .characters import (ACCESSORIES, EXPRESSIONS, FACE_PARTS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, HAIR_WORDS,
                          LOOKS, MARKS, OUTFITS, PALETTE, face_word,
                          SKIN_TONES)
@@ -77,14 +77,15 @@ from .scene import (CTA_STYLES, DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLO
                     mascot_kind)
 
 HEADERS = ("HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP",
-           "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER")
+           "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD")
 OPENINGS = ("plain", "reveal", "close")     # the first shot of a video: as it comes / starts on a face and pulls back /
                                             # a close-up (each video gets one, picked from its hook)
 ON_WORDS, OFF_WORDS = ("on", "yes", "haan", "true", "1"), ("off", "no", "nahi", "false", "0", "none")
 from .locations import LOCATIONS as _LOC   # noqa: E402
 
 BACKGROUNDS = tuple(dict.fromkeys(("kitchen", "room", "street", "school", "market", "office", "bus_stop", "night_road",
-                                   "plain", "living_room", "classroom") + tuple(_LOC) + tuple(vehicles.VEHICLES)))
+                                   "plain", "living_room", "classroom") + tuple(_LOC) +
+                                  tuple(k for k, v in vehicles.VEHICLES.items() if not v.get("pov"))))
 # inside a vehicle people sit on its seats, except these (they work there and stand)
 STANDING_LOOKS = ("tt", "air_hostess", "conductor")
 # actions that make a seated person get up (anything else is done sitting: talk, point, eat, phone...)
@@ -217,7 +218,7 @@ def vocab():
         "props": sorted(PROPS), "sfx": sorted(SFX), "moves": sorted(MOVE_WORDS), "fx": sorted(FX),
         "times": sorted(TIMES + WEATHER), "pan_words": list(PAN_WORDS),
         "themes": sorted(set(theme.THEMES) | set(theme.ALIASES)), "cta_styles": list(CTA_STYLES),
-        "vehicles": sorted(set(vehicles.VEHICLES) | set(vehicles.ALIASES)), "views": sorted(vehicles.VIEW_WORDS),
+        "vehicles": sorted({k for k, v in vehicles.VEHICLES.items() if not v.get("pov")} | set(vehicles.ALIASES)), "views": sorted(vehicles.VIEW_WORDS),
         "dress": sorted(set(decor.PACKS) | set(decor.PACK_WORDS) | set(decor.PIECES) | {"none"}),
         "feel_words": sorted([k, v] for k, v in FEEL_WORDS.items()),
         "sets": sorted(SET_TYPES), "set_words": sorted(set(SET_STATES) | set(SET_X) | {"big", "small", "back", "front", "flip"}),
@@ -228,6 +229,7 @@ def vocab():
         "object_words": ["center", "enter", "exit", "front", "go", "left", "right", "to"],
         "rides": sorted(rides.RIDES), "ride_words": sorted(("ride", "back", "driver") + GETOFF_WORDS),
         "framings": sorted(FRAMINGS), "angle_words": sorted(ANGLE_WORDS + OTS_WORDS),
+        "drive_words": sorted(drive.POV_WORDS), "crowd_words": sorted(crowd.AMOUNT),
         # the page's Builder pickers
         "role_looks": sorted([r, l] for r, l in ROLE_LOOKS.items()), "hair": list(HAIR_STYLES),
         "face_parts": {k: [[v, face_word(k, v)] for v in vals] for k, vals in FACE_PARTS.items()},
@@ -642,6 +644,63 @@ def _stage(tokens, ev, scene_cast, who):
     return move, unknown, lost
 
 
+def _drive_base(kind):
+    """"car" / "auto" for a car / an auto and its driving shots (studio.drive), else None."""
+    kind = str(kind or "")
+    if kind in ("car", "auto"):
+        return kind
+    return drive.POV[kind][0] if kind in drive.POV else None
+
+
+def split_drives(scenes, cast):
+    """A car / an auto scene written without CUT: the studio cuts the drive like a film: it opens outside, from the
+    side; then from in front and inside by turns, a passenger's line from the driver's eyes now and then; the punch
+    line in the rear-view mirror."""
+    groups = {}
+    for sc in scenes:
+        groups.setdefault(sc.get("place_no", id(sc)), []).append(sc)
+    out = []
+    for sc in scenes:
+        group = groups[sc.get("place_no", id(sc))]
+        base = _drive_base(sc["background"].get("type"))
+        if not base or sc.get("cut_in") or sc.get("directed") or len(group) > 1 or \
+                sc["background"].get("type") != base:
+            if base:
+                sc["drive"] = True
+            out.append(sc)
+            continue
+        says = [i for i, ln in enumerate(sc["lines"]) if ln[0] == "say" and ln[1] in cast]
+        riders = [n for n in cast if any(ln[0] in ("say", "do") and ln[1] == n for ln in sc["lines"])]
+        driver = riders[0] if riders else None
+        front_seat = riders[1] if len(riders) > 1 else None
+        if len(says) < 2:
+            sc["drive"] = True
+            out.append(sc)
+            continue
+        cuts = [0] + says[1:]
+        povs = []
+        for k, i in enumerate(says):
+            who = sc["lines"][i][1]
+            if k == 0:
+                povs.append("side")                 # it opens outside: the car going down the road
+            elif k == len(says) - 1 and len(says) >= 4:
+                povs.append("mirror")               # the punch line, close, in the rear-view mirror
+            elif k >= 2 and "pov" not in povs[-2:] and (who == driver or (base == "car" and who == front_seat)):
+                povs.append("pov")                  # from the driver's eyes: his own voice, or the one beside him
+            else:                                   # from in front and from inside, by turns
+                last = next((p_ for p_ in reversed(povs) if p_ in ("front", "inside")), "inside")
+                povs.append("inside" if last == "front" else "front")
+        for k, (a, pov) in enumerate(zip(cuts, povs)):
+            b = cuts[k + 1] if k + 1 < len(cuts) else len(sc["lines"])
+            part = dict(sc, lines=sc["lines"][a:b], background=dict(sc["background"]), drive=True)
+            part["background"]["type"] = base if pov == "inside" else "%s_%s" % (base, pov)
+            part["sets"] = {} if pov != "inside" else dict(sc.get("sets") or {})
+            if k:
+                part.update(cut_in=True, shot=k, title=None)
+            out.append(part)
+    return out
+
+
 def _slot_x(cast, name):
     n = len(cast)
     slots = slots_for(n)
@@ -1030,7 +1089,7 @@ def parse_chat(meta, title, msgs):
 
 HEADER_WORDS = ("HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "OBJ",
                 "DRESS",
-                "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER",
+                "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD",
                 "NARRATOR",
                 "LIGHTS", "AMBIENCE", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
 
@@ -1189,12 +1248,17 @@ def parse_script(text):
             once("cut", "SOUND ke saath CUT ki zarurat nahi: camera khud har bolne wale pe jaata hai (CUT chhod diye)")
             continue
         if m:                                       # a new shot in the same place: a hard cut, its own set of characters
-            frame, reverse, back = "", False, None
+            frame, reverse, back, pov = "", False, None, None
+            drive_base = _drive_base(cur["background"].get("type"))
             for w in re.split(r"[\s,]+", m.group(1).strip()):
                 lw = w.lower()
                 if not w:
                     continue
-                if lw in FRAMINGS and not frame:
+                if drive_base and lw in drive.POV_WORDS and not pov:      # a car / an auto: from where we see it
+                    pov = drive.POV_WORDS[lw]
+                    if lw in FRAMINGS and not frame:
+                        frame = lw                  # (`CUT inside`: the driver big in the middle, as before)
+                elif lw in FRAMINGS and not frame:
                     frame = lw
                 elif lw in OTS_WORDS and not frame:
                     frame = "ots"
@@ -1204,19 +1268,26 @@ def parse_script(text):
                     back = w
                 else:
                     warnings.append("CUT %r: framing wide / medium / inside / ots (+ reverse) likho" % w)
-            shot_no = cur.get("shot", 0) + 1
-            prev_sets = {k: dict(v) for k, v in cur.get("sets", {}).items()}
-            prev_lights = cur.get("lights", "on")
-            prev_amb, prev_dress, place_no = cur.get("ambience"), cur.get("dress"), cur.get("place_no", 0)
-            cur = new_scene(dict(cur["background"]), None)
-            cur["place_no"] = place_no              # same place: dressed the same
-            if prev_dress is not None:
-                cur["dress"] = prev_dress
-            if prev_amb is not None:
-                cur["ambience"] = prev_amb              # same place: the same sound around
-            cur["sets"] = prev_sets                 # same place: the door / sofa / fan are still there
-            cur["lights"] = cur["lights_start"] = prev_lights     # ... and the lights stay as they were
-            cur["cut_in"], cur["framing"], cur["shot"] = True, frame or None, shot_no
+            if pov and not cur["lines"]:            # SCENE: car + CUT front before anybody speaks: it starts so
+                cur["framing"] = frame or cur.get("framing")
+            else:
+                shot_no = cur.get("shot", 0) + 1
+                prev_sets = {k: dict(v) for k, v in cur.get("sets", {}).items()}
+                prev_lights = cur.get("lights", "on")
+                prev_amb, prev_dress, place_no = cur.get("ambience"), cur.get("dress"), cur.get("place_no", 0)
+                cur = new_scene(dict(cur["background"]), None)
+                cur["place_no"] = place_no              # same place: dressed the same
+                if prev_dress is not None:
+                    cur["dress"] = prev_dress
+                if prev_amb is not None:
+                    cur["ambience"] = prev_amb              # same place: the same sound around
+                cur["sets"] = prev_sets                 # same place: the door / sofa / fan are still there
+                cur["lights"] = cur["lights_start"] = prev_lights     # ... and the lights stay as they were
+                cur["cut_in"], cur["framing"], cur["shot"] = True, frame or None, shot_no
+            if pov:                                 # the same drive, seen from somewhere else
+                cur["background"]["type"] = drive_base if pov == "inside" else "%s_%s" % (drive_base, pov)
+                cur["drive"] = cur["directed"] = True    # (the writer cuts this drive: the studio does not)
+                cur["sets"] = {}
             if reverse:
                 cur["reverse"] = True
             if frame == "ots":
@@ -1320,11 +1391,24 @@ def parse_script(text):
 
     # ---- build timelines ----
     out_scenes = []
+    if not classic and not sound_mode:              # a car / an auto with no CUT: the studio cuts its drive itself
+        scenes[:] = split_drives(scenes, cast)
+    riders = {}                                     # who is in each car / auto (CAST order: the first one drives)
+    for sc in scenes:
+        if sc.get("drive") or _drive_base(sc["background"].get("type")):
+            got = riders.setdefault(sc.get("place_no", id(sc)), [])
+            for ln in sc["lines"]:
+                if ln[0] in ("do", "say") and ln[1] in cast and ln[1] not in got and not cast[ln[1]].get("hidden"):
+                    got.append(ln[1])
+    for k_ in riders:
+        riders[k_].sort(key=lambda n_: list(cast).index(n_))
     for si, sc in enumerate(scenes):
         order = []
         for ln in sc["lines"]:
             if ln[0] in ("do", "say") and ln[1].upper() not in ("ALL", "NARRATOR") and ln[1] not in order:
                 order.append(ln[1])
+        if sc.get("place_no", id(sc)) in riders and riders[sc.get("place_no", id(sc))]:
+            order = list(riders[sc.get("place_no", id(sc))])          # everybody in the vehicle is in every shot
         narrated = any(ln[0] == "say" and ln[1] == "NARRATOR" for ln in sc["lines"])
         pan = None
         if sc.get("pan") and si:
@@ -1352,6 +1436,26 @@ def parse_script(text):
             x, slot = _slot_x(fronts, name)
             facing = "front" if len(fronts) != 2 else ("right" if slot == "left" else "left")
             chars[name] = {"slot": slot, "facing": facing}
+        pov_place = drive.PLACES.get(sc["background"].get("type"))
+        if pov_place:                               # a driving shot: the driver at the wheel, the others beside / behind
+            speaker = next((ln[1] for ln in sc["lines"] if ln[0] == "say" and ln[1] in chars), None)
+            xs = pov_place["xs"]
+            for i, name in enumerate(fronts):
+                x_ = xs[i] if i < len(xs) else None
+                if pov_place.get("only_speaker"):
+                    x_ = xs[0] if name == speaker else None
+                if x_ is None:                      # the driver is the camera / not in the mirror
+                    chars[name] = {"hidden": True}
+                    continue
+                chars[name] = {"x": x_, "facing": pov_place["facing"]}
+                if pov_place.get("view"):
+                    chars[name]["view"] = pov_place["view"]
+                ys, ks = pov_place.get("ys") or (), pov_place.get("ks") or ()
+                y_ = ys[i] if i < len(ys) and not pov_place.get("only_speaker") else pov_place.get("y")
+                if y_:
+                    chars[name]["y"] = y_
+                if i < len(ks) and ks[i] != 1:      # a back seat: further from the camera
+                    chars[name]["depth_k"] = ks[i]
         if back:                                    # over the shoulder: back's back big in the near corner
             side = "left" if sc.get("shot", 0) % 2 == 0 else "right"
             chars[back] = {"slot": side, "view": "back"}
@@ -1370,6 +1474,8 @@ def parse_script(text):
                 tl.append({"t": 0.0, "who": name, "expression": face})
         seated = {}
         veh = vehicles.resolve(sc["background"].get("type"))
+        if veh and not vehicles.VEHICLES[veh].get("seat"):
+            veh = None                              # a driving shot: no seats of its own
         if veh:                                     # inside a vehicle: everybody starts on a seat at their place
             for name in fronts:
                 spec_ = cast.get(name, {})
@@ -1453,6 +1559,8 @@ def parse_script(text):
                     ev["bubble"], ev["subtitle"] = False, True
                     for key in ("action", "expression", "prop", "move", "camera", "sfx", "volume", "facing", "look"):
                         ev.pop(key, None)                       # a voice has no body to act with
+                elif pov_place and (chars.get(who) or {}).get("hidden"):
+                    ev["bubble"], ev["subtitle"] = False, True  # a driving shot: the voice of one out of the shot
                 elif len(order) == 2 and others:
                     ev.setdefault("look", others[0])
             elif ev.get("slowmo"):
@@ -1522,6 +1630,9 @@ def parse_script(text):
             item["angle"] = sc["shot"]
         if sc.get("reverse"):
             item["reverse"] = True
+        if pov_place:                               # a driving shot is composed: the camera stays on it whole
+            item["meta"] = {"people_scale": pov_place["scale"], "auto_camera": False}
+            item["angle"] = {"zoom": 1.0, "x": 540.0, "mirror": False}
         out_scenes.append(item)
 
     vary_cast(cast)
@@ -1598,6 +1709,12 @@ def parse_script(text):
         scene["handle"] = handle
         scene["overlays"].append({"text": handle, "style": "tag", "size": 28, "max_w": 520, "pos": [42, 1120],
                                   "rotate": 90, "from": 0.0, "anim": "none", "alpha": 0.7, "handle": True})
+    if meta.get("CROWD"):                           # CROWD: none | kam | zyada: people in the background
+        v = meta["CROWD"].strip().lower()
+        if v in crowd.AMOUNT:
+            scene["crowd"] = v
+        else:
+            warnings.append("CROWD %r: none, kam ya zyada likho" % meta["CROWD"])
     cs = (meta.get("CTA_STYLE") or "").strip().lower()
     if cs:                                          # CTA_STYLE: card (end card) | sticker | caption
         cs = {"end": "card", "endcard": "card", "chhota": "sticker", "small": "sticker", "off": "caption",

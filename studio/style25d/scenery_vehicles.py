@@ -100,34 +100,60 @@ def _front(k, kind):
     return cv
 
 
+def _road_ahead(k, kind, view, time):
+    """fn: the driver's eyes: the road coming at us (studio.drive), on a picture of the frame at k."""
+    from .. import drive
+    size = (int(round(LW * k)), int(round(LH * k)))
+
+    def fn(_im, t):
+        out = Image.new("RGBA", size, (0, 0, 0, 255))
+        drive.road_ahead(out, t, k, kind, view, time)
+        return out
+    return fn
+
+
 def build(kind, s, zmax=1.0, spec=None):
-    from .. import vehicles
+    from .. import drive, vehicles
     spec = spec if isinstance(spec, dict) else {}
     v = vehicles.VEHICLES[kind]
+    pov = v.get("pov")                                             # a driving shot (studio.drive), or None
+    base = drive.POV[kind][0] if pov else kind
     view = vehicles.VIEW_WORDS.get(str(spec.get("view", "")).lower(), v["view"])
     time = spec.get("time")
     night = time == "night"
     speed = float(spec.get("scroll", v["speed"]))
     ko = 0.5 * s                                                   # the view is far / moving / blurred: half size
     kr = s * max(1.0, zmax)
-    sky, wides = vehicles.outside(view, ko, time, kind)
-    sky = sky.convert("RGBA")                                      # (the view is already lit for the time)
-    back = [Layer(sky, ko, 0.0, None, "sky")]
-    for im, mult in wides:
-        bb = im.getchannel("A").getbbox()
-        if not bb:
-            continue
-        strip = im.crop((0, bb[1], im.width, bb[3]))
-        d = 0.15 + 0.6 * mult                                      # far rows drift with the camera less
-        back.append(Layer(Image.new("RGBA", (8, 8), (0, 0, 0, 0)), ko, d, _slider(strip, bb[1], ko, speed * mult),
-                          "view"))
+    if pov == "pov":                                               # the road rushing at the driver
+        blank = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
+        back = [Layer(Image.new("RGBA", (int(round(LW * ko)), int(round(LH * ko))), (90, 150, 220, 255)), ko, 0.0,
+                      None, "sky"),
+                Layer(blank, ko, 0.6, _road_ahead(ko, kind, view, time), "view")]
+    else:
+        sky, wides = vehicles.outside(view, ko, time, kind)
+        sky = sky.convert("RGBA")                                  # (the view is already lit for the time)
+        back = [Layer(sky, ko, 0.0, None, "sky")]
+        if pov == "side":                                          # outside: the road under the car runs too
+            wides = list(wides) + [(drive.road_strip(ko), 1.0)]
+        for im, mult in wides:
+            bb = im.getchannel("A").getbbox()
+            if not bb:
+                continue
+            strip = im.crop((0, bb[1], im.width, bb[3]))
+            d = 0.15 + 0.6 * mult                                  # far rows drift with the camera less
+            back.append(Layer(Image.new("RGBA", (8, 8), (0, 0, 0, 0)), ko, d,
+                              _slider(strip, bb[1], ko, speed * mult), "view"))
     inside = vehicles.inside(kind, kr)
     back.append(Layer(inside, kr, 1.0, None, "set"))
     kl = 0.3 * s
-    back.append(Layer(Image.new("RGBA", (8, 8), (0, 0, 0, 0)), kl, 1.0, _passing_light(kl, kind, view, night),
-                      "window_light", mode="screen"))
-    front = [Layer(_front(0.5 * s, kind).im, 0.5 * s, 1.3, None, "foreground")]
-    amb = LIGHT[kind] if not night else [200, 206, 236]
+    if pov != "side":
+        back.append(Layer(Image.new("RGBA", (8, 8), (0, 0, 0, 0)), kl, 1.0, _passing_light(kl, base, view, night),
+                          "window_light", mode="screen"))
+    if pov:                                                        # the dashboard / the car's body / the mirror
+        front = [Layer(drive.front(kind, kr), kr, 1.0, None, "body")]
+    else:
+        front = [Layer(_front(0.5 * s, kind).im, 0.5 * s, 1.3, None, "foreground")]
+    amb = LIGHT[base] if not night else [200, 206, 236]
     return Layered(back, front, light={"ambient": amb, "dir": 1, "vignette": 0.26}, horizon=800,
                    ground=vehicles.FLOOR_Y)
 
@@ -139,3 +165,6 @@ def _maker(kind):
 
 
 train_25d, bus_25d, metro_25d, plane_25d, car_25d, auto_25d = (_maker(k) for k in KINDS)
+DRIVES = ("car_front", "car_side", "car_pov", "car_mirror", "auto_front", "auto_side", "auto_pov", "auto_mirror")
+(car_front_25d, car_side_25d, car_pov_25d, car_mirror_25d, auto_front_25d, auto_side_25d, auto_pov_25d,
+ auto_mirror_25d) = (_maker(k) for k in DRIVES)

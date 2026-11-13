@@ -844,6 +844,14 @@ PRESETS = {
     "plane_25d": _lazy_spec("scenery_vehicles", "plane_25d"),
     "car_25d": _lazy_spec("scenery_vehicles", "car_25d"),
     "auto_25d": _lazy_spec("scenery_vehicles", "auto_25d"),
+    "car_front_25d": _lazy_spec("scenery_vehicles", "car_front_25d"),
+    "car_side_25d": _lazy_spec("scenery_vehicles", "car_side_25d"),
+    "car_pov_25d": _lazy_spec("scenery_vehicles", "car_pov_25d"),
+    "car_mirror_25d": _lazy_spec("scenery_vehicles", "car_mirror_25d"),
+    "auto_front_25d": _lazy_spec("scenery_vehicles", "auto_front_25d"),
+    "auto_side_25d": _lazy_spec("scenery_vehicles", "auto_side_25d"),
+    "auto_pov_25d": _lazy_spec("scenery_vehicles", "auto_pov_25d"),
+    "auto_mirror_25d": _lazy_spec("scenery_vehicles", "auto_mirror_25d"),
 }
 
 

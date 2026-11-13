@@ -20,9 +20,13 @@ SCRIPT = ("HOOK: Test 😂\nCAST: A = college_boy, B = uncle\nSCENE: {place}\n"
           "A (smile): Bhai chai pila de | भाई चाय पिला दे\nB (sly): Pehle paise | पहले पैसे\nCTA: Tag karo\n")
 
 
-def one_scene(place, style=None):
-    """A single-place scene from the script format (the first scene of the sequence)."""
-    sc, _w = script.parse_script(SCRIPT.format(place=place))
+def one_scene(place, style=None, cut=None):
+    """A single-place scene from the script format (the first scene of the sequence); cut: a CUT line before the
+    first line (`CUT inside`: a car / an auto from inside, not the studio's own driving shots)."""
+    text = SCRIPT.format(place=place)
+    if cut:
+        text = text.replace("SCENE: %s\n" % place, "SCENE: %s\nCUT %s\n" % (place, cut))
+    sc, _w = script.parse_script(text)
     sub = dict(sc, **sc["scenes"][0])
     sub.pop("scenes")
     if style:
@@ -47,7 +51,8 @@ class StyleWordsTests(unittest.TestCase):
         self.assertEqual(styles.preset_for(one_scene("office", "2.5d")), "office_25d")
         self.assertEqual(styles.preset_for(one_scene("hospital", "2.5d")), "hospital_25d")
         self.assertEqual(styles.preset_for(one_scene("graveyard", "2.5d")), "graveyard_25d")
-        self.assertEqual(styles.preset_for(one_scene("taxi", "2.5d")), "car_25d")             # a vehicle's other name
+        self.assertEqual(styles.preset_for(one_scene("taxi", "2.5d", "inside")), "car_25d")   # a vehicle's other name
+        self.assertEqual(styles.preset_for(one_scene("taxi", "2.5d")), "car_side_25d")        # a drive opens outside
         from unittest import mock
         with mock.patch.dict(styles.PLACES_25D):                                              # a place with no set:
             del styles.PLACES_25D["hostel"]                                                   # made automatically
@@ -243,7 +248,8 @@ class RenderTests(unittest.TestCase):
         """Inside a vehicle the view outside slides past in depth layers, the seats and the rocking stay; the view and
         time words still work; 2D vehicles are as they were."""
         for words in ("train", "bus city night", "metro", "plane", "car pahad", "auto"):
-            sc = one_scene(words.split()[0], "2.5d")
+            cut = "inside" if words.split()[0] in ("car", "auto") else None      # (not the studio's driving shots)
+            sc = one_scene(words.split()[0], "2.5d", cut)
             bg = dict(sc["background"])
             if len(words.split()) > 1:
                 bg["view"] = words.split()[1]
@@ -257,7 +263,7 @@ class RenderTests(unittest.TestCase):
             self.assertTrue([o for o in r.plan.sets if o.get("type") in ("berth", "bus_seat", "metro_seat",
                                                                           "plane_seat", "car_seat", "auto_seat")])
             self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.4).tobytes(), words)   # the view slides past
-            self.assertIsNone(Renderer(one_scene(kind), self.W, use_tts=False).bd25)    # 2D: as before
+            self.assertIsNone(Renderer(one_scene(kind, cut=cut), self.W, use_tts=False).bd25)    # 2D: as before
 
     def test_people_stand_on_the_footpath(self):
         """On the road sets the people's feet (y 1700) are on the near footpath, drawn after the traffic: the cars

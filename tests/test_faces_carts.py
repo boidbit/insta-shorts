@@ -36,6 +36,8 @@ class RealSizes(unittest.TestCase):
     def test_a_seated_head_is_in_the_window(self):
         # a seated person's head is around y 980-1180 (seat at ~1520): every vehicle's windows reach it
         for kind, (top, bot) in vehicles.BANDS.items():
+            if vehicles.VEHICLES[kind].get("pov"):
+                continue                                              # (a driving shot has no seats: studio.drive)
             self.assertLess(top, 1000, kind)
             self.assertGreater(bot, 1170, kind)
             inner = vehicles.inside(kind, 0.25)

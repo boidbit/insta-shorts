@@ -268,6 +268,21 @@ Page pe ye dono video options me hain. Approve karne pe page `LOOP: on` / `MASCO
 - **Nazara aur samay:** `SCENE: train gaon night`, `SCENE: bus city`, `SCENE: car samundar`. Nazare: city, gaon, highway, pahad, samundar, clouds (plane), tunnel (metro). Har gaadi ka apna default hai (train → gaon, metro → tunnel, plane → clouds...).
 - **Asli jaisa naap:** deewar seat ke theek peeche hai aur khidki baithe aadmi ki chhaati se shuru ho kar sir ke thoda upar khatam hoti hai, jaise asli train / bus / plane me: baithe logon ka sir khidki ke beech me dikhta hai (pehle khidkiyan bahut upar thi).
 
+### Car / auto drive: alag alag nazar (POV) se 🚗🛺
+
+`SCENE: car` (ya `auto`) me log ho to naya camera drive ko film ki tarah khud kaat deta hai. **CAST ka pehla aadmi gaadi chalata hai**, baaki uske saath (4 tak; car me teesra-chautha peeche ki seat pe, thoda chhota):
+- **side**: bahar se, sadak ke kinare se: poori gaadi chalti hui, pahiye ghoomte, khidki me log, peeche nazara aur neeche sadak bhaagti hai. Pehli line hamesha yahi.
+- **front**: saamne se, windshield ke paar: driver steering pe (India wali right-hand drive), bagal me saathi, dashboard pe chhota dog, bonnet + headlights. Auto me driver beech me handle pe, sawari peeche dono taraf.
+- **pov**: driver ki aankhon se: saamne sadak bhaagti aati hai (beech ki peeli line, khambe / ped paas aate, aage ek truck), dashboard ke meter, steering pe haath, bagal me saathi. Auto me chhota windshield, meter, handle pe dono haath. Jo dikhta nahi (driver khud) uski line subtitle me aati hai.
+- **mirror**: rear-view sheeshe me bolne wale ka chehra, bahar ka nazara dhundhla. Aakhri (punch) line yahin.
+- **inside**: pehle wala andar ka shot (seats, khidki ka nazara).
+
+Khud chunna ho to scene me `CUT front`, `CUT side`, `CUT pov`, `CUT mirror`, `CUT inside` likho (Hinglish bhi: `saamne`, `bahar`, `nazar`, `sheesha`, `andar`). SCENE ke turant baad `CUT front` = scene usi shot se shuru (khaali shot nahi). Ek-do line wali chhoti sawari andar hi rehti hai; `CAMERA: classic` me sab pehle jaisa. 2D aur 2.5D dono me.
+
+### Public jagah pe bheed: `CROWD` 👥
+
+Sadak, bazaar, station, mall, beach, hospital, bank, dhaba, canteen, school ground, gaon... me peeche **kuch random log** apne aap: koi guzar raha hai, koi phone pe, koi chai pee raha hai, koi intezaar me. Wo chhote hain (door hain), thode halke rang ke (aankh kahani pe rahe), kabhi bolte nahi, kabhi characters ke aage nahi aate. Sadak pe wo door ke footpath pe hain (gaadiyan unke aage se guzarti hain); bank / hospital / dukaan pe line me khade logon ki tarah counter ke aage. Har video ke apne log (script se), har baar wahi. `CROWD: zyada` = bheed, `CROWD: kam` = thode (default), `CROWD: none` = koi nahi. Ghar, gaadi ke andar aur `CAMERA: classic` me koi nahi.
+
 ### Sadak ki gaadiyan asli size ki 🚗
 
 Naye camera me `street` aur `bus_stop` pe guzarti gaadiyan (car, auto, truck, bike) logon ke hisaab se badi hain (car ki chhat ek aadmi ke kandhe tak) aur har gaadi me driver baitha hai. `OBJ: car ...` wali gaadiyan pehle se asli naap me thi. `CAMERA: classic` me purani chhoti gaadiyan.

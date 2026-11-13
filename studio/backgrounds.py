@@ -746,6 +746,8 @@ class Background:
         if footpath and self.kind == "mountain_road" and spec.get("ambient", True):
             self.ambient = [("birds", 300, 40, 2), new_traffic(self.kind, True)]
         self._clouds = {}
+        self.crowd = None      # people in the background of a public place (studio.crowd), set by the renderer
+        self.pov = None        # the driver's eyes (studio.drive): (kind, view, time); the road is drawn every frame
         self.static = None
         self.parallax = float(spec.get("parallax", 1.0))   # 0 = all layers move with the ground
         self.layers = []       # scrolling layers, back-to-front: (RGBA strip, y offset, speed multiplier)
@@ -769,6 +771,23 @@ class Background:
             inner = vehicles.inside(vkind, s)
             self.interior = inner if inner.size == (out_w, out_h) else inner.resize((out_w, out_h), Image.LANCZOS)
             self.ambient = []
+            if v.get("pov"):                         # a driving shot (studio.drive)
+                from . import drive
+                if v["pov"] == "pov":                # the driver's eyes: the road comes at us (drawn every frame)
+                    self.layers = []
+                    self.pov = (vkind, view, spec.get("time"))
+                if v["pov"] == "side":               # outside: the road under the car runs too
+                    strip = drive.road_strip(s)
+                    if strip.size != (out_w * 2, out_h):
+                        strip = strip.resize((out_w * 2, out_h), Image.LANCZOS)
+                    bb = strip.getchannel("A").getbbox()
+                    self.layers.append((strip.crop((0, bb[1], strip.width, bb[3])), bb[1], 1.0))
+                fr = drive.front(vkind, s)           # the dashboard / the car's body / the mirror: over the people
+                if fr.size != (out_w, out_h):
+                    fr = fr.resize((out_w, out_h), Image.LANCZOS)
+                bb = fr.getchannel("A").getbbox()
+                if bb:
+                    self.fg.append((FG_FRONT * 10, fr.crop(bb), bb[0], bb[1], None))   # (even the mirror's close-up)
             return
         if self.kind == "image":
             im = Image.open(asset_path(spec["path"])).convert("RGB")
@@ -843,6 +862,9 @@ class Background:
 
     def frame(self, t):
         base = self.static.copy()
+        if self.pov is not None:                    # the road coming at the driver
+            from . import drive
+            drive.road_ahead(base, t, self.out_w / float(LW), *self.pov)
         for strip, y0, mult in self.layers:
             speed = 1.0 - self.parallax * (1.0 - mult)
             off = (t * self.scroll * speed * self.out_w / LW) % self.out_w
@@ -856,6 +878,8 @@ class Background:
             base.paste(part, (0, y0), part)
         if self.interior is not None:               # the vehicle's inside, the view moving past its windows
             base.paste(self.interior, (0, 0), self.interior)
+        if self.crowd is not None:                  # the crowd: behind the traffic, in front of the place
+            self.crowd.draw(base, t, self.out_w / float(LW))
         if self.ambient:
             self._draw_ambient(base, t)
         return base

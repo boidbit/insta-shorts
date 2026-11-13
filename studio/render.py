@@ -368,6 +368,7 @@ class Renderer(Output):
             bg_spec = dict(bg_spec, classic=True)          # CAMERA: classic keeps the old drawings
         self.bg = Background(bg_spec, int(self.W * ang["zoom"] + 0.5), int(self.H * ang["zoom"] + 0.5))
         self.bd25 = self._backdrop25(preset, scene) if preset else None
+        self._add_crowd(scene, preset)
         used = getattr(self.plan, "counters", None)
         mode = getattr(self.plan, "counter_mode", "2d")
         place = bg_spec.get("type") if isinstance(bg_spec, dict) else bg_spec
@@ -497,6 +498,36 @@ class Renderer(Output):
         return StudioBackdrop(preset, self.W, self.H, zmax=min(zmax, 2.4), time=None if same else time, grade=grade,
                               extra=extra, spec=self.plan.background)
 
+    def _add_crowd(self, scene, preset):
+        """People in the background of a public place (studio.crowd): the new camera only, never in a vehicle."""
+        from . import crowd as crowd_
+        if getattr(self.plan, "camera", "") != "cine" or self.plan.vehicle or (preset or "").startswith("auto:"):
+            return
+        bg = self.plan.background if isinstance(self.plan.background, dict) else {"type": self.plan.background}
+        people = crowd_.extras(bg.get("type"), preset, bg.get("layout"), crowd_.amount(scene),
+                               seed=str(scene.get("hook") or "") + str(len(scene.get("timeline", []))))
+        if not people:
+            return
+        time = bg.get("time")
+        tint = {"night": (150, 156, 206), "rain": (170, 176, 196), "evening": (255, 214, 176),
+                "sunset": (255, 206, 166), "dawn": (236, 214, 220)}.get(time, (255, 255, 255))
+        if self.bd25 is not None:
+            amb = self.bd25.light.get("ambient") or [255, 255, 255]
+            tint = tuple(int(a * b / 255) for a, b in zip(amb, tint))
+        crowd = crowd_.Crowd(people, tint if tint != (255, 255, 255) else None)
+        road = preset in styles.SET_AMBIENT if self.bd25 is not None else self.bg.kind in ("street", "bus_stop")
+        if not road:                                    # sorted with the people and the counters
+            self._crowd = crowd
+        elif self.bd25 is not None:                     # on the far footpath: behind the road and its traffic
+            from .style25d.scenery import Layer
+            k = 0.6 * self.s
+            fn = crowd_.layer_fn(crowd, k, (int(round(LW * k)), int(round(LH * k))))
+            back = self.bd25.layered.back
+            at = next((i for i, b in enumerate(back) if b.name == "ambient" or b.d > 1.0), len(back))
+            back.insert(at, Layer(Image.new("RGBA", (8, 8), (0, 0, 0, 0)), k, 1.0, fn, "crowd"))
+        else:
+            self.bg.crowd = crowd
+
     def _view25(self, t):
         """Shot angle + in-shot camera at time t, as StudioBackdrop wants it (computed like _background and the
         camera crop in story_frame)."""
@@ -551,11 +582,40 @@ class Renderer(Output):
 
     def _foreground(self, t):
         """The place's foreground props, placed like the background of this shot (angle zoom / mirror)."""
+        crowd = self._crowd_pieces(t) if self._crowd is not None else []
         if self.bd25 is not None and not self._auto25:
-            return self.bd25.floor_items(self._view25(t))
+            return self.bd25.floor_items(self._view25(t)) + crowd
         if self.bd25 is not None and self.bd25.layered.sprites:      # auto 2.5D: its counters, then the place's props
-            return self.bd25.floor_items(self._view25(t)) + self._foreground_flat(t)
-        return self._foreground_flat(t)
+            return self.bd25.floor_items(self._view25(t)) + self._foreground_flat(t) + crowd
+        return self._foreground_flat(t) + crowd
+
+    _crowd = None           # the crowd as pieces sorted with the people (a place without a road: studio.crowd)
+
+    def _crowd_pieces(self, t):
+        """[(depth y, picture, x, y)] of the crowd in this shot, like the place's own pieces (angle zoom / mirror),
+        so a counter or a character nearer the lens covers them and they cover what is behind them."""
+        if self.bd25 is not None:
+            v = self._view25(t)
+            sc, left, top, mirror = self.s * v["za"], v["La"] * self.s * v["za"], v["Ta"] * self.s * v["za"], v["mirror"]
+        else:
+            ang = self.plan.angle
+            z = ang["zoom"]
+            sc = self.s * z
+            left = clamp(ang["x"] * sc - self.W / 2.0, 0, self.bg.out_w - self.W) if z > 1.001 else 0
+            top = clamp(GROUND_Y * (sc - self.s), 0, self.bg.out_h - self.H) if z > 1.001 else 0
+            mirror = ang["mirror"]
+        out = []
+        for i, e in enumerate(self._crowd.people):
+            got = self._crowd._sprite(i, e, t, sc)
+            if not got:
+                continue
+            im, x, y = got
+            x, y = x - left, y - top
+            if mirror:
+                im = ImageOps.mirror(im)
+                x = self.W - x - im.width
+            out.append((e["y"], im, int(x), int(y)))
+        return out
 
     def _foreground_flat(self, t):
         items = self.bg.foreground(t)

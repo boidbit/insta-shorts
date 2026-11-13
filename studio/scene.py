@@ -943,7 +943,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         x = spec.get("x", slots.get(slot, 540))
         y = spec.get("y", GROUND_Y)
         chars[name] = Char(name, spec, float(x), float(y), i)
-        chars[name].scale *= world
+        chars[name].scale *= world * float(spec.get("depth_k", 1.0))    # (a driving shot's back seat: further)
     if framing == "ots":
         place_over_shoulder(chars)
         for c_ in chars.values():               # the speaker facing us a bit bigger too (still well behind the back)

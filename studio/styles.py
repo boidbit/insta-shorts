@@ -74,7 +74,9 @@ PLACES_25D = {
 }
 # sets that light themselves for the scene's time (a vehicle's view is re-lit by the vehicle engine, its inside keeps
 # its own lights): no re-grading on top
-OWN_TIME = {"train_25d", "bus_25d", "metro_25d", "plane_25d", "car_25d", "auto_25d"}
+OWN_TIME = {"train_25d", "bus_25d", "metro_25d", "plane_25d", "car_25d", "auto_25d"} | {
+    k + "_25d" for k in ("car_front", "car_side", "car_pov", "car_mirror", "auto_front", "auto_side", "auto_pov",
+                         "auto_mirror")}
 # sets with writing on them (shop signs, menus, boards) are never mirrored for a reverse shot (the text would read
 # backwards). The 2d look mirrors every place, as it always has.
 NO_MIRROR = {"gali_25d", "classroom_25d", "office_25d", "meeting_25d", "street_25d", "busstop_25d", "market_25d",
@@ -178,5 +180,6 @@ def preset_for(scene):
         return PLACES_25D[kind]
     from . import vehicles
     if vehicles.resolve(kind):                     # taxi, cab, rickshaw, flight...: the vehicle's own set
-        return PLACES_25D[vehicles.resolve(kind)]
+        v = vehicles.resolve(kind)                  # (a driving shot, car_front...: its own set, studio.drive)
+        return PLACES_25D.get(v, v + "_25d")
     return "auto:" + kind if has_depth(kind) else None

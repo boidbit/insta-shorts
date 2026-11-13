@@ -37,6 +37,11 @@ FLOOR_Y = 1610
 BANDS = {"train": (900, 1320), "bus": (740, 1270), "metro": (740, 1250), "plane": (942, 1178),
          "car": (890, 1250), "auto": (880, 1340)}        # the window band (top, bottom) of each vehicle
 VIEW_CENTER = 575                                         # the views are drawn around this height, then moved
+# the driving shots of a car / an auto (studio.drive): the same vehicle seen from in front, from the side outside, from
+# the driver's eyes, in the rear-view mirror. No seats of their own (the people sit behind the dashboard / the doors).
+from . import drive as _drive                                  # noqa: E402
+VEHICLES.update({k: dict(VEHICLES[base], seat=None, pov=pov) for k, (base, pov) in _drive.POV.items()})
+BANDS.update(_drive.BANDS)
 # speeds of the outside layers relative to the ground speed, back to front
 LAYER_SPEEDS = (0.05, 0.3, 1.0)
 
@@ -285,6 +290,8 @@ def _stitches(g, y0, y1, col, step=90):
 def inside(kind, s):
     """The vehicle's inside as an RGBA picture with see-through windows (the view shows through them). The wall stands
     right behind the seats and the windows sit at a seated person's head (see BANDS)."""
+    if kind in _drive.POV:                                      # a driving shot: its own picture
+        return _drive.inside(kind, s)
     g = _canvas(s)
     A = 255
     top, bot = BANDS[kind]
