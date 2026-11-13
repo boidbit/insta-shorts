@@ -76,7 +76,8 @@ class NewPlaces(unittest.TestCase):
             self.assertIn(p, look.PLACE_LOOK, p)
             self.assertTrue(mystery.pool(p, False), p)
             self.assertIn(p, WRITTEN_PLACES, p)
-            self.assertIn("auto:" + p, styles.NO_MIRROR, p)
+            self.assertIn(p + "_25d", styles.NO_MIRROR, p)
+            self.assertEqual(styles.PLACES_25D[p], p + "_25d")
             self.assertTrue(os.path.exists(os.path.join(root, "assets", "places", p + ".jpg")), p)
         self.assertIn("park", crowd.LANES_2D)
 

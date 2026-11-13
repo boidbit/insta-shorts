@@ -71,6 +71,17 @@ PLACES_25D = {
     "plane": "plane_25d",
     "car": "car_25d",
     "auto": "auto_25d",
+    "ghar_darwaza": "ghar_darwaza_25d",
+    "lift": "lift_25d",
+    "park": "park_25d",
+    "atm": "atm_25d",
+    "petrol_pump": "petrol_pump_25d",
+    "signal": "signal_25d",
+    "buffet": "buffet_25d",
+    "restaurant": "restaurant_25d",
+    "interview_room": "interview_room_25d",
+    "call_center": "call_center_25d",
+    "startup_office": "startup_office_25d",
 }
 # sets that light themselves for the scene's time (a vehicle's view is re-lit by the vehicle engine, its inside keeps
 # its own lights): no re-grading on top
@@ -79,8 +90,8 @@ OWN_TIME = {"train_25d", "bus_25d", "metro_25d", "plane_25d", "car_25d", "auto_2
                          "auto_pov", "auto_mirror")}
 # sets with writing on them (shop signs, menus, boards) are never mirrored for a reverse shot (the text would read
 # backwards). The 2d look mirrors every place, as it always has.
-NO_MIRROR = {"auto:ghar_darwaza", "auto:lift", "auto:atm", "auto:petrol_pump", "auto:signal", "auto:buffet",
-             "auto:restaurant", "auto:interview_room", "auto:call_center", "auto:startup_office", "auto:park",
+NO_MIRROR = {"ghar_darwaza_25d", "lift_25d", "atm_25d", "petrol_pump_25d", "signal_25d", "buffet_25d",
+             "restaurant_25d", "interview_room_25d", "call_center_25d", "startup_office_25d", "park_25d",
              "gali_25d", "classroom_25d", "office_25d", "meeting_25d", "street_25d", "busstop_25d", "market_25d",
              "festival_25d", "railway_25d", "street_road_25d", "busstop_road_25d", "hospital_25d", "bank_25d",
              "police_25d", "court_25d", "canteen_25d",
@@ -138,7 +149,10 @@ NATIVE_TIME = {"kitchen_25d": "day", "gali_25d": "sunset", "diwali_rooftop": "ni
                "exam_hall_25d": "day", "gym_25d": "day", "party_25d": "day", "jail_25d": "day", "beach_25d": "day",
                "desert_25d": "day", "mountain_road_25d": "day", "cricket_ground_25d": "day",
                "school_ground_25d": "day", "street_road_25d": "day", "busstop_road_25d": "day",
-               "mandap_25d": "night", "graveyard_25d": "night", "night_road_25d": "night"}
+               "mandap_25d": "night", "graveyard_25d": "night", "night_road_25d": "night",
+               "ghar_darwaza_25d": "day", "lift_25d": "day", "park_25d": "day", "atm_25d": "day",
+               "petrol_pump_25d": "day", "signal_25d": "day", "buffet_25d": "night", "restaurant_25d": "evening",
+               "interview_room_25d": "day", "call_center_25d": "night", "startup_office_25d": "day"}
 
 
 def normalize(value):
@@ -154,10 +168,6 @@ def scene_style(scene):
 
 
 FLAT_IN_25D = {"image", "plain"}       # stay as they are in 2.5D too (your own photo, the plain colour)
-# places that have no hand-made 2.5D set yet: their own 2D drawing is split into depth layers (autoset).
-# Hand-made sets for them are still to do (Nov 2026).
-AUTO_ONLY_25D = {"ghar_darwaza", "lift", "park", "atm", "petrol_pump", "signal", "buffet", "restaurant",
-                 "interview_room", "call_center", "startup_office"}
 
 
 def has_depth(kind):

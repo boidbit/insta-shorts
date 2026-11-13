@@ -241,13 +241,9 @@ class RenderTests(unittest.TestCase):
         """In 2.5D every studio place is a hand-made set (vehicles included); only your own photo and the plain
         colour stay flat."""
         left = [p for p in script.vocab()["places"]
-                if p not in styles.PLACES_25D and p not in styles.FLAT_IN_25D and p not in styles.AUTO_ONLY_25D]
+                if p not in styles.PLACES_25D and p not in styles.FLAT_IN_25D]
         self.assertEqual(left, [])
         self.assertEqual(styles.FLAT_IN_25D, {"image", "plain"})
-        # the Nov 2026 places wait for their hand-made sets: until then they must at least get the auto depth
-        for p in sorted(styles.AUTO_ONLY_25D):
-            self.assertIn(p, script.vocab()["places"], p)
-            self.assertTrue(styles.has_depth(p), p)
 
     def test_vehicles_in_2_5d(self):
         """Inside a vehicle the view outside slides past in depth layers, the seats and the rocking stay; the view and

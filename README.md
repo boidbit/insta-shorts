@@ -398,7 +398,19 @@ Script me: `B -> touch_feet` phir `A -> bless`; `A (kaan_pakad, embarrassed): So
 
 `ghar_darwaza` (flat ka darwaza: SHARMA ki nameplate, ghanti, toran, joote ka rack, seedhiyan; rishtedaar, delivery, padosi), `lift` (steel ki deewar, sheesha, 7th floor ka button panel: awkward silence), `park` (walking track, bench, jhoola-slide, peeche flats: morning walk aur gossip), `buffet` (shaadi ka khana: PANEER / DAL / PULAO / GULAB JAMUN, shamiyana, laal carpet), `restaurant` (booth, MENU board ke daam, latakti lights, shaam ki sadak wali khidki), `atm` ("Balance: Rs 47", CCTV ON, slips se bhara dabba), `petrol_pump` (DESI PETROLEUM, 107.48 ka board, do machine), `signal` (laal batti, 88 ka countdown, zebra crossing, flyover, "EMI sirf Rs 999" hoarding), `interview_room` (HR / MANAGER / CEO ke card, "Round 7 ??"), `call_center` (raat ke 2 baje, CALLS 487 / 600 ka target), `startup_office` (HUSTLE neon, bean bags, sticky notes, Q4 OKRs).
 
-- 2D aur 2.5D dono me (2.5D: aasmaan, imaaratein, khidki ka nazara alag parat me). Sabka apna look (`buffet` = utsav, `call_center` = daftar...) aur apni mystery; park, buffet, signal, petrol pump pe bheed bhi.
+- 2D aur 2.5D dono me. **2.5D me har ek ka apna set** (`studio/style25d/scenery_2026.py`): jagah ki parten gehrai me, aur upar uski apni zindagi:
+  - darwaza: toran ke patte hilte hain, ghanti ki laal batti, seedhi ki tubelight jhapakti hai, bulb ke paas makkhi
+  - lift: floor number 7, 6, 5... ghat-ta hai, sheeshe pe chamak sarakti hai
+  - park: parinde, girte patte, apne aap jhoolta jhoola, aage oonchi ghaas aur phool
+  - buffet: har bartan se bhaap, jhalar ki jhilmil, girti genda pankhudiyan, aage plates ka dher
+  - restaurant: lamp ki garam roshni, khidki me guzarti gaadiyon ki lights, plate ki bhaap, aage gilaas aur menu
+  - atm: screen ka cursor, CCTV ki laal batti, tubelight ki jhapak
+  - petrol pump: ghoomte meter, peeche guzarti gaadiyan, aage nozzle
+  - signal: 88 se ghat-ta countdown, laal batti ki chamak, doosri sadak ka traffic, aage bike ka sheesha
+  - interview: tik-tik ghadi, whiteboard ki chamak, aage paani ki bottle aur file
+  - call center: jhapakte monitor, target board, aage headset
+  - startup: HUSTLE neon ka jhapakna, laptops ki roshni, hilta sticky note, aage coffee mug
+- Sabka apna look (`buffet` = utsav, `call_center` = daftar...) aur apni mystery; park, buffet, signal, petrol pump pe bheed bhi.
 - In jagahon pe likhawat hai, isliye CUT pe ye ulti (mirror) nahi hoti (`CUT reverse` likho tabhi).
 - Mandir jaan-boojh ke nahi banaya.
 
