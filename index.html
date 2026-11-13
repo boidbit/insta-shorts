@@ -901,12 +901,7 @@ function ideaWithSettings(idea, b) {
 }
 // Video style. Places with a hand-made (premium) 2.5D set: same list as studio/styles.py PLACES_25D (a test keeps
 // them equal). Every other place gets its depth automatically in 2.5D.
-const STYLE_PLACES = ["auto", "balcony", "bank", "bathroom", "beach", "bedroom", "bus", "bus_stop", "canteen", "car",
-  "chai_tapri", "cinema", "classroom", "coaching", "court", "cricket_ground", "desert", "dhaba", "exam_hall",
-  "festival_street", "gaon", "graveyard", "gully", "gym", "haunted_house", "hospital", "hostel", "jail", "jungle",
-  "kirana", "kitchen", "library", "living_room", "mall", "mandap", "market", "medical_store", "meeting_room",
-  "metro", "mithai_shop", "mobile_shop", "mountain_road", "night_road", "office", "party", "plane", "police_station",
-  "railway", "room", "salon", "school", "school_ground", "street", "terrace", "train"];
+const STYLE_PLACES = ["atm", "auto", "balcony", "bank", "bathroom", "beach", "bedroom", "buffet", "bus", "bus_stop", "call_center", "canteen", "car", "chai_tapri", "cinema", "classroom", "coaching", "court", "cricket_ground", "desert", "dhaba", "exam_hall", "festival_street", "gaon", "ghar_darwaza", "graveyard", "gully", "gym", "haunted_house", "hospital", "hostel", "interview_room", "jail", "jungle", "kirana", "kitchen", "library", "lift", "living_room", "mall", "mandap", "market", "medical_store", "meeting_room", "metro", "mithai_shop", "mobile_shop", "mountain_road", "night_road", "office", "park", "party", "petrol_pump", "plane", "police_station", "railway", "restaurant", "room", "salon", "school", "school_ground", "signal", "startup_office", "street", "terrace", "train"];
 // The script's own `STYLE:` line: "2d" / "2.5d", or "" when it has none.
 function styleOf(text) {
   const m = (text || "").match(/^\s*STYLE\s*:\s*([\w.]+)/im);
