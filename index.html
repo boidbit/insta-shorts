@@ -1774,14 +1774,17 @@ async function copyPrompt(style) {
     const tone = $("tone").value !== "auto" ? "\n\n# Tone for THIS video: " + $("tone").selectedOptions[0].textContent : "";
     const full = parts.join("\n\n") + tone + "\n\n# My idea\n" + (idea || "<yahan apna idea likho>") + "\n";
     await navigator.clipboard.writeText(full);
-    const extra = [...keep].map((k) => (PROMPT_MODULES[k] ? PROMPT_MODULES[k].label : k)).join(", ");
+    const extra = [...keep].map((k) => (PROMPT_MODULES[k] ? PROMPT_MODULES[k].label : k === "loop" ? "loop 🔁" : k)).join(", ");
     $("promptNote").classList.remove("hidden");
     $("promptNote").textContent = (style === "2.5d" ? "2.5D" : "2D") + " prompt copy ho gaya (" + Math.round(full.length / 100) / 10 +
       "k akshar" + (extra ? "; saath me: " + extra : "; sirf zaroori hissa") +
       (fixed ? "; 🎭 jagah/characters bhi: " + settingsLines(builder, builderCast(builder)).join(", ") : "") + "). Us AI me paste karo (aakhri line " +
       "me apna idea likho) → jo script mile wo \"📝 Apni script\" tab me paste karo → upar wala checker dekho → Approve." +
       (style === "2.5d" ? " (Script me STYLE: 2.5d line hogi, to Style apne aap 2.5D ho jayega.)" : "") +
-      " Loop, mascot, style, dialogue jaise options prompt me nahi, neeche video options me chuno.";
+      (keep.has("loop")
+        ? " Loop 🔁 on hai: prompt AI se loop script likhwata hai (aakhri line pehli line me judti hai, \"...\" pe adhuri bhi ho sakti hai) aur script me LOOP: on line hogi. Loop nahi chahiye to Loop \"Nahi\" karke dobara copy karo."
+        : " Loop off hai: script normal end wali banegi. Loop wali script chahiye to copy se pehle Loop 🔁 \"Haan\" karo.") +
+      " Mascot, style, dialogue jaise baaki options prompt me nahi, neeche video options me chuno.";
   } catch (e) {
     $("promptNote").classList.remove("hidden");
     $("promptNote").textContent = "Copy nahi ho paya (" + e.message + "). Prompt yahan hai: " +

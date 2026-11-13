@@ -156,7 +156,8 @@ WRONG: A -> wink | smile      RIGHT: A -> shrug grin pop      (one action + one 
 
 # Loop (this reel plays round and round)
 
-The video has no end card: when it ends it starts again at once, and people should not notice. Write the LAST line so that it leads straight back into the FIRST line (the last line asks or sets up exactly what the first line answers, or the story ends where it began), so the second viewing feels like the next beat. Keep it short: 4-6 spoken lines, 12-20 seconds (this replaces the length in rule 4). Still write a CTA line: the studio puts it into the caption.
+The video has no end card: when it ends it starts again at once, and people should not notice. Write the LAST line so that it leads straight back into the FIRST line (the last line asks or sets up exactly what the first line answers, or the story ends where it began), so the second viewing feels like the next beat. The last line may stop mid-sentence ("...aur bolte hain ki...") only when the FIRST line finishes that exact sentence; never leave a line unfinished for any other reason. Keep it short: 4-6 spoken lines, 12-20 seconds (this replaces the length in rule 4). Still write a CTA line: the studio puts it into the caption.
+Write `LOOP: on` on its own line right after the HOOK line, so the script itself says it is a loop: the studio then makes a loop video even if the page option is off, and anyone reading the script knows why the last line runs into the first.
 <!-- /module -->
 
 # Two example scripts (for the voice and the timing; never copy their jokes)
