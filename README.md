@@ -270,12 +270,13 @@ Page pe ye dono video options me hain. Approve karne pe page `LOOP: on` / `MASCO
 
 ### Car / auto drive: alag alag nazar (POV) se 🚗🛺
 
-`SCENE: car` (ya `auto`) me log ho to naya camera drive ko film ki tarah khud kaat deta hai. **CAST ka pehla aadmi gaadi chalata hai**, baaki uske saath (4 tak; car me teesra-chautha peeche ki seat pe, thoda chhota):
+`SCENE: car` (ya `auto`, `taxi`, `rickshaw`) me log ho to naya camera drive ko film ki tarah khud kaat deta hai. **CAST ka pehla aadmi gaadi chalata hai** (CAST me `driver` / `autowala` / `taxiwala` ho to wahi; auto me autowala chup bhi ho to aage baitha hota hai), baaki uske saath (4 tak; car me teesra-chautha peeche ki seat pe, aage ki seats ke peeche se sirf sar dikhte hain). Driver ke **dono haath steering pe** rehte hain (bolte waqt bhi):
 - **side**: bahar se, sadak ke kinare se: poori gaadi chalti hui, pahiye ghoomte, khidki me log, peeche nazara aur neeche sadak bhaagti hai. Pehli line hamesha yahi.
 - **front**: saamne se, windshield ke paar: driver steering pe (India wali right-hand drive), bagal me saathi, dashboard pe chhota dog, bonnet + headlights. Auto me driver beech me handle pe, sawari peeche dono taraf.
 - **pov**: driver ki aankhon se: saamne sadak bhaagti aati hai (beech ki peeli line, khambe / ped paas aate, aage ek truck), dashboard ke meter, steering pe haath, bagal me saathi. Auto me chhota windshield, meter, handle pe dono haath. Jo dikhta nahi (driver khud) uski line subtitle me aati hai.
 - **mirror**: rear-view sheeshe me bolne wale ka chehra, bahar ka nazara dhundhla. Aakhri (punch) line yahin.
-- **inside**: pehle wala andar ka shot (seats, khidki ka nazara).
+- **inside**: car ke andar dashboard se: aage driver (steering pe) aur bagal wala, unke peeche seats, peeche ki seat pe baaki log, peeche ke sheeshe me sadak. Auto me peeche ki bench pe sawari (autowala aage hai, wo is shot me nahi).
+- **Highway** ab bhara hua: do parat pahad, khet ki kataarein, poore ped, dhaba, billboard, bijli ke khambe, crash barrier, kilometre ke patthar, street light, hare board (DESIPUR 12 km), aage rang-birangi "HORN OK PLEASE" truck, saamne se aati car; raat me taare, chaand aur headlight.
 
 Khud chunna ho to scene me `CUT front`, `CUT side`, `CUT pov`, `CUT mirror`, `CUT inside` likho (Hinglish bhi: `saamne`, `bahar`, `nazar`, `sheesha`, `andar`). SCENE ke turant baad `CUT front` = scene usi shot se shuru (khaali shot nahi). Ek-do line wali chhoti sawari andar hi rehti hai; `CAMERA: classic` me sab pehle jaisa. 2D aur 2.5D dono me.
 

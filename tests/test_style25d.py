@@ -51,7 +51,8 @@ class StyleWordsTests(unittest.TestCase):
         self.assertEqual(styles.preset_for(one_scene("office", "2.5d")), "office_25d")
         self.assertEqual(styles.preset_for(one_scene("hospital", "2.5d")), "hospital_25d")
         self.assertEqual(styles.preset_for(one_scene("graveyard", "2.5d")), "graveyard_25d")
-        self.assertEqual(styles.preset_for(one_scene("taxi", "2.5d", "inside")), "car_25d")   # a vehicle's other name
+        self.assertEqual(styles.preset_for(one_scene("taxi", "2.5d", "inside")), "car_cabin_25d")   # a car's other
+        self.assertEqual(styles.preset_for(one_scene("train", "2.5d")), "train_25d")                 # name
         self.assertEqual(styles.preset_for(one_scene("taxi", "2.5d")), "car_side_25d")        # a drive opens outside
         from unittest import mock
         with mock.patch.dict(styles.PLACES_25D):                                              # a place with no set:
@@ -257,13 +258,17 @@ class RenderTests(unittest.TestCase):
                 bg["time"] = "night"
             r = Renderer(dict(sc, background=bg), self.W, use_tts=False)
             kind = words.split()[0]
+            kind = "car_cabin" if kind == "car" else kind               # (a car from inside: its cabin, studio.drive)
             self.assertEqual(r.bd25.preset, kind + "_25d")
             self.assertTrue([ly for ly in r.bd25.layered.back if ly.name == "view"], words)
             self.assertEqual(r.plan.vehicle, kind)
-            self.assertTrue([o for o in r.plan.sets if o.get("type") in ("berth", "bus_seat", "metro_seat",
-                                                                          "plane_seat", "car_seat", "auto_seat")])
+            if kind == "car_cabin":                                     # two front seats, sorted with the people
+                self.assertTrue([sp for sp in r.bd25.layered.sprites if sp.name == "seats"])
+            else:
+                self.assertTrue([o for o in r.plan.sets if o.get("type") in ("berth", "bus_seat", "metro_seat",
+                                                                              "plane_seat", "auto_seat")])
             self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.4).tobytes(), words)   # the view slides past
-            self.assertIsNone(Renderer(one_scene(kind, cut=cut), self.W, use_tts=False).bd25)    # 2D: as before
+            self.assertIsNone(Renderer(one_scene(words.split()[0], cut=cut), self.W, use_tts=False).bd25)   # 2D
 
     def test_people_stand_on_the_footpath(self):
         """On the road sets the people's feet (y 1700) are on the near footpath, drawn after the traffic: the cars

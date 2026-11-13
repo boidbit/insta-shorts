@@ -93,7 +93,7 @@ class Drive(unittest.TestCase):
             self.assertEqual(kinds[0], veh + "_side")                                # it opens outside
             self.assertEqual(kinds[-1], veh + "_mirror")                             # the punch line in the mirror
             self.assertIn(veh + "_front", kinds)
-            self.assertIn(veh, kinds)                                                # and inside, as before
+            self.assertIn({"car": "car_cabin", "auto": "auto"}[veh], kinds)          # and inside
             self.assertIn(veh + "_pov", kinds)                                       # the driver's eyes
             for a, b in zip(kinds, kinds[1:]):
                 self.assertNotEqual(a, b)                                            # every cut somewhere else
@@ -127,7 +127,7 @@ class Drive(unittest.TestCase):
         self.assertEqual({s["background"]["type"] for s in sc["scenes"]}, {"car"})
         one = "\n".join(DRIVE.format(veh="car").splitlines()[:4]) + "\n"
         sc, _w = parse_script(one)
-        self.assertEqual([s["background"]["type"] for s in sc["scenes"]], ["car"])
+        self.assertEqual([s["background"]["type"] for s in sc["scenes"]], ["car_cabin"])     # a short ride: inside
         self.assertNotIn("car_front", vocab()["places"])                             # not a place of its own
 
     def test_four_in_the_car(self):
@@ -140,11 +140,69 @@ class Drive(unittest.TestCase):
         self.assertLess(front["M"].get("depth_k", 1), 1)                             # the back seat: further back
         self.assertLess(front["M"]["y"], front["R"]["y"])
 
+    def test_a_car_inside_is_a_car(self):
+        """From the dashboard: the driver and the one beside him in front with the front seats behind them, the
+        back seat's people behind those seats (their heads between them); the driver's hands on the wheel."""
+        text = DRIVE.format(veh="car").replace("CAST: R = boy, P = girl", "CAST: R = boy, P = girl, M = aunty, "
+                                                                            "D = dadi")
+        text = text.replace("SCENE: car\n", "SCENE: car\nCUT inside\n").replace("P (laugh)", "M (laugh)")
+        text = text.replace("P (shock)", "D (shock)")
+        sc, _w = scene_of(text)
+        self.assertEqual(sc["background"]["type"], "car_cabin")
+        ch = sc["characters"]
+        self.assertLess(ch["R"]["x"], ch["M"]["x"], ch["P"]["x"])                    # the driver on the left (India)
+        self.assertLess(ch["M"]["y"], drive.SEAT_DEPTH)                              # the back seat: behind the
+        self.assertGreater(ch["R"]["y"], drive.SEAT_DEPTH)                           # front seats; the front: before
+        self.assertIn({"t": 0.0, "who": "R", "action": "steer"}, sc["timeline"])
+        self.assertFalse([e for e in sc["timeline"] if e.get("who") == "R" and e.get("say") and e.get("action")])
+        for style in ("", "2.5d"):
+            r = Renderer(dict(sc, style=style) if style else sc, W, use_tts=False)
+            pieces = r._foreground(1.0)
+            self.assertTrue([p for p in pieces if p[0] == drive.SEAT_DEPTH], style)  # the seats, sorted with them
+            r.frame(1.0)
+        sc, _w = parse_script(text + "CAMERA: classic\n")
+        self.assertEqual(sc["scenes"][0]["background"]["type"], "car")             # classic: as before
+
+    def test_hands_on_the_wheel(self):
+        from studio import actions
+        from studio.characters import build_character
+        pose = actions.pose_for("steer", 1.0, 1.0, 1.0, 0.0, {})
+        self.assertTrue(pose["wheel"])
+        _ops, an = build_character({"look": "boy"}, pose, "smile", 0.0, 1.0, 540.0, 1700.0, 1.0)
+        (lx, ly), (rx, ry) = an["hand_l"], an["hand_r"]
+        self.assertLess(lx, 540)
+        self.assertGreater(rx, 540)
+        self.assertLess(abs(ly - ry), 40)                                            # both up at the rim
+        self.assertLess(max(ly, ry), 1700 - 300)
+
+    def test_an_auto_driver_drives(self):
+        text = ("HOOK: x\nCAST: P = papa, A = autowala, B = beta\nSCENE: rickshaw city\nCUT inside\n"
+                "P (tired): Bhaiya AC chalao | भैया एसी चलाओ\nB (laugh): Auto me AC? | ऑटो में एसी?\n")
+        sc, _w = parse_script(text)
+        s0 = sc["scenes"][0]
+        self.assertEqual(s0["background"]["type"], "auto")
+        self.assertTrue(s0["characters"]["A"]["hidden"])                            # the silent autowala sits in front:
+        self.assertFalse(s0["characters"]["P"].get("hidden"))                        # the bench has the passengers
+        sc, _w = parse_script(text.replace("CUT inside\n", "CUT front\n"))
+        self.assertEqual(sc["scenes"][0]["characters"]["A"]["x"], drive.PLACES["auto_front"]["xs"][0])
+
+    def test_the_highway_is_not_bare(self):
+        from PIL import Image
+        im = Image.new("RGB", (216, 384))
+        drive.road_ahead(im, 1.0, 0.2, "car_pov", "highway", None)
+        colours = len(set(im.resize((108, 192)).getdata()))
+        self.assertGreater(colours, 150)                                            # sky, hills, fields, trees, truck
+        sky, layers = vehicles.outside("highway", 0.2, None, "car_side")
+        old_sky, old = vehicles.outside("highway", 0.2, None, "car")
+        self.assertEqual(len(layers), 3)
+        self.assertNotEqual(layers[1][0].tobytes(), old[1][0].tobytes())             # a driving shot: its own view
+
     def test_it_renders_in_both_looks(self):
         for style in ("", "2.5d"):
-            for kind in ("car_front", "car_side", "car_pov", "car_mirror", "auto_front", "auto_side", "auto_pov",
-                         "auto_mirror"):
+            for kind in ("car_front", "car_side", "car_pov", "car_mirror", "car_cabin", "auto_front", "auto_side",
+                         "auto_pov", "auto_mirror"):
                 base, pov = drive.POV[kind]
+                pov = "inside" if pov == "cabin" else pov
                 text = DRIVE.format(veh=base).replace("SCENE: %s\n" % base, "SCENE: %s\nCUT %s\n" % (base, pov))
                 sc, _w = scene_of(text)
                 if style:

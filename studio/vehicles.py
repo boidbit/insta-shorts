@@ -117,7 +117,8 @@ def outside(view, s, time=None, kind=None):
     """(sky picture, [(wide RGBA layer, speed)...]) of the view out of the windows of `kind` (moved into its band)."""
     band = BANDS.get(kind)
     dy = (band[0] + band[1]) / 2.0 - VIEW_CENTER if band else 0.0
-    sky, layers = _outside(view, s, time, dy)
+    rich = _drive.rich_view(view, s, time, dy) if kind in _drive.POV else None     # a driving shot: richer
+    sky, layers = rich or _outside(view, s, time, dy)
     if dy:
         layers = [(_lift(l, -dy * s), sp) for l, sp in layers]
     return sky, layers

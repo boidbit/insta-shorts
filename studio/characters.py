@@ -1297,6 +1297,19 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
 
     # ---- arms (normally behind the head; a pose can bring them in front, e.g. the naagin hood) ----
     def draw_arms():
+        if p.get("wheel"):                          # at the wheel (actions.steer): the rim between the two hands
+            hl, hr = sk["handL"], sk["handR"]
+            rx = max(70.0, abs(hr[0] - hl[0]) / 2.0 / 0.866)            # the hands at ten and two
+            ry = rx * 0.8
+            cx, cy = (hl[0] + hr[0]) / 2.0, (hl[1] + hr[1]) / 2.0 + 0.5 * ry
+            rim = closed_ellipse(cx, cy, rx, ry, 56)
+            for q in ((cx - rx, cy + 4), (cx + rx, cy + 4), (cx, cy + ry)):
+                S.line([(cx, cy), q], 18, INK)
+                S.line([(cx, cy), q], 11, (52, 52, 58))
+            S.dot((cx, cy), 30, (60, 60, 66), INK, 4)
+            S.dot((cx, cy), 11, (200, 200, 206))
+            S.line(rim + rim[:2], 26, INK)
+            S.line(rim + rim[:2], 17, (40, 40, 46))
         for side, sh, elb, hand, a2 in (("L", sk["shL"], sk["elbL"], sk["handL"], p["la2"]),
                                         ("R", sk["shR"], sk["elbR"], sk["handR"], p["ra2"])):
             S.limb([sh, elb, hand], [ARM_W, ARM_W - 3, ARM_W - 7], skin)

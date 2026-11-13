@@ -661,21 +661,26 @@ def split_drives(scenes, cast):
         groups.setdefault(sc.get("place_no", id(sc)), []).append(sc)
     out = []
     for sc in scenes:
+        kind = sc["background"].get("type")
+        if vehicles.resolve(kind) in ("car", "auto") and kind not in drive.POV:
+            sc["background"]["type"] = vehicles.resolve(kind)       # a taxi is a car, a rickshaw an auto
+    for sc in scenes:
         group = groups[sc.get("place_no", id(sc))]
         base = _drive_base(sc["background"].get("type"))
         if not base or sc.get("cut_in") or sc.get("directed") or len(group) > 1 or \
                 sc["background"].get("type") != base:
             if base:
                 sc["drive"] = True
-            out.append(sc)
+            out.append(_cabin(sc))
             continue
         says = [i for i, ln in enumerate(sc["lines"]) if ln[0] == "say" and ln[1] in cast]
-        riders = [n for n in cast if any(ln[0] in ("say", "do") and ln[1] == n for ln in sc["lines"])]
+        riders = _drive_order([n for n in cast if any(ln[0] in ("say", "do") and ln[1] == n for ln in sc["lines"])],
+                              cast, base)
         driver = riders[0] if riders else None
         front_seat = riders[1] if len(riders) > 1 else None
         if len(says) < 2:
             sc["drive"] = True
-            out.append(sc)
+            out.append(_cabin(sc))
             continue
         cuts = [0] + says[1:]
         povs = []
@@ -689,7 +694,10 @@ def split_drives(scenes, cast):
                 povs.append("pov")                  # from the driver's eyes: his own voice, or the one beside him
             else:                                   # from in front and from inside, by turns
                 last = next((p_ for p_ in reversed(povs) if p_ in ("front", "inside")), "inside")
-                povs.append("inside" if last == "front" else "front")
+                pick = "inside" if last == "front" else "front"
+                if pick == "inside" and base == "auto" and who == driver:     # (in the auto he sits in front)
+                    pick = next(p_ for p_ in ("front", "pov", "side") if p_ != povs[-1])
+                povs.append(pick)
         for k, (a, pov) in enumerate(zip(cuts, povs)):
             b = cuts[k + 1] if k + 1 < len(cuts) else len(sc["lines"])
             part = dict(sc, lines=sc["lines"][a:b], background=dict(sc["background"]), drive=True)
@@ -697,8 +705,41 @@ def split_drives(scenes, cast):
             part["sets"] = {} if pov != "inside" else dict(sc.get("sets") or {})
             if k:
                 part.update(cut_in=True, shot=k, title=None)
-            out.append(part)
+            out.append(_cabin(part))
     return out
+
+
+DRIVER_LOOKS = ("driver", "autowala", "taxiwala")
+
+
+def _drive_order(names, cast, base=None):
+    """Who sits where in a car / an auto: a driver (CAST: A = driver / autowala / taxiwala) drives, else the first
+    in CAST; the others in CAST order. An auto always has its driver: the cast's autowala / driver sits in front
+    even when he does not say anything."""
+    def drives(n):
+        spec = cast.get(n) or {}
+        return spec.get("look") in DRIVER_LOOKS or spec.get("role") in DRIVER_LOOKS
+
+    names = list(names)
+    if base == "auto" and names and not any(drives(n) for n in names):
+        hired = next((n for n in cast if drives(n) and not (cast.get(n) or {}).get("hidden")), None)
+        if hired:
+            names.append(hired)
+
+    def key(n):
+        spec = cast.get(n) or {}
+        drives = spec.get("look") in DRIVER_LOOKS or spec.get("role") in DRIVER_LOOKS
+        return (0 if drives else 1, list(cast).index(n) if n in cast else 99)
+    return sorted(names, key=key)
+
+
+def _cabin(sc):
+    """The new camera's inside of a car is the cabin from the dashboard (studio.drive): the two front seats, the back
+    seat behind them; not the row of seats of the vehicle engine (that stays for CAMERA: classic)."""
+    if sc.get("drive") and sc["background"].get("type") == "car":
+        sc["background"]["type"] = "car_cabin"
+        sc["sets"] = {}
+    return sc
 
 
 def _slot_x(cast, name):
@@ -1401,7 +1442,8 @@ def parse_script(text):
                 if ln[0] in ("do", "say") and ln[1] in cast and ln[1] not in got and not cast[ln[1]].get("hidden"):
                     got.append(ln[1])
     for k_ in riders:
-        riders[k_].sort(key=lambda n_: list(cast).index(n_))
+        kinds_ = [_drive_base(sc["background"].get("type")) for sc in scenes if sc.get("place_no", id(sc)) == k_]
+        riders[k_] = _drive_order(riders[k_], cast, next((b for b in kinds_ if b), None))
     for si, sc in enumerate(scenes):
         order = []
         for ln in sc["lines"]:
@@ -1456,6 +1498,17 @@ def parse_script(text):
                     chars[name]["y"] = y_
                 if i < len(ks) and ks[i] != 1:      # a back seat: further from the camera
                     chars[name]["depth_k"] = ks[i]
+        steer_who = None
+        if pov_place and pov_place.get("steer") and fronts and not chars[fronts[0]].get("hidden"):
+            steer_who = fronts[0]                   # both hands on the wheel (actions.steer)
+        if not pov_place and sc.get("drive") and sc["background"].get("type") == "auto" and len(fronts) > 1 \
+                and not classic:
+            chars[fronts[0]] = {"hidden": True}     # inside the auto: the passengers' bench; he sits in front
+            fronts = fronts[1:]
+            for name in fronts:
+                x, slot = _slot_x(fronts, name)
+                chars[name] = {"slot": slot, "facing": "front" if len(fronts) != 2 else
+                               ("right" if slot == "left" else "left")}
         if back:                                    # over the shoulder: back's back big in the near corner
             side = "left" if sc.get("shot", 0) % 2 == 0 else "right"
             chars[back] = {"slot": side, "view": "back"}
@@ -1464,6 +1517,8 @@ def parse_script(text):
             if back not in order:
                 order.append(back)
         tl = [{"t": 0.0, "who": "all", "action": "idle", "expression": "smile"}]
+        if steer_who:
+            tl.append({"t": 0.0, "who": steer_who, "action": "steer"})
         if si == 0:
             tl.append({"t": 0.0, "sfx": "whoosh", "volume": 0.7, "camera": {"shake": 0.5}})
         # the story starts a moment in; a `wait`, a screen card or a set change before the first line now really
@@ -1547,6 +1602,8 @@ def parse_script(text):
                     seated.pop(who, None)               # gets up
                 elif act:
                     ev["on"] = seated[who]              # pointing, eating, on the phone... still seated
+            if ln[0] == "say" and who == steer_who:
+                ev.pop("action", None)                  # the driver talks with his hands on the wheel
             if ln[0] == "say":
                 ev["say"], ev["speak"] = ln[3], ln[4] or ln[3]
                 if sound_mode:
@@ -1559,7 +1616,7 @@ def parse_script(text):
                     ev["bubble"], ev["subtitle"] = False, True
                     for key in ("action", "expression", "prop", "move", "camera", "sfx", "volume", "facing", "look"):
                         ev.pop(key, None)                       # a voice has no body to act with
-                elif pov_place and (chars.get(who) or {}).get("hidden"):
+                elif (pov_place or sc.get("drive")) and (chars.get(who) or {}).get("hidden"):
                     ev["bubble"], ev["subtitle"] = False, True  # a driving shot: the voice of one out of the shot
                 elif len(order) == 2 and others:
                     ev.setdefault("look", others[0])

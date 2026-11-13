@@ -1029,6 +1029,18 @@ def drive(t, sp, I, ph, o):
                        hand("L", (132, -274 - st), (0, 1)), tilt=-2))
 
 
+def steer(t, sp, I, ph, o):
+    """At the wheel, seen from in front (through the windshield, or from the dashboard): both hands on the rim at
+    ten and two (the character draws the wheel between them: pose key `wheel`), turning it a little now and then,
+    the eyes on the road."""
+    turn = 7 * sin(2 * pi * 0.21 * t + ph) + 3 * sin(2 * pi * 0.57 * t + 1.1)
+    d = _stance()
+    d.update(hand("L", (-96, -140 + turn), (-0.35, 1.0)))
+    d.update(hand("R", (96, -140 - turn), (0.35, 1.0)))
+    d.update(wheel=True, tilt=0.12 * turn * I, head_tilt=0.8 * sin(2 * pi * 0.3 * t + ph) * I)
+    return d
+
+
 def throw(t, sp, I, ph, o):
     d = _d(o)
     if t < 0.35:
@@ -1327,7 +1339,7 @@ ACTIONS = {
     # everyday
     "eat": eat, "drink": drink, "phone_call": phone_call, "call": phone_call, "text": text, "type": text,
     "read": read, "write": write, "count_money": count_money, "wash_hands": wash_hands, "sweep": sweep,
-    "cook": cook, "stir": cook, "brush_teeth": brush_teeth, "drive": drive,
+    "cook": cook, "stir": cook, "brush_teeth": brush_teeth, "drive": drive, "steer": steer,
     # two people
     "throw": throw, "catch": catch, "kick": kick, "slap": slap, "punch": punch, "box": box, "push": push,
     "dodge": dodge, "high_five": high_five, "handshake": handshake, "hug": hug, "pat_back": pat_back,

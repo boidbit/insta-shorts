@@ -782,6 +782,12 @@ class Background:
                         strip = strip.resize((out_w * 2, out_h), Image.LANCZOS)
                     bb = strip.getchannel("A").getbbox()
                     self.layers.append((strip.crop((0, bb[1], strip.width, bb[3])), bb[1], 1.0))
+                st = drive.seats(vkind, s)           # the front seats: between the back seat's people and the front
+                if st is not None:
+                    if st.size != (out_w, out_h):
+                        st = st.resize((out_w, out_h), Image.LANCZOS)
+                    bb = st.getchannel("A").getbbox()
+                    self.fg.append((drive.SEAT_DEPTH, st.crop(bb), bb[0], bb[1], None))
                 fr = drive.front(vkind, s)           # the dashboard / the car's body / the mirror: over the people
                 if fr.size != (out_w, out_h):
                     fr = fr.resize((out_w, out_h), Image.LANCZOS)

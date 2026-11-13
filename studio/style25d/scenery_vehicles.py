@@ -12,7 +12,7 @@ import random
 
 from PIL import Image
 
-from .scenery import Cv, Layer, Layered
+from .scenery import Cv, Layer, Layered, Sprite
 from ..util import LH, LW
 
 KINDS = ("train", "bus", "metro", "plane", "car", "auto")
@@ -153,9 +153,14 @@ def build(kind, s, zmax=1.0, spec=None):
         front = [Layer(drive.front(kind, kr), kr, 1.0, None, "body")]
     else:
         front = [Layer(_front(0.5 * s, kind).im, 0.5 * s, 1.3, None, "foreground")]
+    sprites = []
+    seats = drive.seats(kind, kr) if pov else None
+    if seats is not None:                                          # the front seats: sorted with the people
+        bb = seats.getchannel("A").getbbox()
+        sprites.append(Sprite(seats.crop(bb), kr, bb[0] / kr, bb[1] / kr, drive.SEAT_DEPTH, "seats"))
     amb = LIGHT[base] if not night else [200, 206, 236]
     return Layered(back, front, light={"ambient": amb, "dir": 1, "vignette": 0.26}, horizon=800,
-                   ground=vehicles.FLOOR_Y)
+                   ground=vehicles.FLOOR_Y, sprites=sprites)
 
 
 def _maker(kind):
@@ -165,6 +170,7 @@ def _maker(kind):
 
 
 train_25d, bus_25d, metro_25d, plane_25d, car_25d, auto_25d = (_maker(k) for k in KINDS)
-DRIVES = ("car_front", "car_side", "car_pov", "car_mirror", "auto_front", "auto_side", "auto_pov", "auto_mirror")
-(car_front_25d, car_side_25d, car_pov_25d, car_mirror_25d, auto_front_25d, auto_side_25d, auto_pov_25d,
- auto_mirror_25d) = (_maker(k) for k in DRIVES)
+DRIVES = ("car_front", "car_side", "car_pov", "car_mirror", "car_cabin", "auto_front", "auto_side", "auto_pov",
+          "auto_mirror")
+(car_front_25d, car_side_25d, car_pov_25d, car_mirror_25d, car_cabin_25d, auto_front_25d, auto_side_25d,
+ auto_pov_25d, auto_mirror_25d) = (_maker(k) for k in DRIVES)
