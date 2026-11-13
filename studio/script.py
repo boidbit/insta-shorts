@@ -165,7 +165,16 @@ ROLE_LOOKS = {
     "aunty": "aunty", "dadi": "dadi", "nani": "dadi", "dada": "dada", "nana": "dada",
     "dost": "boy", "friend": "boy", "bhai": "college_boy", "brother": "college_boy", "beta": "college_boy",
     "behen": "college_girl", "sister": "college_girl", "beti": "college_girl", "didi": "college_girl",
-    "teacher": "office_guy", "boss": "office_guy", "bachcha": "kid", "student": "kid",
+    "teacher": "master_ji", "masterji": "master_ji", "master": "master_ji", "sir": "master_ji",
+    "boss": "boss", "manager": "boss", "malik_sahab": "boss", "bachcha": "kid",
+    "student": "school_boy", "schoolboy": "school_boy", "chhatra": "school_boy", "schoolgirl": "school_girl",
+    "chhatra_girl": "school_girl", "school_wali": "school_girl",
+    "army": "fauji", "soldier": "fauji", "faujii": "fauji", "jawan": "fauji",
+    "nri": "nri_mama", "mama": "nri_mama", "videshi_mama": "nri_mama", "canada_wala": "nri_mama",
+    "sardar": "sardar_ji", "sardarji": "sardar_ji", "paaji": "sardar_ji", "paji": "sardar_ji",
+    "bearer": "waiter", "mistri": "mechanic", "garage_wala": "mechanic",
+    "sweeper": "safai_wala", "safaiwala": "safai_wala", "safai_karmachari": "safai_wala",
+    "sadhu": "baba", "babaji": "baba", "jyotishi": "baba", "swami": "baba", "tantrik": "baba",
     "pujari": "pandit", "panditji": "pandit", "policewala": "police", "inspector": "police", "havaldar": "police",
     "daroga": "police", "dactor": "doctor", "groom": "dulha", "bride": "dulhan",
     "netaji": "neta", "mantri": "neta", "politician": "neta", "sarpanch": "neta", "mla": "neta",
@@ -189,7 +198,7 @@ ROLE_LOOKS = {
     "gawah": "boy", "witness": "boy", "canteenwala": "chaiwala", "chaiwale": "chaiwala",
 }
 FEMALE_LOOKS = {"food_blogger_girl", "air_hostess", "girl", "college_girl", "aunty", "dadi", "kid_girl", "office_girl", "madam", "dulhan", "nurse",
-                "saas", "bahu"}
+                "saas", "bahu", "school_girl"}
 PITCHES = ["+0Hz", "+14Hz", "-8Hz", "+24Hz", "-14Hz"]
 BUILDS = ("slim", "normal", "chubby")
 BUILD_WORDS = {"mota": "chubby", "moti": "chubby", "fat": "chubby", "patla": "slim", "patli": "slim", "thin": "slim"}
@@ -316,6 +325,12 @@ def cast_spec(words, index, unknown=None):
              "pitch": PITCHES[index % len(PITCHES)], "rate": "+0%"}
     if spec["look"] in ("kid", "kid_girl"):
         voice.update(pitch="+30Hz", rate="+8%")
+    elif spec["look"] in ("school_boy", "school_girl"):
+        voice.update(pitch="+20Hz", rate="+5%")
+    elif spec["look"] in ("baba", "master_ji"):
+        voice.update(pitch="-12Hz", rate="-6%")
+    elif spec["look"] in ("boss", "fauji"):
+        voice.update(pitch="-6Hz")
     elif spec["look"] in ("dada", "dadi"):
         voice.update(pitch="-10Hz", rate="-8%")
     if spec.get("kind") in ANIMAL_WORDS.values() and spec["kind"] != "monkey":

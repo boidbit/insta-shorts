@@ -359,6 +359,14 @@ Instagram grid me saari reels ek jaisi na lagein, isliye har video ka apna look 
 
 `CAMERA: classic` me sab pehle jaisa (koi rang/pehla shot nahi). Command line: `--color golden`, `--cover` (cover PNG banata hai).
 
+### Naye log (Nov 2026) 👔🎒🪖
+
+`boss` (suit, laal tie, tond, haath me phone), `master_ji` (purane master ji: sweater, chashma, chhadi), `school_boy` / `school_girl` (school uniform, tie, peeth pe bag), `fauji` (army wardi, maroon beret), `nri_mama` (videsh se aaye mama: sunglasses, phone), `sardar_ji` (pagdi, dadhi), `waiter` (bow tie, plate), `mechanic` (neeli wardi, spanner), `safai_wala` (jhadu), `baba` (bhagwa, safed dadhi, tilak).
+
+- Role ke naam se bhi: `teacher` / `sir` / `masterji` = master_ji, `boss` / `manager` = boss, `student` = school_boy, `schoolgirl` = school_girl, `army` / `jawan` = fauji, `nri` / `mama` = nri_mama, `sardarji` / `paaji` = sardar_ji, `mistri` = mechanic, `sweeper` = safai_wala, `sadhu` / `jyotishi` / `swami` = baba.
+- Nayi cheezein bhi kisi ko bhi: `sweater`, `beret`, `bowtie`, `backpack` (CAST me: `A = uncle sweater glasses`), haath me `spanner`.
+- Awaaz: school wale bachche patli, baba aur master ji bhaari aur dheemi, boss aur fauji thodi bhaari.
+
 ### Har jagah ka apna look 🎬 (`LOOK`) aur har video me ek ajeeb cheez 👀 (`MYSTERY`)
 
 **Look (colour grading):** ab har jagah apne rang me aati hai, apne aap. Kuch likhna nahi.
