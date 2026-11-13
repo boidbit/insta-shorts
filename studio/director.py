@@ -200,8 +200,8 @@ def problems(scene_dict, tmp_path):
         bgt = bg.get("type") if isinstance(bg, dict) else bg
         if bgt and bgt not in BACKGROUNDS and bgt != "image":
             out.append(where + "unknown background %r" % bgt)
-        if len([c for c in plan.chars.values() if not c.spec.get("hidden")]) > 3:     # a narrator has no body
-            out.append(where + "more than 3 characters")
+        if len([c for c in plan.chars.values() if not c.spec.get("hidden")]) > 4:     # a narrator has no body
+            out.append(where + "more than 4 characters")
         for name, c in plan.chars.items():
             out += [where + p for p in _char_problems(name, c.spec)]
             for ev in c.events:

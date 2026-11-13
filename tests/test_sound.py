@@ -214,7 +214,8 @@ class Draft(unittest.TestCase):
     def test_what_gemini_heard_becomes_a_clean_script(self):
         text, notes = sound.draft(INFO, "sound-abc123")
         self.assertIn("SOUND: sound-abc123", text)
-        self.assertIn("CAST: A = mummy, B = beta, C = dada", text)    # idea roles, else voice -> a look; max 3
+        self.assertIn("CAST: A = mummy, B = beta, C = dada, D = kid_girl", text)    # idea roles / voice -> a look
+        self.assertIn("D (excited, @4.0): Main bhi!", text)          # a fourth voice gets its own character too
         self.assertIn("SCENE: living_room", text)                    # the idea's place (Gemini's own was unknown)
         self.assertIn("A (point, angry, @0.5): Ye kya hai?", text)   # gussa -> angry
         self.assertIn("B (@1.8): Mummy / wo...", text)              # unknown words out, no `|` in the line

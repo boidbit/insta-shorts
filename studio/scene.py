@@ -11,7 +11,19 @@ SLOTS = {
     1: {"center": 540},
     2: {"left": 300, "right": 780, "center": 540},
     3: {"left": 190, "center": 540, "right": 890},
+    4: {"far_left": 150, "left": 405, "center": 540, "right": 675, "far_right": 930},     # a family, an office team
 }
+AUTO_SLOTS = {1: ["center"], 2: ["left", "right"], 3: ["left", "center", "right"],
+              4: ["far_left", "left", "right", "far_right"]}
+
+
+def auto_slots(n):
+    """Where n people stand by themselves (slot names, left to right)."""
+    return AUTO_SLOTS.get(n, AUTO_SLOTS[4] if n > 4 else AUTO_SLOTS[1])
+
+
+def slots_for(n):
+    return SLOTS.get(n, SLOTS[4] if n > 4 else SLOTS[3])
 GROUND_Y = 1700
 SHOT_ZOOM = {"wide": 1.0, "medium": 1.3, "close": 1.7, "two_shot": 1.3}
 SHOT_ALIASES = {"closeup": "close", "close_up": "close", "twoshot": "two_shot", "2shot": "two_shot"}
@@ -57,6 +69,7 @@ def fit_to_angle(ob, ang):
 
 
 PEOPLE_SCALE_3 = 1.06        # ...three people side by side need the room
+PEOPLE_SCALE_4 = 0.9         # ...and four even more
 PEOPLE_SCALE = 1.22          # medium shots: people this much bigger than the painted place (x sqrt of the angle zoom)
 FOCUS_H = {"dog": 170.0, "cat": 120.0, "cow": 260.0, "crow": 70.0, "parrot": 70.0}   # animals: camera looks lower
 
@@ -909,7 +922,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         # people (and their props / set pieces) a bit bigger than the painted place, and more so when the shot's
         # angle shows the place closer: otherwise the room and its furniture dwarf the characters
         n_vis = sum(1 for v in scene.get("characters", {}).values() if isinstance(v, dict) and not v.get("hidden"))
-        base_ = float(meta.get("people_scale", PEOPLE_SCALE if n_vis < 3 else PEOPLE_SCALE_3))   # 3 need room
+        base_ = float(meta.get("people_scale", PEOPLE_SCALE if n_vis < 3 else
+                               (PEOPLE_SCALE_3 if n_vis == 3 else PEOPLE_SCALE_4)))          # 3 / 4 need room
         world = base_ * plan.angle["zoom"] ** 0.5
     plan.framing, plan.world = framing, world
     plan.cut_in = bool(scene.get("cut_in"))
@@ -919,8 +933,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     names = list(cdefs.keys())
     visible = [nm for nm in names if not cdefs[nm].get("hidden")]       # a hidden one is only a voice (narrator)
     n = len(visible)
-    slots = SLOTS.get(n, SLOTS[3])
-    auto = ["left", "center", "right"] if n == 3 else (["left", "right"] if n == 2 else ["center"])
+    slots = slots_for(n)
+    auto = auto_slots(n)
     chars = {}
     for i, name in enumerate(names):
         spec = dict(cdefs[name])
@@ -1461,8 +1475,8 @@ def start_xs(scene):
     names = list(cdefs.keys())
     visible = [nm for nm in names if not cdefs[nm].get("hidden")]
     n = len(visible)
-    slots = SLOTS.get(n, SLOTS[3])
-    auto = ["left", "center", "right"] if n == 3 else (["left", "right"] if n == 2 else ["center"])
+    slots = slots_for(n)
+    auto = auto_slots(n)
     out = {}
     for name in names:
         spec = cdefs[name]

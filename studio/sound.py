@@ -255,7 +255,7 @@ seconds from the beginning of the audio (as exact as you can hear it). Do not tr
 Feelings from the voice (angry, shout, shock, laugh, cry, smug, sly, sad, nervous, excited...); the action is a
 gesture that fits the words and the feeling. Extras follow the emotion: "shake" when the voice shouts or hits hard,
 "close" on the strongest / funniest line, a matching sound or effect (boing, thud, record_scratch, ding, sweat, anger,
-hearts, question...). Not on every line. At most 3 speakers. A song: one line per sung line, action "sing". Only music,
+hearts, question...). Not on every line. At most 4 speakers. A song: one line per sung line, action "sing". Only music,
 no words: "lines" empty.
 Give 3 ideas: different everyday desi situations where this sound fits as a joke (office, ghar, school, shaadi, dost...)%s.
 
@@ -321,7 +321,7 @@ def draft(info, sound_id, context="", start=0.0, end=None):
     places, feels, acts = set(v["places"]), set(v["expressions"]), set(v["actions"])
     ideas = [i for i in (info.get("ideas") or []) if isinstance(i, dict)]
     idea = ideas[0] if ideas else {}
-    speakers = [s for s in (info.get("speakers") or []) if isinstance(s, dict) and s.get("id")][:3]
+    speakers = [s for s in (info.get("speakers") or []) if isinstance(s, dict) and s.get("id")][:4]
     ids = {}
     cast = []
     for n, sp in enumerate(speakers):
@@ -329,7 +329,7 @@ def draft(info, sound_id, context="", start=0.0, end=None):
         if role not in roles:
             role = FALLBACK_ROLE.get((str(sp.get("gender", "")).lower(), str(sp.get("age", "")).lower()),
                                      "college_girl" if str(sp.get("gender", "")).lower() == "female" else "college_boy")
-        letter = "ABC"[n]
+        letter = "ABCD"[n]
         ids[sp["id"]] = letter
         cast.append("%s = %s" % (letter, role))
     place = str(idea.get("place") or info.get("place") or "").strip().lower()

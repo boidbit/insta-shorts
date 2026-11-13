@@ -888,6 +888,7 @@ function builderCast(b) {
   }
   return out;
 }
+const MAX_CAST = 4;                 // people in one scene (studio/scene.py SLOTS goes up to 4)
 // The idea goes to the AI with the builder's choices fixed.
 function ideaWithSettings(idea, b) {
   const lines = settingsLines(b, builderCast(b));
@@ -1607,7 +1608,7 @@ function renderSaved() {
   const all = savedChars(), names = Object.keys(all).sort();
   $("bSaved").replaceChildren(opt("", names.length ? "⭐ Saved character jodo" : "⭐ Saved: abhi koi nahi"),
     ...names.map((n) => opt(n, "@" + n)));
-  $("bSaved").disabled = !names.length || builder.cast.length >= 3;
+  $("bSaved").disabled = !names.length || builder.cast.length >= MAX_CAST;
 }
 try { builder = Object.assign(builder, JSON.parse(store.get("builder") || "{}")); } catch {}
 const saveBuilder = () => store.set("builder", JSON.stringify(builder));
@@ -1651,7 +1652,7 @@ function renderBuilder() {
   $("bPlace").value = builder.place || "auto";
   $("bHook").value = builder.hook || "";
   $("bCta").value = builder.cta || "";
-  $("bAdd").disabled = builder.cast.length >= 3;
+  $("bAdd").disabled = builder.cast.length >= MAX_CAST;
   renderSaved();
   $("bCast").replaceChildren(...builder.cast.map((c, i) => {
     const img = el("img", { alt: c.role, src: `assets/looks/${lookOf(c.role)}.png` });
@@ -1682,7 +1683,7 @@ function renderBuilder() {
 }
 $("bSaved").addEventListener("change", () => {
   const n = $("bSaved").value, c = savedChars()[n];
-  if (c && typeof c === "object" && builder.cast.length < 3) {
+  if (c && typeof c === "object" && builder.cast.length < MAX_CAST) {
     builder.cast.push(Object.assign(JSON.parse(JSON.stringify(c)), { name: n[0].toUpperCase() + n.slice(1) }));
     saveBuilder(); renderBuilder();
   }
@@ -1692,7 +1693,7 @@ $("bPlace").addEventListener("change", () => { builder.place = $("bPlace").value
 $("bHook").addEventListener("input", () => { builder.hook = $("bHook").value.trim(); saveBuilder(); });
 $("bCta").addEventListener("input", () => { builder.cta = $("bCta").value.trim(); saveBuilder(); });
 $("bAdd").addEventListener("click", () => {
-  const roles = ["papa", "beta", "mummy"];
+  const roles = ["papa", "beta", "mummy", "dadi"];
   builder.cast.push({ role: roles[builder.cast.length] || "dost" });
   saveBuilder(); renderBuilder();
 });

@@ -97,7 +97,7 @@ class Rules(unittest.TestCase):
     def test_the_old_contradictions_are_gone(self):
         self.assertNotIn("Change at least every 1-2 lines", PROMPT)       # the camera cuts by itself
         self.assertNotIn("none over 75", PROMPT)
-        self.assertIn("Max 3 characters", PROMPT)                         # 4 do not fit on the screen yet
+        self.assertIn("Max 4 characters", PROMPT)                         # a family / an office team fits
         self.assertIn("Never write CUT in a talk across a counter", PROMPT)
         self.assertIn("near` / `far` (`B -> near shock`", read("SCRIPT_PROMPT_25D.md"))
         self.assertNotIn("use `CUT` (a new shot)", read("SCRIPT_PROMPT_25D.md"))

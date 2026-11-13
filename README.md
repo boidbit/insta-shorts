@@ -45,7 +45,7 @@ Har video ke liye style chuno: GitHub Pages wale page pe sabse upar **Style: 2D 
 
 "Idea do" tab me upar **"Jagah aur characters khud chuno"** kholo:
 
-- **Jagah** (kamra, rasoi, bazaar, office…) aur max 3 **characters**: naam, kaun (papa, mummy, dost… har ek ki chhoti photo), baal, rang, kapde, colour, body, extra (chashma, mooch, topi…). Na chuno to "auto". Ye choice browser me yaad rehti hai.
+- **Jagah** (kamra, rasoi, bazaar, office…) aur max 4 **characters**: naam, kaun (papa, mummy, dost… har ek ki chhoti photo), baal, rang, kapde, colour, body, extra (chashma, mooch, topi…). Na chuno to "auto". Ye choice browser me yaad rehti hai.
 - Neeche box me **idea** likho → AI inhi characters aur jagah ke saath script likhta hai.
 - Ya seedha **dialogue** likho, har line `Naam: baat`:
   ```
@@ -102,7 +102,7 @@ CTA_STYLE: caption
 - `SOUND: <naam ya file> [shuru-aakhir]`: page ka sound (`sound-…`, is browser me save rehta hai) ya repo ki file (`assets/music/x.mp3`, command line ke liye).
 - `@1.8` / `@0:03.2` = sound me ye line kab bolti hai. Thoda aage-peeche ho to studio usse awaaz shuru hone wali jagah pe chipka deta hai. Na likho to thehraav (pause) se andaaza lagata hai; line ke andar lamba thehraav ho to galti ho sakti hai, isliye time likhna behtar.
 - Studio ki apni awaaz band, Devanagari ki zarurat nahi. Munh sound ke hisaab se hilta hai (har line apni awaaz ke hisaab se).
-- Ek hi jagah, ek hi take: CUT, doosri SCENE, slowmo, freeze aur LOOP chhod diye jaate hain (sound bina ruke chalta hai). Camera khud bolne wale pe jaata hai. Max 3 characters.
+- Ek hi jagah, ek hi take: CUT, doosri SCENE, slowmo, freeze aur LOOP chhod diye jaate hain (sound bina ruke chalta hai). Camera khud bolne wale pe jaata hai. Max 4 characters.
 - Sound GitHub ko run ke saath jaata hai (page ka token sirf run chala sakta hai): isliye page use chhota karta hai (Opus, mono) aur ~30-40 sec tak ka hissa hi bhejta hai. Run ke log me sound nahi chhapta (par repo public hai to run ke input me hota hai).
 - Instagram: sound video ke andar hai, isliye reel us sound ke trending page pe nahi judti, aur copyright wale gaane pe Instagram reel ki awaaz band (mute) kar sakta hai. Dialogue / meme sounds me aksar dikkat nahi hoti.
 - Command line: `python -m studio.script x.txt -o x.json && python -m studio.render x.json -o out/x.mp4` (sound ke saath; `--silent-copy` = saath me bina sound wali `out/x.insta.mp4` bhi). `python -m studio.sound analyze file.m4a` = Gemini ne kya suna (JSON).

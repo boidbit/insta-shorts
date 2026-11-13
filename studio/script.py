@@ -72,7 +72,8 @@ from .characters import (ACCESSORIES, EXPRESSIONS, FACE_PARTS, FACE_WORDS, HAIR_
                          LOOKS, MARKS, OUTFITS, PALETTE, face_word,
                          SKIN_TONES)
 from .util import asset_path
-from .scene import (CTA_STYLES, DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLOTS, apply_cta, apply_loop, chat_length,
+from .scene import (CTA_STYLES, DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLOTS, apply_cta, apply_loop, auto_slots,
+                    chat_length, slots_for,
                     mascot_kind)
 
 HEADERS = ("HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP",
@@ -643,8 +644,8 @@ def _stage(tokens, ev, scene_cast, who):
 
 def _slot_x(cast, name):
     n = len(cast)
-    slots = SLOTS.get(n, SLOTS[3])
-    names = ["center"] if n == 1 else (["left", "right"] if n == 2 else ["left", "center", "right"])
+    slots = slots_for(n)
+    names = auto_slots(n)
     return slots[names[min(cast.index(name), len(names) - 1)]], names[min(cast.index(name), len(names) - 1)]
 
 
@@ -1619,8 +1620,8 @@ def parse_script(text):
             scene["mascot"] = {"kind": mascot_kind(v)}
         elif v not in OFF_WORDS:
             warnings.append("MASCOT %r: bhoot, billi, chooha ya off likho" % meta["MASCOT"])
-    if len([n for n in cast if n != "NARRATOR"]) > 3:
-        warnings.append("more than 3 characters: the screen gets crowded")
+    if len([n for n in cast if n != "NARRATOR"]) > 4:
+        warnings.append("more than 4 characters: the screen gets crowded")
     return scene, warnings
 
 
