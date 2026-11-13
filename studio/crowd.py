@@ -66,6 +66,11 @@ LANES_2D = {
     "hospital": [(1320, -60, 1140, "walk")],
     "bank": [(1320, -60, 1140, "walk"), (1316, 860, 980, "stand")],
     "dhaba": [(1310, -60, 1140, "walk"), (1306, 640, 760, "stand")],
+    "park": [(1330, -60, 1140, "walk"), (1120, 360, 600, "stand")],
+    "buffet": [(1320, -60, 1140, "walk"), (1316, 900, 1040, "stand")],
+    "signal": [(1150, -60, 1140, "walk")],
+    "petrol_pump": [(1300, 820, 980, "stand")],
+    "call_center": [(1320, -60, 1140, "walk")],
 }
 STAND_ACTIONS = ("text", "idle", "drink", "phone_call", "look_around", "idle")
 PALE = 0.78                              # their colours, a little washed out next to the characters'

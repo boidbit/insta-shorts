@@ -394,6 +394,14 @@ Script me: `B -> touch_feet` phir `A -> bless`; `A (kaan_pakad, embarrassed): So
 
 `bakri` / `goat` (seeng, dadhi, hamesha chabaati hui), `murga` / `rooster` (laal kalgi, lambi poonch: subah ka alarm), `chhipkali` / `lizard` (deewar pe chipki, poonch hilati: "main toh yahin rehti hoon"), `machhar` / `mosquito` (sar ki oonchai pe bhinbhinata, lambi sui wali naak). Chhipkali aur machhar ke chehre hain, wo baat bhi karte hain (patli, tez awaaz). `B = chhipkali` likho; chhipkali ko zameen pe chahiye to JSON me `"floor": true`. Machhar maarne ka action: `A -> swat`.
 
+### Nayi jagahein: roz ki zindagi 🚪🌳🍛
+
+`ghar_darwaza` (flat ka darwaza: SHARMA ki nameplate, ghanti, toran, joote ka rack, seedhiyan; rishtedaar, delivery, padosi), `lift` (steel ki deewar, sheesha, 7th floor ka button panel: awkward silence), `park` (walking track, bench, jhoola-slide, peeche flats: morning walk aur gossip), `buffet` (shaadi ka khana: PANEER / DAL / PULAO / GULAB JAMUN, shamiyana, laal carpet), `restaurant` (booth, MENU board ke daam, latakti lights, shaam ki sadak wali khidki), `atm` ("Balance: Rs 47", CCTV ON, slips se bhara dabba), `petrol_pump` (DESI PETROLEUM, 107.48 ka board, do machine), `signal` (laal batti, 88 ka countdown, zebra crossing, flyover, "EMI sirf Rs 999" hoarding), `interview_room` (HR / MANAGER / CEO ke card, "Round 7 ??"), `call_center` (raat ke 2 baje, CALLS 487 / 600 ka target), `startup_office` (HUSTLE neon, bean bags, sticky notes, Q4 OKRs).
+
+- 2D aur 2.5D dono me (2.5D: aasmaan, imaaratein, khidki ka nazara alag parat me). Sabka apna look (`buffet` = utsav, `call_center` = daftar...) aur apni mystery; park, buffet, signal, petrol pump pe bheed bhi.
+- In jagahon pe likhawat hai, isliye CUT pe ye ulti (mirror) nahi hoti (`CUT reverse` likho tabhi).
+- Mandir jaan-boojh ke nahi banaya.
+
 ### Har jagah ka apna look 🎬 (`LOOK`) aur har video me ek ajeeb cheez 👀 (`MYSTERY`)
 
 **Look (colour grading):** ab har jagah apne rang me aati hai, apne aap. Kuch likhna nahi.

@@ -26,11 +26,12 @@ ALIASES = {"udan_tashtari": "ufo", "alien": "ufo", "man": "aadmi", "stranger": "
 OFF = ("off", "none", "nahi", "no")
 SKY = {"street", "bus_stop", "gully", "market", "gaon", "beach", "desert", "mountain_road", "cricket_ground",
        "school_ground", "night_road", "terrace", "balcony", "festival_street", "graveyard", "haunted_house",
-       "railway", "dhaba", "chai_tapri", "kirana", "jungle"}
+       "railway", "dhaba", "chai_tapri", "kirana", "jungle", "park", "petrol_pump", "signal"}
 INDOOR = set(decor.INDOOR) | {"room", "living_room", "kitchen", "bedroom", "office", "meeting_room", "classroom",
                               "school", "hostel", "library", "coaching", "exam_hall", "hospital", "bank",
                               "police_station", "jail", "gym", "salon", "canteen", "bathroom", "medical_store",
-                              "mobile_shop", "mithai_shop"}
+                              "mobile_shop", "mithai_shop", "ghar_darwaza", "lift", "atm", "buffet", "restaurant",
+                              "interview_room", "call_center", "startup_office"}
 RIDES = {"train", "bus", "metro", "plane", "car", "auto"}
 NIGHT_PLACES = {"night_road", "haunted_house", "graveyard", "terrace", "festival_street"}
 DUR = {"ufo": 3.8, "aadmi": 2.8, "toota_taara": 0.9, "aankhen": 2.6, "saaya": 2.6, "tasveer": 2.4, "jhapak": 1.1,

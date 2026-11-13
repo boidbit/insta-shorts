@@ -66,6 +66,27 @@ class Look(unittest.TestCase):
         self.assertIsNone(parts[0].mystery)
 
 
+class NewPlaces(unittest.TestCase):
+    def test_the_nov_2026_places_are_complete(self):
+        from studio import crowd, places_2026, styles
+        from studio.scene import WRITTEN_PLACES
+        root = os.path.join(os.path.dirname(__file__), "..")
+        for p in places_2026.NEW:
+            self.assertIn(p, vocab()["places"], p)
+            self.assertIn(p, look.PLACE_LOOK, p)
+            self.assertTrue(mystery.pool(p, False), p)
+            self.assertIn(p, WRITTEN_PLACES, p)
+            self.assertIn("auto:" + p, styles.NO_MIRROR, p)
+            self.assertTrue(os.path.exists(os.path.join(root, "assets", "places", p + ".jpg")), p)
+        self.assertIn("park", crowd.LANES_2D)
+
+    def test_a_cut_never_mirrors_their_signs(self):
+        from studio.scene import shot_angle
+        for k in range(1, 5):
+            self.assertFalse(shot_angle({"background": {"type": "atm"}, "angle": k}, "medium")["mirror"])
+        self.assertTrue(shot_angle({"background": {"type": "atm"}, "reverse": True}, "medium")["mirror"])
+
+
 class Mystery(unittest.TestCase):
     def test_every_video_gets_one_and_the_same_script_the_same_one(self):
         for place in ("room", "street", "night_road", "office", "gaon", "bus"):

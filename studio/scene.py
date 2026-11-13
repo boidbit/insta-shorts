@@ -30,6 +30,9 @@ SHOT_ALIASES = {"closeup": "close", "close_up": "close", "twoshot": "two_shot", 
 # Camera angle of a shot (CUT): the background is seen closer (a longer lens), from a side, or from the other side
 # (mirrored = the reverse shot). (zoom, centre x in logical px, mirror). Shot 0 of a place shows it all.
 ANGLES = [(1.0, 540.0, False), (1.25, 400.0, True), (1.25, 680.0, False), (1.4, 540.0, True)]
+# places whose drawing has writing on it (signs, boards, a nameplate): a CUT never shows them mirrored
+WRITTEN_PLACES = {"image", "ghar_darwaza", "lift", "park", "atm", "petrol_pump", "signal", "buffet", "restaurant",
+                  "interview_room", "call_center", "startup_office"}
 
 
 def shot_angle(scene, framing):
@@ -48,8 +51,8 @@ def shot_angle(scene, framing):
         out = dict(zoom=1.0, x=540.0, mirror=False)
     if scene.get("reverse"):
         out["mirror"] = True
-    if (scene.get("background") or {}).get("type") == "image" and not scene.get("reverse"):
-        out["mirror"] = False                   # a photo may have writing on it: mirror only when asked
+    if (scene.get("background") or {}).get("type") in WRITTEN_PLACES and not scene.get("reverse"):
+        out["mirror"] = False                   # a photo / a place with signs on it: mirror only when asked
     out["zoom"] = clamp(out["zoom"], 1.0, 1.6)
     return out
 

@@ -79,7 +79,9 @@ OWN_TIME = {"train_25d", "bus_25d", "metro_25d", "plane_25d", "car_25d", "auto_2
                          "auto_pov", "auto_mirror")}
 # sets with writing on them (shop signs, menus, boards) are never mirrored for a reverse shot (the text would read
 # backwards). The 2d look mirrors every place, as it always has.
-NO_MIRROR = {"gali_25d", "classroom_25d", "office_25d", "meeting_25d", "street_25d", "busstop_25d", "market_25d",
+NO_MIRROR = {"auto:ghar_darwaza", "auto:lift", "auto:atm", "auto:petrol_pump", "auto:signal", "auto:buffet",
+             "auto:restaurant", "auto:interview_room", "auto:call_center", "auto:startup_office", "auto:park",
+             "gali_25d", "classroom_25d", "office_25d", "meeting_25d", "street_25d", "busstop_25d", "market_25d",
              "festival_25d", "railway_25d", "street_road_25d", "busstop_road_25d", "hospital_25d", "bank_25d",
              "police_25d", "court_25d", "canteen_25d",
              "dhaba_25d", "mithai_25d", "mobile_25d", "medical_25d", "salon_25d", "mall_25d", "cinema_25d",
@@ -152,6 +154,10 @@ def scene_style(scene):
 
 
 FLAT_IN_25D = {"image", "plain"}       # stay as they are in 2.5D too (your own photo, the plain colour)
+# places that have no hand-made 2.5D set yet: their own 2D drawing is split into depth layers (autoset).
+# Hand-made sets for them are still to do (Nov 2026).
+AUTO_ONLY_25D = {"ghar_darwaza", "lift", "park", "atm", "petrol_pump", "signal", "buffet", "restaurant",
+                 "interview_room", "call_center", "startup_office"}
 
 
 def has_depth(kind):
