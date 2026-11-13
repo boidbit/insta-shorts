@@ -862,7 +862,10 @@ def parse_lyrics(meta, lyrics):
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp")
 
 
-UI_WORDS = ("NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
+UI_WORDS = ("NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD", "WHATSAPP", "INSTA",
+            "ORDER", "UPI")
+APP_COLORS = {"zomato": [226, 55, 68], "swiggy": [252, 128, 25], "blinkit": [248, 203, 70], "zepto": [90, 30, 150],
+              "amazon": [35, 47, 62], "flipkart": [40, 116, 240]}
 
 
 def ui_line(key, val):
@@ -890,6 +893,35 @@ def ui_line(key, val):
         return {"type": "counter", "label": parts[0], "start": a, "end": b}, 2.6, None
     if key == "TIMECARD":
         return {"type": "timecard", "text": parts[0]}, 1.6, None
+    if key == "WHATSAPP":                               # WHATSAPP: Mummy | < Kahan ho? | > Library me | < Photo bhejo
+        msgs = []
+        for p in parts[1:]:
+            if not p:
+                continue
+            me = p.startswith(">")
+            msgs.append({"side": "me" if me else "them", "text": p.lstrip("<>").strip(), "at": 0.4 + 1.1 * len(msgs)})
+        if not msgs:
+            return None, 0, "WHATSAPP: 'WHATSAPP: Mummy | < Kahan ho? | > Library me' likho (< unka, > apna message)"
+        hold = 0.4 + 1.1 * len(msgs) + 1.0
+        return {"type": "phone_chat", "title": parts[0], "messages": msgs, "dur": hold + 0.3}, hold, None
+    if key == "INSTA":                                  # INSTA: bittu_official | 2 | Exam ke pehle chill 😎 | 🏖️
+        likes = re.sub(r"[^\d]", "", parts[1]) if len(parts) > 1 else ""
+        spec = {"type": "insta", "user": parts[0].lstrip("@"), "likes": int(likes or 0),
+                "caption": parts[2] if len(parts) > 2 else "", "dur": 3.0}
+        if len(parts) > 3 and parts[3]:
+            spec["emoji"] = parts[3]
+        return spec, 2.7, None
+    if key == "ORDER":                                  # ORDER: Zomato | Paneer Butter Masala | Rs 349 | Delivered
+        spec = {"type": "order", "app": parts[0], "item": parts[1] if len(parts) > 1 else "",
+                "price": parts[2] if len(parts) > 2 else "", "status": parts[3] if len(parts) > 3 else
+                "Out for delivery", "eta": parts[4] if len(parts) > 4 else "", "dur": 3.2}
+        if parts[0].strip().lower() in APP_COLORS:
+            spec["color"] = APP_COLORS[parts[0].strip().lower()]
+        return spec, 2.9, None
+    if key == "UPI":                                    # UPI: Rs 2000 | Sharma ji | Payment successful (or failed)
+        spec = {"type": "upi", "amount": parts[0], "payee": parts[1] if len(parts) > 1 else "",
+                "status": parts[2] if len(parts) > 2 else "Payment successful", "dur": 2.4}
+        return spec, 2.1, None
     if key == "CHAPTER":
         spec = {"type": "chapter", "text": parts[0]}
         if len(parts) > 1:
@@ -1156,7 +1188,8 @@ HEADER_WORDS = ("HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", 
                 "DRESS",
                 "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD", "LOOK", "MYSTERY", "SERIES",
                 "NARRATOR",
-                "LIGHTS", "AMBIENCE", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
+                "LIGHTS", "AMBIENCE", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD", "WHATSAPP",
+                "INSTA", "ORDER", "UPI")
 
 
 def unflatten(text):
@@ -1457,7 +1490,8 @@ def _parse_script(text):
             if frame == "ots":
                 cur["back"] = back
             continue
-        m = re.match(r"^(NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)\s*:\s*(.*)$", line, re.I)
+        m = re.match(r"^(NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD|WHATSAPP|INSTA|ORDER|UPI)\s*:\s*(.*)$",
+                     line, re.I)
         if m:
             if cur is None:
                 cur = new_scene()

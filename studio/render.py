@@ -153,7 +153,8 @@ class OverlayLayer:
         return self._cache[key]
 
     UI_DUR = {"notification": 3.0, "loading": 3.0, "counter": 3.0, "timecard": 1.6, "chapter": 2.2}
-    UI_POS = {"notification": (540, 150), "loading": (540, 900), "counter": (540, 720), "chapter": (540, 330)}
+    UI_POS = {"notification": (540, 150), "loading": (540, 900), "counter": (540, 720), "chapter": (540, 330),
+              "phone_chat": (540, 820), "insta": (540, 760), "order": (540, 700), "upi": (540, 740)}
 
     def _draw_ui(self, img, o, t, t0, t1):
         """Phone notification, loading bar, counter, time card, chapter card, end card (studio/ui.py)."""

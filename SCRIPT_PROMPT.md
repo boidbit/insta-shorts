@@ -94,7 +94,7 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5
 <!-- /module -->
 <!-- module: cards -->
 - Lights: `LIGHTS: off` (dark; lamps and TVs that are on keep glowing), `LIGHTS: dim`, `LIGHTS: on`.
-- Screen cards (a line of their own; the story waits until they can be read): `NOTIFY: Bank | Salary credited Rs 50,000 | Balance: Rs 50,012` (phone notification: app | title | text), `LOADING: Dimaag loading...`, `COUNTER: Balance | 50000 | 12` (a number counts from the first value to the second), `TIMECARD: 3 ghante baad...`, `CHAPTER: Chapter 2 | Exam ka din`, `ENDCARD: Follow karo | @page`.
+- Screen cards (a line of their own; the story waits until they can be read): `NOTIFY: Bank | Salary credited Rs 50,000 | Balance: Rs 50,012` (phone notification: app | title | text), `LOADING: Dimaag loading...`, `COUNTER: Balance | 50000 | 12` (a number counts from the first value to the second), `TIMECARD: 3 ghante baad...`, `CHAPTER: Chapter 2 | Exam ka din`, `ENDCARD: Follow karo | @page`. Phone screens: `WHATSAPP: Mummy | < Kahan ho? | > Library me 📚 | < Photo bhejo` (< their message, > mine; they appear one by one), `INSTA: bittu_official | 2 | Exam se pehle chill 😎 | 🏖️` (user | likes | caption | picture emoji), `ORDER: Zomato | Paneer Butter Masala | Rs 349 | Out for delivery`, `UPI: Rs 2000 | Sharma ji | Payment failed` (a green tick, or a red cross when it failed). Use one when the joke is on a phone.
 <!-- /module -->
 <!-- module: dance -->
 - A line with only a dance (`A -> naagin sly`) is shown ~1.6 s; the dance goes on in the background until that character gets another action.

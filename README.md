@@ -417,6 +417,21 @@ D (smug): AC kaun chalata hai raat bhar? | एसी कौन चलाता �
 - Script me apni CAST line ho to wahi chalti hai; series bas baaki log jod deti hai.
 - Do series pehle se: `sharma_parivar` (P = papa, M = mummy, B = Bittu, D = dadi) aur `office_gang` (S = boss, R = Riya, I = intern, K = Kapoor). Nayi series: `series/meri_series.json` banao (inhi jaisi).
 
+### Phone ki screen kahani ke beech 📱 (WHATSAPP, INSTA, ORDER, UPI)
+
+Ek line, apni jagah pe (kahani us card ke dikhne tak rukti hai):
+```
+WHATSAPP: Mummy | < Kahan ho? | > Library me 📚 | < Photo bhejo
+INSTA: bittu_official | 2 | Exam se pehle chill 😎 | 🏖️
+ORDER: Zomato | Paneer Butter Masala | Rs 349 | Out for delivery | 10 min
+UPI: Rs 2000 | Sharma ji | Payment failed
+```
+- `WHATSAPP`: chat ek-ek message karke bharta hai (`<` unka, `>` apna), beech me "typing..." bhi.
+- `INSTA`: post: user, rangeen photo pe emoji, dil dhadakta hai aur likes ginti me badhte hain, caption.
+- `ORDER`: delivery tracker: Zomato / Swiggy / Blinkit / Zepto / Amazon / Flipkart ka apna rang, khaana + daam, status badalta hai (Order placed → Cooking → aapka status), scooter wala aage badhta hai.
+- `UPI`: amount, kisko, aur hara tick (ya "failed / declined / nahi" ho to laal cross).
+- Page ke Builder me "📱 Screen card" me bhi ye chaaron hain.
+
 ### Har jagah ka apna look 🎬 (`LOOK`) aur har video me ek ajeeb cheez 👀 (`MYSTERY`)
 
 **Look (colour grading):** ab har jagah apne rang me aati hai, apne aap. Kuch likhna nahi.

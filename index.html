@@ -562,7 +562,7 @@ async function checkConnection(openOnFail = false) {
 const V = JSON.parse($("vocab").textContent);
 const SET = Object.fromEntries(Object.entries(V).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, new Set(v)]));
 const HEADERS = new Set(["HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "DRESS", "OBJ", "LIGHTS", "LIGHT", "AMBIENCE", "CROWD", "LOOK", "MYSTERY", "SERIES",
-  "NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD"]);
+  "NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD", "WHATSAPP", "INSTA", "ORDER", "UPI"]);
 const ON_WORDS = ["on", "yes", "haan", "true", "1"], OFF_WORDS = ["off", "no", "nahi", "false", "0", "none"];
 const MASCOTS = ["bhoot", "billi", "chooha", "ghost", "cat", "chuha", "mouse"];
 const words = (s) => s.toLowerCase().split(/[\s,|]+/).map((w) => w.replace(/^[\[\](){}'"]+|[\[\](){}'"]+$/g, "")).filter(Boolean);
@@ -668,7 +668,7 @@ function lintScript(text) {
       const key = m[1].toUpperCase(), val = m[2].trim();
       if (key === "HOOK") hook = !!val;
       if (key === "CTA") cta = !!val;
-      if (["NOTIFY", "NOTIFICATION", "LOADING", "TIMECARD", "CHAPTER", "ENDCARD"].includes(key)) {
+      if (["NOTIFY", "NOTIFICATION", "LOADING", "TIMECARD", "CHAPTER", "ENDCARD", "WHATSAPP", "INSTA", "ORDER", "UPI"].includes(key)) {
         if (!val) out.push(`${key}: ke baad text likho`);
         continue;
       }
@@ -817,7 +817,7 @@ const EMO = { gussa: "angry", ghussa: "angry", hairan: "surprised", shock: "shoc
 const EMO_CHIPS = [["😠", "gussa"], ["😲", "hairan"], ["😱", "shock"], ["😏", "akad"], ["😂", "hasi"], ["😢", "rona"],
   ["🤔", "soch"], ["😍", "pyaar"], ["😈", "chalak"], ["😄", "khush"], ["📢", "chilla"], ["💀", "mar"],
   ["👀", "judge"], ["😠", "ghoor"], ["🤤", "laar"], ["🤑", "paisa"], ["😅", "sharminda"]];
-const HEADER_RE = /^(HOOK|CAST|SOUND|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|OBJ|LIGHTS?|AMBIENCE|CROWD|LOOK|MYSTERY|SERIES|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)\s*:\s*(.*)$/i;
+const HEADER_RE = /^(HOOK|CAST|SOUND|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|OBJ|LIGHTS?|AMBIENCE|CROWD|LOOK|MYSTERY|SERIES|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD|WHATSAPP|INSTA|ORDER|UPI)\s*:\s*(.*)$/i;
 const SAY_RE = /^([A-Za-z][\w ]{0,24}?)\s*(?:\(([^)]*)\))?\s*:\s*(\S.*)$/;
 const ACT_RE = /^([A-Za-z][\w ]{0,24}?)\s*->\s*(\S.*)$/;
 const DEFAULT_CTA = "Apne dost ko tag karo 👇";
@@ -945,7 +945,7 @@ function buildScript(text, b, style = "2d") {
     if (!line) { rows.push({ cut: "CUT" }); continue; }
     if (/^(CUT|SHOT)\b/i.test(line)) { rows.push({ cut: line, own: true }); continue; }
     if ((m = line.match(HEADER_RE))) {
-      if (/^(OBJ|LIGHTS?|AMBIENCE|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)$/i.test(m[1])) rows.push({ raw: line });   // story lines: kept in place
+      if (/^(OBJ|LIGHTS?|AMBIENCE|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD|WHATSAPP|INSTA|ORDER|UPI)$/i.test(m[1])) rows.push({ raw: line });   // story lines: kept in place
       else meta[m[1].toUpperCase()] = m[2].trim();
       continue;
     }
@@ -1001,7 +1001,7 @@ function buildScript(text, b, style = "2d") {
 // Mirrors unflatten() in studio/script.py.
 function unflatten(text) {
   if ((text.match(/\n/g) || []).length >= 3 || !/\b(HOOK|CAST|SCENE)\s*:/.test(text)) return text;
-  const heads = "HOOK|CAST|SOUND|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|OBJ|NARRATOR|LIGHTS|AMBIENCE|CROWD|LOOK|MYSTERY|SERIES|NOTIFY|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD";
+  const heads = "HOOK|CAST|SOUND|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|OBJ|NARRATOR|LIGHTS|AMBIENCE|CROWD|LOOK|MYSTERY|SERIES|NOTIFY|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD|WHATSAPP|INSTA|ORDER|UPI";
   let t = text.trim().replace(new RegExp(`\\s+(?=(?:${heads})\\s*:)`, "g"), "\n");
   t = t.replace(new RegExp(`\\s+(?=(?:CUT|SHOT)\\b(?:\\s+(?:${V.framings.join("|")}|reverse|over|[A-Z]\\w*))*\\s+[A-Z]\\w*\\s*[(:\\-])`, "g"), "\n");
   const cast = (t.match(/^CAST\s*:\s*(.*)$/m) || [, ""])[1];
@@ -1020,7 +1020,7 @@ function unflatten(text) {
 // Items: blank | raw {text} | cut {text} | head {key, value} (HOOK CTA CAPTION HASHTAGS STYLE) | cast {chars} |
 // scene {place, words, title} | obj {what, rest} | screen {key, value} | line {who, acting[], text, dev}
 // (a line without text is an action line: "P -> facepalm"). `orig` = the line as it was written.
-const SCREEN_KEYS = ["NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD"];
+const SCREEN_KEYS = ["NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD", "WHATSAPP", "INSTA", "ORDER", "UPI"];
 const TEXT_KEYS = ["HOOK", "CTA", "CAPTION", "HASHTAGS", "STYLE"];
 const CAM_WORDS = ["zoom", "slowmo", "slow_motion"];
 const GROUP_AFTER = { enter: ["left", "right", "back", "pop", "fast", "peek"], exit: ["left", "right", "fast"],
@@ -1805,10 +1805,13 @@ const openAdv = new WeakSet(), openChars = new WeakSet();   // open ⚙️ panel
 const TIME_NAMES = { day: "☀️ Din", night: "🌙 Raat", evening: "🌆 Shaam", sunset: "🌇 Sunset", dawn: "🌅 Subah",
   rain: "🌧️ Baarish", fog: "🌫️ Kohra", snow: "❄️ Barf", fireflies: "✨ Jugnu", leaves: "🍂 Patte" };
 const SCREEN_NAMES = { NOTIFY: "📱 Phone notification", LOADING: "⏳ Loading", COUNTER: "🔢 Ginti (counter)",
-  TIMECARD: "⏰ Time card", CHAPTER: "📖 Chapter", ENDCARD: "🏁 End card" };
+  TIMECARD: "⏰ Time card", CHAPTER: "📖 Chapter", ENDCARD: "🏁 End card", WHATSAPP: "💬 WhatsApp chat",
+  INSTA: "📸 Insta post", ORDER: "🛵 Food order", UPI: "💸 UPI payment" };
 const SCREEN_HINT = { NOTIFY: "Bank | Salary credited | Balance: Rs 12", NOTIFICATION: "Bank | Salary credited | Balance: Rs 12",
   LOADING: "Dimaag loading...", COUNTER: "Balance | 50000 | 12", TIMECARD: "3 ghante baad...",
-  CHAPTER: "Chapter 2 | Exam ka din", ENDCARD: "Follow karo | @page" };
+  CHAPTER: "Chapter 2 | Exam ka din", ENDCARD: "Follow karo | @page",
+  WHATSAPP: "Mummy | < Kahan ho? | > Library me 📚 | < Photo bhejo", INSTA: "bittu_official | 2 | Exam se pehle chill 😎 | 🏖️",
+  ORDER: "Zomato | Paneer Butter Masala | Rs 349 | Out for delivery", UPI: "Rs 2000 | Sharma ji | Payment failed" };
 const ENTRY_ACTS = ["enter left", "enter right", "enter back", "enter pop", "enter left fast", "enter right fast",
   "exit left", "exit right", "exit left fast", "exit right fast", "walk left", "walk center", "walk right"];
 const FEEL_WORD = Object.fromEntries(EMO_CHIPS.map(([icon, w]) => [EMO[w] || w, [icon, w]]));   // angry -> 😠 gussa
