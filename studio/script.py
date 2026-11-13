@@ -469,12 +469,14 @@ def ots_back(sc, before, order, cast):
 # plain words a writer (or a chat AI) often uses for a feeling or an action -> the studio's own word, so a script
 # written with "happy", "gussa", "running" still acts (the writer prompt then needs fewer rules)
 FEEL_WORDS = {
+    "ghoorna": "stare", "ghoor": "stare", "staring": "stare", "judging": "side_eye", "sideeye": "side_eye",
+    "laar": "drool", "drooling": "drool", "lalach": "money_eyes", "paisa": "money_eyes", "sharminda": "embarrassed",
     "happy": "smile", "khush": "smile", "cheerful": "smile", "smiling": "smile", "gusse": "angry", "ghussa": "angry",
     "naraz": "angry", "naraaz": "angry", "irritated": "angry", "annoyed": "angry", "frustrated": "angry",
     "furious": "angry", "mad": "angry", "dukhi": "sad", "upset": "sad", "udaas": "sad", "udas": "sad",
     "worried": "nervous", "tension": "nervous", "tense": "nervous", "anxious": "nervous", "ghabraya": "nervous",
     "darr": "scared", "dara": "scared", "afraid": "scared", "hairan": "surprised", "shocked": "shock",
-    "amazed": "surprised", "confident": "proud", "tired": "sleepy", "thaka": "sleepy", "embarrassed": "shy",
+    "amazed": "surprised", "confident": "proud", "tired": "sleepy", "thaka": "sleepy",
     "sharma": "shy", "sarcastic": "smug", "naughty": "sly", "mischievous": "sly", "serious": "neutral",
     "calm": "relaxed", "chill": "relaxed", "crying": "cry", "rona": "cry", "laughing": "laugh", "hasna": "laugh",
     "thinking": "think", "soch": "think", "romantic": "love", "pyaar": "love", "disgusted": "disgust",

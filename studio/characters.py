@@ -315,8 +315,16 @@ EXPRESSIONS = {
     "excited": ("wide", "laugh", "up"),
     "blush": ("happy", "smile", None),
     "kiss": ("closed", "o", None),
+    # the faces of the comments section
+    "side_eye": ("side", "flat", "think"),          # judging from the corner of the eye
+    "stare": ("stare", "flat", "angry"),            # ghoorna: the parent's stare
+    "eye_roll": ("roll", "flat", None),             # oh please
+    "drool": ("wide", "drool", "up"),               # food (or anything else) worth drooling over
+    "money_eyes": ("money", "grin", "up"),          # paisa hi paisa
+    "embarrassed": ("dot", "wavy", "sad"),          # caught: blush and a drop of sweat
 }
-BLUSH = {"shy", "blush", "love", "kiss"}
+BLUSH = {"shy", "blush", "love", "kiss", "embarrassed"}
+SWEAT_DROP = {"embarrassed", "nervous"}
 TEARS = {"cry", "lol"}
 # Eyes that should not be replaced by a "blink"
 NO_BLINK = {"happy", "relaxed", "closed", "x", "heart", "wink", "spiral"}
@@ -1418,6 +1426,7 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         eyes = "closed"
     fdx = (face_f if face_f is not None else facing) * 14 + p["look_x"] * 5
     lx, ly = p["look_x"] * 7, p["look_y"] * 5
+    side_k = -1.0 if (face_f if face_f is not None else facing) > 0 else 1.0    # a side-eye looks the other way
 
     for sgn in (-1, 1):
         cx, cy = _eye_center(sgn, fdx)
@@ -1474,6 +1483,27 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         elif eyes == "spiral":
             hline([(cx + (2 + i * 0.9) * math.cos(i * 0.45 + t * 9 * sgn), cy + (2 + i * 0.9) * math.sin(i * 0.45 + t * 9 * sgn))
                    for i in range(22)], 4)
+        elif eyes == "side":            # the pupils pushed into the corner the head looks away from, lids low
+            hpoly(closed_ellipse(cx, cy + 2, 21, 15, 28), WHITE, INK, 5)
+            hpoly(closed_ellipse(cx + side_k * 11, cy + 4, 8, 9, 18), INK, None)
+            lid = ellipse_pts(cx, cy + 2, 22, 16, 16, 180, 360) + [(cx + 22, cy - 1), (cx - 22, cy - 1)]
+            hpoly([(a, min(b, cy - 1)) for a, b in lid], skin, None)
+            hline([(cx - 23, cy - 1), (cx + 23, cy - 1)], 6)
+        elif eyes == "stare":           # a hard narrow stare, small pupils
+            hpoly(closed_ellipse(cx, cy + 2, 21, 11, 28), WHITE, INK, 5)
+            hpoly(closed_ellipse(cx + lx, cy + 2, 5.5, 6.5, 14), INK, None)
+            hline([(cx - 23, cy - 9 + sgn * 3), (cx + 23, cy - 9 - sgn * 3)], 6)
+        elif eyes == "roll":            # white eyes, the pupils gone up under the lids
+            hpoly(closed_ellipse(cx, cy, 20, 18, 28), WHITE, INK, 5)
+            hpoly(closed_ellipse(cx + sgn * 2, cy - 12, 9, 6, 14), INK, None)
+            hline(ellipse_pts(cx, cy, 20, 18, 14, 200, 340), 5)
+        elif eyes == "money":           # rupee signs for eyes
+            hpoly(closed_ellipse(cx, cy, 21, 23, 28), (236, 248, 226), INK, 5)
+            g = (40, 140, 60)
+            hline([(cx - 10, cy - 12), (cx + 10, cy - 12)], 5, g)
+            hline([(cx - 10, cy - 5), (cx + 10, cy - 5)], 5, g)
+            hline([(cx - 10, cy - 12)] + bezier((cx + 2, cy - 12), (cx + 14, cy - 6), (cx - 6, cy + 1), 6)
+                  + [(cx + 9, cy + 15)], 5, g)
         elif eyes == "wink":
             if sgn < 0:
                 hline(ellipse_pts(cx, cy + 8, 20, 17, 16, 200, 340), 7)
@@ -1534,6 +1564,8 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     if beard != "none":
         _beard(hline, hpoly, beard, skin, hcol, fdx, fx, fy)
 
+    if expr in SWEAT_DROP:              # a drop of sweat at the temple
+        hpoly([(fdx + 60, -78), (fdx + 70, -52)] + ellipse_pts(fdx + 64, -50, 10, 11, 10, 0, 180), TEAR, INK, 3)
     # tears
     if expr in TEARS:
         for sgn in (-1, 1):
@@ -1597,6 +1629,11 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         open_mouth(fdx, my + 14, 24, 34, teeth=False)
     elif mouth == "wavy":
         hline([(fdx - 30 + i * 7.5, my + 10 + (5 if i % 2 else -5)) for i in range(9)], 6)
+    elif mouth == "drool":              # open a little, a drop running down from the corner
+        open_mouth(fdx, my + 8, 22, 14, teeth=False)
+        dy = (t * 0.7) % 1.0
+        hline([(fdx + 18, my + 14), (fdx + 20, my + 26 + 30 * dy)], 6, (170, 210, 240))
+        hpoly(closed_ellipse(fdx + 20, my + 32 + 30 * dy, 6, 8, 12), (170, 210, 240), INK, 3)
     else:  # flat
         hline([(fdx - 22, my + 10), (fdx + 22, my + 10)], 7)
     if "dimple" in marks and mouth in ("smile", "grin", "laugh", "smirk"):

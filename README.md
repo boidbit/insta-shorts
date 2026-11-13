@@ -367,6 +367,10 @@ Instagram grid me saari reels ek jaisi na lagein, isliye har video ka apna look 
 - Nayi cheezein bhi kisi ko bhi: `sweater`, `beret`, `bowtie`, `backpack` (CAST me: `A = uncle sweater glasses`), haath me `spanner`.
 - Awaaz: school wale bachche patli, baba aur master ji bhaari aur dheemi, boss aur fauji thodi bhaari.
 
+### Naye chehre (comments wale) 👀
+
+`side_eye` (aankh ke kone se judge karna), `stare` (ghoorna: mummy-papa wala), `eye_roll` (aankh ghumana), `drool` (khaana dekh ke laar), `money_eyes` (aankhon me ₹), `embarrassed` (laal gaal + maathe pe paseene ki boond). Hinglish me bhi: `ghoorna`, `judging`, `laar`, `paisa` / `lalach`, `sharminda`. Page ke Builder me inke chips bhi hain (👀 🤤 🤑 😅).
+
 ### Har jagah ka apna look 🎬 (`LOOK`) aur har video me ek ajeeb cheez 👀 (`MYSTERY`)
 
 **Look (colour grading):** ab har jagah apne rang me aati hai, apne aap. Kuch likhna nahi.

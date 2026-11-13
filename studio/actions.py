@@ -412,19 +412,19 @@ def _n(t, ph=0.0):
     return (sin(t * 0.73 + ph) * 0.5 + sin(t * 1.37 + ph * 2.1) * 0.3 + sin(t * 2.91 + ph * 3.7) * 0.2)
 
 
-ANGRY = {"angry", "shout", "determined", "disgust"}
+ANGRY = {"angry", "shout", "determined", "disgust", "stare"}
 
 
-HAPPY = {"smile", "grin", "laugh", "lol", "excited", "love", "wink", "blush"}
+HAPPY = {"smile", "grin", "laugh", "lol", "excited", "love", "wink", "blush", "drool", "money_eyes"}
 
 
 SAD = {"sad", "cry", "hurt", "bored", "sleepy", "yawn"}
 
 
-SCARED = {"scared", "nervous", "shock", "surprised", "cringe", "dizzy"}
+SCARED = {"scared", "nervous", "shock", "surprised", "cringe", "dizzy", "embarrassed"}
 
 
-COOL = {"smug", "sly", "proud", "evil", "kiss"}
+COOL = {"smug", "sly", "proud", "evil", "kiss", "side_eye", "eye_roll"}
 
 
 THINK = {"think", "confused", "shh"}
