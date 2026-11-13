@@ -452,8 +452,9 @@ def _wide_layer(s, tint):
     return G(s, w=LW * 2, color=tuple(tint) + (0,), mode="RGBA")
 
 
-def night_road(s):
+def night_road(s, footpath=False):
     """Returns (static sky gradient, [wide RGBA layer, ...]) back-to-front, one per NIGHT_LAYER_SPEEDS.
+    footpath (the new camera): the road runs behind the people, who walk on the near footpath.
     Every wide layer repeats every 1080 logical px; each tile is also drawn one tile to the left and
     to the right of the canvas so shapes that overhang a tile edge continue into the neighbour and
     nothing pops when the scroll wraps."""
@@ -491,9 +492,21 @@ def night_road(s):
 
     # ground: footpath, road, lane marks, lamp post (moves at the full scroll speed)
     gr = _wide_layer(s, (30, 32, 50))
-    gr.rect(0, 1240, LW * 2, 1380, (30, 32, 50))           # footpath
-    gr.rect(0, 1380, LW * 2, LH, (26, 26, 36))               # road
-    gr.line([(0, 1380), (LW * 2, 1380)], (60, 62, 90), 6)
+    if footpath:
+        gr.rect(0, 1240, LW * 2, 1300, (30, 32, 50))       # the far footpath
+        gr.rect(0, 1300, LW * 2, 1540, (26, 26, 36))        # the road
+        gr.line([(0, 1300), (LW * 2, 1300)], (60, 62, 90), 6)
+        gr.rect(0, 1540, LW * 2, 1566, (70, 70, 84))        # the kerb and the near footpath the people walk on
+        gr.rect(0, 1566, LW * 2, LH, (44, 46, 64))
+        gr.line([(0, 1540), (LW * 2, 1540)], (80, 82, 110), 6)
+        for x in range(0, LW * 2, 150):
+            gr.line([(x, 1566), (x - 60, LH)], (36, 38, 54), 4)
+        for y in (1650, 1780):
+            gr.line([(0, y), (LW * 2, y)], (36, 38, 54), 4)
+    else:
+        gr.rect(0, 1240, LW * 2, 1380, (30, 32, 50))           # footpath
+        gr.rect(0, 1380, LW * 2, LH, (26, 26, 36))               # road
+        gr.line([(0, 1380), (LW * 2, 1380)], (60, 62, 90), 6)
     # lamp glow: smooth radial falloff (a patch per lamp, not stacked flat discs)
     R = 190
     n = int(2 * R * gr.k)
@@ -505,7 +518,8 @@ def night_road(s):
     patch = Image.fromarray(patch, "RGBA")
     for ox in (0, LW):
         for xx_ in (20, 380, 740):
-            gr.rect(ox + xx_, 1700, ox + xx_ + 190, 1722, (214, 196, 120))
+            ly_ = 1410 if footpath else 1700                    # the lane marks, in the middle of the road
+            gr.rect(ox + xx_, ly_, ox + xx_ + 190, ly_ + (14 if footpath else 22), (214, 196, 120))
         lx = ox + 300
         gr.line([(lx, 1260), (lx, 780)], (14, 14, 22), 16)
         gr.line([(lx, 790), (lx + 90, 790)], (14, 14, 22), 12)
@@ -578,6 +592,28 @@ def fg_bench(s):
     return g
 
 
+def fg_bus_shelter(s):
+    """The bus shelter on the near footpath (new camera): a piece in front of the road and its traffic, behind the
+    people waiting at it. Its glass back lets the traffic show through."""
+    g = _fg_canvas(s)
+    g.ellipse(-40, 1580, 700, 1640, (0, 0, 0, 50))
+    g.rect(-20, 900, 640, 1600, (190, 226, 240, 110), INK, 5)               # the glass back
+    g.rect(10, 960, 220, 1300, (240, 200, 90), INK, 5)                      # the poster
+    g.circle(115, 1110, 44, (214, 70, 64), INK, 4)
+    g.rrect(260, 1420, 610, 1456, 8, (150, 104, 68), INK, 6)                # the bench
+    g.rect(284, 1456, 300, 1600, INK)
+    g.rect(570, 1456, 586, 1600, INK)
+    for x in (-30, 640):                                                    # posts
+        g.rect(x - 12, 860, x + 12, 1640, (90, 110, 130), INK, 4)
+    g.rect(-60, 800, 700, 862, (70, 150, 150), INK, 6)                       # the roof
+    g.line([(880, 1650), (880, 820)], INK, 12)                               # the bus-stop pole and its sign
+    g.circle(880, 790, 64, (60, 110, 200), INK, 7)
+    g.rrect(850, 766, 910, 810, 8, (255, 255, 255), INK, 4)
+    g.circle(862, 816, 7, INK, INK, 2)
+    g.circle(898, 816, 7, INK, INK, 2)
+    return g
+
+
 def fg_poles(s):
     """Dark tree trunks that sweep past in front of everything (scrolls faster than the ground)."""
     g = _wide_layer(s, (7, 8, 16))
@@ -595,6 +631,7 @@ FG_PROPS = {
     "desk": (fg_desk, 1620, None),
     "bench": (fg_bench, 1620, None),
     "poles": (fg_poles, FG_FRONT, 1.6),
+    "bus_shelter": (fg_bus_shelter, 1610, None),
 }
 DEFAULT_FG = {"night_road": ["poles"]}      # everything else: none unless the scene asks
 
@@ -607,9 +644,27 @@ AMBIENT = {
     "bus_stop": [("cloud", 220, 11, 1.0), ("cloud", 460, 7, 0.7), ("birds", 360, 55, 2), ("traffic", 1470, 0.42, 7.5)],
     "school": [("birds", 110, 48, 2)],
 }
-# the new camera: the traffic is in proportion to the people (a car on the far lane is about half a person tall, not
-# a toy), each with a driver at the wheel; ("traffic", y, scale, period, driven)
-TRAFFIC_NEW = {"street": ("traffic", 1600, 1.3, 8.0, True), "bus_stop": ("traffic", 1580, 1.2, 7.0, True)}
+# the new camera: the traffic is in proportion to the people (as big as the lane's distance makes it, not a toy), each
+# with a driver at the wheel; ("traffic", y, scale or {kind: scale}, period, driven)
+TRAFFIC_NEW = ("street", "bus_stop")            # their traffic with the new camera: new_traffic() below
+# The road places, the new camera: the people stand on the footpath in front (y 1700) and the road runs behind them
+# (studio.places_plus.*_footpath); a scene with a vehicle in it keeps the people on the road ("layout": "road").
+# Either way the traffic is in proportion to the people, as far away as its lane is.
+ROAD_PLACES = ("street", "bus_stop", "night_road", "mountain_road")
+
+
+def road_traffic(lane_y, horizon, period):
+    """("traffic", lane, {kind: scale}, period, driven): each vehicle as big as a real one would look on a lane at
+    lane_y (wheels), seen with the eye at `horizon`, next to people standing at y 1700."""
+    from .objects import PERSON_R, REF_SCALE
+    f = (lane_y - horizon) / (1700.0 - horizon)
+    return ("traffic", lane_y, {k: REF_SCALE * f / PERSON_R[k] for k in ("car", "auto", "truck", "bike")}, period, True)
+
+
+def new_traffic(kind, footpath):
+    """The traffic of a road place with the new camera."""
+    period = {"street": 8.0, "bus_stop": 7.0, "mountain_road": 12.0}.get(kind, 9.0)
+    return road_traffic(1470, 860, period) if footpath else road_traffic(1500, 900, period)
 TRAFFIC_KINDS = ("car", "auto", "truck", "car", "bike")
 TRAFFIC_COLORS = {"car": [(200, 50, 50), (240, 240, 236), (60, 100, 190), (160, 164, 172)]}
 
@@ -683,8 +738,13 @@ class Background:
         self.kind = spec.get("type", "plain")
         self.scroll = float(spec.get("scroll", 0.0))   # logical px per second
         self.ambient = AMBIENT.get(self.kind, []) if spec.get("ambient", True) else []
+        # the new camera: people on the footpath of a road place (unless a vehicle keeps them on the road)
+        footpath = self.kind in ROAD_PLACES and not spec.get("classic") and spec.get("layout") != "road"
+        self.footpath = footpath
         if self.ambient and not spec.get("classic") and self.kind in TRAFFIC_NEW:
-            self.ambient = [TRAFFIC_NEW[self.kind] if a[0] == "traffic" else a for a in self.ambient]
+            self.ambient = [new_traffic(self.kind, footpath) if a[0] == "traffic" else a for a in self.ambient]
+        if footpath and self.kind == "mountain_road" and spec.get("ambient", True):
+            self.ambient = [("birds", 300, 40, 2), new_traffic(self.kind, True)]
         self._clouds = {}
         self.static = None
         self.parallax = float(spec.get("parallax", 1.0))   # 0 = all layers move with the ground
@@ -717,7 +777,7 @@ class Background:
             l, t = (im.width - out_w) // 2, (im.height - out_h) // 2
             self.static = im.crop((l, t, l + out_w, t + out_h))
         elif self.kind == "night_road":
-            sky, wides = night_road(s)
+            sky, wides = night_road(s, footpath=footpath)
             self.static = sky
             for im, mult in zip(wides, NIGHT_LAYER_SPEEDS):      # parallax: far layers crawl, the road runs
                 if im.size != (out_w * 2, out_h):
@@ -731,8 +791,11 @@ class Background:
             fn = dict(LOCATIONS, **{"kitchen": kitchen, "room": room, "street": street, "school": school,
                                     "market": market, "office": office, "bus_stop": bus_stop}).get(self.kind)
             if not spec.get("classic"):              # the new camera gets the richer drawings of the busiest places
-                from .places_plus import RICH
+                from .places_plus import RICH, bus_stop_footpath, mountain_road_footpath, street_footpath
                 fn = RICH.get(self.kind, fn)
+                if footpath:
+                    fn = {"street": street_footpath, "bus_stop": bus_stop_footpath,
+                          "mountain_road": mountain_road_footpath}.get(self.kind, fn)
             if fn:
                 self.static = fn(s)
             else:
@@ -746,6 +809,8 @@ class Background:
             self.static = grade(self.static, spec["time"])
 
         names = spec.get("foreground", DEFAULT_FG.get(self.kind, []))       # props in front of the people
+        if footpath and self.kind == "bus_stop" and "foreground" not in spec:
+            names = ["bus_shelter"]                    # the shelter stands on the near footpath, before the traffic
         names = [names] if isinstance(names, str) else (names if isinstance(names, (list, tuple)) else [])
         for name in names:
             if name not in FG_PROPS:

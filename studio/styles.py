@@ -78,7 +78,8 @@ OWN_TIME = {"train_25d", "bus_25d", "metro_25d", "plane_25d", "car_25d", "auto_2
 # sets with writing on them (shop signs, menus, boards) are never mirrored for a reverse shot (the text would read
 # backwards). The 2d look mirrors every place, as it always has.
 NO_MIRROR = {"gali_25d", "classroom_25d", "office_25d", "meeting_25d", "street_25d", "busstop_25d", "market_25d",
-             "festival_25d", "railway_25d", "hospital_25d", "bank_25d", "police_25d", "court_25d", "canteen_25d",
+             "festival_25d", "railway_25d", "street_road_25d", "busstop_road_25d", "hospital_25d", "bank_25d",
+             "police_25d", "court_25d", "canteen_25d",
              "dhaba_25d", "mithai_25d", "mobile_25d", "medical_25d", "salon_25d", "mall_25d", "cinema_25d",
              "library_25d", "coaching_25d", "exam_hall_25d", "gym_25d", "party_25d", "mountain_road_25d",
              "cricket_ground_25d", "school_ground_25d", "graveyard_25d"} | {
@@ -89,9 +90,8 @@ NO_MIRROR = {"gali_25d", "classroom_25d", "office_25d", "meeting_25d", "street_2
 
 
 def _traffic(lane_y, horizon, period):
-    from .objects import PERSON_R, REF_SCALE
-    f = (lane_y - horizon) / (1700.0 - horizon)            # how much smaller things are on that lane than at the feet
-    return ("traffic", lane_y, {k: REF_SCALE * f / PERSON_R[k] for k in ("car", "auto", "truck", "bike")}, period, True)
+    from .backgrounds import road_traffic                  # (each vehicle as big as its lane's distance makes it)
+    return road_traffic(lane_y, horizon, period)
 
 
 # preset -> the moving life drawn over it: clouds and birds far away, the traffic on its road (2D keeps its own)
@@ -99,7 +99,28 @@ SET_AMBIENT = {
     "street_25d": [("cloud", 190, 14, 1.0), ("cloud", 450, 9, 0.75), ("birds", 330, 60, 3), _traffic(1470, 860, 9.0)],
     "busstop_25d": [("cloud", 220, 11, 1.0), ("cloud", 460, 7, 0.7), ("birds", 360, 55, 2), _traffic(1470, 860, 7.5)],
     "mountain_road_25d": [("birds", 300, 40, 2), _traffic(1440, 1000, 12.0)],
+    # a scene with a vehicle in it: the people on the road next to it, the traffic on the far lane behind them
+    "street_road_25d": [("cloud", 190, 14, 1.0), ("cloud", 450, 9, 0.75), ("birds", 330, 60, 3),
+                        _traffic(1500, 900, 9.0)],
+    "busstop_road_25d": [("cloud", 220, 11, 1.0), ("cloud", 460, 7, 0.7), ("birds", 360, 55, 2),
+                         _traffic(1500, 900, 7.5)],
 }
+ROAD_WITH_VEHICLE = {"street": "street_road_25d", "bus_stop": "busstop_road_25d", "night_road": None}
+
+
+def on_the_road(scene):
+    """True when a road place's scene has a vehicle in it (`OBJ: auto`, `A -> ride bike`): then the people stay on
+    the road next to it (both looks), instead of on the footpath."""
+    bg = scene.get("background") or {}
+    if (bg.get("type") if isinstance(bg, dict) else bg) not in ROAD_WITH_VEHICLE:
+        return False
+    from . import objects
+    for raw in scene.get("timeline", []):
+        for key in ("obj", "ride"):
+            d = raw.get(key)
+            if isinstance(d, dict) and objects.resolve_kind(d.get("kind", "")) in objects.VEHICLES:
+                return True
+    return False
 KEEP_AMBIENT = set(SET_AMBIENT)
 # the light each preset is painted in; another SCENE time (night, rain...) re-lights it
 NATIVE_TIME = {"kitchen_25d": "day", "gali_25d": "sunset", "diwali_rooftop": "night", "room_25d": "day",
@@ -112,7 +133,8 @@ NATIVE_TIME = {"kitchen_25d": "day", "gali_25d": "sunset", "diwali_rooftop": "ni
                "bathroom_25d": "day", "hostel_25d": "day", "library_25d": "day", "coaching_25d": "day",
                "exam_hall_25d": "day", "gym_25d": "day", "party_25d": "day", "jail_25d": "day", "beach_25d": "day",
                "desert_25d": "day", "mountain_road_25d": "day", "cricket_ground_25d": "day",
-               "school_ground_25d": "day", "mandap_25d": "night", "graveyard_25d": "night", "night_road_25d": "night"}
+               "school_ground_25d": "day", "street_road_25d": "day", "busstop_road_25d": "day",
+               "mandap_25d": "night", "graveyard_25d": "night", "night_road_25d": "night"}
 
 
 def normalize(value):
@@ -150,6 +172,8 @@ def preset_for(scene):
         return None
     bg = scene.get("background") or {}
     kind = bg.get("type") if isinstance(bg, dict) else bg
+    if kind in ROAD_WITH_VEHICLE and on_the_road(scene):
+        return ROAD_WITH_VEHICLE[kind]
     if kind in PLACES_25D:
         return PLACES_25D[kind]
     from . import vehicles

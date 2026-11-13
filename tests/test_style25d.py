@@ -271,6 +271,13 @@ class RenderTests(unittest.TestCase):
             near = next(i for i, n in enumerate(names) if n in ("footpath", "shoulder"))
             moving = [i for i, n in enumerate(names) if n in ("ambient", "cars")]
             self.assertTrue(moving and max(moving) < near, place)
+        for place, preset in (("street", "street_road_25d"), ("bus_stop", "busstop_road_25d"), ("night_road", None)):
+            s = ("HOOK: x\nSTYLE: 2.5d\nCAST: A = boy, B = autowala\nSCENE: %s\nOBJ: auto right\n"
+                 "A: Bhaiya chaloge? | भैया\nB: Haan | हाँ\n") % place
+            sc, _w = script.parse_script(s)
+            sub = dict(sc, **sc["scenes"][0]) if sc.get("scenes") else sc
+            sub.pop("scenes", None)
+            self.assertEqual(styles.preset_for(sub), preset, place)         # with its vehicle: on the road
         lane, horizon = 1470, 860
         car = styles.SET_AMBIENT["street_25d"][-1]
         self.assertEqual(car[1], lane)

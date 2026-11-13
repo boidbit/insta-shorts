@@ -12,7 +12,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from studio import counters, objects, styles, vehicles                # noqa: E402
-from studio.backgrounds import Background, TRAFFIC_NEW                # noqa: E402
+from studio.backgrounds import Background, new_traffic                # noqa: E402
 from studio.characters import (FACE_PARTS, FACE_WORDS, HAIR_STYLES, LOOKS, MARKS, build_character,   # noqa: E402
                                face_word)
 from studio.scene import compile_scene, split_scenes                  # noqa: E402
@@ -56,12 +56,30 @@ class RealSizes(unittest.TestCase):
     def test_road_traffic_is_people_sized_in_the_new_camera_only(self):
         cine = Background({"type": "street"}, 108, 192).ambient
         classic = Background({"type": "street", "classic": True}, 108, 192).ambient
-        self.assertIn(TRAFFIC_NEW["street"], cine)
+        self.assertIn(new_traffic("street", True), cine)
         old = next(a for a in classic if a[0] == "traffic")
         self.assertLess(old[2], 0.5)                                  # classic: the little toy cars as before
-        self.assertGreater(TRAFFIC_NEW["street"][2], 2 * old[2])
+        new = new_traffic("street", True)[2]
+        self.assertGreater(new["car"], 2.0)                           # a car a little smaller than a person
+        self.assertGreater(new["truck"], new["car"])                  # each kind in its own proportion
         frames = [Background({"type": "street"}, 216, 384).frame(t) for t in (0.5, 2.5)]
         self.assertEqual(frames[0].size, (216, 384))
+
+    def test_people_on_the_footpath_in_2d(self):
+        """The new camera: on the road places the people stand on the footpath, the road and its traffic behind
+        them; a scene with a vehicle in it keeps them on the road with it; the classic camera keeps the old place."""
+        for kind in ("street", "bus_stop", "mountain_road", "night_road"):
+            self.assertTrue(Background({"type": kind}, 108, 192).footpath, kind)
+            self.assertFalse(Background({"type": kind, "classic": True}, 108, 192).footpath, kind)
+            self.assertFalse(Background({"type": kind, "layout": "road"}, 108, 192).footpath, kind)
+        self.assertEqual([f[1].size[0] > 0 for f in Background({"type": "bus_stop"}, 108, 192).fg], [True])
+        self.assertTrue(any(a[0] == "traffic" for a in Background({"type": "mountain_road"}, 108, 192).ambient))
+        from studio.scene import compile_scene, split_scenes
+        talk = "HOOK: h\nCAST: A = boy, B = girl\nSCENE: street\n%sA: Chalo | चलो\nB: Haan | हाँ\n"
+        plan = compile_scene(split_scenes(parse_script(talk % "")[0])[0], use_tts=False)
+        self.assertNotEqual(plan.background.get("layout"), "road")
+        plan = compile_scene(split_scenes(parse_script(talk % "OBJ: auto right\n")[0])[0], use_tts=False)
+        self.assertEqual(plan.background.get("layout"), "road")       # the auto and its passenger: on the road
 
 
 class Carts(unittest.TestCase):

@@ -110,6 +110,148 @@ def street(s):
     return g.done()
 
 
+# ------------------------------------------------------------------ the road places, people on the footpath
+# The new camera: the people (y 1700) stand on the near footpath and the road runs BEHIND them, so the traffic passes
+# behind them in proportion (backgrounds.road_traffic). A scene with a vehicle in it (OBJ auto, a ride) keeps the old
+# drawing with the people on the road, next to their vehicle. `CAMERA: classic` keeps the old drawings too.
+FAR_PATH, FAR_KERB, ROAD_TOP, ROAD_BOT, NEAR_PATH = 1100, 1160, 1180, 1540, 1566
+
+
+def _road_band(g, top=ROAD_TOP, bot=ROAD_BOT, zebra=False, line=(240, 220, 120)):
+    g.rect(0, top, LW, bot, (92, 94, 102))
+    g.line([(0, top), (LW, top)], INK, 4)
+    for xx in range(-40, LW, 220):                                # the dashed middle line
+        g.rect(xx, (top + bot) / 2 - 8, xx + 120, (top + bot) / 2 + 8, line)
+    if zebra:
+        for x in range(620, 1000, 80):
+            g.poly([(x + 10, top + 16), (x + 50, top + 16), (x + 70, bot - 16), (x + 14, bot - 16)], (230, 230, 226))
+
+
+def _near_footpath(g, col=(212, 206, 194), joint=(190, 184, 172)):
+    for x in range(0, LW, 120):                                   # the kerb, black and yellow
+        g.rect(x, ROAD_BOT, x + 60, NEAR_PATH, (20, 20, 20))
+        g.rect(x + 60, ROAD_BOT, x + 120, NEAR_PATH, (250, 210, 40))
+    g.line([(0, ROAD_BOT), (LW, ROAD_BOT)], INK, 5)
+    g.rect(0, NEAR_PATH, LW, LH, col)                             # the near footpath the people stand on
+    for y in (1640, 1740, 1860):
+        g.line([(0, y), (LW, y)], joint, 3)
+    for x in range(-600, LW + 600, 150):
+        g.line([(x, NEAR_PATH), (540 + (x - 540) * 1.6, LH)], joint, 3)
+    g.line([(0, NEAR_PATH), (LW, NEAR_PATH)], INK, 4)
+
+
+def street_footpath(s):
+    g = G(s)
+    dy = -140                                                     # the shop row, moved back across the road
+    with g.on("sky"):
+        g.vgrad(0, 900, (130, 196, 240), (230, 240, 246))
+        g.circle(880, 200, 70, (255, 228, 140))
+    rnd = random.Random(11)
+    with g.on("far"):                                           # the far skyline, hazy
+        x = -30
+        while x < LW:
+            w, h = rnd.randint(120, 200), rnd.randint(380, 640)
+            g.rect(x, 900 - h + dy, x + w, 900 + dy, (182, 198, 216))
+            for wy in range(900 - h + 40 + dy, 880 + dy, 60):
+                for wx in range(x + 18, x + w - 30, 44):
+                    g.rect(wx, wy, wx + 20, wy + 30, (204, 216, 230))
+            x += w + rnd.randint(8, 30)
+    shops = [("MEDICAL", (60, 160, 110)), ("MOBILE", (70, 110, 200)), ("SWEETS", (230, 120, 50)),
+             ("TAILOR", (170, 80, 160))]
+    for i, (name, col) in enumerate(shops):                     # a row of shop buildings
+        x0 = -10 + i * 275
+        x1 = x0 + 268
+        g.rect(x0, 420 + dy, x1, 1240 + dy, ((236, 214, 170), (214, 196, 214), (226, 206, 160), (196, 214, 200))[i],
+               INK, 6)
+        for wx in (x0 + 30, x0 + 150):                          # the flats above
+            g.rect(wx, 480 + dy, wx + 90, 620 + dy, (150, 180, 206), INK, 4)
+            g.line([(wx + 45, 480 + dy), (wx + 45, 620 + dy)], INK, 3)
+            g.rect(wx - 6, 620 + dy, wx + 96, 640 + dy, (180, 170, 150), INK, 3)
+        g.rect(x0 + 40, 690 + dy, x0 + 130, 760 + dy, (240, 240, 236), INK, 3)          # an AC box
+        g.line([(x0 + 50, 740 + dy), (x0 + 120, 740 + dy)], (170, 170, 170), 3)
+        _sign(g, max(x0 + 16, 14), 800 + dy, min(x1 - 16, LW - 14), 880 + dy, name, col, (255, 255, 255), 44)
+        g.poly([(x0, 900 + dy), (x1, 900 + dy), (x1 + 10, 960 + dy), (x0 - 10, 960 + dy)], col, INK, 4)  # awning
+        for k in range(6):
+            xx = x0 + k * (x1 - x0) / 6.0
+            g.line([(xx, 900 + dy), (xx - 4, 960 + dy)], (250, 246, 236), 6)
+        g.rect(x0 + 20, 970 + dy, x1 - 20, 1240 + dy, (90, 96, 104), INK, 5)           # the open shop
+        _shelf(g, x0 + 30, 990 + dy, x1 - 30, 1200 + dy, 3, "grocery" if i % 2 else "books", seed=i + 3,
+               col=(150, 110, 76))
+    g.line([(0, 380 + dy), (LW, 430 + dy)], (40, 40, 44), 3)     # the wires
+    g.line([(0, 400 + dy), (LW, 470 + dy)], (40, 40, 44), 2)
+    g.rect(0, FAR_PATH, LW, FAR_KERB, (206, 200, 188))            # the far footpath and its kerb
+    for x in range(0, LW, 120):
+        g.line([(x, FAR_PATH), (x - 8, FAR_KERB)], (186, 180, 170), 3)
+        g.rect(x, FAR_KERB, x + 60, ROAD_TOP, (20, 20, 20))
+        g.rect(x + 60, FAR_KERB, x + 120, ROAD_TOP, (250, 210, 40))
+    g.line([(0, FAR_PATH), (LW, FAR_PATH)], INK, 5)
+    _road_band(g, zebra=True)
+    g.line([(980, 1130), (980, 560)], (60, 60, 64), 14)           # a street lamp and an electric pole (far side)
+    g.line([(980, 570), (900, 570)], (60, 60, 64), 10)
+    g.rrect(880, 560, 920, 596, 10, (255, 236, 160), INK, 4)
+    g.note_light(900, 580, 24, (255, 236, 160))
+    g.rect(60, 480, 84, 1130, (90, 90, 96), INK, 4)
+    g.rect(40, 520, 104, 600, (110, 110, 118), INK, 4)           # the transformer box
+    _near_footpath(g)
+    _light_patch(g, [(0, NEAR_PATH), (LW, NEAR_PATH), (LW, LH), (0, LH)], (255, 240, 200), 30, 20)
+    return g.done()
+
+
+def bus_stop_footpath(s):
+    """The bus stop: buildings across the road, the road, and the near footpath the people wait on (the shelter is a
+    piece in front of the traffic: backgrounds.fg_bus_shelter)."""
+    g = G(s)
+    with g.on("sky"):
+        g.vgrad(0, 900, (150, 205, 240), (226, 240, 248))
+        g.circle(200, 220, 76, (255, 226, 130))
+    rnd = random.Random(11)
+    x = -30
+    with g.on("far"):
+        while x < LW:
+            w = rnd.randint(170, 260)
+            h = rnd.randint(380, 720)
+            g.rect(x, FAR_PATH - h, x + w, FAR_PATH, [(190, 176, 160), (160, 184, 200), (206, 176, 120)][rnd.randint(0, 2)],
+                   INK, 6)
+            for wy in range(FAR_PATH - h + 36, FAR_PATH - 50, 100):
+                for wx in range(x + 24, x + w - 40, 62):
+                    g.rect(wx, wy, wx + 30, wy + 54, (140, 175, 205), INK, 3)
+            x += w + 8
+    g.rect(0, FAR_PATH, LW, ROAD_TOP, (206, 202, 192))
+    g.line([(0, FAR_PATH), (LW, FAR_PATH)], INK, 5)
+    _road_band(g)
+    _near_footpath(g, col=(208, 204, 194))
+    return g.done()
+
+
+def mountain_road_footpath(s):
+    """The mountain road: the people stand on the gravel shoulder in front, the road (and its traffic) behind them,
+    the crash barrier and the mountains beyond."""
+    g = G(s)
+    loc = _loc()
+    loc._sky(g, (130, 190, 240), (230, 240, 248), 1100)
+    with g.on("far"):
+        g.poly([(-100, 1100), (260, 520), (560, 1100)], (150, 160, 190), INK, 5)
+        g.poly([(300, 1100), (700, 420), (1180, 1100)], (130, 140, 176), INK, 5)
+        g.poly([(640, 470), (700, 420), (760, 470), (730, 500), (680, 490)], (250, 250, 255))
+    with g.on("mid"):
+        g.poly([(0, 1100), (LW, 1100), (LW, 1240), (0, 1240)], (110, 160, 90))
+        for x in range(30, LW, 110):
+            g.poly([(x, 1180), (x + 40, 1060), (x + 80, 1180)], (50, 110, 60), INK, 3)
+    g.line([(0, 1230), (LW, 1230)], (200, 200, 206), 10)          # the crash barrier
+    for x in range(20, LW, 120):
+        g.rect(x, 1220, x + 14, 1250, (200, 200, 206), INK, 2)
+    _road_band(g, top=1250, bot=1520)
+    g.rect(0, 1520, LW, LH, (168, 150, 124))                       # the gravel shoulder
+    g.line([(0, 1520), (LW, 1520)], (236, 236, 230), 8)
+    rnd = random.Random(5)
+    for _ in range(70):
+        x, y = rnd.randint(0, LW), rnd.randint(1540, LH)
+        g.circle(x, y, rnd.randint(3, 7), (140, 124, 100))
+    g.rect(120, 1430, 220, 1580, (250, 250, 246), INK, 4)          # a milestone
+    g.rect(120, 1430, 220, 1470, (240, 200, 40), INK, 3)
+    return g.done()
+
+
 # ------------------------------------------------------------------ market
 def market(s):
     g = G(s, color=(250, 232, 196))

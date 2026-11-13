@@ -803,6 +803,8 @@ PRESETS = {
     "bedroom_25d": _lazy("scenery_more", "bedroom_25d"),
     "street_25d": _lazy("scenery_road", "street_25d"),
     "busstop_25d": _lazy("scenery_road", "busstop_25d"),
+    "street_road_25d": _lazy("scenery_roadside", "street_road_25d"),
+    "busstop_road_25d": _lazy("scenery_roadside", "busstop_road_25d"),
     "market_25d": _lazy("scenery_road", "market_25d"),
     "festival_25d": _lazy("scenery_town", "festival_25d"),
     "railway_25d": _lazy("scenery_town", "railway_25d"),

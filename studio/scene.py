@@ -893,6 +893,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             k_ = objects.resolve_kind(d_.get("kind", "")) if isinstance(d_, dict) else None
             if k_ in objects.PERSON_R:
                 kinds_.add(k_)
+    if styles.on_the_road(scene):                   # a vehicle on a road place: the people stay on the road with it
+        plan.background = dict(plan.background, layout="road")
     framing = scene.get("framing") or meta.get("framing")
     if framing not in ("wide", "medium", "inside", "ots"):
         framing = "wide" if any(k_ in objects.VEHICLES for k_ in kinds_) else "medium"
