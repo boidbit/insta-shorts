@@ -71,7 +71,7 @@ HAIR_WORDS = {"do_choti": "two_plaits", "two_braids": "two_plaits", "plaits": "t
 # how a new hairdo looks from behind (the back of the head is drawn like this one)
 HAIR_BACK = {"bob": "long", "two_plaits": "braid", "side_braid": "braid", "mohawk": "spiky", "man_bun": "bun",
              "curly_open": "curly"}
-OUTFITS = ("tshirt", "shirt", "kurta", "salwar", "saree", "uniform", "blazer", "vest", "kurta_jacket", "stripes")
+OUTFITS = ("tshirt", "shirt", "kurta", "salwar", "saree", "uniform", "blazer", "vest", "kurta_jacket", "stripes", "sweater")
 BUILDS = {"slim": (0.9, 0.0), "normal": (1.0, 6.0), "chubby": (1.2, 44.0)}
 # height: (whole-body scale, extra leg length). A tall person is mostly longer legs, the head stays readable.
 HEIGHTS = {"tall": (1.05, 1.13), "normal": (1.0, 1.0), "short": (0.96, 0.9)}
@@ -120,7 +120,7 @@ FACE_WORDS.update({
     "clean_shaven": ("shave", True), "clean_shave": ("shave", True),
 })
 ACCESSORIES = ("glasses", "sunglasses", "cap", "turban", "moustache", "beard", "bindi", "tilak", "earrings", "tuft",
-               "topi", "beanie", "nurse_cap")
+               "topi", "beanie", "nurse_cap", "beret", "bowtie", "backpack")
 
 # Ready-made Indian looks. Anything in the character spec overrides these.
 LOOKS = {
@@ -220,6 +220,32 @@ LOOKS = {
                   prop="pen", accessories=["glasses"], moustache="thin"),
     "judge": dict(skin="wheatish", hair="balding", hair_color="grey", outfit="blazer", color="black", pants="black",
                   accent="white", shoes="black", build="chubby", accessories=["glasses"], marks=["age_lines"]),
+    # the office, the school and the family's visitors
+    "boss": dict(skin="wheatish", hair="balding", outfit="blazer", color="black", pants="black", accent="red",
+                 shoes="black", build="chubby", moustache="thick", accessories=["moustache"], prop="phone",
+                 expression="smug"),
+    "master_ji": dict(skin="brown", hair="balding", hair_color="grey", outfit="sweater", color="maroon",
+                      pants="grey", accent="cream", shoes="black", build="slim", prop="stick",
+                      accessories=["glasses", "moustache"], marks=["age_lines"]),
+    "school_boy": dict(skin="wheatish", hair="side_part", outfit="uniform", color="white", pants="grey",
+                       accent="navy", shoes="black", scale=0.84, accessories=["backpack"]),
+    "school_girl": dict(skin="wheatish", hair="two_plaits", outfit="uniform", color="white", pants="navy",
+                        accent="navy", shoes="black", scale=0.82, accessories=["backpack"]),
+    "fauji": dict(skin="brown", hair="short", outfit="uniform", color="olive", pants="olive", accent="olive",
+                  shoes="black", height="tall", cap_color="maroon", moustache="thick",
+                  accessories=["beret", "moustache"], expression="proud"),
+    "nri_mama": dict(skin="fair", hair="side_part", outfit="tshirt", color="sky", pants="khaki", shoes="white",
+                     build="chubby", beard="stubble", prop="phone", accessories=["sunglasses"], expression="smug"),
+    "sardar_ji": dict(skin="wheatish", hair="long", outfit="kurta", color="sky", pants="white", shoes="brown",
+                      build="chubby", turban_color="navy", beard="full", accessories=["turban", "beard"]),
+    "waiter": dict(skin="brown", hair="side_part", outfit="shirt", color="white", pants="black", shoes="black",
+                   build="slim", prop="plate", moustache="thin", accessories=["bowtie", "moustache"]),
+    "mechanic": dict(skin="dark", hair="curly", outfit="shirt", color="navy", pants="navy", shoes="black",
+                     prop="spanner", beard="stubble", marks=["mole"]),
+    "safai_wala": dict(skin="dark", hair="short", outfit="tshirt", color="orange", pants="grey", shoes="chappal",
+                       build="slim", prop="broom", accessories=["moustache"]),
+    "baba": dict(skin="brown", hair="long", hair_color="grey", outfit="kurta", color="saffron", pants="saffron",
+                 shoes="chappal", beard="full", prop="stick", accessories=["beard", "tilak"], expression="relaxed"),
     "pilot": dict(skin="fair", hair="side_part", outfit="blazer", color="navy", pants="navy", accent="gold",
                   shoes="black", cap_color="navy", accessories=["cap", "sunglasses"]),
     "air_hostess": dict(skin="fair", hair="bun", outfit="blazer", color="red", pants="red", accent="white",
@@ -289,8 +315,16 @@ EXPRESSIONS = {
     "excited": ("wide", "laugh", "up"),
     "blush": ("happy", "smile", None),
     "kiss": ("closed", "o", None),
+    # the faces of the comments section
+    "side_eye": ("side", "flat", "think"),          # judging from the corner of the eye
+    "stare": ("stare", "flat", "angry"),            # ghoorna: the parent's stare
+    "eye_roll": ("roll", "flat", None),             # oh please
+    "drool": ("wide", "drool", "up"),               # food (or anything else) worth drooling over
+    "money_eyes": ("money", "grin", "up"),          # paisa hi paisa
+    "embarrassed": ("dot", "wavy", "sad"),          # caught: blush and a drop of sweat
 }
-BLUSH = {"shy", "blush", "love", "kiss"}
+BLUSH = {"shy", "blush", "love", "kiss", "embarrassed"}
+SWEAT_DROP = {"embarrassed", "nervous"}
 TEARS = {"cry", "lol"}
 # Eyes that should not be replaced by a "blink"
 NO_BLINK = {"happy", "relaxed", "closed", "x", "heart", "wink", "spiral"}
@@ -299,7 +333,7 @@ PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick", "bag", "chai", "glass"
          "money", "newspaper", "book", "notebook", "pen", "laptop", "umbrella", "remote", "broom", "belan", "pillow",
          "gift", "balloon", "trophy", "torch", "key", "bat", "flag", "camera", "banana", "bottle", "letter",
          "toothbrush", "dumbbell", "box", "cooker", "thali", "lota", "tiffin", "mithai", "report_card", "injection",
-         "stethoscope", "milk_can", "vlog_cam", "vlog_mic")
+         "stethoscope", "milk_can", "vlog_cam", "vlog_mic", "spanner")
 
 
 def d2r(a):
@@ -605,6 +639,10 @@ def _draw_prop2(S, prop, hand, d, n, pt):
         prect(-10, -12, 60, 12, (40, 40, 46), 4)
         for a in (12, 28, 44):
             S.dot(pt(a, 0), 4, (220, 80, 70))
+    elif prop == "spanner":         # the mechanic's spanner
+        S.line([pt(-6, 0), pt(70, 0)], 11, (150, 154, 162))
+        S.poly(closed_ellipse(*pt(82, 0), 17, 17, 14), (170, 174, 182), INK, 4)
+        S.poly(closed_ellipse(*pt(90, 0), 8, 6, 10), (60, 60, 66), None)
     elif prop == "broom":
         S.line([pt(-30, 0), pt(300, 0)], 10, (150, 104, 70))
         S.poly([pt(296, -18), pt(296, 18), pt(392, 44), pt(392, -44)], (222, 192, 112), INK, 5)
@@ -825,7 +863,7 @@ def _draw_outfit(S, o, sk, cols, build, back=False, drag=0.0, lap=False):
         S.poly([(-sw + 6, top + 4), (-sw - 22, top + 30), (-sw - 30, -40), (-sw - 4, -54)], main, INK, OUTLINE)
         return
 
-    hem = {"tshirt": 18, "shirt": 18, "uniform": 18, "vest": 10, "blazer": 30, "stripes": 18,
+    hem = {"tshirt": 18, "shirt": 18, "uniform": 18, "vest": 10, "blazer": 30, "stripes": 18, "sweater": 30,
            "kurta": 130, "kurta_jacket": 130, "salwar": 120}.get(outfit, 18)
     hw = ww + (16 if outfit in ("kurta", "salwar", "kurta_jacket") else 4)
     long_top = outfit in ("kurta", "salwar", "kurta_jacket")
@@ -863,7 +901,15 @@ def _draw_outfit(S, o, sk, cols, build, back=False, drag=0.0, lap=False):
         S.line([(0, top + 30), (0, min(hem - 10, top + 200))], 3, shade(main, 0.85))
         return
 
-    if outfit == "vest":
+    if outfit == "sweater":         # a sleeveless V-neck sweater over a full-sleeve shirt (the shirt = accent)
+        S.poly([(-24, top - 2), (24, top - 2), (0, top + 96)], accent, INK, 4)
+        for sgn in (-1, 1):
+            S.poly([(0, top + 16), (sgn * 26, top - 6), (sgn * 30, top + 22)], shade(accent, 1.04), INK, 4)
+        S.line([(-24, top + 2), (0, top + 98), (24, top + 2)], 7, shade(main, 0.78))
+        for y in range(int(top + 120), int(hem - 30), 26):
+            S.line([(-ww * 0.7, y), (ww * 0.7, y)], 2, shade(main, 0.86))
+        S.line([(-ww - 2, hem - 14), (ww + 2, hem - 14)], 8, shade(main, 0.8))
+    elif outfit == "vest":
         S.poly(ellipse_pts(0, top, 26, 40, 14, 0, 180), skin, INK, 4)
     elif outfit in ("tshirt",):
         S.line(ellipse_pts(0, top, 24, 18, 12, 10, 170), 5)
@@ -1075,7 +1121,7 @@ def _back_of_head(S, HH, style, hc, acc, o, cols):
         for j in range(3):
             S.line([HH(q) for q in bezier((-HEAD_RX + 6, -30 - j * 24), (0, -60 - j * 26),
                                           (HEAD_RX - 6, -30 - j * 24), 10)], 4, shade(tc, 0.75))
-    for a in ("topi", "beanie", "nurse_cap"):
+    for a in ("topi", "beanie", "nurse_cap", "beret"):
         if a in acc:
             _head_cap(S, HH, a, o)
     if "earrings" in acc:
@@ -1185,6 +1231,12 @@ def _head_cap(S, HH, kind, o):
         S.line([HH(q) for q in [(-HEAD_RX * 0.86, -HEAD_RY * 0.62), (HEAD_RX * 0.86, -HEAD_RY * 0.62)]], 14, WHITE)
         S.poly([HH(q) for q in [(-HEAD_RX - 8, -46), (HEAD_RX + 8, -46), (HEAD_RX + 8, -26), (-HEAD_RX - 8, -26)]],
                shade(col, 1.4) if sum(col) < 200 else shade(col, 0.8), INK, 5)
+    elif kind == "beret":           # the fauji's beret, pulled down to one side, with a badge
+        col = color_of(o.get("cap_color", "maroon"), "maroon")
+        dome = ellipse_pts(-10, -HEAD_RY * 0.62, HEAD_RX + 14, 46, 24, 180, 360)
+        S.poly([HH(q) for q in dome + [(HEAD_RX + 4, -HEAD_RY * 0.46), (-HEAD_RX - 24, -HEAD_RY * 0.5)]], col, INK, 6)
+        S.line([HH(q) for q in [(-HEAD_RX - 2, -HEAD_RY * 0.5), (HEAD_RX + 2, -HEAD_RY * 0.46)]], 9, shade(col, 0.7))
+        S.dot(HH((HEAD_RX * 0.42, -HEAD_RY * 0.7)), 11, GOLD, INK, 3)
     elif kind == "nurse_cap":
         pts = [(-46, -HEAD_RY + 2), (-38, -HEAD_RY - 30), (38, -HEAD_RY - 30), (46, -HEAD_RY + 2)]
         S.poly([HH(q) for q in pts], WHITE, INK, 5)
@@ -1285,8 +1337,28 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     _draw_feet(S, sk, o.get("shoes", "black"), skin)
 
     # ---- neck + torso ----
+    bag_col = color_of(o.get("bag_color", "red" if o.get("accent") in ("navy", None) else "navy"), "red")
+    if "backpack" in acc and not back:            # the school bag peeks out behind both shoulders
+        bw_ = BUILDS.get(build, BUILDS["normal"])[0] * 62
+        S.poly([(-bw_ - 16, -TORSO_H + 40), (bw_ + 16, -TORSO_H + 40), (bw_ + 20, -TORSO_H + 250),
+                (-bw_ - 20, -TORSO_H + 250)], bag_col, INK, OUTLINE)
     S.tube([(0, -TORSO_H + 20), HH((0, HEAD_RY * 0.55))], 30, skin)
     _draw_outfit(S, o, sk, cols, build, back=back, drag=p.get("drag", 0.0), lap=p.get("th_k", 1.0) < 0.6)
+    if "backpack" in acc:
+        bw_ = BUILDS.get(build, BUILDS["normal"])[0] * 62
+        if back:                                    # seen from behind: the whole bag on the back
+            S.poly([(-bw_ + 4, -TORSO_H + 36), (bw_ - 4, -TORSO_H + 36), (bw_, -TORSO_H + 240),
+                    (-bw_, -TORSO_H + 240)], bag_col, INK, OUTLINE)
+            S.poly([(-bw_ * 0.6, -TORSO_H + 150), (bw_ * 0.6, -TORSO_H + 150), (bw_ * 0.6, -TORSO_H + 220),
+                    (-bw_ * 0.6, -TORSO_H + 220)], shade(bag_col, 0.8), INK, 4)
+        else:                                       # the straps over the shoulders
+            for sgn in (-1, 1):
+                S.tube([(sgn * (bw_ - 18), -TORSO_H + 10), (sgn * (bw_ - 10), -TORSO_H + 150)], 12, shade(bag_col, 0.9))
+    if "bowtie" in acc and not back:
+        bt = -TORSO_H + 14
+        for sgn in (-1, 1):
+            S.poly([(0, bt), (sgn * 26, bt - 13), (sgn * 26, bt + 13)], (24, 24, 30), INK, 3)
+        S.dot((0, bt), 7, (40, 40, 48), INK, 3)
     if hair == "braid" and not covered and not back:
         _braid(S, HH, hcol, cols["accent"], p.get("drag", 0.0))
     elif hair == "two_plaits" and not covered and not back:
@@ -1313,7 +1385,8 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         for side, sh, elb, hand, a2 in (("L", sk["shL"], sk["elbL"], sk["handL"], p["la2"]),
                                         ("R", sk["shR"], sk["elbR"], sk["handR"], p["ra2"])):
             S.limb([sh, elb, hand], [ARM_W, ARM_W - 3, ARM_W - 7], skin)
-            _sleeve(S, outfit, sh, elb, hand, cols["main"])
+            _sleeve(S, "shirt" if outfit == "sweater" else outfit, sh, elb, hand,
+                    cols["accent"] if outfit == "sweater" else cols["main"])
             _hand(S, hand, a2, side, skin, finger=p.get("finger") == side)
             if p.get("thumb") == side:
                 S.limb([hand, add(hand, (0.0, -34.0))], [12, 9], skin)
@@ -1353,6 +1426,7 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         eyes = "closed"
     fdx = (face_f if face_f is not None else facing) * 14 + p["look_x"] * 5
     lx, ly = p["look_x"] * 7, p["look_y"] * 5
+    side_k = -1.0 if (face_f if face_f is not None else facing) > 0 else 1.0    # a side-eye looks the other way
 
     for sgn in (-1, 1):
         cx, cy = _eye_center(sgn, fdx)
@@ -1409,6 +1483,27 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         elif eyes == "spiral":
             hline([(cx + (2 + i * 0.9) * math.cos(i * 0.45 + t * 9 * sgn), cy + (2 + i * 0.9) * math.sin(i * 0.45 + t * 9 * sgn))
                    for i in range(22)], 4)
+        elif eyes == "side":            # the pupils pushed into the corner the head looks away from, lids low
+            hpoly(closed_ellipse(cx, cy + 2, 21, 15, 28), WHITE, INK, 5)
+            hpoly(closed_ellipse(cx + side_k * 11, cy + 4, 8, 9, 18), INK, None)
+            lid = ellipse_pts(cx, cy + 2, 22, 16, 16, 180, 360) + [(cx + 22, cy - 1), (cx - 22, cy - 1)]
+            hpoly([(a, min(b, cy - 1)) for a, b in lid], skin, None)
+            hline([(cx - 23, cy - 1), (cx + 23, cy - 1)], 6)
+        elif eyes == "stare":           # a hard narrow stare, small pupils
+            hpoly(closed_ellipse(cx, cy + 2, 21, 11, 28), WHITE, INK, 5)
+            hpoly(closed_ellipse(cx + lx, cy + 2, 5.5, 6.5, 14), INK, None)
+            hline([(cx - 23, cy - 9 + sgn * 3), (cx + 23, cy - 9 - sgn * 3)], 6)
+        elif eyes == "roll":            # white eyes, the pupils gone up under the lids
+            hpoly(closed_ellipse(cx, cy, 20, 18, 28), WHITE, INK, 5)
+            hpoly(closed_ellipse(cx + sgn * 2, cy - 12, 9, 6, 14), INK, None)
+            hline(ellipse_pts(cx, cy, 20, 18, 14, 200, 340), 5)
+        elif eyes == "money":           # rupee signs for eyes
+            hpoly(closed_ellipse(cx, cy, 21, 23, 28), (236, 248, 226), INK, 5)
+            g = (40, 140, 60)
+            hline([(cx - 10, cy - 12), (cx + 10, cy - 12)], 5, g)
+            hline([(cx - 10, cy - 5), (cx + 10, cy - 5)], 5, g)
+            hline([(cx - 10, cy - 12)] + bezier((cx + 2, cy - 12), (cx + 14, cy - 6), (cx - 6, cy + 1), 6)
+                  + [(cx + 9, cy + 15)], 5, g)
         elif eyes == "wink":
             if sgn < 0:
                 hline(ellipse_pts(cx, cy + 8, 20, 17, 16, 200, 340), 7)
@@ -1469,6 +1564,8 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     if beard != "none":
         _beard(hline, hpoly, beard, skin, hcol, fdx, fx, fy)
 
+    if expr in SWEAT_DROP:              # a drop of sweat at the temple
+        hpoly([(fdx + 60, -78), (fdx + 70, -52)] + ellipse_pts(fdx + 64, -50, 10, 11, 10, 0, 180), TEAR, INK, 3)
     # tears
     if expr in TEARS:
         for sgn in (-1, 1):
@@ -1532,6 +1629,11 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         open_mouth(fdx, my + 14, 24, 34, teeth=False)
     elif mouth == "wavy":
         hline([(fdx - 30 + i * 7.5, my + 10 + (5 if i % 2 else -5)) for i in range(9)], 6)
+    elif mouth == "drool":              # open a little, a drop running down from the corner
+        open_mouth(fdx, my + 8, 22, 14, teeth=False)
+        dy = (t * 0.7) % 1.0
+        hline([(fdx + 18, my + 14), (fdx + 20, my + 26 + 30 * dy)], 6, (170, 210, 240))
+        hpoly(closed_ellipse(fdx + 20, my + 32 + 30 * dy, 6, 8, 12), (170, 210, 240), INK, 3)
     else:  # flat
         hline([(fdx - 22, my + 10), (fdx + 22, my + 10)], 7)
     if "dimple" in marks and mouth in ("smile", "grin", "laugh", "smirk"):
@@ -1571,7 +1673,7 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
             for j in range(3):
                 S.line([HH(q) for q in bezier((-HEAD_RX + 6, -44 - j * 22), (0, -80 - j * 24),
                                               (HEAD_RX - 6, -44 - j * 22), 10)], 4, shade(tc, 0.75))
-        elif a in ("topi", "beanie", "nurse_cap"):
+        elif a in ("topi", "beanie", "nurse_cap", "beret"):
             _head_cap(S, HH, a, o)
         elif a == "moustache" and not shave:
             _moustache(hline, hpoly, o.get("moustache", "normal"), hcol, fdx)

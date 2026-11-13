@@ -792,6 +792,18 @@ def _lazy_spec(module, fn_name):
 
 PRESETS = {
     "diwali_rooftop": diwali_rooftop,
+    "ghar_darwaza_25d": _lazy("scenery_2026", "ghar_darwaza_25d"),
+    "lift_25d": _lazy("scenery_2026", "lift_25d"),
+    "park_25d": _lazy("scenery_2026", "park_25d"),
+    "atm_25d": _lazy("scenery_2026", "atm_25d"),
+    "petrol_pump_25d": _lazy("scenery_2026", "petrol_pump_25d"),
+    "signal_25d": _lazy("scenery_2026", "signal_25d"),
+    "buffet_25d": _lazy("scenery_2026", "buffet_25d"),
+    "restaurant_25d": _lazy("scenery_2026", "restaurant_25d"),
+    "interview_room_25d": _lazy("scenery_2026", "interview_room_25d"),
+    "call_center_25d": _lazy("scenery_2026", "call_center_25d"),
+    "startup_office_25d": _lazy("scenery_2026", "startup_office_25d"),
+
     "kitchen_25d": _lazy("scenery_kitchen", "kitchen_25d"),
     "gali_25d": _lazy("scenery_gali", "gali_25d"),
     "room_25d": _lazy("scenery_home", "room_25d"),

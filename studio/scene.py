@@ -30,6 +30,9 @@ SHOT_ALIASES = {"closeup": "close", "close_up": "close", "twoshot": "two_shot", 
 # Camera angle of a shot (CUT): the background is seen closer (a longer lens), from a side, or from the other side
 # (mirrored = the reverse shot). (zoom, centre x in logical px, mirror). Shot 0 of a place shows it all.
 ANGLES = [(1.0, 540.0, False), (1.25, 400.0, True), (1.25, 680.0, False), (1.4, 540.0, True)]
+# places whose drawing has writing on it (signs, boards, a nameplate): a CUT never shows them mirrored
+WRITTEN_PLACES = {"image", "ghar_darwaza", "lift", "park", "atm", "petrol_pump", "signal", "buffet", "restaurant",
+                  "interview_room", "call_center", "startup_office"}
 
 
 def shot_angle(scene, framing):
@@ -48,8 +51,8 @@ def shot_angle(scene, framing):
         out = dict(zoom=1.0, x=540.0, mirror=False)
     if scene.get("reverse"):
         out["mirror"] = True
-    if (scene.get("background") or {}).get("type") == "image" and not scene.get("reverse"):
-        out["mirror"] = False                   # a photo may have writing on it: mirror only when asked
+    if (scene.get("background") or {}).get("type") in WRITTEN_PLACES and not scene.get("reverse"):
+        out["mirror"] = False                   # a photo / a place with signs on it: mirror only when asked
     out["zoom"] = clamp(out["zoom"], 1.0, 1.6)
     return out
 
@@ -71,7 +74,8 @@ def fit_to_angle(ob, ang):
 PEOPLE_SCALE_3 = 1.06        # ...three people side by side need the room
 PEOPLE_SCALE_4 = 0.9         # ...and four even more
 PEOPLE_SCALE = 1.22          # medium shots: people this much bigger than the painted place (x sqrt of the angle zoom)
-FOCUS_H = {"dog": 170.0, "cat": 120.0, "cow": 260.0, "crow": 70.0, "parrot": 70.0}   # animals: camera looks lower
+FOCUS_H = {"dog": 170.0, "cat": 120.0, "cow": 260.0, "goat": 170.0, "crow": 70.0, "parrot": 70.0, "rooster": 90.0,
+           "lizard": 690.0, "mosquito": 580.0}   # animals: camera looks lower
 
 OTS_BACK = dict(k=2.3, drop=1200.0, left=150.0, right=930.0)      # the near shoulder: big, cut off by the frame
 

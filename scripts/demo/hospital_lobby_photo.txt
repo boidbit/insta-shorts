@@ -1,0 +1,8 @@
+HOOK: Hospital me token 28 😭
+CAST: A = uncle glasses, B = nurse
+SCENE: hospital_lobby
+A (nervous): Sister, mera number kab aayega? | सिस्टर, मेरा नंबर कब आएगा?
+B (bored): Abhi token 28 chal raha hai, uncle. | अभी टोकन 28 चल रहा है, अंकल।
+A (shock): Mera toh 412 hai! | मेरा तो 412 है!
+CUT wide
+B (smug): Toh kal subah aaiye. | तो कल सुबह आइए।

@@ -412,19 +412,19 @@ def _n(t, ph=0.0):
     return (sin(t * 0.73 + ph) * 0.5 + sin(t * 1.37 + ph * 2.1) * 0.3 + sin(t * 2.91 + ph * 3.7) * 0.2)
 
 
-ANGRY = {"angry", "shout", "determined", "disgust"}
+ANGRY = {"angry", "shout", "determined", "disgust", "stare"}
 
 
-HAPPY = {"smile", "grin", "laugh", "lol", "excited", "love", "wink", "blush"}
+HAPPY = {"smile", "grin", "laugh", "lol", "excited", "love", "wink", "blush", "drool", "money_eyes"}
 
 
 SAD = {"sad", "cry", "hurt", "bored", "sleepy", "yawn"}
 
 
-SCARED = {"scared", "nervous", "shock", "surprised", "cringe", "dizzy"}
+SCARED = {"scared", "nervous", "shock", "surprised", "cringe", "dizzy", "embarrassed"}
 
 
-COOL = {"smug", "sly", "proud", "evil", "kiss"}
+COOL = {"smug", "sly", "proud", "evil", "kiss", "side_eye", "eye_roll"}
 
 
 THINK = {"think", "confused", "shh"}
@@ -1305,6 +1305,189 @@ def talk_emotion(t, sp, I, ph, o):
     return _side(d, pose)
 
 
+# ------------------------------------------------------------------ desi gestures (Nov 2026)
+def touch_feet(t, sp, I, ph, o):
+    # pair chhoona: a deep bow towards the one in front, the hand reaching down to their feet, then up again
+    d = _d(o)
+    e = ease_out(_once(t, 0, 0.45)) * (1 - ease_in(_once(t, 1.7, 0.45)))
+    if o.get("_facing", "front") == "front":        # seen from the front: crouch down, the hand reaching forward low
+        return _P(dict(ll1=-58 * e - 9 * (1 - e), ll2=12 * e, rl1=58 * e + 9 * (1 - e), rl2=-12 * e),
+                  hand("R", _lerp2((60, -150), (150 * d, 40), e), (1, 0.6)), hand("L", (-60, -60), (-1, 0.4)),
+                  tilt=8 * e * d, head_dy=10 * e, look_y=0.8 * e, look_x=0.4 * d, face="smile")
+    return _side(d, _P(_hinge(62 * e), hand("R", _lerp2((40, -150), (150, 240), e), (1, 0.3)),
+                       hand("L", (-30, -140), (-1, 0.5)), look_y=0.6 * e, face="smile"))
+
+
+def bless(t, sp, I, ph, o):
+    # aashirwad: the palm raised over the head of the one bowing in front, a small nod, a smile
+    d = _d(o)
+    e = ease_out(_once(t, 0, 0.35))
+    bob = 6 * sin(2 * pi * 1.1 * t) * e
+    return _side(d, _P(hand("R", _lerp2((60, -150), (150, -210 + bob), e), (0.6, 1)),
+                       hand("L", (-60, -110), (-1, 0.2)), tilt=4 * e, head_dy=4 * e, look_y=0.6 * e,
+                       face="smile", ll1=-9, rl1=9))
+
+
+def kaan_pakad(t, sp, I, ph, o):
+    # sorry: both hands holding the ears, and a little uthak-baithak (knees bend and straighten)
+    b = 0.5 - 0.5 * cos(2 * pi * 0.9 * sp * t)
+    return _P(hand("R", (118, -404), (1, -0.8)), hand("L", (-118, -404), (-1, -0.8)),
+              dict(ll1=-14 - 26 * b, ll2=26 * b, rl1=14 + 26 * b, rl2=-26 * b), lift=30 * b, arms_front=True,
+              look_y=0.5, head_dy=4, face="embarrassed")
+
+
+def kaan_kheench(t, sp, I, ph, o):
+    # pulls the ear of the one in front: reach, pinch, a tug back and up (mummy / master ji)
+    d = _d(o)
+    e = ease_out(_once(t, 0, 0.3))
+    tug = 22 * sin(pi * _once(t, 0.35, 0.5)) + 10 * max(0.0, sin(2 * pi * 1.4 * (t - 0.85))) * (t > 0.85)
+    return _side(d, _P(hand("R", _lerp2((60, -150), (196 - tug, -420 - tug * 0.5), e), (0.4, 1)),
+                       hand("L", (-72, -92), (-1, -0.3)), tilt=-3 * e, face="angry", ll1=-12, rl1=12))
+
+
+def ghoorna(t, sp, I, ph, o):
+    # the stare: arms crossed, the head pushed forward a little, very still
+    d = _d(o)
+    e = ease_out(_once(t, 0, 0.4))
+    return _side(d, _P(hand("R", (-44, -212), (1, 1)), hand("L", (44, -206), (-1, 1)), head_dx=8 * e,
+                       head_dy=3 * e, tilt=2 * e, face="stare", ll1=-10, rl1=10))
+
+
+def eye_roll(t, sp, I, ph, o):
+    # oh please: the head goes up and round, a hand flicks away
+    e = ease_out(_once(t, 0, 0.3)) * (1 - ease_in(_once(t, 1.1, 0.4)))
+    flick = sin(pi * _once(t, 0.2, 0.4))
+    return _P(hand("R", (90 + 30 * flick, -200 - 40 * flick), (1, 0.6)), head_tilt=-9 * e, look_y=-0.8 * e,
+              face="eye_roll", ll1=-9, rl1=9)
+
+
+def finger_wag(t, sp, I, ph, o):
+    # na na na: the index finger up and wagging, a small head shake
+    d = _d(o)
+    w = sin(2 * pi * 3.0 * sp * t)
+    return _side(d, _P(hand("R", (136 + 16 * w, -420), (1, 1)), finger="R", head_tilt=4 * w, look_x=0.3,
+                       face="smug", ll1=-9, rl1=9))
+
+
+def pinch_cheeks(t, sp, I, ph, o):
+    # the relative aunty: both hands at the cheeks of the one in front, wobbling them
+    d = _d(o)
+    e = ease_out(_once(t, 0, 0.3))
+    w = 7 * sin(2 * pi * 4 * t) * e
+    return _side(d, _P(hand("R", _lerp2((40, -200), (196 + w, -384), e), (0.3, 1)),
+                       hand("L", _lerp2((-40, -200), (150 - w, -380), e), (0.3, 1)), tilt=6 * e,
+                       face="love", ll1=-9, rl1=9))
+
+
+def check_watch(t, sp, I, ph, o):
+    # late ho gaya: the left wrist up in front, the right finger tapping the watch, the eyes on it
+    tap = 6 * abs(sin(2 * pi * 2 * t))
+    return _P(hand("L", (6, -236), (-1, 1)), hand("R", (22, -244 - tap), (1, 1)), finger="R", look_y=0.9,
+              head_dy=4, face="angry", ll1=-9, rl1=9)
+
+
+def selfie(t, sp, I, ph, o):
+    # the phone held up high in front, the head tilted for the angle, a pout
+    d = _d(o)
+    sw = 3 * sin(2 * pi * 0.6 * t)
+    return _side(d, _P(hand("R", (120, -560 + sw), (1, 0.2)), hand("L", (-60, -110), (-1, 0.3)), prop="phone",
+                       head_tilt=-8, look_y=-0.6, look_x=0.5, face="kiss", ll1=-9, rl1=9))
+
+
+def scroll(t, sp, I, ph, o):
+    # doom-scrolling: the phone low in front, the thumb flicking up now and then, a bored face
+    flick = 8 * max(0.0, sin(2 * pi * 0.8 * t)) ** 4
+    return _P(hand("R", (16, -214 - flick), (1, 1)), hand("L", (-12, -208), (-1, 1)), prop="phone",
+              look_y=0.9, head_dy=6, face="bored", ll1=-9, rl1=9)
+
+
+def video_call(t, sp, I, ph, o):
+    # the phone held out at face height, talking to it, the other hand explaining
+    d = _d(o)
+    g = sin(2 * pi * 0.9 * t)
+    return _side(d, _P(hand("R", (150, -388), (1, 0.4)), hand("L", (40 + 20 * g, -230 - 20 * g), (-0.4, 1)),
+                       prop="phone", look_x=0.7, face="grin", ll1=-9, rl1=9))
+
+
+def eat_hands(t, sp, I, ph, o):
+    # haath se khaana: the thali on the other hand, the fingers going to the mouth
+    d = _d(o)
+    k = 0.5 - 0.5 * cos(2 * pi * 0.6 * sp * t)
+    pose = _P(hand("L", (60, -180), (-0.2, 1)), hand("R", _lerp2((80, -196), (12, -350), k), (1, 1)),
+              props=[("thali", "L")], ll1=-9, rl1=9, face="eating")
+    pose["chew"] = (0.5 + 0.5 * sin(2 * pi * 3.2 * t)) if k > 0.5 else 0.0
+    return _side(d, pose)
+
+
+def fan_self(t, sp, I, ph, o):
+    # garmi: a hand fanning the face fast, the head back, the other hand on the hip
+    d = _d(o)
+    f = sin(2 * pi * 4.5 * t)
+    return _side(d, _P(hand("R", (112 + 16 * f, -430 + 10 * f), (1, 0.8)), hand("L", (-72, -92), (-1, -0.3)),
+                       prop="newspaper", head_tilt=-6, look_y=-0.4, face="hurt", ll1=-9, rl1=9))
+
+
+def swat(t, sp, I, ph, o):
+    # machhar: the eyes follow something, then a clap in the air, again somewhere else
+    q = (t * sp) % 1.3
+    cx = 70 * sin(2.7 * int(t * sp / 1.3) + 1.0)
+    cy = -470 + 60 * cos(1.9 * int(t * sp / 1.3))
+    k = sin(pi * clamp((q - 0.65) / 0.25))
+    return _P(hand("R", (cx + 30 + 110 * (1 - k), cy), (1, 0.2)), hand("L", (cx - 30 - 110 * (1 - k), cy), (-1, 0.2)),
+              look_x=cx / 80.0, look_y=-0.7, face="angry", lift=-8 * k, ll1=-12, rl1=12)
+
+
+def knock(t, sp, I, ph, o):
+    # knocking on the door in front: the fist taps three times, waits, again
+    d = _d(o)
+    q = (t * sp) % 1.6
+    tap = sum(sin(pi * clamp((q - a) / 0.12)) for a in (0.1, 0.32, 0.54))
+    return _side(d, _P(hand("R", (170 + 18 * tap, -340), (0.2, 1)), hand("L", (-60, -110), (-1, 0.3)),
+                       look_x=0.6, face="neutral", ll1=-9, rl1=9))
+
+
+def ring_bell(t, sp, I, ph, o):
+    # the doorbell: the finger presses, holds, presses again (impatient)
+    d = _d(o)
+    q = (t * sp) % 1.1
+    press = sin(pi * clamp((q - 0.1) / 0.35))
+    return _side(d, _P(hand("R", (156 + 14 * press, -372), (0.2, 1)), hand("L", (-72, -92), (-1, -0.3)),
+                       finger="R", look_x=0.6, face="bored", ll1=-9, rl1=9))
+
+
+def propose(t, sp, I, ph, o):
+    # on one knee, the ring (a gift box) held up to the one in front
+    d = _d(o)
+    e = ease_out(_once(t, 0, 0.5))
+    legs = dict(rl1=86 * e + 9 * (1 - e), rl2=4 * e, ll1=-6 * e - 9 * (1 - e), ll2=-96 * e)
+    return _side(d, _P(legs, hand("R", _lerp2((60, -150), (190, -300), e), (0.5, 1)),
+                       hand("L", _lerp2((-40, -150), (150, -296), e), (0.5, 1)), prop="gift", look_y=-0.5 * e,
+                       face="love", tilt=-3 * e))
+
+
+def cry_hug(t, sp, I, ph, o):
+    # holding on to the one in front and sobbing, the shoulders shaking
+    d = _d(o)
+    e = ease_out(_once(t, 0, 0.35))
+    sob = 4 * sin(2 * pi * 5 * t) * e
+    pose = _P(hand("R", _lerp2((80, -120), (196, -296 + sob), e), (0.2, -0.4)),
+              hand("L", _lerp2((-80, -120), (176, -300 + sob), e), (0, 1)),
+              tilt=9 * e, head_dx=12 * e, head_dy=6 * e + sob * 0.5, lift=sob * 0.4, face="cry", ll1=-9, rl1=9)
+    return _side(d, pose)
+
+
+def pull_chair(t, sp, I, ph, o):
+    # the prank: bent a little, the hands low in front, yanking back fast, then the evil grin
+    d = _d(o)
+    k = ease_in(_once(t, 0.4, 0.2))
+    return _side(d, _P(_hinge(20 * (1 - 0.5 * k)), hand("R", _lerp2((150, -60), (10, -70), k), (0.3, 1)),
+                       hand("L", _lerp2((120, -50), (-20, -60), k), (0.3, 1)), face="evil" if k > 0.5 else "sly"))
+
+
+DESI_GESTURES = {"touch_feet", "bless", "kaan_pakad", "kaan_kheench", "ghoorna", "eye_roll", "finger_wag",
+                 "pinch_cheeks", "check_watch", "selfie", "scroll", "video_call", "eat_hands", "fan_self", "swat",
+                 "knock", "ring_bell", "propose", "cry_hug", "pull_chair"}
+
 SING_ACTIONS = {"sing", "gaana"}
 # moves worth watching for a while: a script line with only one of these holds the cursor ~1.6 s
 DANCES = {"dance", "dance2", "dance3", "disco", "sway", "naagin", "nagin", "bhangra", "aeroplane", "airplane",
@@ -1349,6 +1532,16 @@ ACTIONS = {
     "pushup": pushup, "lift_weights": lift_weights, "garba": garba, "hookstep": hookstep, "floss": floss,
     # animal words (studio/animals.py draws them for dogs, cats, cows and birds; a person just does the nearest thing)
     "bark": talk, "meow": talk, "moo": talk, "caw": talk, "wag": sway, "fly": aeroplane, "peck": bow,
+    # desi gestures (and their Hinglish names)
+    "touch_feet": touch_feet, "pair_chhoona": touch_feet, "pairi_pauna": touch_feet, "bless": bless,
+    "aashirwad": bless, "kaan_pakad": kaan_pakad, "sorry": kaan_pakad, "uthak_baithak": kaan_pakad,
+    "kaan_kheench": kaan_kheench, "ear_pull": kaan_kheench, "ghoorna": ghoorna, "ghoor": ghoorna,
+    "eye_roll": eye_roll, "finger_wag": finger_wag, "na_na": finger_wag, "pinch_cheeks": pinch_cheeks,
+    "gaal_kheench": pinch_cheeks, "check_watch": check_watch, "ghadi": check_watch, "selfie": selfie,
+    "scroll": scroll, "video_call": video_call, "eat_hands": eat_hands, "haath_se_khana": eat_hands,
+    "fan_self": fan_self, "garmi": fan_self, "swat": swat, "knock": knock, "khatkhata": knock,
+    "ring_bell": ring_bell, "ghanti": ring_bell, "propose": propose, "kneel": propose, "cry_hug": cry_hug,
+    "pull_chair": pull_chair, "kursi_kheench": pull_chair,
 }
 
 

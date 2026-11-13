@@ -1,0 +1,16 @@
+HOOK: Jab ghar ka bijli bill aaya 😭
+SERIES: sharma_parivar 1
+P (angry, point): Ye 4000 ka bijli bill kiska hai?! | ये चार हज़ार का बिजली बिल किसका है?!
+B (embarrassed, kaan_pakad): Papa, mera nahi hai, sach me! | पापा, मेरा नहीं है, सच में!
+D (side_eye): Raat bhar AC kaun chalata hai, Bittu? | रात भर एसी कौन चलाता है, बिट्टू?
+B (scroll, smug): Dadi, main toh library me padh raha tha. | दादी, मैं तो लाइब्रेरी में पढ़ रहा था।
+INSTA: bittu_official | 2 | Raat ke 3 baje, AC full, gaming on 😎 | 🎮
+P (stare, ghoorna): Library me?! | लाइब्रेरी में?!
+UPI: Rs 4000 | Bijli Vibhag | Payment failed
+SCENE: ghar_darwaza | Agle din... ⏰
+B -> ring_bell
+M (shock): Bittu, ye bijli wale aaye hain! | बिट्टू, ये बिजली वाले आए हैं!
+B (cry_hug): Mummy, mujhe bacha lo! | मम्मी, मुझे बचा लो!
+CTA: Tag karo us bhai ko jo raat bhar AC chalata hai 👇
+CAPTION: Har ghar me ek Bittu hota hai 😂
+HASHTAGS: #bijlibill #desicomedy #funnyreels

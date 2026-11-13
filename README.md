@@ -359,6 +359,128 @@ Instagram grid me saari reels ek jaisi na lagein, isliye har video ka apna look 
 
 `CAMERA: classic` me sab pehle jaisa (koi rang/pehla shot nahi). Command line: `--color golden`, `--cover` (cover PNG banata hai).
 
+### Naye log (Nov 2026) 👔🎒🪖
+
+`boss` (suit, laal tie, tond, haath me phone), `master_ji` (purane master ji: sweater, chashma, chhadi), `school_boy` / `school_girl` (school uniform, tie, peeth pe bag), `fauji` (army wardi, maroon beret), `nri_mama` (videsh se aaye mama: sunglasses, phone), `sardar_ji` (pagdi, dadhi), `waiter` (bow tie, plate), `mechanic` (neeli wardi, spanner), `safai_wala` (jhadu), `baba` (bhagwa, safed dadhi, tilak).
+
+- Role ke naam se bhi: `teacher` / `sir` / `masterji` = master_ji, `boss` / `manager` = boss, `student` = school_boy, `schoolgirl` = school_girl, `army` / `jawan` = fauji, `nri` / `mama` = nri_mama, `sardarji` / `paaji` = sardar_ji, `mistri` = mechanic, `sweeper` = safai_wala, `sadhu` / `jyotishi` / `swami` = baba.
+- Nayi cheezein bhi kisi ko bhi: `sweater`, `beret`, `bowtie`, `backpack` (CAST me: `A = uncle sweater glasses`), haath me `spanner`.
+- Awaaz: school wale bachche patli, baba aur master ji bhaari aur dheemi, boss aur fauji thodi bhaari.
+
+### Naye chehre (comments wale) 👀
+
+`side_eye` (aankh ke kone se judge karna), `stare` (ghoorna: mummy-papa wala), `eye_roll` (aankh ghumana), `drool` (khaana dekh ke laar), `money_eyes` (aankhon me ₹), `embarrassed` (laal gaal + maathe pe paseene ki boond). Hinglish me bhi: `ghoorna`, `judging`, `laar`, `paisa` / `lalach`, `sharminda`. Page ke Builder me inke chips bhi hain (👀 🤤 🤑 😅).
+
+### Desi gestures 🙏 (naye actions)
+
+| Action | Kya karta hai |
+|---|---|
+| `touch_feet` (`pair_chhoona`) | jhuk ke saamne wale ke pair chhoona |
+| `bless` (`aashirwad`) | jhuke hue sar pe haath |
+| `kaan_pakad` (`sorry`, `uthak_baithak`) | dono kaan pakad ke uthak-baithak |
+| `kaan_kheench` | saamne wale ka kaan kheenchna (mummy / master ji) |
+| `ghoorna` | haath baandh ke ghoorna (chehra `stare` apne aap) |
+| `eye_roll`, `finger_wag` (`na_na`) | aankh ghumana, ungli hila ke "na na na" |
+| `pinch_cheeks` (`gaal_kheench`) | rishtedaar aunty ka gaal kheenchna |
+| `check_watch` (`ghadi`) | ghadi pe ungli: "late ho gaya" |
+| `selfie`, `scroll`, `video_call` | phone wali zindagi |
+| `eat_hands` (`haath_se_khana`), `fan_self` (`garmi`), `swat` | thali se khaana, pankha jhalna, hawa me machhar maarna |
+| `knock` (`khatkhata`), `ring_bell` (`ghanti`) | darwaza khatkhatana, ghanti bajana |
+| `propose` (`kneel`), `cry_hug`, `pull_chair` (`kursi_kheench`) | ghutne pe propose, ro ke gale lagna, kursi kheenchne wala prank |
+
+Script me: `B -> touch_feet` phir `A -> bless`; `A (kaan_pakad, embarrassed): Sorry mummy! | सॉरी मम्मी!`.
+
+### Naye jaanwar 🐐🐓🦎🦟
+
+`bakri` / `goat` (seeng, dadhi, hamesha chabaati hui), `murga` / `rooster` (laal kalgi, lambi poonch: subah ka alarm), `chhipkali` / `lizard` (deewar pe chipki, poonch hilati: "main toh yahin rehti hoon"), `machhar` / `mosquito` (sar ki oonchai pe bhinbhinata, lambi sui wali naak). Chhipkali aur machhar ke chehre hain, wo baat bhi karte hain (patli, tez awaaz). `B = chhipkali` likho; chhipkali ko zameen pe chahiye to JSON me `"floor": true`. Machhar maarne ka action: `A -> swat`.
+
+### Nayi jagahein: roz ki zindagi 🚪🌳🍛
+
+`ghar_darwaza` (flat ka darwaza: SHARMA ki nameplate, ghanti, toran, joote ka rack, seedhiyan; rishtedaar, delivery, padosi), `lift` (steel ki deewar, sheesha, 7th floor ka button panel: awkward silence), `park` (walking track, bench, jhoola-slide, peeche flats: morning walk aur gossip), `buffet` (shaadi ka khana: PANEER / DAL / PULAO / GULAB JAMUN, shamiyana, laal carpet), `restaurant` (booth, MENU board ke daam, latakti lights, shaam ki sadak wali khidki), `atm` ("Balance: Rs 47", CCTV ON, slips se bhara dabba), `petrol_pump` (DESI PETROLEUM, 107.48 ka board, do machine), `signal` (laal batti, 88 ka countdown, zebra crossing, flyover, "EMI sirf Rs 999" hoarding), `interview_room` (HR / MANAGER / CEO ke card, "Round 7 ??"), `call_center` (raat ke 2 baje, CALLS 487 / 600 ka target), `startup_office` (HUSTLE neon, bean bags, sticky notes, Q4 OKRs).
+
+- 2D aur 2.5D dono me. **2.5D me har ek ka apna set** (`studio/style25d/scenery_2026.py`): jagah ki parten gehrai me, aur upar uski apni zindagi:
+  - darwaza: toran ke patte hilte hain, ghanti ki laal batti, seedhi ki tubelight jhapakti hai, bulb ke paas makkhi
+  - lift: floor number 7, 6, 5... ghat-ta hai, sheeshe pe chamak sarakti hai
+  - park: parinde, girte patte, apne aap jhoolta jhoola, aage oonchi ghaas aur phool
+  - buffet: har bartan se bhaap, jhalar ki jhilmil, girti genda pankhudiyan, aage plates ka dher
+  - restaurant: lamp ki garam roshni, khidki me guzarti gaadiyon ki lights, plate ki bhaap, aage gilaas aur menu
+  - atm: screen ka cursor, CCTV ki laal batti, tubelight ki jhapak
+  - petrol pump: ghoomte meter, peeche guzarti gaadiyan, aage nozzle
+  - signal: 88 se ghat-ta countdown, laal batti ki chamak, doosri sadak ka traffic, aage bike ka sheesha
+  - interview: tik-tik ghadi, whiteboard ki chamak, aage paani ki bottle aur file
+  - call center: jhapakte monitor, target board, aage headset
+  - startup: HUSTLE neon ka jhapakna, laptops ki roshni, hilta sticky note, aage coffee mug
+- Sabka apna look (`buffet` = utsav, `call_center` = daftar...) aur apni mystery; park, buffet, signal, petrol pump pe bheed bhi.
+- In jagahon pe likhawat hai, isliye CUT pe ye ulti (mirror) nahi hoti (`CUT reverse` likho tabhi).
+- Mandir jaan-boojh ke nahi banaya.
+
+### Series: wahi family har episode me 📺 (`SERIES`)
+
+`series/` folder me ek family / gang ki file hoti hai (CAST, naam, pehli jagah, rang, hashtag). Script me bas:
+```
+HOOK: Bijli ka bill aaya 😭
+SERIES: sharma_parivar 3
+P (angry, point): Ye 4000 ka bill kiska hai? | ये चार हज़ार का बिल किसका है?
+B (scared): Mera nahi papa! | मेरा नहीं पापा!
+D (smug): AC kaun chalata hai raat bhar? | एसी कौन चलाता है रात भर?
+```
+- CAST likhne ki zarurat nahi: jo log script me bolte / act karte hain wo series se aate hain. **Har episode me wahi chehra** (chehre ke hisse series ke naam se pakke hote hain, chahe us episode me koi aur ho ya na ho), wahi kapde, wahi rang (`COLOR`), pehli jagah (`SCENE` na likho to series wali).
+- Pehle 3 second upar chhota badge: **"Sharma Parivar • Part 3"**; caption ke aage "(Part 3)", hashtags me `#sharmaparivar`.
+- Script me apni CAST line ho to wahi chalti hai; series bas baaki log jod deti hai.
+- Do series pehle se: `sharma_parivar` (P = papa, M = mummy, B = Bittu, D = dadi) aur `office_gang` (S = boss, R = Riya, I = intern, K = Kapoor). Nayi series: `series/meri_series.json` banao (inhi jaisi).
+
+### Phone ki screen kahani ke beech 📱 (WHATSAPP, INSTA, ORDER, UPI)
+
+Ek line, apni jagah pe (kahani us card ke dikhne tak rukti hai):
+```
+WHATSAPP: Mummy | < Kahan ho? | > Library me 📚 | < Photo bhejo
+INSTA: bittu_official | 2 | Exam se pehle chill 😎 | 🏖️
+ORDER: Zomato | Paneer Butter Masala | Rs 349 | Out for delivery | 10 min
+UPI: Rs 2000 | Sharma ji | Payment failed
+```
+- `WHATSAPP`: chat ek-ek message karke bharta hai (`<` unka, `>` apna), beech me "typing..." bhi.
+- `INSTA`: post: user, rangeen photo pe emoji, dil dhadakta hai aur likes ginti me badhte hain, caption.
+- `ORDER`: delivery tracker: Zomato / Swiggy / Blinkit / Zepto / Amazon / Flipkart ka apna rang, khaana + daam, status badalta hai (Order placed → Cooking → aapka status), scooter wala aage badhta hai.
+- `UPI`: amount, kisko, aur hara tick (ya "failed / declined / nahi" ho to laal cross).
+- Page ke Builder me "📱 Screen card" me bhi ye chaaron hain.
+
+### Har jagah ka apna look 🎬 (`LOOK`) aur har video me ek ajeeb cheez 👀 (`MYSTERY`)
+
+**Look (colour grading):** ab har jagah apne rang me aati hai, apne aap. Kuch likhna nahi.
+
+| Jagah | Look |
+|---|---|
+| hospital, medical_store, bathroom | `clinic`: thanda, saaf, halka hara-neela |
+| office, bank, meeting_room, court | `daftar`: thaka hua grey-neela |
+| room, living_room, bedroom, balcony / kitchen | `ghar` / `rasoi`: garam, dhoop wala |
+| gully, chai_tapri, kirana, gaon, dhaba, canteen | `sunehra`: sunehri dhool, kone halke gehre |
+| market, mithai_shop | `bazaar`: chatak rang |
+| mandap, party, festival_street, terrace | `utsav`: gehre rang, lights ke aas-paas chamak |
+| night_road (aur koi bhi jagah `night`) | `raat`: neeli parchhai, peeli lights, chamak |
+| haunted_house, graveyard | `darr`: feeka hara, gehre kone, film grain |
+| jail, police_station | `hawalat`: rang uda hua, zyada contrast |
+| school, classroom, coaching, library, hostel | `padhai`: purani yaad jaisa garam |
+| beach / desert / mountain_road / jungle | `samundar` / `registan` / `pahad` / `kudrat` |
+| street, bus_stop / train, bus, car... | `sadak` / `safar` |
+
+- **Mood upar se:** `MUSIC: sad` rang feeka karta hai, `MUSIC: suspense` andhera aur grain, `MUSIC: festive` rang gehre. `SCENE: kitchen night` me lamps chamakte hain; `rain` / `fog` me rang dhul jaate hain.
+- **Khud chuno:** `LOOK: yaad` (purani yaad: sepia, grain), `LOOK: sapna` (sapna: chamak), `LOOK: noir` (black & white), ya upar ka koi bhi naam (`LOOK: darr`): poori video usi look me. `LOOK: off` = jaisa bana hai waisa.
+- Apni photo (`image`) aur `plain` pe koi jagah ka look nahi lagta (sirf mood). `CAMERA: classic` me purani tasveer hi rehti hai (koi look nahi).
+- Rang ke themes (`COLOR: golden`...) pehle jaise: wo hook card / CTA ke rang aur halka sa tint hain; look uske upar jagah ka apna rang hai.
+
+**Mystery:** har video me ek baar, kahani ke beech me, logon ke peeche kuch ajeeb hota hai jise koi character nahi dekhta. Log dobara dekhte hain aur comment me poochte hain "peeche kya tha?".
+
+| Kahan | Kya |
+|---|---|
+| Bahar (street, gaon, beach, gully...) | `ufo` (chhoti udan tashtari aasmaan se guzarti hai), `aadmi` (topi aur lambe coat wala aadmi door khada dekhta hai, phir gayab) |
+| Bahar, raat me | `toota_taara`, `aankhen` (andhere me do chamakti aankhen jhapakti hain) |
+| Andar (room, office, hospital...) | `saaya` (peeche ki deewar pe kisi ki parchhai guzarti hai), `tasveer` (deewar ki tasveer aankhen ghuma ke muskurati hai), `jhapak` (light jhapakti hai), `tv` (kamre me TV ho to wo khud on ho jaata hai) |
+| Gaadi ke andar | `jhapak` |
+
+- Kaunsi cheez aayegi wo jagah aur hook se tay hoti hai: wahi script = wahi cheez; nayi script = nayi cheez.
+- `MYSTERY: ufo` = khud chuno, `MYSTERY: off` = kuch nahi. Kai jagah wali video me ye beech wali jagah me aata hai, pehli line ya punch line pe nahi.
+- Mascot 👻 (page ka option) alag hai aur pehle jaisa chalta hai.
+
 ### CTA: end card, sticker ya sirf caption 📣
 
 CTA ab zaruri nahi: `CTA:` line na likho to video punch line ke baad khatam. Likho to page pe **CTA 📣** se chuno kaise dikhe:

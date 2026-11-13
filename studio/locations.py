@@ -986,3 +986,7 @@ from .places_plus import HORIZON as _NEW_HORIZON, NEW as _NEW_PLACES   # noqa: E
 
 LOCATIONS.update(_NEW_PLACES)
 LOC_HORIZON.update(_NEW_HORIZON)
+from .places_2026 import HORIZON as _HORIZON_2026, NEW as _PLACES_2026   # noqa: E402  (ghar_darwaza, park, buffet...)
+
+LOCATIONS.update(_PLACES_2026)
+LOC_HORIZON.update(_HORIZON_2026)

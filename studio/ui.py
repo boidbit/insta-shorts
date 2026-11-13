@@ -16,7 +16,8 @@ from PIL import Image, ImageDraw
 from .text import font, text_block
 from .util import LH, LW, clamp, ease_out, ease_out_back
 
-TYPES = ("chat", "notification", "loading", "counter", "timecard", "chapter", "endcard")
+TYPES = ("chat", "notification", "loading", "counter", "timecard", "chapter", "endcard", "phone_chat", "insta",
+         "order", "upi")
 INK = (16, 16, 16)
 
 
@@ -192,6 +193,112 @@ def endcard(o, lt, s, size):
     return im
 
 
+# ---------------------------------------------------------------- phone screens inside a story (Nov 2026)
+def phone_chat(o, lt, s):
+    """WHATSAPP: a chat that fills in message by message during the story (the messages carry "at" seconds)."""
+    return chat(dict(o, color=o.get("color", (24, 120, 104))), lt, s)
+
+
+def insta(o, lt, s):
+    """INSTA: a post: the user, a picture (a colour gradient with an emoji), the heart, the likes counting up, the
+    caption."""
+    W, H = 860 * s, 1040 * s
+    im, d = _canvas(W, H)
+    _rr(d, [0, 0, W - 1, H - 1], 40 * s, (255, 255, 255), INK, max(2, int(5 * s)))
+    d.ellipse([34 * s, 30 * s, 114 * s, 110 * s], fill=(230, 80, 140))
+    d.ellipse([42 * s, 38 * s, 106 * s, 102 * s], fill=(250, 210, 120))
+    user = text_block(str(o.get("user", "user")), 36 * s, 560 * s, fill=INK)
+    im.alpha_composite(user, (int(134 * s), int(50 * s)))
+    top, bot = 140 * s, 760 * s
+    pic = Image.new("RGB", (2, 2))
+    for (x, y), c in zip(((0, 0), (1, 0), (0, 1), (1, 1)), ((250, 120, 90), (230, 80, 150), (250, 190, 80),
+                                                             (130, 90, 220))):
+        pic.putpixel((x, y), c)
+    pic = pic.resize((int(W - 2 * 10 * s), int(bot - top)), Image.BILINEAR)
+    im.paste(pic, (int(10 * s), int(top)))
+    em = text_block(str(o.get("emoji", "📸")), 150 * s, 300 * s, fill=(255, 255, 255))
+    im.alpha_composite(em, (int(W / 2 - em.width / 2), int((top + bot) / 2 - em.height / 2)))
+    beat = 1.0 + 0.25 * math.sin(math.pi * clamp((lt - 0.6) / 0.35))
+    hr = 30 * s * beat
+    hx, hy = 70 * s, 820 * s
+    red = (236, 50, 70) if lt > 0.6 else (255, 255, 255)
+    d.ellipse([hx - hr, hy - hr * 0.9, hx, hy + hr * 0.1], fill=red, outline=INK, width=max(1, int(3 * s)))
+    d.ellipse([hx, hy - hr * 0.9, hx + hr, hy + hr * 0.1], fill=red, outline=INK, width=max(1, int(3 * s)))
+    d.polygon([(hx - hr * 0.96, hy - hr * 0.3), (hx + hr * 0.96, hy - hr * 0.3), (hx, hy + hr * 1.0)], fill=red)
+    likes = int(o.get("likes", 0))
+    shown = int(likes * ease_out(clamp(lt / 1.4)))
+    lk = text_block("%s likes" % format(shown, ","), 34 * s, 600 * s, fill=INK)
+    im.alpha_composite(lk, (int(124 * s), int(796 * s)))
+    cap = text_block(str(o.get("caption", "")), 32 * s, W - 70 * s, fill=(60, 60, 66))
+    im.alpha_composite(cap.crop((0, 0, cap.width, min(cap.height, int(150 * s)))), (int(34 * s), int(870 * s)))
+    return im
+
+
+def order(o, lt, s):
+    """ORDER: a food-delivery tracker: the app's colour bar, the dish and the price, a moving rider on a progress
+    line, and the status that changes ("Order placed" -> "Cooking" -> the status the script gave)."""
+    W, H = 860 * s, 560 * s
+    im, d = _canvas(W, H)
+    col = tuple(o.get("color", (226, 55, 68)))
+    _rr(d, [0, 0, W - 1, H - 1], 40 * s, (255, 255, 255), INK, max(2, int(5 * s)))
+    _rr(d, [0, 0, W - 1, 130 * s], 40 * s, col)
+    d.rectangle([0, 90 * s, W - 1, 130 * s], fill=col)
+    app = text_block(str(o.get("app", "Food")), 50 * s, 700 * s, fill=(255, 255, 255))
+    im.alpha_composite(app, (int(40 * s), int(36 * s)))
+    item = text_block(str(o.get("item", "")), 40 * s, 560 * s, fill=INK)
+    im.alpha_composite(item, (int(40 * s), int(160 * s)))
+    price = text_block(str(o.get("price", "")), 40 * s, 220 * s, fill=(40, 140, 60))
+    im.alpha_composite(price, (int(W - 40 * s - price.width), int(160 * s)))
+    steps = ["Order placed", "Cooking", str(o.get("status", "Out for delivery"))]
+    k = ease_out(clamp(lt / 2.2))
+    st = steps[min(2, int(k * 3.0 - 1e-6))] if k < 1 else steps[2]
+    status = text_block(st, 38 * s, 760 * s, fill=col)
+    im.alpha_composite(status, (int(40 * s), int(260 * s)))
+    y = 400 * s
+    d.line([(60 * s, y), (W - 60 * s, y)], fill=(220, 220, 224), width=max(2, int(12 * s)))
+    x = 60 * s + (W - 120 * s) * k
+    d.line([(60 * s, y), (x, y)], fill=col, width=max(2, int(12 * s)))
+    for i in range(3):
+        cx = 60 * s + (W - 120 * s) * i / 2.0
+        d.ellipse([cx - 16 * s, y - 16 * s, cx + 16 * s, y + 16 * s], fill=col if k >= i / 2.0 else (220, 220, 224))
+    rider = text_block("🛵", 60 * s, 120 * s, fill=INK)
+    im.alpha_composite(rider, (int(x - rider.width / 2), int(y - 90 * s)))
+    eta = text_block(str(o.get("eta", "")), 30 * s, 760 * s, fill=(120, 120, 128))
+    im.alpha_composite(eta, (int(40 * s), int(460 * s)))
+    return im
+
+
+def upi(o, lt, s):
+    """UPI: a payment screen: the amount, to whom, and the big green tick that pops in (or a red cross for
+    "failed")."""
+    W, H = 820 * s, 820 * s
+    im, d = _canvas(W, H)
+    st_ = str(o.get("status", "")).lower()
+    failed = any(w in st_ for w in ("fail", "declin", "nahi", "reject", "insufficient", "error"))
+    col = (220, 60, 60) if failed else (30, 160, 90)
+    _rr(d, [0, 0, W - 1, H - 1], 44 * s, (255, 255, 255), INK, max(2, int(5 * s)))
+    pop = ease_out_back(clamp((lt - 0.3) / 0.4))
+    r = 110 * s * max(0.0, pop)
+    cx, cy = W / 2, 230 * s
+    if r > 1:
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=col)
+        if failed:
+            d.line([(cx - r * 0.45, cy - r * 0.45), (cx + r * 0.45, cy + r * 0.45)], fill=(255, 255, 255),
+                   width=max(2, int(22 * s * pop)))
+            d.line([(cx - r * 0.45, cy + r * 0.45), (cx + r * 0.45, cy - r * 0.45)], fill=(255, 255, 255),
+                   width=max(2, int(22 * s * pop)))
+        else:
+            d.line([(cx - r * 0.5, cy), (cx - r * 0.12, cy + r * 0.38), (cx + r * 0.52, cy - r * 0.36)],
+                   fill=(255, 255, 255), width=max(2, int(24 * s * pop)), joint="curve")
+    amt = text_block(str(o.get("amount", "")), 84 * s, W - 60 * s, fill=INK)
+    im.alpha_composite(amt, (int(W / 2 - amt.width / 2), int(390 * s)))
+    to = text_block("to " + str(o.get("payee", "")) if o.get("payee") else "", 38 * s, W - 60 * s, fill=(90, 90, 96))
+    im.alpha_composite(to, (int(W / 2 - to.width / 2), int(510 * s)))
+    stt = text_block(str(o.get("status", "Payment successful")), 42 * s, W - 60 * s, fill=col)
+    im.alpha_composite(stt, (int(W / 2 - stt.width / 2), int(600 * s)))
+    return im
+
+
 def render(o, lt, s, dur, size):
     """RGBA image for overlay o at local time lt, or None. Full-screen types return a frame-sized image."""
     t = o.get("type")
@@ -209,4 +316,12 @@ def render(o, lt, s, dur, size):
         return chapter(o, lt, s)
     if t == "endcard":
         return endcard(o, lt, s, size)
+    if t == "phone_chat":
+        return phone_chat(o, lt, s)
+    if t == "insta":
+        return insta(o, lt, s)
+    if t == "order":
+        return order(o, lt, s)
+    if t == "upi":
+        return upi(o, lt, s)
     return None

@@ -67,7 +67,7 @@ import os
 import re
 import zlib
 
-from . import actions, audio, crowd, decor, drive, gemini_music, objects, rides, styles, theme, vehicles
+from . import actions, audio, crowd, decor, drive, gemini_music, look, mystery, objects, rides, styles, theme, vehicles
 from .characters import (ACCESSORIES, EXPRESSIONS, FACE_PARTS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, HAIR_WORDS,
                          LOOKS, MARKS, OUTFITS, PALETTE, face_word,
                          SKIN_TONES)
@@ -77,7 +77,7 @@ from .scene import (CTA_STYLES, DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLO
                     mascot_kind)
 
 HEADERS = ("HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP",
-           "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD")
+           "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD", "LOOK", "MYSTERY", "SERIES")
 OPENINGS = ("plain", "reveal", "close")     # the first shot of a video: as it comes / starts on a face and pulls back /
                                             # a close-up (each video gets one, picked from its hook)
 ON_WORDS, OFF_WORDS = ("on", "yes", "haan", "true", "1"), ("off", "no", "nahi", "false", "0", "none")
@@ -165,7 +165,16 @@ ROLE_LOOKS = {
     "aunty": "aunty", "dadi": "dadi", "nani": "dadi", "dada": "dada", "nana": "dada",
     "dost": "boy", "friend": "boy", "bhai": "college_boy", "brother": "college_boy", "beta": "college_boy",
     "behen": "college_girl", "sister": "college_girl", "beti": "college_girl", "didi": "college_girl",
-    "teacher": "office_guy", "boss": "office_guy", "bachcha": "kid", "student": "kid",
+    "teacher": "master_ji", "masterji": "master_ji", "master": "master_ji", "sir": "master_ji",
+    "boss": "boss", "manager": "boss", "malik_sahab": "boss", "bachcha": "kid",
+    "student": "school_boy", "schoolboy": "school_boy", "chhatra": "school_boy", "schoolgirl": "school_girl",
+    "chhatra_girl": "school_girl", "school_wali": "school_girl",
+    "army": "fauji", "soldier": "fauji", "faujii": "fauji", "jawan": "fauji",
+    "nri": "nri_mama", "mama": "nri_mama", "videshi_mama": "nri_mama", "canada_wala": "nri_mama",
+    "sardar": "sardar_ji", "sardarji": "sardar_ji", "paaji": "sardar_ji", "paji": "sardar_ji",
+    "bearer": "waiter", "mistri": "mechanic", "garage_wala": "mechanic",
+    "sweeper": "safai_wala", "safaiwala": "safai_wala", "safai_karmachari": "safai_wala",
+    "sadhu": "baba", "babaji": "baba", "jyotishi": "baba", "swami": "baba", "tantrik": "baba",
     "pujari": "pandit", "panditji": "pandit", "policewala": "police", "inspector": "police", "havaldar": "police",
     "daroga": "police", "dactor": "doctor", "groom": "dulha", "bride": "dulhan",
     "netaji": "neta", "mantri": "neta", "politician": "neta", "sarpanch": "neta", "mla": "neta",
@@ -189,7 +198,7 @@ ROLE_LOOKS = {
     "gawah": "boy", "witness": "boy", "canteenwala": "chaiwala", "chaiwale": "chaiwala",
 }
 FEMALE_LOOKS = {"food_blogger_girl", "air_hostess", "girl", "college_girl", "aunty", "dadi", "kid_girl", "office_girl", "madam", "dulhan", "nurse",
-                "saas", "bahu"}
+                "saas", "bahu", "school_girl"}
 PITCHES = ["+0Hz", "+14Hz", "-8Hz", "+24Hz", "-14Hz"]
 BUILDS = ("slim", "normal", "chubby")
 BUILD_WORDS = {"mota": "chubby", "moti": "chubby", "fat": "chubby", "patla": "slim", "patli": "slim", "thin": "slim"}
@@ -248,7 +257,10 @@ def _words(s):
 
 ANIMAL_WORDS = {"dog": "dog", "kutta": "dog", "doggy": "dog", "cat": "cat", "billi": "cat", "cow": "cow",
                 "gaay": "cow", "gai": "cow", "crow": "crow", "kauwa": "crow", "kaua": "crow", "parrot": "parrot",
-                "tota": "parrot", "totaa": "parrot", "monkey": "monkey", "bandar": "monkey"}
+                "tota": "parrot", "totaa": "parrot", "monkey": "monkey", "bandar": "monkey", "goat": "goat",
+                "bakri": "goat", "bakra": "goat", "rooster": "rooster", "murga": "rooster", "murgi": "rooster",
+                "hen": "rooster", "lizard": "lizard", "chhipkali": "lizard", "chipkali": "lizard",
+                "mosquito": "mosquito", "machhar": "mosquito", "macchar": "mosquito", "machchhar": "mosquito"}
 
 
 BEHIND_WORDS = {"peeche": True, "piche": True, "behind": True, "counter_peeche": True, "aage": False,
@@ -316,12 +328,22 @@ def cast_spec(words, index, unknown=None):
              "pitch": PITCHES[index % len(PITCHES)], "rate": "+0%"}
     if spec["look"] in ("kid", "kid_girl"):
         voice.update(pitch="+30Hz", rate="+8%")
+    elif spec["look"] in ("school_boy", "school_girl"):
+        voice.update(pitch="+20Hz", rate="+5%")
+    elif spec["look"] in ("baba", "master_ji"):
+        voice.update(pitch="-12Hz", rate="-6%")
+    elif spec["look"] in ("boss", "fauji"):
+        voice.update(pitch="-6Hz")
     elif spec["look"] in ("dada", "dadi"):
         voice.update(pitch="-10Hz", rate="-8%")
     if spec.get("kind") in ANIMAL_WORDS.values() and spec["kind"] != "monkey":
         if isinstance(spec.get("color"), str) and spec["color"] in PALETTE:
             spec["color"] = list(PALETTE[spec["color"]])  # the animal rig takes an RGB colour
         voice.update(pitch="+20Hz" if spec["kind"] in ("cat", "parrot", "crow") else "-6Hz")
+        if spec["kind"] in ("mosquito", "lizard"):
+            voice.update(pitch="+40Hz", rate="+12%")      # tiny: a thin, quick voice
+        elif spec["kind"] in ("goat", "rooster"):
+            voice.update(pitch="+12Hz")
     spec["voice"] = voice
     return spec
 
@@ -454,12 +476,14 @@ def ots_back(sc, before, order, cast):
 # plain words a writer (or a chat AI) often uses for a feeling or an action -> the studio's own word, so a script
 # written with "happy", "gussa", "running" still acts (the writer prompt then needs fewer rules)
 FEEL_WORDS = {
+    "staring": "stare", "judging": "side_eye", "sideeye": "side_eye",
+    "laar": "drool", "drooling": "drool", "lalach": "money_eyes", "paisa": "money_eyes", "sharminda": "embarrassed",
     "happy": "smile", "khush": "smile", "cheerful": "smile", "smiling": "smile", "gusse": "angry", "ghussa": "angry",
     "naraz": "angry", "naraaz": "angry", "irritated": "angry", "annoyed": "angry", "frustrated": "angry",
     "furious": "angry", "mad": "angry", "dukhi": "sad", "upset": "sad", "udaas": "sad", "udas": "sad",
     "worried": "nervous", "tension": "nervous", "tense": "nervous", "anxious": "nervous", "ghabraya": "nervous",
     "darr": "scared", "dara": "scared", "afraid": "scared", "hairan": "surprised", "shocked": "shock",
-    "amazed": "surprised", "confident": "proud", "tired": "sleepy", "thaka": "sleepy", "embarrassed": "shy",
+    "amazed": "surprised", "confident": "proud", "tired": "sleepy", "thaka": "sleepy",
     "sharma": "shy", "sarcastic": "smug", "naughty": "sly", "mischievous": "sly", "serious": "neutral",
     "calm": "relaxed", "chill": "relaxed", "crying": "cry", "rona": "cry", "laughing": "laugh", "hasna": "laugh",
     "thinking": "think", "soch": "think", "romantic": "love", "pyaar": "love", "disgusted": "disgust",
@@ -838,7 +862,10 @@ def parse_lyrics(meta, lyrics):
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".webp")
 
 
-UI_WORDS = ("NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
+UI_WORDS = ("NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD", "WHATSAPP", "INSTA",
+            "ORDER", "UPI")
+APP_COLORS = {"zomato": [226, 55, 68], "swiggy": [252, 128, 25], "blinkit": [248, 203, 70], "zepto": [90, 30, 150],
+              "amazon": [35, 47, 62], "flipkart": [40, 116, 240]}
 
 
 def ui_line(key, val):
@@ -866,6 +893,35 @@ def ui_line(key, val):
         return {"type": "counter", "label": parts[0], "start": a, "end": b}, 2.6, None
     if key == "TIMECARD":
         return {"type": "timecard", "text": parts[0]}, 1.6, None
+    if key == "WHATSAPP":                               # WHATSAPP: Mummy | < Kahan ho? | > Library me | < Photo bhejo
+        msgs = []
+        for p in parts[1:]:
+            if not p:
+                continue
+            me = p.startswith(">")
+            msgs.append({"side": "me" if me else "them", "text": p.lstrip("<>").strip(), "at": 0.4 + 1.1 * len(msgs)})
+        if not msgs:
+            return None, 0, "WHATSAPP: 'WHATSAPP: Mummy | < Kahan ho? | > Library me' likho (< unka, > apna message)"
+        hold = 0.4 + 1.1 * len(msgs) + 1.0
+        return {"type": "phone_chat", "title": parts[0], "messages": msgs, "dur": hold + 0.3}, hold, None
+    if key == "INSTA":                                  # INSTA: bittu_official | 2 | Exam ke pehle chill 😎 | 🏖️
+        likes = re.sub(r"[^\d]", "", parts[1]) if len(parts) > 1 else ""
+        spec = {"type": "insta", "user": parts[0].lstrip("@"), "likes": int(likes or 0),
+                "caption": parts[2] if len(parts) > 2 else "", "dur": 3.0}
+        if len(parts) > 3 and parts[3]:
+            spec["emoji"] = parts[3]
+        return spec, 2.7, None
+    if key == "ORDER":                                  # ORDER: Zomato | Paneer Butter Masala | Rs 349 | Delivered
+        spec = {"type": "order", "app": parts[0], "item": parts[1] if len(parts) > 1 else "",
+                "price": parts[2] if len(parts) > 2 else "", "status": parts[3] if len(parts) > 3 else
+                "Out for delivery", "eta": parts[4] if len(parts) > 4 else "", "dur": 3.2}
+        if parts[0].strip().lower() in APP_COLORS:
+            spec["color"] = APP_COLORS[parts[0].strip().lower()]
+        return spec, 2.9, None
+    if key == "UPI":                                    # UPI: Rs 2000 | Sharma ji | Payment successful (or failed)
+        spec = {"type": "upi", "amount": parts[0], "payee": parts[1] if len(parts) > 1 else "",
+                "status": parts[2] if len(parts) > 2 else "Payment successful", "dur": 2.4}
+        return spec, 2.1, None
     if key == "CHAPTER":
         spec = {"type": "chapter", "text": parts[0]}
         if len(parts) > 1:
@@ -1130,9 +1186,10 @@ def parse_chat(meta, title, msgs):
 
 HEADER_WORDS = ("HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "OBJ",
                 "DRESS",
-                "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD",
+                "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD", "LOOK", "MYSTERY", "SERIES",
                 "NARRATOR",
-                "LIGHTS", "AMBIENCE", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
+                "LIGHTS", "AMBIENCE", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD", "WHATSAPP",
+                "INSTA", "ORDER", "UPI")
 
 
 def unflatten(text):
@@ -1186,12 +1243,111 @@ def expand_saved(words, saved, warnings):
     return SAVED_RE.sub(sub, words)
 
 
+SERIES_DIR = "series"
+SERIES_RE = re.compile(r"^\s*SERIES\s*:\s*([A-Za-z0-9_\-]+)(?:\s+(?:part|ep|episode|#)?\s*(\d+))?\s*$", re.I | re.M)
+SPEAKER_RE = re.compile(r"^\s*([A-Za-z][\w]*)\s*(?:\(|:|->)", re.M)
+
+
+def load_series(name):
+    """series/<name>.json -> dict, or None. {"title", "cast": {letter: "cast words"}, "names", "place", "color",
+    "hashtag", "handle"}."""
+    import json
+    path = asset_path(os.path.join(SERIES_DIR, name.strip().lower() + ".json"))
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) and isinstance(data.get("cast"), dict) else None
+
+
+def series_words(series, letter, words):
+    """The cast words of a series character with its face pinned (face shape, eyes, nose, brows, height), chosen
+    from the series and the letter: the same face in every episode, whoever else is in it. Words the series file
+    already gives win."""
+    v = vocab()["face_parts"]
+    have = set(words.lower().split())
+    h = zlib.crc32(("series|%s|%s" % (series, letter)).encode("utf-8"))
+    add = []
+    for i, part in enumerate(("face", "eyes", "nose", "brows")):
+        opts = [w for _val, w in v[part]]
+        if not have & set(opts) and not have & {val for val, _w in v[part]}:
+            add.append(opts[(h >> (4 * i)) % len(opts)])
+    small = have & {"kid", "kid_girl", "bachcha", "dada", "dadi", "nani", "nana", "school_boy", "school_girl"}
+    if not small and not have & {"tall", "lamba", "lambi", "nata", "nati", "short"}:
+        hw = ("", "lamba", "", "nata")[(h >> 16) % 4]
+        if hw:
+            add.append(hw)
+    return " ".join([words] + add)
+
+
+def apply_series(text):
+    """`SERIES: sharma_parivar 3`: the same family in every episode. The series' people who act in this script join
+    its CAST (a letter the script casts itself keeps the script's words), and its colours, handle and first place
+    come in when the script does not set them. Returns (text, series info or None, warnings)."""
+    m = SERIES_RE.search(text)
+    if not m:
+        return text, None, []
+    name, part = m.group(1).lower(), int(m.group(2)) if m.group(2) else None
+    data = load_series(name)
+    if not data:
+        return text, None, ["SERIES %r: series/%s.json nahi mili (series/ folder me family ki file banao)" % (name, name)]
+    cast = {str(k): series_words(name, str(k), str(v)) for k, v in data["cast"].items()}
+    speakers = set(SPEAKER_RE.findall(text))
+    used = [k for k in cast if k in speakers] or list(cast)        # always in the series' own order
+    cast_line = re.search(r"^\s*CAST\s*:\s*(.*)$", text, re.M | re.I)
+    have = set()
+    if cast_line:
+        have = {p.split("=")[0].strip() for p in cast_line.group(1).split(",") if "=" in p}
+    extra = ["%s = %s" % (k, cast[k]) for k in used if k not in have]
+    add = []
+    if extra and cast_line:
+        text = text[:cast_line.end()] + (", " if cast_line.group(1).strip() else "") + ", ".join(extra) + \
+            text[cast_line.end():]
+    elif extra:
+        add.append("CAST: " + ", ".join(extra))
+    for key, field in (("COLOR", "color"), ("HANDLE", "handle")):
+        if data.get(field) and not re.search(r"^\s*%s\s*:" % key, text, re.M | re.I):
+            add.append("%s: %s" % (key, data[field]))
+    if data.get("place") and not re.search(r"^\s*SCENE\s*:", text, re.M | re.I):
+        add.append("SCENE: %s" % data["place"])
+    if add:
+        text = text[:m.end()] + "\n" + "\n".join(add) + text[m.end():]
+    info = {"name": name, "title": data.get("title") or name.replace("_", " ").title(), "part": part,
+            "hashtag": data.get("hashtag")}
+    return text, info, []
+
+
 def parse_script(text):
     """Return (scene dict, warnings)."""
     text, flat = unflatten(text)
     if flat:
         scene, warns = parse_script(text)
         return scene, ["script ek hi line me aaya tha (line break kho gaye); lines apne aap alag ki"] + warns
+    text, series_info, series_warn = apply_series(text)
+    if series_info or series_warn:
+        scene, warns = _parse_script(text)
+        if series_info:
+            _series_badge(scene, series_info)
+        return scene, series_warn + warns
+    return _parse_script(text)
+
+
+def _series_badge(scene, info):
+    """The series' name (and the part) as a small tag at the top of the first seconds, its hashtag in the post."""
+    label = info["title"] + (" • Part %d" % info["part"] if info["part"] else "")
+    scene["series"] = dict(info, label=label)
+    scene.setdefault("overlays", []).append({"text": label, "style": "tag", "size": 30, "max_w": 700,
+                                             "pos": [540, 92], "from": 0.0, "to": 3.2, "anim": "pop", "series": True})
+    post = scene.setdefault("post", {})
+    tags = post.setdefault("hashtags", [])
+    if info.get("hashtag") and info["hashtag"] not in tags:
+        tags.insert(0, info["hashtag"])
+    if info["part"] and post.get("caption") and "Part" not in post["caption"]:
+        post["caption"] = post["caption"] + " (Part %d)" % info["part"]
+
+
+def _parse_script(text):
     cht = _split_chat(text)
     if cht:
         return parse_chat(*cht)
@@ -1334,7 +1490,8 @@ def parse_script(text):
             if frame == "ots":
                 cur["back"] = back
             continue
-        m = re.match(r"^(NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)\s*:\s*(.*)$", line, re.I)
+        m = re.match(r"^(NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD|WHATSAPP|INSTA|ORDER|UPI)\s*:\s*(.*)$",
+                     line, re.I)
         if m:
             if cur is None:
                 cur = new_scene()
@@ -1772,6 +1929,18 @@ def parse_script(text):
             scene["crowd"] = v
         else:
             warnings.append("CROWD %r: none, kam ya zyada likho" % meta["CROWD"])
+    if meta.get("MYSTERY"):                         # MYSTERY: auto | off | ufo, aadmi, saaya, tasveer...
+        v = mystery.resolve(meta["MYSTERY"])
+        if v is None:
+            warnings.append("MYSTERY %r: auto, off ya inme se ek likho: %s" % (meta["MYSTERY"], ", ".join(mystery.KINDS)))
+        elif v != "auto":
+            scene["mystery"] = v
+    if meta.get("LOOK"):                            # LOOK: auto | off | a look's name (darr, yaad, utsav...)
+        v = look.resolve(meta["LOOK"])
+        if v is None:
+            warnings.append("LOOK %r: auto, off ya inme se ek likho: %s" % (meta["LOOK"], ", ".join(sorted(look.LOOKS))))
+        elif v != "auto":
+            scene.setdefault("meta", {})["look"] = v
     cs = (meta.get("CTA_STYLE") or "").strip().lower()
     if cs:                                          # CTA_STYLE: card (end card) | sticker | caption
         cs = {"end": "card", "endcard": "card", "chhota": "sticker", "small": "sticker", "off": "caption",

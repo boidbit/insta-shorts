@@ -46,10 +46,16 @@ LANES_25D = {
     "hospital_25d": [(1310, 840, 960, "stand"), (1360, -60, 1140, "walk")],
     "bank_25d": [(1210, 520, 600, "stand"), (1210, 820, 900, "stand"), (1300, -60, 1140, "walk")],
     "dhaba_25d": [(1260, 640, 760, "stand"), (1290, -60, 1140, "walk")],
+    "park_25d": [(1330, -60, 1140, "walk"), (1120, 360, 600, "stand")],
+    "buffet_25d": [(1320, -60, 1140, "walk"), (1316, 900, 1040, "stand")],
+    "signal_25d": [(1150, -60, 1140, "walk")],
+    "petrol_pump_25d": [(1300, 820, 980, "stand")],
+    "call_center_25d": [(1320, -60, 1140, "walk")],
 }
 HORIZON_25D = {"street_road_25d": 900, "busstop_road_25d": 900, "festival_25d": 880, "railway_25d": 860,
                "mall_25d": 760, "beach_25d": 900, "gaon_25d": 900, "canteen_25d": 800, "hospital_25d": 800,
-               "bank_25d": 760, "dhaba_25d": 900}
+               "bank_25d": 760, "dhaba_25d": 900, "park_25d": 860, "buffet_25d": 820, "signal_25d": 860,
+               "petrol_pump_25d": 860, "call_center_25d": 820}
 LANES_2D = {
     "street": [(1140, -60, 1140, "walk"), (1136, 120, 960, "stand")],
     "bus_stop": [(1150, -60, 1140, "walk"), (1146, 300, 760, "stand")],
@@ -66,6 +72,11 @@ LANES_2D = {
     "hospital": [(1320, -60, 1140, "walk")],
     "bank": [(1320, -60, 1140, "walk"), (1316, 860, 980, "stand")],
     "dhaba": [(1310, -60, 1140, "walk"), (1306, 640, 760, "stand")],
+    "park": [(1330, -60, 1140, "walk"), (1120, 360, 600, "stand")],
+    "buffet": [(1320, -60, 1140, "walk"), (1316, 900, 1040, "stand")],
+    "signal": [(1150, -60, 1140, "walk")],
+    "petrol_pump": [(1300, 820, 980, "stand")],
+    "call_center": [(1320, -60, 1140, "walk")],
 }
 STAND_ACTIONS = ("text", "idle", "drink", "phone_call", "look_around", "idle")
 PALE = 0.78                              # their colours, a little washed out next to the characters'

@@ -1,0 +1,11 @@
+HOOK: Shaadi ka buffet aur Sharma ji 😭
+STYLE: 2.5d
+SERIES: sharma_parivar 2
+SCENE: buffet night
+P (drool): Paneer bas ek piece bacha hai! | पनीर बस एक पीस बचा है!
+M (stare): Plate me pehle se teen hain. | प्लेट में पहले से तीन हैं।
+D (side_eye): Main bhi line me hoon, Sharma. | मैं भी लाइन में हूँ, शर्मा।
+SCENE: signal | Wapas jaate hue... 🚦
+B (scroll, bored): Papa, 88 second ka signal hai. | पापा, अठासी सेकंड का सिग्नल है।
+P (fan_self): Garmi bhi aur paneer bhi nahi mila. | गर्मी भी और पनीर भी नहीं मिला।
+CAPTION: Har shaadi ki kahani 😂

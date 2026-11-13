@@ -1,0 +1,14 @@
+{
+  "title": "Office Gang",
+  "about": "Ek startup ka office: boss ka 'we are a family', Gen-Z intern, thaka hua manager.",
+  "cast": {
+    "S": "boss",
+    "R": "office_girl ponytail sunglasses",
+    "I": "college_boy curly tshirt mustard",
+    "K": "office_guy balding glasses mota"
+  },
+  "names": {"S": "Boss", "R": "Riya", "I": "Intern", "K": "Kapoor"},
+  "place": "startup_office",
+  "color": "cool",
+  "hashtag": "#officegang"
+}

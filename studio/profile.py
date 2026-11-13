@@ -175,6 +175,18 @@ def draw_side(o, p, cols, expr, mouth_open, t, x0, ground_y, k, blink=False, pro
         hline([(ex - 9, ey + 9), (ex + 9, ey - 9)], 6)
     elif eyes == "heart":
         hpoly(closed_ellipse(ex, ey, 11, 10, 16), (214, 50, 70), INK, 3)
+    elif eyes in ("side", "stare", "roll", "money"):
+        hpoly(closed_ellipse(ex, ey, 12, 9 if eyes == "stare" else 12, 18), WHITE if eyes != "money" else
+              (236, 248, 226), INK, 4)
+        if eyes == "money":
+            hline([(ex - 6, ey - 6), (ex + 6, ey - 6)], 4, (40, 140, 60))
+            hline([(ex - 6, ey), (ex + 6, ey)], 4, (40, 140, 60))
+            hline([(ex - 4, ey - 6), (ex + 6, ey + 9)], 4, (40, 140, 60))
+        else:
+            dx_, dy_ = {"side": (-6, 2), "stare": (3, 0), "roll": (0, -7)}[eyes]
+            hpoly(closed_ellipse(ex + dx_, ey + dy_, 5 if eyes == "stare" else 6.5, 6.5, 12), INK, None)
+        if eyes in ("side", "stare"):
+            hline([(ex - 13, ey - 4), (ex + 13, ey - 6)], 5)
     else:
         r = 7.5 if o.get("eyes") in ("small", "narrow", "sleepy") else 10.0
         hpoly(closed_ellipse(ex + 1, ey + look, r * 0.85, r * 1.15, 18), INK, None)
@@ -239,6 +251,9 @@ def draw_side(o, p, cols, expr, mouth_open, t, x0, ground_y, k, blink=False, pro
         hline(bezier((54, my + 8), (68, my - 4), (84, my + 6), 10), 6)
     elif mouth == "wavy":
         hline([(54 + i * 6, my + (3 if i % 2 else -3)) for i in range(6)], 5)
+    elif mouth == "drool":
+        hpoly(closed_ellipse(70, my + 6, 11, 8, 14), MOUTH_IN, INK, 5)
+        hline([(78, my + 10), (80, my + 22 + 24 * ((t * 0.7) % 1.0))], 5, (170, 210, 240))
     else:
         hline([(54, my + 2), (84, my)], 6)
     if lips == "full" and mouth in ("flat", "neutral", "smile", "smirk"):
