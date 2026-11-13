@@ -1539,7 +1539,7 @@ ACTIONS = {
     "eye_roll": eye_roll, "finger_wag": finger_wag, "na_na": finger_wag, "pinch_cheeks": pinch_cheeks,
     "gaal_kheench": pinch_cheeks, "check_watch": check_watch, "ghadi": check_watch, "selfie": selfie,
     "scroll": scroll, "video_call": video_call, "eat_hands": eat_hands, "haath_se_khana": eat_hands,
-    "fan_self": fan_self, "garmi": fan_self, "swat": swat, "machhar": swat, "knock": knock, "khatkhata": knock,
+    "fan_self": fan_self, "garmi": fan_self, "swat": swat, "knock": knock, "khatkhata": knock,
     "ring_bell": ring_bell, "ghanti": ring_bell, "propose": propose, "kneel": propose, "cry_hug": cry_hug,
     "pull_chair": pull_chair, "kursi_kheench": pull_chair,
 }

@@ -384,11 +384,15 @@ Instagram grid me saari reels ek jaisi na lagein, isliye har video ka apna look 
 | `pinch_cheeks` (`gaal_kheench`) | rishtedaar aunty ka gaal kheenchna |
 | `check_watch` (`ghadi`) | ghadi pe ungli: "late ho gaya" |
 | `selfie`, `scroll`, `video_call` | phone wali zindagi |
-| `eat_hands` (`haath_se_khana`), `fan_self` (`garmi`), `swat` (`machhar`) | thali se khaana, pankha jhalna, hawa me machhar maarna |
+| `eat_hands` (`haath_se_khana`), `fan_self` (`garmi`), `swat` | thali se khaana, pankha jhalna, hawa me machhar maarna |
 | `knock` (`khatkhata`), `ring_bell` (`ghanti`) | darwaza khatkhatana, ghanti bajana |
 | `propose` (`kneel`), `cry_hug`, `pull_chair` (`kursi_kheench`) | ghutne pe propose, ro ke gale lagna, kursi kheenchne wala prank |
 
 Script me: `B -> touch_feet` phir `A -> bless`; `A (kaan_pakad, embarrassed): Sorry mummy! | सॉरी मम्मी!`.
+
+### Naye jaanwar 🐐🐓🦎🦟
+
+`bakri` / `goat` (seeng, dadhi, hamesha chabaati hui), `murga` / `rooster` (laal kalgi, lambi poonch: subah ka alarm), `chhipkali` / `lizard` (deewar pe chipki, poonch hilati: "main toh yahin rehti hoon"), `machhar` / `mosquito` (sar ki oonchai pe bhinbhinata, lambi sui wali naak). Chhipkali aur machhar ke chehre hain, wo baat bhi karte hain (patli, tez awaaz). `B = chhipkali` likho; chhipkali ko zameen pe chahiye to JSON me `"floor": true`. Machhar maarne ka action: `A -> swat`.
 
 ### Har jagah ka apna look 🎬 (`LOOK`) aur har video me ek ajeeb cheez 👀 (`MYSTERY`)
 

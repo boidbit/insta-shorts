@@ -257,7 +257,10 @@ def _words(s):
 
 ANIMAL_WORDS = {"dog": "dog", "kutta": "dog", "doggy": "dog", "cat": "cat", "billi": "cat", "cow": "cow",
                 "gaay": "cow", "gai": "cow", "crow": "crow", "kauwa": "crow", "kaua": "crow", "parrot": "parrot",
-                "tota": "parrot", "totaa": "parrot", "monkey": "monkey", "bandar": "monkey"}
+                "tota": "parrot", "totaa": "parrot", "monkey": "monkey", "bandar": "monkey", "goat": "goat",
+                "bakri": "goat", "bakra": "goat", "rooster": "rooster", "murga": "rooster", "murgi": "rooster",
+                "hen": "rooster", "lizard": "lizard", "chhipkali": "lizard", "chipkali": "lizard",
+                "mosquito": "mosquito", "machhar": "mosquito", "macchar": "mosquito", "machchhar": "mosquito"}
 
 
 BEHIND_WORDS = {"peeche": True, "piche": True, "behind": True, "counter_peeche": True, "aage": False,
@@ -337,6 +340,10 @@ def cast_spec(words, index, unknown=None):
         if isinstance(spec.get("color"), str) and spec["color"] in PALETTE:
             spec["color"] = list(PALETTE[spec["color"]])  # the animal rig takes an RGB colour
         voice.update(pitch="+20Hz" if spec["kind"] in ("cat", "parrot", "crow") else "-6Hz")
+        if spec["kind"] in ("mosquito", "lizard"):
+            voice.update(pitch="+40Hz", rate="+12%")      # tiny: a thin, quick voice
+        elif spec["kind"] in ("goat", "rooster"):
+            voice.update(pitch="+12Hz")
     spec["voice"] = voice
     return spec
 
