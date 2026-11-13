@@ -19,7 +19,7 @@ import zlib
 import numpy as np
 from PIL import Image, ImageChops, ImageDraw, ImageOps
 
-from . import actions, audio, gemini_music, objects, rides, sound, styles, theme, ui
+from . import actions, audio, gemini_music, look, mystery, objects, rides, sound, styles, theme, ui
 from .backgrounds import Background
 from .characters import LA, SH, TH, UA, DEFAULT_POSE, build_character, render_ops, skeleton
 from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_at, camera_roll, camera_whip,
@@ -403,6 +403,9 @@ class Renderer(Output):
         self._shadow = _shadow_sprite() if self.shadows else None
         own_picture = (scene.get("background") or {}).get("type") == "image"      # the user's picture stays as it is
         self._theme = theme.resolve(meta.get("theme")) if getattr(self.plan, "camera", "") == "cine" else None
+        # the place's own colour grade (studio.look): a hospital, a dhaba and a shaadi each get their camera
+        self._look = look.for_scene(scene, self.plan, self.W, self.H) if getattr(self.plan, "camera", "") == "cine" \
+            else None
         if self._theme and self.bd25 is None and not own_picture and getattr(self.bg, "static", None) is not None:
             self.bg.static = theme.shift_place(self.bg.static, self._theme)        # this video's own colours
         vig_default = 0.0 if own_picture else 0.16
@@ -1216,6 +1219,7 @@ class Renderer(Output):
                                           tear_phase=(t * 1.1) % 1.0)
         return dict(ops=ops, an=an, rf=rf, pose=pose, x=x, y=y, k=k, animal=spec.get("kind"))
 
+    mystery = None          # set by mystery.place_mystery: the strange thing that happens once in this video
     mascots = ()            # set by place_mascot: [{"kind", "who", "t0", "t1", "side", "level"}]
 
     def _draw_mascot(self, img, c, t, m):
@@ -1334,6 +1338,8 @@ class Renderer(Output):
         light = self._light_level(t)
         for im_, (px_, py_) in ([] if skip or (shot and shot.get("blur")) else self.sets.wall(t, power=light >= 0.5)):
             img.paste(im_, (px_, py_), im_)     # doors, windows, clocks, fans...
+        if self.mystery and not (shot and shot.get("blur")):    # something strange behind the people (studio.mystery)
+            mystery.draw(img, self.mystery, t, s)
         order = sorted((c for c in plan.chars.values() if not c.spec.get("hidden") and c.name not in hide),
                        key=lambda c: (c.draw_pos(t)[1], c.draw_pos(t)[0]))
         anchors = {}
@@ -1418,6 +1424,10 @@ class Renderer(Output):
                                            for n, a in anchors.items()})
         if self._theme:                             # the video's colour mood (under the bubbles and captions)
             img = theme.grade(img, self._theme)
+        if self.mystery:
+            img = mystery.post(img, self.mystery, t)
+        if self._look is not None:                  # the place's look: grade, glow, dark corners, grain
+            img = self._look.apply(img, int(t * self.plan.fps))
 
         # camera first, so the speech bubbles can be kept inside the visible part of the frame
         z, vl, vt, vw, vh = self._cam_view(t)
@@ -1873,6 +1883,9 @@ def make_video(scene, width=1080, use_tts=True, fps=None, tts_provider=None, dia
         scene = apply_loop(scene)
     if mascot is not None:
         scene = dict(scene, mascot=mascot)
+    mood = scene["music"].get("style") if isinstance(scene.get("music"), dict) else None
+    if mood and "mood" not in scene.get("meta", {}):    # the music's mood colours every place (studio.look)
+        scene = dict(scene, meta=dict(scene.get("meta", {}), mood=mood))
     if scene.get("scenes"):
         v = Sequence(scene, width, use_tts, fps, tts_provider)
         parts = v.parts
@@ -1882,6 +1895,7 @@ def make_video(scene, width=1080, use_tts=True, fps=None, tts_provider=None, dia
     if scene.get("mascot"):
         seed = zlib.crc32(str(scene.get("hook") or scene.get("name") or "reel").encode("utf-8"))
         place_mascot(parts, scene["mascot"], seed, bool(scene.get("loop")))
+    mystery.place_mystery(parts, mystery.seed_of(scene), scene.get("mystery", "auto"))
     return Looped(v) if scene.get("loop") else v
 
 

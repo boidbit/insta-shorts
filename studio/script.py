@@ -67,7 +67,7 @@ import os
 import re
 import zlib
 
-from . import actions, audio, crowd, decor, drive, gemini_music, objects, rides, styles, theme, vehicles
+from . import actions, audio, crowd, decor, drive, gemini_music, look, mystery, objects, rides, styles, theme, vehicles
 from .characters import (ACCESSORIES, EXPRESSIONS, FACE_PARTS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, HAIR_WORDS,
                          LOOKS, MARKS, OUTFITS, PALETTE, face_word,
                          SKIN_TONES)
@@ -77,7 +77,7 @@ from .scene import (CTA_STYLES, DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLO
                     mascot_kind)
 
 HEADERS = ("HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP",
-           "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD")
+           "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD", "LOOK", "MYSTERY")
 OPENINGS = ("plain", "reveal", "close")     # the first shot of a video: as it comes / starts on a face and pulls back /
                                             # a close-up (each video gets one, picked from its hook)
 ON_WORDS, OFF_WORDS = ("on", "yes", "haan", "true", "1"), ("off", "no", "nahi", "false", "0", "none")
@@ -1130,7 +1130,7 @@ def parse_chat(meta, title, msgs):
 
 HEADER_WORDS = ("HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "OBJ",
                 "DRESS",
-                "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD",
+                "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD", "LOOK", "MYSTERY",
                 "NARRATOR",
                 "LIGHTS", "AMBIENCE", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
 
@@ -1772,6 +1772,18 @@ def parse_script(text):
             scene["crowd"] = v
         else:
             warnings.append("CROWD %r: none, kam ya zyada likho" % meta["CROWD"])
+    if meta.get("MYSTERY"):                         # MYSTERY: auto | off | ufo, aadmi, saaya, tasveer...
+        v = mystery.resolve(meta["MYSTERY"])
+        if v is None:
+            warnings.append("MYSTERY %r: auto, off ya inme se ek likho: %s" % (meta["MYSTERY"], ", ".join(mystery.KINDS)))
+        elif v != "auto":
+            scene["mystery"] = v
+    if meta.get("LOOK"):                            # LOOK: auto | off | a look's name (darr, yaad, utsav...)
+        v = look.resolve(meta["LOOK"])
+        if v is None:
+            warnings.append("LOOK %r: auto, off ya inme se ek likho: %s" % (meta["LOOK"], ", ".join(sorted(look.LOOKS))))
+        elif v != "auto":
+            scene.setdefault("meta", {})["look"] = v
     cs = (meta.get("CTA_STYLE") or "").strip().lower()
     if cs:                                          # CTA_STYLE: card (end card) | sticker | caption
         cs = {"end": "card", "endcard": "card", "chhota": "sticker", "small": "sticker", "off": "caption",

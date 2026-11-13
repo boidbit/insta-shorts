@@ -359,6 +359,43 @@ Instagram grid me saari reels ek jaisi na lagein, isliye har video ka apna look 
 
 `CAMERA: classic` me sab pehle jaisa (koi rang/pehla shot nahi). Command line: `--color golden`, `--cover` (cover PNG banata hai).
 
+### Har jagah ka apna look 🎬 (`LOOK`) aur har video me ek ajeeb cheez 👀 (`MYSTERY`)
+
+**Look (colour grading):** ab har jagah apne rang me aati hai, apne aap. Kuch likhna nahi.
+
+| Jagah | Look |
+|---|---|
+| hospital, medical_store, bathroom | `clinic`: thanda, saaf, halka hara-neela |
+| office, bank, meeting_room, court | `daftar`: thaka hua grey-neela |
+| room, living_room, bedroom, balcony / kitchen | `ghar` / `rasoi`: garam, dhoop wala |
+| gully, chai_tapri, kirana, gaon, dhaba, canteen | `sunehra`: sunehri dhool, kone halke gehre |
+| market, mithai_shop | `bazaar`: chatak rang |
+| mandap, party, festival_street, terrace | `utsav`: gehre rang, lights ke aas-paas chamak |
+| night_road (aur koi bhi jagah `night`) | `raat`: neeli parchhai, peeli lights, chamak |
+| haunted_house, graveyard | `darr`: feeka hara, gehre kone, film grain |
+| jail, police_station | `hawalat`: rang uda hua, zyada contrast |
+| school, classroom, coaching, library, hostel | `padhai`: purani yaad jaisa garam |
+| beach / desert / mountain_road / jungle | `samundar` / `registan` / `pahad` / `kudrat` |
+| street, bus_stop / train, bus, car... | `sadak` / `safar` |
+
+- **Mood upar se:** `MUSIC: sad` rang feeka karta hai, `MUSIC: suspense` andhera aur grain, `MUSIC: festive` rang gehre. `SCENE: kitchen night` me lamps chamakte hain; `rain` / `fog` me rang dhul jaate hain.
+- **Khud chuno:** `LOOK: yaad` (purani yaad: sepia, grain), `LOOK: sapna` (sapna: chamak), `LOOK: noir` (black & white), ya upar ka koi bhi naam (`LOOK: darr`): poori video usi look me. `LOOK: off` = jaisa bana hai waisa.
+- Apni photo (`image`) aur `plain` pe koi jagah ka look nahi lagta (sirf mood). `CAMERA: classic` me purani tasveer hi rehti hai (koi look nahi).
+- Rang ke themes (`COLOR: golden`...) pehle jaise: wo hook card / CTA ke rang aur halka sa tint hain; look uske upar jagah ka apna rang hai.
+
+**Mystery:** har video me ek baar, kahani ke beech me, logon ke peeche kuch ajeeb hota hai jise koi character nahi dekhta. Log dobara dekhte hain aur comment me poochte hain "peeche kya tha?".
+
+| Kahan | Kya |
+|---|---|
+| Bahar (street, gaon, beach, gully...) | `ufo` (chhoti udan tashtari aasmaan se guzarti hai), `aadmi` (topi aur lambe coat wala aadmi door khada dekhta hai, phir gayab) |
+| Bahar, raat me | `toota_taara`, `aankhen` (andhere me do chamakti aankhen jhapakti hain) |
+| Andar (room, office, hospital...) | `saaya` (peeche ki deewar pe kisi ki parchhai guzarti hai), `tasveer` (deewar ki tasveer aankhen ghuma ke muskurati hai), `jhapak` (light jhapakti hai), `tv` (kamre me TV ho to wo khud on ho jaata hai) |
+| Gaadi ke andar | `jhapak` |
+
+- Kaunsi cheez aayegi wo jagah aur hook se tay hoti hai: wahi script = wahi cheez; nayi script = nayi cheez.
+- `MYSTERY: ufo` = khud chuno, `MYSTERY: off` = kuch nahi. Kai jagah wali video me ye beech wali jagah me aata hai, pehli line ya punch line pe nahi.
+- Mascot 👻 (page ka option) alag hai aur pehle jaisa chalta hai.
+
 ### CTA: end card, sticker ya sirf caption 📣
 
 CTA ab zaruri nahi: `CTA:` line na likho to video punch line ke baad khatam. Likho to page pe **CTA 📣** se chuno kaise dikhe:
