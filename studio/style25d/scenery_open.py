@@ -5,8 +5,9 @@ beach_25d          a beach by day: the sea far away with a sailboat and an islan
                    sandcastle with a bucket, a beach ball blurred in front.
 desert_25d         a desert in the heat: a huge pale sun, far dunes with a camel caravan walking along the ridge,
                    nearer dunes with wind ripples, cacti, rocks, a dry bush, a tumbleweed rolling by now and then.
-mountain_road_25d  a mountain road: snowy peaks far away, pine slopes in the mist, an eagle circling, the crash barrier
-                   and the PAHADPUR milestone, a curve sign, the road with its yellow line, a pine branch in front.
+mountain_road_25d  a mountain road: snowy peaks far away, pine slopes in the mist, an eagle circling, the crash barrier,
+                   the road with its traffic behind the people, who stand on the gravel shoulder by the PAHADPUR
+                   milestone and a curve sign; a pine branch in front.
 cricket_ground_25d a cricket ground: the stands full of people (a Mexican wave runs through them), floodlights, the
                    score board, boundary boards (SIXER, CHAUKA), the striped outfield, the pitch with its stumps, a bat
                    and a ball blurred in front.
@@ -349,7 +350,7 @@ def desert_25d(s, zmax=1.0):
 
 
 # ------------------------------------------------------------------ mountain road
-MR_RAIL, MR_ROAD = 1230, 1300
+MR_RAIL, MR_ROAD, MR_EDGE = 1196, 1206, 1500      # barrier, road, near edge
 
 
 def _peaks(k):
@@ -391,43 +392,65 @@ def _slopes(k):
 
 
 def _mountain_road(k, kg):
+    """The far side: grass and pines at the valley's edge, the crash barrier, the road (its traffic passes here)."""
     cv = Cv(k, blend=True)
     light = Cv(kg, fill=(255, 240, 200, 0))
-    fill_tex(cv, [(-20, 1150), (LW + 20, 1150), (LW + 20, MR_ROAD), (-20, MR_ROAD)],
-             [(1150, (110, 150, 90)), (MR_ROAD, (100, 136, 80))], seed=433, cell=14, lo=0.9, hi=1.08)
+    fill_tex(cv, [(-20, 1140), (LW + 20, 1140), (LW + 20, MR_ROAD), (-20, MR_ROAD)],
+             [(1140, (110, 150, 90)), (MR_ROAD, (100, 136, 80))], seed=433, cell=14, lo=0.9, hi=1.08)
     rnd = random.Random(435)
-    for _ in range(50):                                                                    # grass tufts
-        x, y = rnd.uniform(0, LW), rnd.uniform(1160, MR_ROAD - 10)
-        cv.line([(x, y), (x - 4, y - 14)], (80, 120, 60, 255), 2)
-        cv.line([(x, y), (x + 4, y - 12)], (80, 120, 60, 255), 2)
-    _pine(cv, 980, 1200, 320, (40, 100, 60))
-    _pine(cv, 70, 1180, 260, (40, 96, 58))
-    for x in range(20, LW, 130):                                                           # the crash barrier
-        cv.rect(x - 6, MR_RAIL - 20, x + 6, MR_ROAD - 4, (150, 154, 160, 255), INK, 1)
-    cv.rect(-20, MR_RAIL - 30, LW + 20, MR_RAIL, (200, 204, 210, 255), INK, 2)
-    cv.line([(-20, MR_RAIL - 15), (LW + 20, MR_RAIL - 15)], (150, 154, 160, 255), 3)
-    for x in range(40, LW, 260):
-        cv.rect(x, MR_RAIL - 26, x + 16, MR_RAIL - 4, (240, 60, 50, 255))
-    mx = 300                                                                               # the milestone
-    cv.poly([(mx - 50, MR_ROAD - 4), (mx + 50, MR_ROAD - 4), (mx + 50, 1150), (mx, 1110), (mx - 50, 1150)],
-            (250, 250, 246, 255), INK, 3)
-    cv.poly([(mx - 50, 1150), (mx, 1110), (mx + 50, 1150), (mx + 50, 1170), (mx - 50, 1170)], (240, 200, 40, 255),
-            INK, 2)
-    quad_image(cv, sign_image("PAHADPUR 12", (250, 250, 246), (30, 30, 30), 600, 260, border=(250, 250, 246)),
-               [(mx - 46, 1180), (mx + 46, 1180), (mx + 46, 1230), (mx - 46, 1230)])
-    sx = 760                                                                               # a curve sign
-    cv.rect(sx - 5, 1060, sx + 5, MR_ROAD - 4, (120, 124, 130, 255))
-    cv.poly([(sx, 980), (sx + 56, 1036), (sx, 1092), (sx - 56, 1036)], (250, 200, 40, 255), INK, 3)
-    cv.line([(sx - 16, 1060), (sx - 16, 1030), (sx + 4, 1014), (sx + 16, 1014)], (30, 30, 30, 255), 6)
-    cv.poly([(sx + 16, 1004), (sx + 30, 1014), (sx + 16, 1024)], (30, 30, 30, 255))
-    fill_tex(cv, [(-20, MR_ROAD), (LW + 20, MR_ROAD), (LW + 20, LH), (-20, LH)],
-             [(MR_ROAD, (100, 102, 108)), (LH, (78, 80, 86))], seed=437, cell=10, lo=0.88, hi=1.08)
-    cv.rect(-20, MR_ROAD, LW + 20, MR_ROAD + 10, (236, 236, 230, 255))                     # the edge line
-    for x in range(-40, LW + 40, 160):
-        cv.rect(x, 1690, x + 90, 1704, (240, 200, 60, 255))
+    for _ in range(40):                                                                    # grass tufts
+        x, y = rnd.uniform(0, LW), rnd.uniform(1150, MR_RAIL - 4)
+        cv.line([(x, y), (x - 3, y - 10)], (80, 120, 60, 255), 2)
+        cv.line([(x, y), (x + 3, y - 9)], (80, 120, 60, 255), 2)
+    _pine(cv, 980, 1180, 300, (40, 100, 60))
+    _pine(cv, 70, 1170, 240, (40, 96, 58))
+    for x in range(20, LW, 110):                                                           # the crash barrier
+        cv.rect(x - 5, MR_RAIL - 22, x + 5, MR_ROAD + 4, (150, 154, 160, 255), INK, 1)
+    cv.rect(-20, MR_RAIL - 28, LW + 20, MR_RAIL, (200, 204, 210, 255), INK, 2)
+    cv.line([(-20, MR_RAIL - 14), (LW + 20, MR_RAIL - 14)], (150, 154, 160, 255), 3)
+    for x in range(40, LW, 220):
+        cv.rect(x, MR_RAIL - 24, x + 14, MR_RAIL - 4, (240, 60, 50, 255))
+    fill_tex(cv, [(-20, MR_ROAD), (LW + 20, MR_ROAD), (LW + 20, MR_EDGE), (-20, MR_EDGE)],
+             [(MR_ROAD, (106, 108, 114)), (MR_EDGE, (86, 88, 94))], seed=437, cell=10, lo=0.88, hi=1.08)
+    cv.rect(-20, MR_ROAD + 8, LW + 20, MR_ROAD + 14, (236, 236, 230, 255))                 # the edge lines
+    cv.rect(-20, MR_EDGE - 16, LW + 20, MR_EDGE - 8, (236, 236, 230, 255))
+    ym = (MR_ROAD + MR_EDGE) / 2.0
+    for x in range(-40, LW + 40, 170):                                                     # the yellow middle line
+        cv.rect(x, ym - 5, x + 90, ym + 5, (240, 200, 60, 255))
     light.poly([(-200, -40), (300, -40), (700, 1500), (100, 1500)], (255, 240, 200, 30))
     light.blur(30)
     return cv, light
+
+
+def _mountain_near(k):
+    """The near side: the gravel shoulder the people stand on, the PAHADPUR milestone and a curve sign (drawn after
+    the traffic, which passes behind them)."""
+    cv = Cv(k, blend=True)
+    fill_tex(cv, [(-20, MR_EDGE), (LW + 20, MR_EDGE), (LW + 20, LH), (-20, LH)],
+             [(MR_EDGE, (168, 150, 124)), (LH, (150, 132, 106))], seed=439, cell=8, lo=0.86, hi=1.1)
+    cv.line([(-20, MR_EDGE), (LW + 20, MR_EDGE)], INK, 2)
+    rnd = random.Random(441)
+    for _ in range(60):                                                                    # pebbles and grass
+        x, y = rnd.uniform(0, LW), rnd.uniform(MR_EDGE + 10, LH)
+        if rnd.random() < 0.6:
+            cv.ell(x, y, rnd.uniform(3, 8), rnd.uniform(2, 5), (130, 116, 96, 255))
+        else:
+            for j in range(4):
+                cv.line([(x, y), (x + (j - 1.5) * 7, y - rnd.uniform(16, 30))], (90, 130, 60, 255), 3)
+    mx, mb = 170, 1610                                                                     # the milestone
+    cv.poly([(mx - 66, mb), (mx + 66, mb), (mx + 66, mb - 170), (mx, mb - 220), (mx - 66, mb - 170)],
+            (250, 250, 246, 255), INK, 3)
+    cv.poly([(mx - 66, mb - 170), (mx, mb - 220), (mx + 66, mb - 170), (mx + 66, mb - 144), (mx - 66, mb - 144)],
+            (240, 200, 40, 255), INK, 2)
+    quad_image(cv, sign_image("PAHADPUR 12", (250, 250, 246), (30, 30, 30), 600, 260, border=(250, 250, 246)),
+               [(mx - 60, mb - 130), (mx + 60, mb - 130), (mx + 60, mb - 64), (mx - 60, mb - 64)])
+    cv.ell(mx, mb + 4, 90, 12, (60, 50, 40, 70))
+    sx, sb = 960, 1590                                                                     # a curve sign
+    cv.rect(sx - 7, 1290, sx + 7, sb, (120, 124, 130, 255), INK, 1)
+    cv.poly([(sx, 1180), (sx + 76, 1256), (sx, 1332), (sx - 76, 1256)], (250, 200, 40, 255), INK, 3)
+    cv.line([(sx - 22, 1290), (sx - 22, 1250), (sx + 6, 1228), (sx + 22, 1228)], (30, 30, 30, 255), 8)
+    cv.poly([(sx + 22, 1214), (sx + 40, 1228), (sx + 22, 1242)], (30, 30, 30, 255))
+    return cv
 
 
 def _eagle(k):
@@ -457,6 +480,7 @@ def mountain_road_25d(s, zmax=1.0):
     far = _peaks(0.5 * s)
     mid = _slopes(0.6 * s)
     st, light = _mountain_road(kr, kg)
+    near = _mountain_near(kr)
     fg = _mountain_front(0.5 * s)
     back = [
         Layer(far.im, 0.5 * s, 0.06, _drift_clouds(0.5 * s, seed=439), "peaks"),
@@ -464,10 +488,11 @@ def mountain_road_25d(s, zmax=1.0):
         Layer(mid.im, 0.6 * s, 0.4, None, "slopes"),
         Layer(st.im, kr, 1.0, None, "set"),
         Layer(light.im, kg, 1.0, None, "sunlight", mode="screen"),
+        Layer(near.im, kr, 1.0005, None, "shoulder"),                 # (after the traffic, which is at d = 1)
     ]
     front = [Layer(fg.im, 0.5 * s, 1.3, None, "foreground")]
     return Layered(back, front, light={"ambient": [248, 252, 255], "dir": -1, "vignette": 0.22}, horizon=1000,
-                   ground=MR_ROAD)
+                   ground=MR_EDGE)
 
 
 # ------------------------------------------------------------------ cricket ground

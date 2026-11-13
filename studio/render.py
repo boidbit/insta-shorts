@@ -470,16 +470,15 @@ class Renderer(Output):
         from .style25d.scenery import StudioBackdrop
         time = (scene.get("background") or {}).get("time")
         native = styles.NATIVE_TIME.get(preset)
-        same = time in (None, "", "day", native) or (native == "sunset" and time == "evening")
+        same = time in (None, "", "day", native) or (native == "sunset" and time == "evening") or \
+            preset in styles.OWN_TIME
         cams = [sg[3] for sg in self.plan.cam_segments] + ([1.05] if self.plan.shakes else [])
         zmax = self.plan.angle["zoom"] * max([1.0] + cams)
         extra = []
         bg = self.bg if preset.startswith("auto:") else None
-        if preset in styles.KEEP_AMBIENT:               # a hand-made road / outdoor set: the place's own traffic,
-            spec = self.plan.background                 # clouds and birds still pass (only those are drawn from it)
-            if getattr(self.plan, "camera", "") != "cine" and isinstance(spec, dict):
-                spec = dict(spec, classic=True)
-            bg = Background(spec, self.bg.out_w, self.bg.out_h)
+        if preset in styles.SET_AMBIENT:                # a hand-made road set: its own clouds, birds and traffic
+            bg = Background({"type": "plain", "ambient": False}, self.bg.out_w, self.bg.out_h)
+            bg.ambient = list(styles.SET_AMBIENT[preset])
         if bg is not None and bg.ambient:
             from .style25d.scenery import Layer
 
@@ -496,7 +495,7 @@ class Renderer(Output):
             if kinds - {"cloud", "birds"}:
                 extra.append(Layer(Image.new("RGBA", (8, 8)), k, 1.0, ambient(kinds - {"cloud", "birds"}), "ambient"))
         return StudioBackdrop(preset, self.W, self.H, zmax=min(zmax, 2.4), time=None if same else time, grade=grade,
-                              extra=extra)
+                              extra=extra, spec=self.plan.background)
 
     def _view25(self, t):
         """Shot angle + in-shot camera at time t, as StudioBackdrop wants it (computed like _background and the

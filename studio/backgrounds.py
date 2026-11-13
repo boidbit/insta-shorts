@@ -834,7 +834,8 @@ class Background:
         if driven:
             kind = TRAFFIC_KINDS[cycle % len(TRAFFIC_KINDS)]
             cols = TRAFFIC_COLORS.get(kind)
-            im, (ax, ay), wheels = driven_sprite(kind, s * scale, cols[(cycle // 2) % len(cols)] if cols else None)
+            sc = scale.get(kind, 1.0) if isinstance(scale, dict) else scale     # (a 2.5D road: each in proportion)
+            im, (ax, ay), wheels = driven_sprite(kind, s * sc, cols[(cycle // 2) % len(cols)] if cols else None)
         else:
             kinds = ("car", "auto", "scooter", "truck")
             kind = kinds[cycle % len(kinds)]

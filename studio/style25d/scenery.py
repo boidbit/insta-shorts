@@ -781,6 +781,15 @@ def _lazy(module, fn_name):
     return build
 
 
+def _lazy_spec(module, fn_name):
+    """Like _lazy, for a set that also needs the scene's place words (a vehicle: its view, its time, its speed)."""
+    def build(s, zmax=1.0, spec=None):
+        import importlib
+        return getattr(importlib.import_module("." + module, __package__), fn_name)(s, zmax, spec)
+    build.takes_spec = True
+    return build
+
+
 PRESETS = {
     "diwali_rooftop": diwali_rooftop,
     "kitchen_25d": _lazy("scenery_kitchen", "kitchen_25d"),
@@ -824,6 +833,15 @@ PRESETS = {
     "mountain_road_25d": _lazy("scenery_open", "mountain_road_25d"),
     "cricket_ground_25d": _lazy("scenery_open", "cricket_ground_25d"),
     "school_ground_25d": _lazy("scenery_open", "school_ground_25d"),
+    "mandap_25d": _lazy("scenery_night", "mandap_25d"),
+    "graveyard_25d": _lazy("scenery_night", "graveyard_25d"),
+    "night_road_25d": _lazy("scenery_night", "night_road_25d"),
+    "train_25d": _lazy_spec("scenery_vehicles", "train_25d"),
+    "bus_25d": _lazy_spec("scenery_vehicles", "bus_25d"),
+    "metro_25d": _lazy_spec("scenery_vehicles", "metro_25d"),
+    "plane_25d": _lazy_spec("scenery_vehicles", "plane_25d"),
+    "car_25d": _lazy_spec("scenery_vehicles", "car_25d"),
+    "auto_25d": _lazy_spec("scenery_vehicles", "auto_25d"),
 }
 
 
@@ -847,13 +865,15 @@ class StudioBackdrop:
     (zoom za, left/top in logical units) and the in-shot camera (zoom zc, crop window left/top in px).
     """
 
-    def __init__(self, preset, out_w, out_h, zmax=1.0, time=None, grade=None, extra=None):
+    def __init__(self, preset, out_w, out_h, zmax=1.0, time=None, grade=None, extra=None, spec=None):
         self.preset = preset
         self.W, self.H = out_w, out_h
         self.s = out_w / float(LW)
         if preset.startswith("auto:"):              # any studio place, split into depth layers automatically
             from .autoset import build_auto
             self.layered = build_auto(preset[5:], self.s, zmax, time)
+        elif getattr(PRESETS[preset], "takes_spec", False):
+            self.layered = PRESETS[preset](self.s, zmax, spec=spec)
         else:
             self.layered = PRESETS[preset](self.s, zmax)
         for ly in extra or []:                      # e.g. the place's moving clouds / birds (far) and traffic (near)

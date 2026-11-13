@@ -62,18 +62,45 @@ PLACES_25D = {
     "mountain_road": "mountain_road_25d",
     "cricket_ground": "cricket_ground_25d",
     "school_ground": "school_ground_25d",
+    "mandap": "mandap_25d",
+    "graveyard": "graveyard_25d",
+    "night_road": "night_road_25d",
+    "train": "train_25d",
+    "bus": "bus_25d",
+    "metro": "metro_25d",
+    "plane": "plane_25d",
+    "car": "car_25d",
+    "auto": "auto_25d",
 }
+# sets that light themselves for the scene's time (a vehicle's view is re-lit by the vehicle engine, its inside keeps
+# its own lights): no re-grading on top
+OWN_TIME = {"train_25d", "bus_25d", "metro_25d", "plane_25d", "car_25d", "auto_25d"}
 # sets with writing on them (shop signs, menus, boards) are never mirrored for a reverse shot (the text would read
 # backwards). The 2d look mirrors every place, as it always has.
 NO_MIRROR = {"gali_25d", "classroom_25d", "office_25d", "meeting_25d", "street_25d", "busstop_25d", "market_25d",
              "festival_25d", "railway_25d", "hospital_25d", "bank_25d", "police_25d", "court_25d", "canteen_25d",
              "dhaba_25d", "mithai_25d", "mobile_25d", "medical_25d", "salon_25d", "mall_25d", "cinema_25d",
              "library_25d", "coaching_25d", "exam_hall_25d", "gym_25d", "party_25d", "mountain_road_25d",
-             "cricket_ground_25d", "school_ground_25d"} | {
+             "cricket_ground_25d", "school_ground_25d", "graveyard_25d"} | {
     "auto:" + p for p in ("bus_stop", "railway", "canteen", "exam_hall", "library", "coaching", "party", "gym",
                           "hospital", "police_station", "bank")}
-# hand-made outdoor sets that keep their place's moving life (traffic on the road, clouds, birds)
-KEEP_AMBIENT = {"street_25d", "busstop_25d"}
+# hand-made road sets: the people stand on the footpath in front, the road runs behind them and its traffic is in
+# proportion to them (a car on the road behind is a little smaller than somebody on the footpath, as far away as it is)
+
+
+def _traffic(lane_y, horizon, period):
+    from .objects import PERSON_R, REF_SCALE
+    f = (lane_y - horizon) / (1700.0 - horizon)            # how much smaller things are on that lane than at the feet
+    return ("traffic", lane_y, {k: REF_SCALE * f / PERSON_R[k] for k in ("car", "auto", "truck", "bike")}, period, True)
+
+
+# preset -> the moving life drawn over it: clouds and birds far away, the traffic on its road (2D keeps its own)
+SET_AMBIENT = {
+    "street_25d": [("cloud", 190, 14, 1.0), ("cloud", 450, 9, 0.75), ("birds", 330, 60, 3), _traffic(1470, 860, 9.0)],
+    "busstop_25d": [("cloud", 220, 11, 1.0), ("cloud", 460, 7, 0.7), ("birds", 360, 55, 2), _traffic(1470, 860, 7.5)],
+    "mountain_road_25d": [("birds", 300, 40, 2), _traffic(1440, 1000, 12.0)],
+}
+KEEP_AMBIENT = set(SET_AMBIENT)
 # the light each preset is painted in; another SCENE time (night, rain...) re-lights it
 NATIVE_TIME = {"kitchen_25d": "day", "gali_25d": "sunset", "diwali_rooftop": "night", "room_25d": "day",
                "classroom_25d": "day", "office_25d": "day", "meeting_25d": "day", "jungle_25d": "day",
@@ -85,7 +112,7 @@ NATIVE_TIME = {"kitchen_25d": "day", "gali_25d": "sunset", "diwali_rooftop": "ni
                "bathroom_25d": "day", "hostel_25d": "day", "library_25d": "day", "coaching_25d": "day",
                "exam_hall_25d": "day", "gym_25d": "day", "party_25d": "day", "jail_25d": "day", "beach_25d": "day",
                "desert_25d": "day", "mountain_road_25d": "day", "cricket_ground_25d": "day",
-               "school_ground_25d": "day"}
+               "school_ground_25d": "day", "mandap_25d": "night", "graveyard_25d": "night", "night_road_25d": "night"}
 
 
 def normalize(value):
@@ -100,8 +127,7 @@ def scene_style(scene):
     return normalize(scene.get("style") or meta.get("style") or DEFAULT)
 
 
-FLAT_IN_25D = {"image", "plain", "night_road", "train", "bus", "metro", "plane", "car",
-               "auto"}       # stay as they are in 2.5D too (a vehicle's view already moves in layers)
+FLAT_IN_25D = {"image", "plain"}       # stay as they are in 2.5D too (your own photo, the plain colour)
 
 
 def has_depth(kind):
@@ -110,6 +136,9 @@ def has_depth(kind):
         return True
     if not kind or kind in FLAT_IN_25D:
         return False
+    from . import vehicles
+    if vehicles.resolve(kind):
+        return True
     from .style25d.autoset import place_function
     return bool(place_function(kind))
 
@@ -123,4 +152,7 @@ def preset_for(scene):
     kind = bg.get("type") if isinstance(bg, dict) else bg
     if kind in PLACES_25D:
         return PLACES_25D[kind]
+    from . import vehicles
+    if vehicles.resolve(kind):                     # taxi, cab, rickshaw, flight...: the vehicle's own set
+        return PLACES_25D[vehicles.resolve(kind)]
     return "auto:" + kind if has_depth(kind) else None

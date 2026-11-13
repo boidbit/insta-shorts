@@ -2,11 +2,12 @@
 
 street_25d   a busy shop street by day: the city far away (its own layer), rooftops with water tanks and a hoarding
              (middle layer), a row of four shops (MEDICAL, MOBILE, SWEETS, TAILOR) with awnings, shelves of goods and
-             balconies above, an electric pole with its tangle of wires, a street lamp, the footpath and its kerb, the
-             road with a zebra crossing, a blinking OPEN sign, a blurred barricade and cone in front. The place's own
-             traffic still drives along the road and its clouds and birds still pass (styles.KEEP_AMBIENT).
-busstop_25d  a bus stop: a shelter with its roof, bench and an ad, the BUS STOP sign, a big shady tree, a row of
-             flats with a XEROX shop behind, the road in front with the traffic.
+             balconies above on the far footpath, the road with a zebra crossing, a blinking OPEN sign; the people
+             stand on the near footpath with the electric pole and the street lamp, and the traffic passes behind
+             them, in proportion (styles.SET_AMBIENT); a bollard and a plant blurred in front.
+busstop_25d  a bus stop: the people wait on the near footpath by the shelter (its roof, bench, an ad, glass the
+             traffic shows through) and the BUS STOP sign; across the road a row of flats with a XEROX shop and a
+             big shady tree.
 market_25d   a sabzi bazaar: three stalls (SABZI, FRUITS, MASALA) under striped canopies, the old market far behind,
              bunting that flutters; each stall's counter is a piece the people are depth-sorted with, so the
              sabziwala stands behind it and the customer in front (counters.PRESET_PLACES["market"]).
@@ -24,7 +25,7 @@ from ..util import LH, LW
 
 INK = (46, 40, 44, 255)
 ROAD_VP = (540, 900)
-PATH_Y, KERB_Y, ROAD_Y = 1250, 1330, 1352
+PATH_Y = 1250                           # where a shop of the row stands (before it is moved up)
 
 
 def gx(x, y_ref, y, vp=ROAD_VP):
@@ -114,42 +115,6 @@ def rooftops(k, board=("SALE 50% OFF", (250, 210, 60), (180, 40, 40)), seed=6):
         quad_image(cv, sign_image(text, bg, fg, 900, 300), [(700, 170), (1040, 170), (1040, 300), (700, 300)])
     cv.blur(1.1)
     return cv
-
-
-def footpath_and_road(cv, path_y=PATH_Y, kerb_y=KERB_Y, road_y=ROAD_Y, zebra=(40, 330), seed=12):
-    """The footpath (tiles running to the vanishing point), the kerb in black and yellow, the road with its lines."""
-    fill_tex(cv, [(-10, path_y), (LW + 10, path_y), (LW + 10, kerb_y), (-10, kerb_y)],
-             [(path_y, (196, 190, 182)), (kerb_y, (184, 178, 170))], seed=seed, cell=18, lo=0.93, hi=1.05)
-    for y in (path_y + (kerb_y - path_y) * f for f in (0.3, 0.62)):
-        cv.line([(-10, y), (LW + 10, y)], (150, 146, 140, 255), 2)
-    for x in range(-560, 1700, 90):
-        cv.line([(gx(x, path_y, path_y), path_y), (gx(x, path_y, kerb_y), kerb_y)], (150, 146, 140, 255), 2)
-    cv.line([(-10, path_y), (LW + 10, path_y)], INK, 3)
-    for i, x in enumerate(range(-600, 1800, 70)):                         # kerb stones
-        a, b = gx(x, kerb_y, kerb_y), gx(x + 70, kerb_y, kerb_y)
-        c, d = gx(x + 70, kerb_y, road_y), gx(x, kerb_y, road_y)
-        cv.poly([(a, kerb_y), (b, kerb_y), (c, road_y), (d, road_y)],
-                ((236, 196, 50) if i % 2 else (40, 40, 44)) + (255,))
-    cv.line([(-10, kerb_y), (LW + 10, kerb_y)], INK, 2)
-    cv.line([(-10, road_y), (LW + 10, road_y)], INK, 2)
-    fill_tex(cv, [(-10, road_y), (LW + 10, road_y), (LW + 10, LH), (-10, LH)],
-             [(road_y, (96, 98, 104)), (LH, (74, 76, 82))], seed=seed + 1, cell=10, lo=0.88, hi=1.08)
-    rnd = random.Random(seed)
-    for _ in range(9):                                                    # patches and cracks
-        x, y = rnd.uniform(0, LW), rnd.uniform(road_y + 40, LH - 40)
-        w = rnd.uniform(40, 120)
-        cv.ell(x, y, w, w * 0.18, (60, 62, 68, 90))
-        cv.line([(x - w * 0.6, y), (x - w * 0.1, y + 6), (x + w * 0.5, y - 4)], (50, 52, 58, 120), 2)
-    cv.rect(-10, road_y + 14, LW + 10, road_y + 22, (236, 200, 60, 255))  # the yellow edge line
-    for x in range(-40, LW + 40, 150):                                    # the dashed middle line
-        cv.rect(x, 1488, x + 80, 1500, (240, 240, 236, 255))
-    if zebra:
-        for xs in range(zebra[0], zebra[1], 64):
-            pts = [(xs, road_y + 24), (xs + 36, road_y + 24), (gx(xs + 36, road_y, LH), LH), (gx(xs, road_y, LH), LH)]
-            cv.poly(pts, (236, 236, 232, 235))
-    cv.ell(820, 1830, 96, 24, (70, 70, 74, 255), (40, 40, 44, 255), 3)    # a manhole
-    for i in range(-3, 4):
-        cv.line([(820 + i * 22, 1812), (820 + i * 22, 1848)], (52, 52, 56, 255), 2)
 
 
 def electric_pole(cv, x, base, top=230, wires_to=((LW + 40, 330), (LW + 40, 420))):
@@ -289,36 +254,102 @@ SHOPS = [(-20, 270, 470, (236, 222, 196), "MEDICAL", (40, 150, 90), ((40, 150, 9
          (270, 540, 560, (214, 196, 226), "MOBILE", (60, 90, 190), ((60, 90, 190), (240, 240, 236)), "mobile"),
          (540, 820, 430, (248, 214, 186), "SWEETS", (230, 110, 40), ((230, 110, 40), (250, 230, 150)), "sweets"),
          (820, 1100, 510, (200, 226, 206), "TAILOR", (150, 60, 140), ((150, 60, 140), (240, 240, 236)), "tailor")]
-OPEN_SIGN = (300, 1020, 380, 1052)
+# The road sets, from the back: the shops (or flats) on the far footpath, the road with its traffic, and the near
+# footpath the people stand on (y 1700). The road runs BEHIND the people, so a car passes behind them, as big as
+# its distance makes it (styles.SET_AMBIENT); everything on the near footpath is a layer drawn after the traffic.
+STREET_VP = (540, 860)
+FAR_PATH, FAR_KERB, ROAD_TOP, ROAD_BOT, NEAR_KERB = 1100, 1156, 1172, 1540, 1566
+SHOP_SHIFT = 150                                            # the shop row is drawn as before, moved up by this much
+OPEN_SIGN = (300, 1020 - SHOP_SHIFT, 380, 1052 - SHOP_SHIFT)
+
+
+def _moved_up(cv, draw, dy):
+    """draw(canvas) on a canvas of its own, then laid on cv moved up by dy logical px."""
+    c = Cv(cv.k, blend=True)
+    draw(c)
+    off = int(round(dy * cv.k))
+    cv.im.alpha_composite(c.im.crop((0, off, c.im.width, c.im.height)), dest=(0, 0))
+    cv.d = ImageDraw.Draw(cv.im)
+
+
+def _footpath(cv, y0, y1, seed, col=(198, 192, 184), vp=STREET_VP):
+    fill_tex(cv, [(-10, y0), (LW + 10, y0), (LW + 10, y1), (-10, y1)], [(y0, col), (y1, mul(col, 0.95))], seed=seed,
+             cell=18, lo=0.93, hi=1.05)
+    y = y0
+    while y < y1:                                                   # rows of slabs, wider apart nearer the lens
+        y = vp[1] + (y - vp[1]) * 1.13
+        if y < y1:
+            cv.line([(-10, y), (LW + 10, y)], mul(col, 0.8) + (255,), 2)
+    for x in range(-2400, 3400, 120):
+        cv.line([(gx(x, y0, y0, vp), y0), (gx(x, y0, y1, vp), y1)], mul(col, 0.8) + (255,), 2)
+    cv.line([(-10, y0), (LW + 10, y0)], INK, 2)
+
+
+def _kerb(cv, y0, y1, vp=STREET_VP):
+    for i, x in enumerate(range(-2400, 3400, 80)):
+        cv.poly([(gx(x, y0, y0, vp), y0), (gx(x + 80, y0, y0, vp), y0), (gx(x + 80, y0, y1, vp), y1),
+                 (gx(x, y0, y1, vp), y1)], ((236, 196, 50) if i % 2 else (40, 40, 44)) + (255,))
+    cv.line([(-10, y0), (LW + 10, y0)], INK, 2)
+    cv.line([(-10, y1), (LW + 10, y1)], INK, 2)
+
+
+def _road(cv, y0, y1, seed, zebra=None, vp=STREET_VP):
+    fill_tex(cv, [(-10, y0), (LW + 10, y0), (LW + 10, y1), (-10, y1)], [(y0, (104, 106, 112)), (y1, (84, 86, 92))],
+             seed=seed, cell=10, lo=0.88, hi=1.08)
+    rnd = random.Random(seed)
+    for _ in range(7):                                                # patches and cracks
+        x, y = rnd.uniform(0, LW), rnd.uniform(y0 + 30, y1 - 30)
+        w = rnd.uniform(40, 110) * (y - vp[1]) / 600.0
+        cv.ell(x, y, w, w * 0.18, (64, 66, 72, 90))
+    for y in (y0 + 12, y1 - 16):                                      # the yellow edge lines
+        cv.rect(-10, y, LW + 10, y + 6 * (y - vp[1]) / 600.0, (236, 200, 60, 255))
+    ym = (y0 + y1) / 2.0                                               # the dashed middle line
+    for x in range(-60, LW + 60, 170):
+        cv.rect(x, ym - 5, x + 90, ym + 5, (240, 240, 236, 255))
+    if zebra:
+        for xs in range(zebra[0], zebra[1], 70):                      # stripes running to the vanishing point
+            cv.poly([(gx(xs, y1, y0 + 24, vp), y0 + 24), (gx(xs + 40, y1, y0 + 24, vp), y0 + 24),
+                     (xs + 40, y1 - 24), (xs, y1 - 24)], (236, 236, 232, 235))
+    cv.ell(260, y1 - 70, 70, 14, (70, 70, 74, 255), (40, 40, 44, 255), 3)   # a manhole
 
 
 def _street(k, kg):
     cv = Cv(k, blend=True)
     light = Cv(kg, fill=(255, 236, 190, 0), blend=True)
-    for i, sh in enumerate(SHOPS):
-        _shop(cv, *sh, seed=20 + i)
+
+    def shops(c):
+        for i, sh in enumerate(SHOPS):
+            _shop(c, *sh, seed=20 + i)
+    _moved_up(cv, shops, SHOP_SHIFT)
+    _footpath(cv, FAR_PATH, FAR_KERB, 12)
     for (x0, x1, _t, _c, _s, _sc, _a, _k) in SHOPS:                      # the awnings' shade on the footpath
-        cv.poly([(x0 + 10, PATH_Y), (x1 - 4, PATH_Y), (x1 - 40, PATH_Y + 40), (x0 - 20, PATH_Y + 40)], (30, 24, 30, 46))
-    footpath_and_road(cv)
-    electric_pole(cv, 150, 1300, wires_to=((LW + 40, 300), (LW + 40, 380), (700, 500)))
-    street_lamp(cv, 960, 1300)
-    # a green dustbin and a parked cycle on the footpath
-    cv.poly([(452, 1300), (500, 1300), (494, 1232), (458, 1232)], (60, 140, 80, 255), INK, 2)
-    cv.rect(450, 1222, 502, 1234, (40, 110, 60, 255), INK, 2)
-    for wx in (620, 720):
-        cv.ell(wx, 1290, 34, 34, None, (40, 40, 44, 255), 5)
-    cv.line([(620, 1290), (668, 1236), (720, 1290), (690, 1290), (668, 1236), (650, 1222)], (200, 50, 50, 255), 5)
-    cv.line([(700, 1220), (690, 1290)], (200, 50, 50, 255), 5)
-    cv.line([(690, 1214), (716, 1214)], (40, 40, 44, 255), 5)
-    cv.line([(640, 1216), (664, 1216)], (40, 40, 44, 255), 6)
-    # the shadow of the pole on the road (sun from the upper right)
-    cv.poly([(140, 1352), (162, 1352), (20, 1920), (-20, 1920)], (20, 20, 30, 40))
-    # sunlight
+        cv.poly([(x0 + 10, FAR_PATH), (x1 - 4, FAR_PATH), (x1 - 24, FAR_PATH + 26), (x0 - 10, FAR_PATH + 26)],
+                (30, 24, 30, 46))
+    _kerb(cv, FAR_KERB, ROAD_TOP)
+    _road(cv, ROAD_TOP, ROAD_BOT, 13, zebra=(700, 1040))
+    # a green dustbin and a parked cycle on the far footpath
+    cv.poly([(452, 1140), (482, 1140), (478, 1096), (456, 1096)], (60, 140, 80, 255), INK, 2)
+    cv.rect(450, 1090, 484, 1098, (40, 110, 60, 255), INK, 1)
+    for wx in (600, 660):
+        cv.ell(wx, 1130, 22, 22, None, (40, 40, 44, 255), 4)
+    cv.line([(600, 1130), (630, 1096), (660, 1130), (640, 1130), (630, 1096), (618, 1088)], (200, 50, 50, 255), 4)
     for (x0, x1) in ((560, 760), (820, 1000)):
-        light.poly([(x0 + 300, -40), (x1 + 300, -40), (x1 - 100, 1360), (x0 - 100, 1360)], (255, 236, 190, 40))
-    light.glow(680, 1160, 160, (255, 210, 140), 70)                       # the sweet shop's warm bulbs
+        light.poly([(x0 + 300, -40), (x1 + 300, -40), (x1 - 100, 1540), (x0 - 100, 1540)], (255, 236, 190, 40))
+    light.glow(680, 1160 - SHOP_SHIFT, 160, (255, 210, 140), 70)          # the sweet shop's warm bulbs
     light.blur(30)
     return cv, light
+
+
+def _street_near(k):
+    """The near footpath the people stand on, with its kerb, the electric pole and the street lamp (drawn after the
+    traffic: the cars pass behind them)."""
+    cv = Cv(k, blend=True)
+    _kerb(cv, ROAD_BOT, NEAR_KERB)
+    _footpath(cv, NEAR_KERB, LH, 14, col=(206, 198, 186))
+    cv.poly([(70, NEAR_KERB + 90), (100, NEAR_KERB + 90), (-60, LH), (-120, LH)], (20, 20, 30, 40))   # pole shadow
+    electric_pole(cv, 90, 1660, top=-40, wires_to=((LW + 40, 260), (LW + 40, 340), (700, 360)))
+    street_lamp(cv, 1000, 1650, top=420, arm=-130)
+    return cv
 
 
 def _open_sign(k):
@@ -340,22 +371,17 @@ def _open_sign(k):
 
 
 def _street_front(k):
-    cv = Cv(k, fill=(200, 60, 60, 0), blend=True)
-    # a red and white barricade in the bottom-left corner
-    for i in range(7):
-        cols = (220, 50, 50) if i % 2 == 0 else (245, 245, 240)
-        cv.poly([(-60 + i * 50, 1780), (-10 + i * 50, 1780), (-40 + i * 50, 1840), (-90 + i * 50, 1840)], cols + (255,))
-    cv.rect(-60, 1840, 290, 1856, (60, 60, 64, 255))
-    cv.rect(20, 1856, 40, 1940, (60, 60, 64, 255))
-    cv.rect(220, 1856, 240, 1940, (60, 60, 64, 255))
-    # a traffic cone bottom-right
-    cv.poly([(990, 1660), (1020, 1660), (1070, 1900), (940, 1900)], (250, 120, 30, 255))
-    for y in (1730, 1800):
-        w = (y - 1660) / 240.0 * 65 + 15
-        cv.poly([(1005 - w, y), (1005 + w, y), (1005 + w + 5, y + 26), (1005 - w - 5, y + 26)], (250, 250, 246, 255))
-    cv.rect(910, 1890, 1100, 1930, (240, 100, 30, 255))
+    cv = Cv(k, fill=(240, 200, 40, 0), blend=True)
+    cv.rect(990, 1640, 1080, 1960, (40, 40, 44, 255))                   # a bollard, black and yellow
+    for y in (1680, 1780, 1880):
+        cv.rect(990, y, 1080, y + 40, (240, 200, 40, 255))
+    cv.ell(1035, 1640, 45, 16, (60, 60, 64, 255))
+    _leaves(cv, 14, -80, 200, 1760, 1990, 60, ((50, 120, 50), (120, 170, 80)), 17)   # a potted plant's leaves
     cv.blur(9)
     return cv
+
+
+NEAR_D = 1.0005                         # the near footpath: just after the traffic in the stack (which is at d = 1)
 
 
 def street_25d(s, zmax=1.0):
@@ -365,6 +391,7 @@ def street_25d(s, zmax=1.0):
     far = skyline(0.5 * s)
     mid = rooftops(0.6 * s)
     st, light = _street(kr, kg)
+    near = _street_near(kr)
     fg = _street_front(0.5 * s)
     back = [
         Layer(sky.im, 0.5 * s, 0.0, None, "sky"),
@@ -373,18 +400,19 @@ def street_25d(s, zmax=1.0):
         Layer(st.im, kr, 1.0, None, "set"),
         Layer(light.im, kg, 1.0, None, "sunlight", mode="screen"),
         Layer(_blank(0.4 * s), 0.4 * s, 1.0, _open_sign(0.4 * s), "open_sign", mode="screen"),
+        Layer(near.im, kr, NEAR_D, None, "footpath"),
     ]
     front = [Layer(fg.im, 0.5 * s, 1.3, None, "foreground")]
     return Layered(back, front, light={"ambient": [255, 250, 242], "dir": 1, "vignette": 0.24},
-                   horizon=ROAD_VP[1], ground=KERB_Y)
+                   horizon=STREET_VP[1], ground=NEAR_KERB)
 
 
 # ------------------------------------------------------------------ bus stop
-STOP_PATH = 1170
+STOP_PATH = 1170                                  # (the flats are drawn as before, then moved up to the far footpath)
 
 
 def _flats(cv, rnd):
-    """A row of flats behind the bus stop (farther than the street's shops): balconies, a XEROX shop."""
+    """A row of flats across the road from the bus stop: balconies, a XEROX shop."""
     for (x0, x1, top, col) in ((-20, 360, 560, (226, 206, 176)), (360, 700, 640, (200, 214, 226)),
                                (700, 1100, 520, (232, 200, 190))):
         cv.rect(x0, top, x1, STOP_PATH, col + (255,), INK, 3)
@@ -422,66 +450,66 @@ def _tree(cv, x, top, base, spread=230, seed=31):
 def _busstop(k, kg):
     cv = Cv(k, blend=True)
     light = Cv(kg, fill=(255, 236, 190, 0), blend=True)
-    rnd = random.Random(41)
-    _flats(cv, rnd)
-    fill_tex(cv, [(-10, STOP_PATH), (LW + 10, STOP_PATH), (LW + 10, KERB_Y), (-10, KERB_Y)],
-             [(STOP_PATH, (200, 194, 186)), (KERB_Y, (186, 180, 172))], seed=43, cell=18, lo=0.93, hi=1.05)
-    for x in range(-560, 1700, 90):
-        cv.line([(gx(x, STOP_PATH, STOP_PATH), STOP_PATH), (gx(x, STOP_PATH, KERB_Y), KERB_Y)],
-                (156, 150, 144, 255), 2)
-    for y in (1210, 1260, 1300):
-        cv.line([(-10, y), (LW + 10, y)], (156, 150, 144, 255), 2)
-    cv.line([(-10, STOP_PATH), (LW + 10, STOP_PATH)], INK, 3)
-    footpath_and_road(cv, path_y=KERB_Y - 2, zebra=None, seed=44)
-    _tree(cv, 930, 380, 1240)
-    # the shelter: back panel with an ad, bench, pillars, roof
-    sx0, sx1 = 90, 730
-    cv.rect(sx0 + 20, 930, sx1 - 20, 1190, (170, 210, 230, 150), INK, 3)  # glass back
-    quad_image(cv, sign_image("CHAI BREAK", (250, 196, 60), (120, 40, 30), 700, 600),
-               [(150, 960), (330, 960), (330, 1120), (150, 1120)])
-    cv.ell(240, 1080, 26, 18, (240, 240, 240, 255), INK, 2)               # a cup on the ad
-    cv.rect(400, 1120, 700, 1144, (60, 120, 160, 255), INK, 2)            # the bench
-    cv.rect(400, 1080, 700, 1096, (60, 120, 160, 255), INK, 2)
-    for bx in (420, 680):
-        cv.rect(bx - 5, 1144, bx + 5, 1200, (80, 80, 86, 255))
-    for px in (sx0 + 10, 380, sx1 - 10):                                  # back posts
-        cv.rect(px - 7, 905, px + 7, 1200, (120, 126, 134, 255), INK, 2)
-    for px in (sx0 - 10, sx1 + 10):                                       # front posts (on the kerb side)
-        cv.rect(px - 10, 905, px + 10, 1305, (110, 116, 124, 255), INK, 3)
-    cv.poly([(sx0 - 40, 900), (sx1 + 40, 900), (sx1 + 10, 930), (sx0 + 10, 930)], (60, 110, 120, 255), INK, 3)
-    cv.rect(sx0 - 40, 846, sx1 + 40, 900, (40, 150, 160, 255), INK, 3)    # the roof's front with its name
-    quad_image(cv, sign_image("BUS STOP  21  45  102", (40, 150, 160), (255, 255, 255), 1400, 120),
-               [(sx0 - 20, 852), (sx1 + 20, 852), (sx1 + 20, 894), (sx0 - 20, 894)])
-    cv.poly([(sx0 - 40, 846), (sx1 + 40, 846), (sx1 + 20, 832), (sx0 - 20, 832)], (70, 170, 180, 255), INK, 2)
-    cv.poly([(sx0, 1305), (sx1, 1305), (sx1 + 30, 1325), (sx0 - 30, 1325)], (20, 20, 30, 50))   # shade
-    # the bus stop sign
-    px = 840
-    cv.rect(px - 7, 640, px + 7, 1310, (120, 126, 134, 255), INK, 2)
-    cv.ell(px, 640, 58, 58, (40, 90, 190, 255), INK, 3)
-    cv.ell(px, 640, 50, 50, None, (250, 250, 250, 255), 4)
-    cv.rect(px - 28, 616, px + 28, 664, (250, 250, 250, 255))               # a little bus
-    cv.rect(px - 22, 622, px + 22, 640, (40, 90, 190, 255))
-    cv.ell(px - 16, 666, 7, 7, (40, 40, 44, 255))
-    cv.ell(px + 16, 666, 7, 7, (40, 40, 44, 255))
-    quad_image(cv, sign_image("BUS STOP", (40, 90, 190), (255, 255, 255), 600, 160),
-               [(px - 70, 710), (px + 70, 710), (px + 70, 750), (px - 70, 750)])
+    _moved_up(cv, lambda c: _flats(c, random.Random(41)), STOP_PATH - FAR_PATH)
+    _footpath(cv, FAR_PATH, FAR_KERB, 43)
+    _tree(cv, 930, 330, 1150, spread=200)
+    _kerb(cv, FAR_KERB, ROAD_TOP)
+    _road(cv, ROAD_TOP, ROAD_BOT, 44)
     for (x0, x1) in ((300, 520), (640, 900)):
-        light.poly([(x0 + 300, -40), (x1 + 300, -40), (x1 - 100, 1340), (x0 - 100, 1340)], (255, 236, 190, 38))
+        light.poly([(x0 - 300, -40), (x1 - 300, -40), (x1 + 100, 1600), (x0 + 100, 1600)], (255, 236, 190, 38))
     light.blur(30)
     return cv, light
 
 
-def _leaf_shadows(k, region=(760, 1180, 1100, 1330), seed=47):
+def _busstop_near(k):
+    """The near footpath with the bus shelter and the BUS STOP sign (drawn after the traffic, which shows through the
+    shelter's glass)."""
+    cv = Cv(k, blend=True)
+    _kerb(cv, ROAD_BOT, NEAR_KERB)
+    _footpath(cv, NEAR_KERB, LH, 45, col=(206, 198, 186))
+    x0, x1, base = -40, 620, 1600
+    cv.poly([(x0 - 30, base + 10), (x1 + 30, base + 10), (x1 + 60, base + 70), (x0 - 60, base + 70)], (20, 20, 30, 50))
+    cv.rect(x0, 880, x1, base, (180, 214, 232, 110), INK, 3)                # the glass back
+    cv.poly([(x0 + 300, base - 20), (x0 + 380, 900), (x0 + 420, 900), (x0 + 340, base - 20)], (255, 255, 255, 50))
+    quad_image(cv, sign_image("CHAI BREAK", (250, 196, 60), (120, 40, 30), 700, 900),
+               [(10, 960), (230, 960), (230, 1300), (10, 1300)])
+    cv.ell(120, 1200, 34, 24, (240, 240, 240, 255), INK, 2)                 # a cup on the ad
+    cv.rect(260, 1440, 600, 1472, (60, 120, 160, 255), INK, 2)              # the bench
+    cv.rect(260, 1370, 600, 1390, (60, 120, 160, 255), INK, 2)
+    for bx in (280, 580):
+        cv.rect(bx - 6, 1472, bx + 6, base, (80, 80, 86, 255))
+    for px in (x0 + 10, 300, x1 - 10):                                      # back posts
+        cv.rect(px - 8, 640, px + 8, base, (120, 126, 134, 255), INK, 2)
+    for px in (x0 - 30, x1 + 30):                                            # front posts
+        cv.rect(px - 12, 600, px + 12, 1670, (110, 116, 124, 255), INK, 3)
+    cv.poly([(x0 - 80, 600), (x1 + 80, 600), (x1 + 20, 650), (x0 - 20, 650)], (60, 110, 120, 255), INK, 3)
+    cv.rect(x0 - 80, 530, x1 + 80, 600, (40, 150, 160, 255), INK, 3)        # the roof's front with its name
+    quad_image(cv, sign_image("BUS STOP  21  45  102", (40, 150, 160), (255, 255, 255), 1400, 120),
+               [(x0 - 50, 540), (x1 + 50, 540), (x1 + 50, 592), (x0 - 50, 592)])
+    px = 880                                                                 # the bus stop sign
+    cv.rect(px - 8, 760, px + 8, 1650, (120, 126, 134, 255), INK, 2)
+    cv.ell(px, 760, 66, 66, (40, 90, 190, 255), INK, 3)
+    cv.ell(px, 760, 56, 56, None, (250, 250, 250, 255), 4)
+    cv.rect(px - 32, 734, px + 32, 786, (250, 250, 250, 255))
+    cv.rect(px - 25, 740, px + 25, 760, (40, 90, 190, 255))
+    cv.ell(px - 18, 788, 8, 8, (40, 40, 44, 255))
+    cv.ell(px + 18, 788, 8, 8, (40, 40, 44, 255))
+    quad_image(cv, sign_image("BUS STOP", (40, 90, 190), (255, 255, 255), 600, 160),
+               [(px - 80, 840), (px + 80, 840), (px + 80, 886), (px - 80, 886)])
+    return cv
+
+
+def _leaf_shadows(k, region=(740, 1100, 1100, 1160), seed=47):
     """fn: the tree's dappled shade on the footpath, moving a little in the breeze."""
     rnd = random.Random(seed)
-    spots = [(rnd.uniform(region[0], region[2]), rnd.uniform(region[1], region[3]), rnd.uniform(14, 34),
-              rnd.uniform(0, 6.28)) for _ in range(26)]
+    spots = [(rnd.uniform(region[0], region[2]), rnd.uniform(region[1], region[3]), rnd.uniform(10, 24),
+              rnd.uniform(0, 6.28)) for _ in range(22)]
 
     def fn(_im, t):
         cv = Cv(k, fill=(20, 30, 20, 0))
         for (x, y, r, ph) in spots:
-            cv.ell(x + math.sin(t * 0.9 + ph) * 6, y, r, r * 0.4, (20, 30, 20, 60))
-        cv.blur(4)
+            cv.ell(x + math.sin(t * 0.9 + ph) * 5, y, r, r * 0.35, (20, 30, 20, 60))
+        cv.blur(3)
         return cv.im
     return fn
 
@@ -489,8 +517,6 @@ def _leaf_shadows(k, region=(760, 1180, 1100, 1330), seed=47):
 def _busstop_front(k):
     cv = Cv(k, fill=(60, 120, 60, 0), blend=True)
     _leaves(cv, 22, 820, 1180, -120, 160, 60, ((36, 96, 44), (70, 140, 60)), 53)   # branches over the top
-    cv.poly([(-60, 1700), (60, 1700), (80, 1940), (-60, 1940)], (240, 240, 236, 255))     # a milestone corner
-    cv.poly([(-60, 1640), (40, 1640), (60, 1700), (-60, 1700)], (240, 196, 50, 255))
     cv.blur(9)
     return cv
 
@@ -499,8 +525,9 @@ def busstop_25d(s, zmax=1.0):
     kr = s * max(1.0, zmax)
     kg = 0.32 * s
     sky = day_sky(0.5 * s, sun=(200, 260), seed=7)
-    far = skyline(0.5 * s, seed=9, tops=(330, 540))
+    far = skyline(0.5 * s, seed=9, tops=(300, 500))
     st, light = _busstop(kr, kg)
+    near = _busstop_near(kr)
     fg = _busstop_front(0.5 * s)
     back = [
         Layer(sky.im, 0.5 * s, 0.0, None, "sky"),
@@ -508,10 +535,11 @@ def busstop_25d(s, zmax=1.0):
         Layer(st.im, kr, 1.0, None, "set"),
         Layer(light.im, kg, 1.0, None, "sunlight", mode="screen"),
         Layer(_blank(0.4 * s), 0.4 * s, 1.0, _leaf_shadows(0.4 * s), "leaf_shade"),
+        Layer(near.im, kr, NEAR_D, None, "footpath"),
     ]
     front = [Layer(fg.im, 0.5 * s, 1.3, None, "foreground")]
     return Layered(back, front, light={"ambient": [255, 250, 240], "dir": -1, "vignette": 0.24},
-                   horizon=ROAD_VP[1], ground=KERB_Y)
+                   horizon=STREET_VP[1], ground=NEAR_KERB)
 
 
 # ------------------------------------------------------------------ market

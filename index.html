@@ -271,13 +271,11 @@
         <span class="hint">Style:</span>
         <label class="opt"><input type="radio" name="style" value="2d" checked>2D (normal)</label>
         <label class="opt"><input type="radio" name="style" value="2.5d">2.5D ✨ (gehrai)</label>
-        <span class="hint stylehint hidden" id="styleHint">2.5D me <b>har jagah</b> gehrai ke saath banti hai (aasmaan, door ki
-          imaaratein, khidki ka nazara alag parat me; roshni aur parchhai logon pe bhi). ✨ wali jagahein haath se bane
-          premium sets hain: <b>rasoi (kitchen), gali (gully / chai_tapri / kirana), chhat (terrace), ghar ka kamra
-          (room / living_room), bedroom, classroom (school), office, meeting_room, jungle, haunted_house, street, bus_stop,
-          market, festival_street, railway, gaon, hospital, bank, police_station, court, canteen, dhaba,
-          mithai_shop, mobile_shop, medical_store, salon, mall, cinema, balcony, bathroom, hostel, library, coaching,
-          exam_hall, gym, party, jail, beach, desert, mountain_road, cricket_ground, school_ground</b>. Sirf apni photo, plain aur night_road flat rehti hain.</span>
+        <span class="hint stylehint hidden" id="styleHint">2.5D me <b>har jagah haath se bana set</b> hai ✨: aasmaan,
+          door ki imaaratein, khidki ka nazara alag parat me, chalti cheezein (pankha, traffic, lehrein, train), roshni aur
+          parchhai logon pe bhi. Gaadiyon (train, bus, metro, plane, car, auto) me bahar ka nazara gehrai ke saath
+          guzarta hai. Sadak wali jagah pe log footpath pe khade hote hain, gaadiyan peeche se guzarti hain. Sirf apni
+          photo aur plain flat rehti hain.</span>
       </div>
       <div class="tabs" role="tablist">
         <button class="tab" role="tab" data-mode="script" aria-selected="true">📝 Apni script</button>
@@ -899,11 +897,12 @@ function ideaWithSettings(idea, b) {
 }
 // Video style. Places with a hand-made (premium) 2.5D set: same list as studio/styles.py PLACES_25D (a test keeps
 // them equal). Every other place gets its depth automatically in 2.5D.
-const STYLE_PLACES = ["balcony", "bank", "bathroom", "beach", "bedroom", "bus_stop", "canteen", "chai_tapri",
-  "cinema", "classroom", "coaching", "court", "cricket_ground", "desert", "dhaba", "exam_hall", "festival_street",
-  "gaon", "gully", "gym", "haunted_house", "hospital", "hostel", "jail", "jungle", "kirana", "kitchen", "library",
-  "living_room", "mall", "market", "medical_store", "meeting_room", "mithai_shop", "mobile_shop", "mountain_road",
-  "office", "party", "police_station", "railway", "room", "salon", "school", "school_ground", "street", "terrace"];
+const STYLE_PLACES = ["auto", "balcony", "bank", "bathroom", "beach", "bedroom", "bus", "bus_stop", "canteen", "car",
+  "chai_tapri", "cinema", "classroom", "coaching", "court", "cricket_ground", "desert", "dhaba", "exam_hall",
+  "festival_street", "gaon", "graveyard", "gully", "gym", "haunted_house", "hospital", "hostel", "jail", "jungle",
+  "kirana", "kitchen", "library", "living_room", "mall", "mandap", "market", "medical_store", "meeting_room",
+  "metro", "mithai_shop", "mobile_shop", "mountain_road", "night_road", "office", "party", "plane", "police_station",
+  "railway", "room", "salon", "school", "school_ground", "street", "terrace", "train"];
 // The script's own `STYLE:` line: "2d" / "2.5d", or "" when it has none.
 function styleOf(text) {
   const m = (text || "").match(/^\s*STYLE\s*:\s*([\w.]+)/im);

@@ -46,18 +46,24 @@ class StyleWordsTests(unittest.TestCase):
         self.assertEqual(styles.preset_for(one_scene("classroom", "2.5d")), "classroom_25d")
         self.assertEqual(styles.preset_for(one_scene("office", "2.5d")), "office_25d")
         self.assertEqual(styles.preset_for(one_scene("hospital", "2.5d")), "hospital_25d")
-        self.assertEqual(styles.preset_for(one_scene("graveyard", "2.5d")), "auto:graveyard")  # made automatically
+        self.assertEqual(styles.preset_for(one_scene("graveyard", "2.5d")), "graveyard_25d")
+        self.assertEqual(styles.preset_for(one_scene("taxi", "2.5d")), "car_25d")             # a vehicle's other name
+        from unittest import mock
+        with mock.patch.dict(styles.PLACES_25D):                                              # a place with no set:
+            del styles.PLACES_25D["hostel"]                                                   # made automatically
+            self.assertEqual(styles.preset_for(one_scene("hostel", "2.5d")), "auto:hostel")
         self.assertIsNone(styles.preset_for(one_scene("plain", "2.5d")))                     # stays flat
         self.assertIsNone(styles.preset_for(one_scene("kitchen")))           # 2d
 
     def test_every_place_has_depth_in_2_5d(self):
-        from studio.style25d.autoset import build_auto
+        from studio.style25d.autoset import build_auto, place_function
         for place in script.vocab()["places"]:
-            if place in styles.FLAT_IN_25D or place in styles.PLACES_25D:
+            if place in styles.FLAT_IN_25D:
                 continue
             self.assertTrue(styles.has_depth(place), place)
-            layered = build_auto(place, 0.1)
-            self.assertGreaterEqual(len(layered.back), 2, place)              # at least a sky and the set
+            if place_function(place):                              # the automatic layering still works for every
+                layered = build_auto(place, 0.1)                   # drawn place (a new place gets it until it has
+                self.assertGreaterEqual(len(layered.back), 2, place)    # a hand-made set)
 
     def test_every_preset_exists(self):
         from studio.style25d.scenery import PRESETS
@@ -158,7 +164,8 @@ class RenderTests(unittest.TestCase):
                               ("exam_hall", "exam_hall_25d"), ("gym", "gym_25d"), ("party", "party_25d"),
                               ("jail", "jail_25d"), ("beach", "beach_25d"), ("desert", "desert_25d"),
                               ("mountain_road", "mountain_road_25d"), ("cricket_ground", "cricket_ground_25d"),
-                              ("school_ground", "school_ground_25d")):
+                              ("school_ground", "school_ground_25d"), ("mandap", "mandap_25d"),
+                              ("graveyard", "graveyard_25d"), ("night_road", "night_road_25d")):
             r = Renderer(one_scene(place, "2.5d"), self.W, use_tts=False)
             self.assertEqual(r.bd25.preset, preset)
             self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.4).tobytes(), place)    # screens, fan, leaves, bats
@@ -181,7 +188,7 @@ class RenderTests(unittest.TestCase):
     def test_road_sets_keep_their_traffic(self):
         """The hand-made street and bus stop still have the place's own cars, clouds and birds; the bazaar's
         sabziwala stands behind his stall's counter."""
-        for place in ("street", "bus_stop"):
+        for place in ("street", "bus_stop", "mountain_road"):
             names = [ly.name for ly in Renderer(one_scene(place, "2.5d"), self.W, use_tts=False).bd25.layered.back]
             self.assertIn("ambient", names, place)
             self.assertIn("sky_life", names, place)
@@ -225,25 +232,64 @@ class RenderTests(unittest.TestCase):
             self.assertEqual(r.frame(1.0).size, (self.W, self.W * 16 // 9))
 
     def test_every_place_has_a_hand_made_set(self):
-        """In 2.5D every studio place is now a hand-made set, except the vehicles and the flat ones (which stay as
-        they are) and the two religious places (mandap, graveyard), which are still made automatically."""
+        """In 2.5D every studio place is a hand-made set (vehicles included); only your own photo and the plain
+        colour stay flat."""
         left = [p for p in script.vocab()["places"]
                 if p not in styles.PLACES_25D and p not in styles.FLAT_IN_25D]
-        self.assertEqual(sorted(left), ["graveyard", "mandap"])
+        self.assertEqual(left, [])
+        self.assertEqual(styles.FLAT_IN_25D, {"image", "plain"})
+
+    def test_vehicles_in_2_5d(self):
+        """Inside a vehicle the view outside slides past in depth layers, the seats and the rocking stay; the view and
+        time words still work; 2D vehicles are as they were."""
+        for words in ("train", "bus city night", "metro", "plane", "car pahad", "auto"):
+            sc = one_scene(words.split()[0], "2.5d")
+            bg = dict(sc["background"])
+            if len(words.split()) > 1:
+                bg["view"] = words.split()[1]
+            if "night" in words:
+                bg["time"] = "night"
+            r = Renderer(dict(sc, background=bg), self.W, use_tts=False)
+            kind = words.split()[0]
+            self.assertEqual(r.bd25.preset, kind + "_25d")
+            self.assertTrue([ly for ly in r.bd25.layered.back if ly.name == "view"], words)
+            self.assertEqual(r.plan.vehicle, kind)
+            self.assertTrue([o for o in r.plan.sets if o.get("type") in ("berth", "bus_seat", "metro_seat",
+                                                                          "plane_seat", "car_seat", "auto_seat")])
+            self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.4).tobytes(), words)   # the view slides past
+            self.assertIsNone(Renderer(one_scene(kind), self.W, use_tts=False).bd25)    # 2D: as before
+
+    def test_people_stand_on_the_footpath(self):
+        """On the road sets the people's feet (y 1700) are on the near footpath, drawn after the traffic: the cars
+        pass behind them, as big as their distance makes them."""
+        from studio.objects import PERSON_R, REF_SCALE
+        for place in ("street", "bus_stop", "mountain_road", "night_road"):
+            r = Renderer(one_scene(place, "2.5d"), self.W, use_tts=False)
+            ground = r.bd25.layered.ground
+            self.assertLess(ground, 1700, place)                   # the footpath starts before the feet
+            names = [ly.name for ly in r.bd25.layered.back]
+            near = next(i for i, n in enumerate(names) if n in ("footpath", "shoulder"))
+            moving = [i for i, n in enumerate(names) if n in ("ambient", "cars")]
+            self.assertTrue(moving and max(moving) < near, place)
+        lane, horizon = 1470, 860
+        car = styles.SET_AMBIENT["street_25d"][-1]
+        self.assertEqual(car[1], lane)
+        self.assertAlmostEqual(car[2]["car"], REF_SCALE * (lane - horizon) / (1700.0 - horizon) / PERSON_R["car"])
 
     def test_premium_sets_move(self):
         r = Renderer(one_scene("room", "2.5d"), self.W, use_tts=False)
         self.assertNotEqual(r.frame(1.0).tobytes(), r.frame(1.03).tobytes())       # the fan turns, the TV flickers
 
     def test_auto_place_at_night_and_in_a_close_shot(self):
-        auto = [p for p in json.loads(re.search(r'id="vocab">(.*?)</script>', PAGE, re.S).group(1))["places"]
-                if (styles.preset_for(one_scene(p, "2.5d")) or "").startswith("auto:")]
-        for place in auto[:2]:                                    # (the places still made automatically)
-            sc = one_scene(place, "2.5d")
-            sc["background"] = dict(sc["background"], time="night")
-            r = Renderer(dict(sc, angle=3), self.W, use_tts=False)
-            self.assertTrue(r.bd25.preset.startswith("auto:"))
-            self.assertEqual(r.frame(1.0).size, self.frame(one_scene(place)).size)
+        from unittest import mock
+        with mock.patch.dict(styles.PLACES_25D):                  # (every place has a hand-made set: take two away)
+            for place in ("street", "hostel"):
+                del styles.PLACES_25D[place]
+                sc = one_scene(place, "2.5d")
+                sc["background"] = dict(sc["background"], time="night")
+                r = Renderer(dict(sc, angle=3), self.W, use_tts=False)
+                self.assertTrue(r.bd25.preset.startswith("auto:"))
+                self.assertEqual(r.frame(1.0).size, self.frame(one_scene(place)).size)
 
 
 class PeopleTests(unittest.TestCase):
