@@ -77,7 +77,7 @@ from .scene import (CTA_STYLES, DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLO
                     mascot_kind)
 
 HEADERS = ("HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP",
-           "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD", "LOOK", "MYSTERY")
+           "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD", "LOOK", "MYSTERY", "SERIES")
 OPENINGS = ("plain", "reveal", "close")     # the first shot of a video: as it comes / starts on a face and pulls back /
                                             # a close-up (each video gets one, picked from its hook)
 ON_WORDS, OFF_WORDS = ("on", "yes", "haan", "true", "1"), ("off", "no", "nahi", "false", "0", "none")
@@ -1154,7 +1154,7 @@ def parse_chat(meta, title, msgs):
 
 HEADER_WORDS = ("HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "OBJ",
                 "DRESS",
-                "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD", "LOOK", "MYSTERY",
+                "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD", "LOOK", "MYSTERY", "SERIES",
                 "NARRATOR",
                 "LIGHTS", "AMBIENCE", "NOTIFY", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD")
 
@@ -1210,12 +1210,111 @@ def expand_saved(words, saved, warnings):
     return SAVED_RE.sub(sub, words)
 
 
+SERIES_DIR = "series"
+SERIES_RE = re.compile(r"^\s*SERIES\s*:\s*([A-Za-z0-9_\-]+)(?:\s+(?:part|ep|episode|#)?\s*(\d+))?\s*$", re.I | re.M)
+SPEAKER_RE = re.compile(r"^\s*([A-Za-z][\w]*)\s*(?:\(|:|->)", re.M)
+
+
+def load_series(name):
+    """series/<name>.json -> dict, or None. {"title", "cast": {letter: "cast words"}, "names", "place", "color",
+    "hashtag", "handle"}."""
+    import json
+    path = asset_path(os.path.join(SERIES_DIR, name.strip().lower() + ".json"))
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) and isinstance(data.get("cast"), dict) else None
+
+
+def series_words(series, letter, words):
+    """The cast words of a series character with its face pinned (face shape, eyes, nose, brows, height), chosen
+    from the series and the letter: the same face in every episode, whoever else is in it. Words the series file
+    already gives win."""
+    v = vocab()["face_parts"]
+    have = set(words.lower().split())
+    h = zlib.crc32(("series|%s|%s" % (series, letter)).encode("utf-8"))
+    add = []
+    for i, part in enumerate(("face", "eyes", "nose", "brows")):
+        opts = [w for _val, w in v[part]]
+        if not have & set(opts) and not have & {val for val, _w in v[part]}:
+            add.append(opts[(h >> (4 * i)) % len(opts)])
+    small = have & {"kid", "kid_girl", "bachcha", "dada", "dadi", "nani", "nana", "school_boy", "school_girl"}
+    if not small and not have & {"tall", "lamba", "lambi", "nata", "nati", "short"}:
+        hw = ("", "lamba", "", "nata")[(h >> 16) % 4]
+        if hw:
+            add.append(hw)
+    return " ".join([words] + add)
+
+
+def apply_series(text):
+    """`SERIES: sharma_parivar 3`: the same family in every episode. The series' people who act in this script join
+    its CAST (a letter the script casts itself keeps the script's words), and its colours, handle and first place
+    come in when the script does not set them. Returns (text, series info or None, warnings)."""
+    m = SERIES_RE.search(text)
+    if not m:
+        return text, None, []
+    name, part = m.group(1).lower(), int(m.group(2)) if m.group(2) else None
+    data = load_series(name)
+    if not data:
+        return text, None, ["SERIES %r: series/%s.json nahi mili (series/ folder me family ki file banao)" % (name, name)]
+    cast = {str(k): series_words(name, str(k), str(v)) for k, v in data["cast"].items()}
+    speakers = set(SPEAKER_RE.findall(text))
+    used = [k for k in cast if k in speakers] or list(cast)        # always in the series' own order
+    cast_line = re.search(r"^\s*CAST\s*:\s*(.*)$", text, re.M | re.I)
+    have = set()
+    if cast_line:
+        have = {p.split("=")[0].strip() for p in cast_line.group(1).split(",") if "=" in p}
+    extra = ["%s = %s" % (k, cast[k]) for k in used if k not in have]
+    add = []
+    if extra and cast_line:
+        text = text[:cast_line.end()] + (", " if cast_line.group(1).strip() else "") + ", ".join(extra) + \
+            text[cast_line.end():]
+    elif extra:
+        add.append("CAST: " + ", ".join(extra))
+    for key, field in (("COLOR", "color"), ("HANDLE", "handle")):
+        if data.get(field) and not re.search(r"^\s*%s\s*:" % key, text, re.M | re.I):
+            add.append("%s: %s" % (key, data[field]))
+    if data.get("place") and not re.search(r"^\s*SCENE\s*:", text, re.M | re.I):
+        add.append("SCENE: %s" % data["place"])
+    if add:
+        text = text[:m.end()] + "\n" + "\n".join(add) + text[m.end():]
+    info = {"name": name, "title": data.get("title") or name.replace("_", " ").title(), "part": part,
+            "hashtag": data.get("hashtag")}
+    return text, info, []
+
+
 def parse_script(text):
     """Return (scene dict, warnings)."""
     text, flat = unflatten(text)
     if flat:
         scene, warns = parse_script(text)
         return scene, ["script ek hi line me aaya tha (line break kho gaye); lines apne aap alag ki"] + warns
+    text, series_info, series_warn = apply_series(text)
+    if series_info or series_warn:
+        scene, warns = _parse_script(text)
+        if series_info:
+            _series_badge(scene, series_info)
+        return scene, series_warn + warns
+    return _parse_script(text)
+
+
+def _series_badge(scene, info):
+    """The series' name (and the part) as a small tag at the top of the first seconds, its hashtag in the post."""
+    label = info["title"] + (" • Part %d" % info["part"] if info["part"] else "")
+    scene["series"] = dict(info, label=label)
+    scene.setdefault("overlays", []).append({"text": label, "style": "tag", "size": 30, "max_w": 700,
+                                             "pos": [540, 92], "from": 0.0, "to": 3.2, "anim": "pop", "series": True})
+    post = scene.setdefault("post", {})
+    tags = post.setdefault("hashtags", [])
+    if info.get("hashtag") and info["hashtag"] not in tags:
+        tags.insert(0, info["hashtag"])
+    if info["part"] and post.get("caption") and "Part" not in post["caption"]:
+        post["caption"] = post["caption"] + " (Part %d)" % info["part"]
+
+
+def _parse_script(text):
     cht = _split_chat(text)
     if cht:
         return parse_chat(*cht)

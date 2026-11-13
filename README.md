@@ -402,6 +402,21 @@ Script me: `B -> touch_feet` phir `A -> bless`; `A (kaan_pakad, embarrassed): So
 - In jagahon pe likhawat hai, isliye CUT pe ye ulti (mirror) nahi hoti (`CUT reverse` likho tabhi).
 - Mandir jaan-boojh ke nahi banaya.
 
+### Series: wahi family har episode me 📺 (`SERIES`)
+
+`series/` folder me ek family / gang ki file hoti hai (CAST, naam, pehli jagah, rang, hashtag). Script me bas:
+```
+HOOK: Bijli ka bill aaya 😭
+SERIES: sharma_parivar 3
+P (angry, point): Ye 4000 ka bill kiska hai? | ये चार हज़ार का बिल किसका है?
+B (scared): Mera nahi papa! | मेरा नहीं पापा!
+D (smug): AC kaun chalata hai raat bhar? | एसी कौन चलाता है रात भर?
+```
+- CAST likhne ki zarurat nahi: jo log script me bolte / act karte hain wo series se aate hain. **Har episode me wahi chehra** (chehre ke hisse series ke naam se pakke hote hain, chahe us episode me koi aur ho ya na ho), wahi kapde, wahi rang (`COLOR`), pehli jagah (`SCENE` na likho to series wali).
+- Pehle 3 second upar chhota badge: **"Sharma Parivar • Part 3"**; caption ke aage "(Part 3)", hashtags me `#sharmaparivar`.
+- Script me apni CAST line ho to wahi chalti hai; series bas baaki log jod deti hai.
+- Do series pehle se: `sharma_parivar` (P = papa, M = mummy, B = Bittu, D = dadi) aur `office_gang` (S = boss, R = Riya, I = intern, K = Kapoor). Nayi series: `series/meri_series.json` banao (inhi jaisi).
+
 ### Har jagah ka apna look 🎬 (`LOOK`) aur har video me ek ajeeb cheez 👀 (`MYSTERY`)
 
 **Look (colour grading):** ab har jagah apne rang me aati hai, apne aap. Kuch likhna nahi.

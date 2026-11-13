@@ -1,0 +1,14 @@
+{
+  "title": "Sharma Parivar",
+  "about": "Ek middle-class ghar: papa ka bijli bill, mummy ke taane, beta ka phone, dadi ki dhamki.",
+  "cast": {
+    "P": "papa balding moustache glasses shirt sky mota",
+    "M": "mummy bun saree maroon bindi earrings",
+    "B": "school_boy spiky wheatish",
+    "D": "dadi glasses saree cream"
+  },
+  "names": {"P": "Papa", "M": "Mummy", "B": "Bittu", "D": "Dadi"},
+  "place": "living_room",
+  "color": "golden",
+  "hashtag": "#sharmaparivar"
+}

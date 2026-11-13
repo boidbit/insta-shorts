@@ -561,7 +561,7 @@ async function checkConnection(openOnFail = false) {
 // ---------------------------------------------------------------- script checker (mirrors studio/script.py)
 const V = JSON.parse($("vocab").textContent);
 const SET = Object.fromEntries(Object.entries(V).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, new Set(v)]));
-const HEADERS = new Set(["HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "DRESS", "OBJ", "LIGHTS", "LIGHT", "AMBIENCE", "CROWD", "LOOK", "MYSTERY",
+const HEADERS = new Set(["HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "DRESS", "OBJ", "LIGHTS", "LIGHT", "AMBIENCE", "CROWD", "LOOK", "MYSTERY", "SERIES",
   "NOTIFY", "NOTIFICATION", "LOADING", "COUNTER", "TIMECARD", "CHAPTER", "ENDCARD"]);
 const ON_WORDS = ["on", "yes", "haan", "true", "1"], OFF_WORDS = ["off", "no", "nahi", "false", "0", "none"];
 const MASCOTS = ["bhoot", "billi", "chooha", "ghost", "cat", "chuha", "mouse"];
@@ -785,7 +785,8 @@ function lintScript(text) {
     out.push(`"${short(line)}": ye line samajh nahi aayi`);
   }
   if (!hook) out.push("HOOK: line nahi hai");
-  if (declared) for (const n of new Set(used)) if (n.toUpperCase() !== "ALL" && !cast.has(n)) out.push(`${n} CAST me nahi hai`);
+  const series = /^\s*SERIES\s*:/im.test(text);       // a series brings its own family into the CAST (series/*.json)
+  if (declared && !series) for (const n of new Set(used)) if (n.toUpperCase() !== "ALL" && !cast.has(n)) out.push(`${n} CAST me nahi hai`);
   return out;
 }
 
@@ -816,7 +817,7 @@ const EMO = { gussa: "angry", ghussa: "angry", hairan: "surprised", shock: "shoc
 const EMO_CHIPS = [["😠", "gussa"], ["😲", "hairan"], ["😱", "shock"], ["😏", "akad"], ["😂", "hasi"], ["😢", "rona"],
   ["🤔", "soch"], ["😍", "pyaar"], ["😈", "chalak"], ["😄", "khush"], ["📢", "chilla"], ["💀", "mar"],
   ["👀", "judge"], ["😠", "ghoor"], ["🤤", "laar"], ["🤑", "paisa"], ["😅", "sharminda"]];
-const HEADER_RE = /^(HOOK|CAST|SOUND|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|OBJ|LIGHTS?|AMBIENCE|CROWD|LOOK|MYSTERY|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)\s*:\s*(.*)$/i;
+const HEADER_RE = /^(HOOK|CAST|SOUND|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|OBJ|LIGHTS?|AMBIENCE|CROWD|LOOK|MYSTERY|SERIES|NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD)\s*:\s*(.*)$/i;
 const SAY_RE = /^([A-Za-z][\w ]{0,24}?)\s*(?:\(([^)]*)\))?\s*:\s*(\S.*)$/;
 const ACT_RE = /^([A-Za-z][\w ]{0,24}?)\s*->\s*(\S.*)$/;
 const DEFAULT_CTA = "Apne dost ko tag karo 👇";
@@ -1000,7 +1001,7 @@ function buildScript(text, b, style = "2d") {
 // Mirrors unflatten() in studio/script.py.
 function unflatten(text) {
   if ((text.match(/\n/g) || []).length >= 3 || !/\b(HOOK|CAST|SCENE)\s*:/.test(text)) return text;
-  const heads = "HOOK|CAST|SOUND|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|OBJ|NARRATOR|LIGHTS|AMBIENCE|CROWD|LOOK|MYSTERY|NOTIFY|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD";
+  const heads = "HOOK|CAST|SOUND|SCENE|CTA|CAPTION|HASHTAGS|MUSIC|TRANSITION|STYLE|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|OBJ|NARRATOR|LIGHTS|AMBIENCE|CROWD|LOOK|MYSTERY|SERIES|NOTIFY|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD";
   let t = text.trim().replace(new RegExp(`\\s+(?=(?:${heads})\\s*:)`, "g"), "\n");
   t = t.replace(new RegExp(`\\s+(?=(?:CUT|SHOT)\\b(?:\\s+(?:${V.framings.join("|")}|reverse|over|[A-Z]\\w*))*\\s+[A-Z]\\w*\\s*[(:\\-])`, "g"), "\n");
   const cast = (t.match(/^CAST\s*:\s*(.*)$/m) || [, ""])[1];
@@ -1169,7 +1170,7 @@ function cardsToScript(model) {
 }
 const touch = (it) => { delete it.orig; return it; };
 // a settings line (shown in its own box, not among the story cards); LIGHTS is a story moment (bijli gayi), so not one
-const SETTING_RE = /^(CAST|SOUND|MUSIC|TRANSITION|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|AMBIENCE|CROWD|LOOK|MYSTERY)\s*:/i;
+const SETTING_RE = /^(CAST|SOUND|MUSIC|TRANSITION|CAMERA|LOOP|MASCOT|COLOR|CTA_STYLE|HANDLE|COVER|DRESS|AMBIENCE|CROWD|LOOK|MYSTERY|SERIES)\s*:/i;
 const isSetting = (it) => it.k === "raw" && SETTING_RE.test(it.text);
 const isStory = (it) => ["line", "cut", "screen", "obj", "scene"].includes(it.k) || (it.k === "raw" && !isSetting(it));
 const keyAt = (items, KEY) => items.findIndex((it) => (KEY === "SCENE" ? it.k === "scene" : (it.k === "head" || it.k === "cast") && it.key.toUpperCase() === KEY));
