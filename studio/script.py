@@ -117,6 +117,8 @@ SET_STATES = ("open", "closed", "on", "off", "ringing", "idle", "rustle", "night
 JAIL_DOOR = {"id": "jail_door", "type": "jail_door", "x": 930, "y": 1290, "fit": True}
 SET_X = {"far_left": 120, "left": 230, "center": 540, "right": 850, "far_right": 960}
 SEAT_ACTIONS = ("sit", "lie_down", "lie", "sleep_lie", "rofl")
+PUT_WORDS = ("put", "rakh", "rakho", "rakhna", "place")       # A -> put bag desk
+TAKE_WORDS = ("take", "utha", "uthao", "uthana", "pick")       # A -> take file desk
 
 
 def parse_set(raw, placed):
@@ -124,7 +126,10 @@ def parse_set(raw, placed):
     Returns (kind, spec, problems): kind "place" (new piece) or "state" (a piece already in this place)."""
     words = raw.split()
     typ = words[0].lower()
+    typ = "table" if typ == "table_set" else typ
     rest = words[1:]
+    items = [_sets.ITEM_WORDS[w.lower()] for w in rest if w.lower() in _sets.ITEM_WORDS and typ in _sets.SURFACE]
+    rest = [w for w in rest if not (w.lower() in _sets.ITEM_WORDS and typ in _sets.SURFACE)]
     state = next((w.lower() for w in rest if w.lower() in SET_STATES), None)
     pos = next((w.lower() for w in rest if w.lower() in SET_X), None)
     flags = {w.lower() for w in rest}
@@ -144,6 +149,8 @@ def parse_set(raw, placed):
     text = [w for w in rest if w.lower() not in known]
     sid = typ if typ not in placed else "%s%d" % (typ, sum(1 for k in placed if k.startswith(typ)) + 1)
     spec["id"] = sid                                # (also when a word is unknown: the piece is still placed)
+    if items:                                       # `OBJ: desk center file chai thappa`: lying on it
+        spec["items"] = items
     if typ in ("signboard", "blackboard") and text:
         spec["text"] = " ".join(text)
     elif text:
@@ -630,6 +637,26 @@ def _stage(tokens, ev, scene_cast, who):
             else:
                 unknown.append("ride %s (%s)" % (nxt or "?", ", ".join(sorted(rides.RIDES))))
                 i += 1 if nxt else 0
+        elif w in PUT_WORDS or w in TAKE_WORDS:     # A -> put bag desk / take file (table): things on furniture
+            key = "put" if w in PUT_WORDS else "take"
+            spec, j = {}, i + 1
+            while j < len(tokens) and tokens[j] in ("on", "from", "pe", "par", "se", "upar"):
+                j += 1
+            if j < len(tokens) and tokens[j] in _sets.ITEM_WORDS:
+                spec["item"] = _sets.ITEM_WORDS[tokens[j]]
+                j += 1
+            while j < len(tokens) and tokens[j] in ("on", "from", "pe", "par", "se", "upar"):
+                j += 1
+            if j < len(tokens) and (tokens[j] in _sets.SURFACE or tokens[j] == "table"):
+                spec["on"] = tokens[j]
+                j += 1
+            if "item" not in spec:
+                unknown.append("%s (kya? %s)" % (w, ", ".join(sorted(set(_sets.ITEM_WORDS.values())))))
+            else:
+                ev["action"] = key
+                ev[key] = spec
+                acts.append(key)
+            i = j - 1
         elif w in SEAT_ACTIONS and nxt in SET_TYPES:                 # A -> sit sofa / sleep_lie bed
             ev["action"] = w
             ev["on"] = nxt
@@ -1585,7 +1612,10 @@ def _parse_script(text):
             cur["lights"] = m.group(1).lower()
             continue
         m = re.match(r"^OBJ\s*:\s*(\S+)(.*)$", line, re.I)
-        if m and m.group(1).lower() in SET_TYPES:
+        if m and m.group(1).lower() == "table" and any(w.lower() in _sets.ITEM_WORDS for w in m.group(2).split()):
+            line = "OBJ: table_set" + m.group(2)               # a table with things on it: the furniture piece
+            m = re.match(r"^OBJ\s*:\s*(\S+)(.*)$", line, re.I)
+        if m and (m.group(1).lower() in SET_TYPES or m.group(1).lower() == "table_set"):
             if cur is None:
                 cur = new_scene()
             placed = cur.setdefault("sets", {})

@@ -769,6 +769,189 @@ def d_jail_door(o, st, t, ob):
 DRAW = {k: globals()["d_" + k] for k in SPEC}
 
 
+# ---------------------------------------------------------------- things that lie on a surface (a desk, a bed...)
+# `OBJ: desk center file chai thappa` puts them there; `A -> put bag desk` / `A -> take file` move them (the script
+# and scene modules turn those into "add" / "remove" set events). The table top is at dy = -350.
+SURFACE = {"table": -350, "desk": -350, "bed": -300, "khaat": -232, "sofa": -195, "bench": -205, "stool": -222,
+           "box": -200, "chair": -205, "cupboard": -850, "fridge": -790, "counter": -350}
+PAPER, PAPER_D = (250, 248, 238, 255), (210, 206, 190, 255)
+
+
+def i_file(o, x):                  # a sarkari file: a khaki folder with papers sticking out and a string
+    o.rect(x - 78, -26, x + 78, 0, (214, 184, 120, 255), INK, 4)
+    for dy in (-34, -30):
+        o.rect(x - 70, dy, x + 66, dy + 8, PAPER, INK, 2)
+    o.line([(x, -26), (x + 8, -8), (x - 6, 0)], (180, 40, 40, 255), 3)
+
+
+def i_files(o, x):                 # a pile of files
+    for k, dx in enumerate((-6, 8, -2, 6, 0)):
+        o.rect(x - 80 + dx, -18 * (k + 1), x + 80 + dx, -18 * k, ((214, 184, 120, 255), (190, 160, 100, 255))[k % 2],
+               INK, 3)
+
+
+def i_chai(o, x):                  # a cutting-chai glass
+    o.poly([(x - 20, -62), (x + 20, -62), (x + 15, 0), (x - 15, 0)], (240, 236, 226, 200), INK, 3)
+    o.poly([(x - 18, -44), (x + 18, -44), (x + 15, 0), (x - 15, 0)], (196, 130, 70, 255), None)
+
+
+def i_thappa(o, x):                # a rubber stamp on its ink pad
+    o.rect(x - 52, -14, x + 52, 0, (40, 40, 120, 255), INK, 3)
+    o.rect(x - 22, -40, x + 22, -14, (120, 80, 50, 255), INK, 3)
+    o.ellipse(x, -58, 18, 18, (150, 30, 30, 255), INK, 3)
+
+
+def i_pathar(o, x):                # a big stone
+    o.poly([(x - 62, 0), (x - 70, -30), (x - 34, -64), (x + 22, -70), (x + 66, -40), (x + 60, 0)],
+           (150, 146, 140, 255), INK, 4)
+    o.line([(x - 20, -46), (x + 10, -30)], (110, 106, 100, 255), 3)
+
+
+def i_paperweight(o, x):           # a glass paperweight
+    o.ellipse(x, -26, 30, 26, (170, 220, 240, 200), INK, 3)
+    o.ellipse(x - 8, -34, 8, 6, (255, 255, 255, 220), None)
+
+
+def i_notes(o, x):                 # a bundle of notes with its band
+    for k in range(3):
+        o.rect(x - 60, -14 * (k + 1), x + 60, -14 * k, (150, 200, 150, 255), INK, 2)
+    o.rect(x - 12, -44, x + 12, 0, (240, 220, 120, 255), None)
+
+
+def i_bag(o, x):                   # a big bag (the one that holds the file down)
+    o.rrect(x - 90, -120, x + 90, 0, 22, (60, 60, 70, 255), INK, 5)
+    o.line([(x - 40, -120), (x - 30, -160), (x + 30, -160), (x + 40, -120)], INK, 8)
+    o.rect(x - 60, -80, x + 60, -60, (90, 90, 100, 255), None)
+
+
+def i_laptop(o, x):
+    o.poly([(x - 90, 0), (x + 90, 0), (x + 100, -10), (x - 100, -10)], (150, 154, 162, 255), INK, 3)
+    o.poly([(x - 80, -10), (x + 80, -10), (x + 74, -110), (x - 74, -110)], (60, 64, 72, 255), INK, 3)
+    o.poly([(x - 66, -20), (x + 66, -20), (x + 62, -100), (x - 62, -100)], (120, 190, 235, 255), None)
+
+
+def i_phone(o, x):
+    o.rect(x - 34, -10, x + 34, 0, (40, 44, 52, 255), INK, 2)
+
+
+def i_book(o, x):
+    o.rect(x - 60, -22, x + 60, 0, (180, 60, 60, 255), INK, 3)
+    o.rect(x - 54, -18, x + 60, -4, PAPER, None)
+
+
+def i_register(o, x):              # the clerk's big register
+    o.rect(x - 90, -28, x + 90, 0, (90, 60, 40, 255), INK, 3)
+    o.rect(x - 84, -24, x + 90, -6, PAPER_D, None)
+
+
+def i_plate(o, x):
+    o.ellipse(x, -6, 70, 12, (250, 250, 246, 255), INK, 3)
+    o.ellipse(x, -14, 40, 12, (220, 160, 80, 255), None)
+
+
+def i_tiffin(o, x):
+    for k in range(3):
+        o.rect(x - 40, -30 * (k + 1), x + 40, -30 * k, (200, 204, 210, 255), INK, 3)
+    o.line([(x - 46, -96), (x - 46, -110), (x + 46, -110), (x + 46, -96)], INK, 4)
+
+
+def i_bottle(o, x):
+    o.rect(x - 18, -90, x + 18, 0, (170, 214, 236, 200), INK, 3)
+    o.rect(x - 10, -110, x + 10, -90, (60, 120, 200, 255), INK, 2)
+
+
+def i_pen_stand(o, x):
+    o.rect(x - 24, -50, x + 24, 0, (60, 60, 66, 255), INK, 3)
+    for dx, c in ((-10, (40, 80, 200, 255)), (4, (200, 40, 40, 255)), (12, INK)):
+        o.line([(x + dx, -50), (x + dx + 4, -86)], c, 4)
+
+
+def i_chalk_box(o, x):
+    o.rect(x - 40, -26, x + 40, 0, (240, 240, 236, 255), INK, 3)
+    for dx in (-24, -8, 8, 24):
+        o.line([(x + dx, -26), (x + dx, -40)], (250, 250, 250, 255), 6)
+
+
+def i_newspaper(o, x):
+    o.poly([(x - 80, 0), (x + 80, 0), (x + 70, -14), (x - 70, -14)], PAPER_D, INK, 3)
+    o.line([(x - 60, -8), (x + 50, -8)], (120, 120, 120, 255), 2)
+
+
+def i_gift(o, x):
+    o.rect(x - 50, -80, x + 50, 0, (200, 50, 80, 255), INK, 3)
+    o.line([(x, -80), (x, 0)], (250, 220, 90, 255), 8)
+
+
+def i_lota(o, x):
+    o.ellipse(x, -36, 34, 34, (196, 140, 70, 255), INK, 3)
+    o.rect(x - 14, -84, x + 14, -62, (196, 140, 70, 255), INK, 3)
+
+
+def i_glass(o, x):
+    o.poly([(x - 22, -70), (x + 22, -70), (x + 17, 0), (x - 17, 0)], (210, 230, 240, 170), INK, 3)
+
+
+ITEMS = {k[2:]: v for k, v in list(globals().items()) if k.startswith("i_") and callable(v)}
+ITEM_WORDS = {"file": "file", "files": "files", "fileon": "files", "chai": "chai", "cup": "chai", "thappa": "thappa",
+              "stamp": "thappa", "mohar": "thappa", "pathar": "pathar", "patthar": "pathar", "stone": "pathar",
+              "paperweight": "paperweight", "notes": "notes", "gaddi": "notes", "money": "notes", "paisa": "notes",
+              "rishwat": "notes", "bag": "bag", "thaila": "bag", "laptop": "laptop", "phone": "phone",
+              "mobile": "phone", "book": "book", "kitaab": "book", "register": "register", "plate": "plate",
+              "tiffin": "tiffin", "bottle": "bottle", "pen_stand": "pen_stand", "pen": "pen_stand",
+              "chalk": "chalk_box", "chalk_box": "chalk_box", "newspaper": "newspaper", "akhbaar": "newspaper",
+              "gift": "gift", "lota": "lota", "glass": "glass"}
+# what a character holds while carrying an item (the hand props of characters.py)
+HELD_AS = {"file": "file", "files": "box", "chai": "chai", "thappa": "thappa", "pathar": "pathar",
+           "paperweight": "pathar", "notes": "money", "bag": "bag", "laptop": "laptop", "phone": "phone",
+           "book": "book", "register": "notebook", "plate": "plate", "tiffin": "tiffin", "bottle": "bottle",
+           "pen_stand": "pen", "chalk_box": "chalk", "newspaper": "newspaper", "gift": "gift", "lota": "lota",
+           "glass": "glass"}
+
+
+def draw_items(o, typ, items, hw):
+    """Lay the items out on the surface of a piece (left to right, a little apart)."""
+    top = SURFACE.get(typ)
+    if top is None or not items:
+        return
+    n = len(items)
+    span = min(hw * 0.75, 70.0 * n)
+    if n > 1:                                   # the newest (just put down) in the middle, where it is seen
+        rest = list(items[:-1])
+        mid = n // 2
+        items = rest[:mid] + [items[-1]] + rest[mid:]
+    for k, it in enumerate(items):
+        fn = ITEMS.get(it)
+        if fn is None:
+            continue
+        x = 0.0 if n == 1 else -span + 2 * span * k / (n - 1)
+        fn(_Shift(o, top), x)
+
+
+class _Shift:
+    """An O that draws with dy measured from the surface (dy <= 0 above it)."""
+
+    def __init__(self, o, top):
+        self.o, self.top = o, top
+
+    def __getattr__(self, name):
+        fn = getattr(self.o, name)
+
+        def call(*a, **k):
+            if name in ("rect",):
+                x0, y0, x1, y1 = a[:4]
+                return fn(x0, y0 + self.top, x1, y1 + self.top, *a[4:], **k)
+            if name == "rrect":
+                x0, y0, x1, y1 = a[:4]
+                return fn(x0, y0 + self.top, x1, y1 + self.top, *a[4:], **k)
+            if name in ("poly", "line"):
+                return fn([(px, py + self.top) for px, py in a[0]], *a[1:], **k)
+            if name == "ellipse":
+                cx, cy = a[:2]
+                return fn(cx, cy + self.top, *a[2:], **k)
+            return fn(*a, **k)
+        return call
+
+
 def obj_pos(ob, events, oid, t):
     """(x, y, direction, distance travelled) of an object at time t, following its "move" events."""
     x, y = float(ob.get("x", 540)), float(ob.get("y", 1700))
@@ -817,6 +1000,21 @@ class Sets:
         x, y, _d, _dist = self.pos(oid, t)
         return st, x, y
 
+    def items(self, oid, t):
+        """What lies on this piece at time t: its own items, then what was put down / taken away."""
+        ob = self.objs[oid]
+        out = list(ob.get("items", []))
+        for ev in self.events:
+            if ev["t"] > t:
+                break
+            if ev["set"] != oid:
+                continue
+            if ev.get("add"):
+                out.append(ev["add"])
+            if ev.get("remove") and ev["remove"] in out:
+                out.remove(ev["remove"])
+        return out
+
     def seat_height(self, oid):
         ob = self.objs.get(oid)
         if not ob:
@@ -831,12 +1029,16 @@ class Sets:
         x, y, dirn, dist = self.pos(ob["id"], t)
         animated = typ in ("clock", "fan", "tv", "tree", "bush", "phone", "chulha", "drip", "washing_machine",
                            "fairy_lights", "flag_stand", "puddle")
-        key = (ob["id"], st) if not animated else None
+        items = tuple(self.items(ob["id"], t)) if typ in SURFACE else ()
+        key = (ob["id"], st, items) if not animated else None
         if key and key in self._cache:
             return self._cache[key]
-        cy = y - (h_up - h_dn) * sc / 2
-        p = Patch(x, cy, hw * sc + 10, (h_up + h_dn) * sc / 2 + 10, self.s)
-        DRAW[typ](O(p, x, y, sc, bool(ob.get("flip"))), st, t, ob)
+        extra = 180 if items else 0                     # room above the top for what lies on it
+        cy = y - (h_up + extra - h_dn) * sc / 2
+        p = Patch(x, cy, hw * sc + 10, (h_up + extra + h_dn) * sc / 2 + 10, self.s)
+        oo = O(p, x, y, sc, bool(ob.get("flip")))
+        DRAW[typ](oo, st, t, ob)
+        draw_items(oo, typ, list(items), hw)
         small = p.im.reduce(p.ss)
         res = (small, (int(round(p.ox * self.s)), int(round(p.oy * self.s))))
         if key:

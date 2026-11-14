@@ -20,7 +20,11 @@ SHOP_ROLES = ("shopkeeper", "dukandar", "dukaandar", "lala", "lalaji", "kiranawa
               "medicalwala", "pharmacist")
 # who goes behind an OBJ counter by himself
 OBJ_WHO = {"thela": dict(looks=("kulchewala", "thelewala", "sabziwala", "chaiwala", "halwai"), roles=()),
-           "counter": dict(looks=SELLERS, roles=SHOP_ROLES), "table": dict(looks=(), roles=())}
+           "counter": dict(looks=SELLERS, roles=SHOP_ROLES), "table": dict(looks=(), roles=()),
+           # a desk (OBJ: desk): the people who work at one sit behind it by themselves
+           "desk": dict(looks=("clerk", "boss", "principal", "judge", "doctor", "master_ji", "office_guy"),
+                        roles=("babu", "cashier", "munshi", "receptionist", "manager", "headmaster", "teacher"))}
+DESK_SETS = ("desk", "table")
 BEHIND_OBJ = (0.95, -55.0)      # (size, feet offset): one step behind the cart / the counter
 
 # The counters painted into the places. shapes = the counter's front (logical px of the picture): it is drawn again
@@ -124,6 +128,10 @@ def place_behind(plan, place, cine, mode="2d", mirror=True):
                                                          ("table" if o.kind == "table" else None))
         if base:
             spots.append(("obj", o, OBJ_WHO[base], o.rest))
+    for ob in getattr(plan, "sets", None) or []:     # a desk / table piece of furniture (`OBJ: desk center`)
+        if ob.get("type") in DESK_SETS:
+            spots.append(("set", ob, OBJ_WHO["desk"] if ob["type"] == "desk" else OBJ_WHO["table"],
+                          float(ob.get("x", 540))))
     for i, c in enumerate(painted(place, mode)):
         spots.append(("paint", i, c, frame_point(c["x"], c["y"], angle)[0]))
     if not spots:
@@ -134,6 +142,8 @@ def place_behind(plan, place, cine, mode="2d", mirror=True):
         taken.add(c.name)
         if kind == "obj":
             _behind_object(c, ref)
+        elif kind == "set":
+            _behind_desk(c, ref)
         else:
             _behind_painted(c, info, plan, angle)
             used.append(ref)
@@ -187,6 +197,16 @@ def _make_room(plan, behind):
         clear = [x for x in spots if all(abs(x - bx) >= gap for bx in backs)]
         c.x = min(clear, key=lambda x: abs(x - c.x)) if clear else \
             max(spots, key=lambda x: min(abs(x - bx) for bx in backs))
+
+
+def _behind_desk(c, ob):
+    """Behind a desk / table: in the middle of it, one step back, so the desk covers the legs (a babu at work)."""
+    k, dy = BEHIND_OBJ
+    dy = (float(ob.get("y", 1700)) + dy + 10.0) - c.y
+    c.x = float(ob.get("x", 540))
+    c.depth.append((0.0, k, dy, k, dy, 0.01))
+    c.depth.sort(key=lambda d: d[0])
+    c.behind_x = c.x
 
 
 def _behind_object(c, o):

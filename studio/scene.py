@@ -4,6 +4,7 @@ import os
 import sys
 
 from . import audio, counter_shots, counters, decor, effects, elevenlabs_tts, gemini_tts, objects, rides, styles, vehicles
+from . import sets as _sets
 from .characters import assign_faces, color_of, resolve_spec
 from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, ease_out, ease_out_back, lerp
 
@@ -891,6 +892,71 @@ def auto_camera_cine(plan, chars, cam_events, shakes, rolls):
                 cam_events.append(dict(t=tf, zoom=1.0, dur=0.35))
 
 
+PUT_REACH = 0.45                     # seconds from the start of the reach until the thing touches the table
+
+
+def _surface(set_by_id, name):
+    """The piece of furniture `name` means: its id, else the first piece of that type (a "table" may be a desk)."""
+    if name in set_by_id:
+        return set_by_id[name]
+    for alias in ((name,), ("table", "desk") if name in ("table", "desk", None) else ()):
+        for ob in set_by_id.values():
+            if ob.get("type") in alias and ob.get("type") in _sets.SURFACE:
+                return ob
+    return next((ob for ob in set_by_id.values() if ob.get("type") in ("table", "desk")), None) if name is None else None
+
+
+PUT_TIME = 2.0                       # seconds a put / take takes on the timeline (a walk over + the reach)
+
+
+def _put_take(plan, c, t, key, spec, set_by_id):
+    """`A -> put bag desk` / `A -> take file`: noted now, done in _resolve_put_take once everybody stands where the
+    shot puts them (counters move people). Returns when the action is done (the cursor)."""
+    plan.put_take = getattr(plan, "put_take", []) + [(c, t, key, spec, set_by_id)]
+    return t + PUT_TIME
+
+
+def _resolve_put_take(plan):
+    for c, t, key, spec, set_by_id in getattr(plan, "put_take", []):
+        _do_put_take(plan, c, t, key, spec, set_by_id)
+    for c in plan.chars.values():
+        c.events.sort(key=lambda e: e["t"])
+        c.moves.sort(key=lambda m: m[0])
+    plan.set_events.sort(key=lambda e: e["t"])
+
+
+def _do_put_take(plan, c, t, key, spec, set_by_id):
+    """Walk up to the piece if it is not within reach, reach out, and the thing goes from the hand onto it (or from
+    it into the hand)."""
+    ob = _surface(set_by_id, spec.get("on"))
+    item = spec["item"]
+    held = _sets.HELD_AS.get(item, item)
+    if ob is None:                                  # nothing to put it on: just the gesture (and the hand)
+        plan.warnings.append("%s %s: %s jagah me nahi hai (OBJ: desk / table / bed... likho)" %
+                             (key, item, spec.get("on") or "table"))
+        return
+    x0, y0 = c.pos_at(t)
+    tx = float(ob.get("x", 540))
+    hw = _sets.SPEC[ob["type"]][0] * float(ob.get("scale", 1.0))
+    side = -1 if x0 < tx else 1
+    stand = tx + side * (hw * 0.5 + 110)
+    dur = 0.0
+    if abs(x0 - stand) > 70:                        # walk over to it first
+        dur = clamp(abs(x0 - stand) / 430.0, 0.45, PUT_TIME - 1.1)
+        c.moves.append((t, t + dur, x0, y0, stand, y0, False))
+        c.events.append({"t": t, "action": "idle"})
+    reach = t + dur + PUT_REACH
+    c.events.append({"t": t + dur, "action": key, "dir": -side, "facing": "left" if side > 0 else "right"})
+    if key == "put":
+        c.events.append({"t": t, "prop": held})
+        c.events.append({"t": reach, "prop": ""})
+        plan.set_events.append({"t": reach, "set": ob["id"], "add": item})
+    else:
+        plan.set_events.append({"t": reach, "set": ob["id"], "remove": item})
+        c.events.append({"t": reach, "prop": held})
+    c.events.append({"t": t + dur + 1.1, "facing": "front"})
+
+
 def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan = Plan()
     meta = scene.get("meta", {})
@@ -1045,6 +1111,9 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                     c.events.append({"t": t, "dir": head})
                 c.moves.append((t, t + 0.001, x0, y0, float(ob.get("x", 540)) + dx, float(ob.get("y", 1700)) + 1,
                                 False))
+            for key_ in ("put", "take"):                # put down / pick up a thing on a piece of furniture
+                if isinstance(ev.get(key_), dict):
+                    cursor = max(cursor, _put_take(plan, c, t, key_, ev[key_], set_by_id))
             if "move" in ev:
                 m = ev["move"]
                 x0, y0 = c.pos_at(t)
@@ -1243,6 +1312,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.counter_mode = "2d" if not preset_ else ("auto" if preset_.startswith("auto:") else "preset")
     plan.counters = counters.place_behind(plan, place_, cine, plan.counter_mode,
                                           mirror=not preset_ or preset_ not in styles.NO_MIRROR)
+    _resolve_put_take(plan)                         # people now stand where the shot has them: walk to the desk
     seller_ = next((c_ for c_ in chars.values() if getattr(c_, "behind", None) is not None), None)
     if plan.framing == "ots" and seller_ is not None:     # the shoulder in the corner away from the seller
         side_ = "left" if getattr(seller_, "behind_x", seller_.x) > LW / 2.0 else "right"

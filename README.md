@@ -450,6 +450,19 @@ Page pe "📼 Pichli reels" me koi bhi reel kholo: video ke neeche **"📜 Is vi
 - Ab har nayi reel ke release me script (`script.txt`, notes me bhi) aur scene (`*.scene.json`) dono save hote hain.
 - Purani 66 reels ki script unke GitHub run ke log se nikaal ke `assets/reel_scripts.json` me rakhi hai; page wahan se dikhata hai. (7 purani reels kisi file ya AI ke seedhe scene se bani thin, unki likhi script thi hi nahi.)
 
+### Cheezein rakhna aur uthana 🗂️ (desk pe file, bag, pathar...)
+
+```
+OBJ: desk center file chai thappa
+B (bored): File bahut halki hai, ud jayegi. | फ़ाइल बहुत हल्की है, उड़ जाएगी।
+A -> put bag desk thud
+B -> take file
+```
+- `OBJ: <desk / table / bed / sofa / bench / stool / box / khaat> <jagah> <cheezein>`: un pe pehle se rakhi cheezein.
+- Cheezein: `file`, `files` (dher), `chai`, `thappa` (stamp), `pathar`, `paperweight`, `notes` / `gaddi` / `paisa` (noton ki gaddi), `bag` / `thaila`, `laptop`, `phone`, `book`, `register`, `plate`, `tiffin`, `bottle`, `pen_stand`, `chalk_box`, `newspaper` / `akhbaar`, `gift`, `lota`, `glass`.
+- `A -> put bag desk` (ya `rakh`, `rakho`): door ho to pehle chal ke desk tak jaata hai, jhuk ke rakhta hai, cheez haath se nikal ke desk pe rehti hai. `A -> take file` (ya `utha`, `uthao`): desk se utha ke haath me.
+- Desk pe kaam karne wale (`clerk`, `boss`, `principal`, `judge`, `doctor`, `master_ji`, aur `babu`, `cashier`, `receptionist`, `manager`, `teacher`) apne aap desk ke peeche khade hote hain: desk unke aage. Kisi aur ko bhejna ho to CAST me `peeche`.
+
 ### Har jagah ka apna look 🎬 (`LOOK`) aur har video me ek ajeeb cheez 👀 (`MYSTERY`)
 
 **Look (colour grading):** ab har jagah apne rang me aati hai, apne aap. Kuch likhna nahi.

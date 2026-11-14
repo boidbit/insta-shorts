@@ -1523,6 +1523,28 @@ def pull_chair(t, sp, I, ph, o):
                        hand("L", _lerp2((120, -50), (-20, -60), k), (0.3, 1)), face="evil" if k > 0.5 else "sly"))
 
 
+def put(t, sp, I, ph, o):
+    # puts something down on the table in front: lean in, the hand goes down to the top and lets go, back up
+    d = _d(o)
+    go = _smooth(t / 0.45)
+    back = _smooth((t - 0.75) / 0.4)
+    e = go * (1 - back)
+    pose = _P(_hinge(18 * e), hand("R", _lerp2((70, -150), (196, -10), e), (0.6, 1)),
+              hand("L", (-40, -130), (-1, 0.5)), look_y=0.7 * e, face="smile" if t > 0.5 else None)
+    return _side(d, pose)
+
+
+def take(t, sp, I, ph, o):
+    # picks something up from the table in front: lean in, grab, lift it to the chest
+    d = _d(o)
+    go = _smooth(t / 0.45)
+    lift = _smooth((t - 0.5) / 0.45)
+    tgt = _lerp2(_lerp2((70, -150), (196, -10), go), (80, -230), lift)
+    pose = _P(_hinge(18 * go * (1 - lift)), hand("R", tgt, (0.6, 1)), hand("L", (-40, -130), (-1, 0.5)),
+              look_y=0.7 * go * (1 - lift))
+    return _side(d, pose)
+
+
 DESI_GESTURES = {"touch_feet", "bless", "kaan_pakad", "kaan_kheench", "ghoorna", "eye_roll", "finger_wag",
                  "pinch_cheeks", "check_watch", "selfie", "scroll", "video_call", "eat_hands", "fan_self", "swat",
                  "knock", "ring_bell", "propose", "cry_hug", "pull_chair"}
@@ -1581,6 +1603,7 @@ ACTIONS = {
     "fan_self": fan_self, "garmi": fan_self, "swat": swat, "knock": knock, "khatkhata": knock,
     "ring_bell": ring_bell, "ghanti": ring_bell, "propose": propose, "kneel": propose, "cry_hug": cry_hug,
     "pull_chair": pull_chair, "kursi_kheench": pull_chair,
+    "put": put, "take": take,
 }
 
 
