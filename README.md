@@ -480,6 +480,16 @@ Har action apna auzaar khud haath me laata hai:
 
 Prompt me ye ek "kaam-kaaj" module hai: idea me kaam ki baat ho (bartan, pocha, silai, babu, board...) to hi copy prompt me judta hai.
 
+### Naye reaction moves 😎
+
+| Action (Hinglish naam) | Kya |
+|---|---|
+| `double_take` (`dobara_dekh`) | dekha, nazar hatayi... phir jhatke se wapas: aankhein badi, chhota sa hop |
+| `slow_clap` (`dheere_taali`) | taunt wali dheemi taali |
+| `mic_drop` | mic aage, ek beat... aur chhod diya, thodi upar |
+| `collar_up` (`collar`, `collar_khada`) | collar khada, do baar flick: swag |
+| `nazar_utaar` (`nazar`) | mutthi chehre ke aas-paas teen chakkar, phir jhatak ke "thoo thoo" |
+
 ### Sarkari daftar 🏛️ aur kuch situations
 
 - `SCENE: sarkari_daftar` (ya `sarkari_office`, `govt_office`, `daftar`, `tehsil`, `kachehri`): hari peeli deewar, files se thasaathas almirah, "KHIDKI NO. 3", "LUNCH 1:00 - 2:00 / KAL AANA", 1998 ka calendar, jaali wali khidki, tube light, dheema pankha (2.5D me pankha ghoomta hai, tube light tim-timati hai, ek kagaz hawa me udta hai). Babu ki desk (files, register, thappa ke saath) studio khud rakhta hai; clerk / babu khud uske peeche baithta hai. Apni `OBJ: desk ...` likho to wo is desk ki jagah le leti hai.

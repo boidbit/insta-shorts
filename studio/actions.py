@@ -501,18 +501,22 @@ def _d(o):
 
 
 _MIX_NEUTRAL = {"tilt": 0.0, "head_tilt": 0.0, "lift": 0.0, "shift": 0.0, "dx": 0.0, "head_dx": 0.0, "head_dy": 0.0,
-                "look_x": 0.0, "look_y": 0.0, "la_k1": 1.0, "la_k2": 1.0, "ra_k1": 1.0, "ra_k2": 1.0}
+                "look_x": 0.0, "look_y": 0.0, "la_k1": 1.0, "la_k2": 1.0, "ra_k1": 1.0, "ra_k2": 1.0,
+                "arm_k": 1.0,
+                # a limb a pose leaves out hangs as it does standing (not a jump at the middle of the blend)
+                "la1": -14.0, "la2": -8.0, "ra1": 14.0, "ra2": 8.0, "ll1": -7.0, "ll2": -2.0, "rl1": 7.0, "rl2": 2.0}
 
 
 def _mix(p1, p2, w):
-    """Blend two poses (angles the short way round)."""
+    """Blend two poses. Arms and legs go straight from one angle to the other (an elbow never swings round the
+    back because the short way round flipped half way); the body's tilt goes the short way (after a cartwheel)."""
     w = clamp(w)
     w = w * w * (3 - 2 * w)
     out = dict(p2 if w >= 0.5 else p1)
     for k in set(p1) | set(p2):
         a, b = p1.get(k, _MIX_NEUTRAL.get(k)), p2.get(k, _MIX_NEUTRAL.get(k))
         if isinstance(a, (int, float)) and isinstance(b, (int, float)) and not isinstance(a, bool):
-            if k in ("la1", "la2", "ra1", "ra2", "ll1", "ll2", "rl1", "rl2", "tilt", "head_tilt"):
+            if k in ("tilt", "head_tilt"):
                 out[k] = a + (((b - a + 180) % 360) - 180) * w
             else:
                 out[k] = a + (b - a) * w
@@ -707,8 +711,10 @@ def cartwheel(t, sp, I, ph, o):
     h = c + 168.0 * (1 - cos(r)) / 2             # hips rise while upside down so the hands reach the floor
     pose = dict(tilt=th, ra1=150, ra2=150, la1=-150, la2=-150, rl1=32, rl2=32, ll1=-32, ll2=-32,
                 dx=-c * sin(r), lift=-h + c * cos(r))
-    if p >= 1:
-        pose = dict(ll1=-9, rl1=9)
+    if p >= 1:                                   # landed: the arms come down, they do not snap down
+        t_end = 0.9 / max(0.2, sp)
+        landed = dict(tilt=0.0, ra1=150, ra2=150, la1=-150, la2=-150, rl1=32, rl2=32, ll1=-32, ll2=-32)
+        pose = _mix(landed, dict(ll1=-9, rl1=9), (t - t_end) / 0.35)
     return _side(d, pose)
 
 
@@ -969,7 +975,7 @@ def dizzy(t, sp, I, ph, o):
 def hit_react(t, sp, I, ph, o):
     """Getting slapped / punched: head snaps away from the hitter (who is on the `_dir` side)."""
     d = _d(o)
-    k = math.exp(-5 * t) * sin(pi * _once(t, 0, 0.12) + 0.0) if t < 0.12 else math.exp(-5 * (t - 0.12))
+    k = _smooth(t / 0.12) if t < 0.12 else math.exp(-5 * (t - 0.12))     # snaps away fast, eases back
     pose = dict(tilt=-12 * k * I, head_tilt=-18 * k * I, head_dx=-10 * k, shift=-10 * k,
                 la1=-30 * k - 14, ra1=30 * k + 14, ll1=-9, rl1=9, face="hurt" if t < 1.2 else None)
     return _side(d, pose)
@@ -1159,7 +1165,7 @@ def high_five(t, sp, I, ph, o):
 
 def handshake(t, sp, I, ph, o):
     d = _d(o)
-    pump = 14 * sin(2 * pi * 3 * t) if t < 1.4 else 0
+    pump = 14 * sin(2 * pi * 3 * t) * (1 - _smooth((t - 1.1) / 0.3))     # the pumping dies away
     return _side(d, _P(hand("R", (176, -206 + pump), (0, 1)), face="smile", tilt=3, ll1=-9, rl1=9))
 
 
@@ -1716,6 +1722,69 @@ def wipe_table(t, sp, I, ph, o):
                  look_y=0.8)
 
 
+# ------------------------------------------------------------------ reactions (Nov 2026, smooth moves)
+def double_take(t, sp, I, ph, o):
+    # sees it, looks away as if nothing... then snaps back: eyes wide, a small hop back
+    d = _d(o)
+    away = _smooth(t / 0.3) * (1 - _smooth((t - 0.45) / 0.15))     # a calm glance away and back
+    snap = _smooth((t - 0.7) / 0.1)                                 # the snap: fast but eased, no pop
+    hop = sin(pi * clamp((t - 0.7) / 0.35)) if t > 0.7 else 0.0
+    pose = _P(_stance(), hand("R", (60 - 20 * snap, -110 - 120 * snap), (1, 0.6)),
+              hand("L", (-60 + 10 * snap, -110 - 110 * snap), (-1, 0.6)),
+              look_x=-0.7 * away + 0.6 * snap, head_dx=-8 * away + 10 * snap, head_tilt=-4 * away + 6 * snap,
+              tilt=-5 * snap, lift=-14 * hop, face="shock" if t > 0.72 else "neutral")
+    return _side(d, pose)
+
+
+def slow_clap(t, sp, I, ph, o):
+    # the sarcastic slow clap: wide apart... clap... wide apart, about one a second, an unimpressed face
+    u = (t * 0.95 * sp) % 1.0
+    gap = abs(cos(pi * u)) ** 0.7                                   # 1 = apart, 0 = the hands meet
+    x = 14 + 96 * gap
+    return _P(hand("R", (x, -236 + 8 * gap), (1, 0.8)), hand("L", (-x, -236 + 8 * gap), (-1, 0.8)),
+              dict(ll1=-10, rl1=10), head_tilt=3 * sin(2 * pi * 0.3 * t), lift=-2 * (1 - gap),
+              look_y=0.1, face="sly")
+
+
+def mic_drop(t, sp, I, ph, o):
+    # holds the mic out at shoulder height, a beat... lets it go, the hand stays open, chin up
+    d = _d(o)
+    up = _smooth(t / 0.35)
+    go = t > 0.95
+    pose = _P(_stance(), hand("R", _lerp2((60, -150), (190, -280), up), (0.6, 1)),
+              hand("L", (-70, -96), (-1, -0.3)), head_dy=-4 * up, look_y=-0.25 * up,
+              face="smug" if go else "sly")
+    if not go:
+        pose["prop"] = "mic"
+    return _side(d, pose)
+
+
+def collar_up(t, sp, I, ph, o):
+    # pops the collar: both hands to the collar and a flick up and out, twice, the chin up - "swag"
+    e = _smooth(t / 0.25)
+    flick = max(0.0, sin(2 * pi * 1.6 * sp * max(0.0, t - 0.25))) if t < 1.5 else 0.0
+    x = 52 + 20 * flick
+    y = -284 - 12 * flick
+    return _P(hand("R", _lerp2((70, -110), (x, y), e), (1, 1)), hand("L", _lerp2((-70, -110), (-x, y), e), (-1, 1)),
+              dict(ll1=-12, rl1=12), head_dy=-5 * e, look_y=-0.35 * e, head_tilt=4 * flick, face="smug")
+
+
+def nazar_utaar(t, sp, I, ph, o):
+    # nazar utaarna: the fist goes round the other's face three times, then a flick away with "thoo thoo"
+    d = _d(o)
+    a = 2 * pi * 1.3 * sp * t
+    rounds = t < 2.3
+    if rounds:
+        tgt = (175 + 38 * cos(a), -360 + 38 * sin(a))
+    else:
+        f = _smooth((t - 2.3) / 0.3)
+        tgt = _lerp2((175 + 38 * cos(2 * pi * 1.3 * sp * 2.3), -360 + 38 * sin(2 * pi * 1.3 * sp * 2.3)),
+                     (110, -470), f)
+    pose = _P(_stance(), hand("R", tgt, (0.5, 1)), hand("L", (-50, -150), (-1, 0.6)),
+              tilt=4, head_dx=5, look_x=0.6, face="think" if rounds else "smile")
+    return _side(d, pose)
+
+
 WORK_ACTIONS = {"write_board", "stamp", "iron", "wash_dishes", "mop", "sew", "hammer", "dig", "chop", "pour",
                 "knead", "roll_roti", "serve", "shuffle_papers", "fold_clothes", "water_plants", "paint_wall",
                 "carry_head", "wipe_table"}
@@ -1724,6 +1793,7 @@ WORK_ACTIONS = {"write_board", "stamp", "iron", "wash_dishes", "mop", "sew", "ha
 DESI_GESTURES = {"touch_feet", "bless", "kaan_pakad", "kaan_kheench", "ghoorna", "eye_roll", "finger_wag",
                  "pinch_cheeks", "check_watch", "selfie", "scroll", "video_call", "eat_hands", "fan_self", "swat",
                  "knock", "ring_bell", "propose", "cry_hug", "pull_chair"}
+REACTION_MOVES = {"double_take", "slow_clap", "mic_drop", "collar_up", "nazar_utaar"}
 
 SING_ACTIONS = {"sing", "gaana"}
 # moves worth watching for a while: a script line with only one of these holds the cursor ~1.6 s
@@ -1789,6 +1859,10 @@ ACTIONS = {
     "shuffle_papers": shuffle_papers, "fold_clothes": fold_clothes, "kapde_tah": fold_clothes,
     "water_plants": water_plants, "paani_de": water_plants, "paint_wall": paint_wall, "rang": paint_wall,
     "carry_head": carry_head, "sir_pe_bojh": carry_head, "wipe_table": wipe_table, "saaf_kar": wipe_table,
+    # reactions
+    "double_take": double_take, "dobara_dekh": double_take, "slow_clap": slow_clap, "dheere_taali": slow_clap,
+    "mic_drop": mic_drop, "collar_up": collar_up, "collar": collar_up, "collar_khada": collar_up,
+    "nazar_utaar": nazar_utaar, "nazar": nazar_utaar,
 }
 
 

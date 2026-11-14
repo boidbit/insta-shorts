@@ -63,6 +63,7 @@ If the joke needs a place, thing or action not listed here, change the joke to o
     work (each brings its tool into the hand): write_board (chalk on the blackboard), stamp (thappa on a file), iron (istri), wash_dishes (bartan), mop (pocha), sew (silai), hammer, dig (phawda), chop (sabzi kaatna), pour (chai daalna from a kettle), knead (aata goondhna), roll_roti (belan), serve (a waiter's tray), shuffle_papers (the busy babu), fold_clothes, water_plants, paint_wall, carry_head (a load on the head), wipe_table
 <!-- /module -->
     desi: touch_feet (pair chhoona), bless (aashirwad), kaan_pakad (sorry, holding the ears), kaan_kheench (pulls the other's ear), ghoorna (the stare), eye_roll, finger_wag (na na na), pinch_cheeks (the aunty), check_watch (late!), selfie, scroll, video_call, eat_hands, fan_self (garmi), swat (machhar), knock, ring_bell, propose (on one knee), cry_hug, pull_chair (the prank)
+    reactions: double_take, slow_clap, mic_drop, collar_up, nazar_utaar
 <!-- module: dance -->
     sports / gym: bat, bowl, race_start, jumping_jacks, squat, pushup, lift_weights
     desi dance pack: naagin (shaadi naagin dance), bhangra, aeroplane (uncle's arms-out dance), thumka, dance_walk (dancing while walking), kamar_dard (dances like a hero, then the back gives way), sing (a mic appears and the mouth sings), garba, hookstep, floss, disco, dance, sway
