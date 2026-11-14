@@ -120,7 +120,7 @@ FACE_WORDS.update({
     "clean_shaven": ("shave", True), "clean_shave": ("shave", True),
 })
 ACCESSORIES = ("glasses", "sunglasses", "cap", "turban", "moustache", "beard", "bindi", "tilak", "earrings", "tuft",
-               "topi", "beanie", "nurse_cap", "beret", "bowtie", "backpack")
+               "topi", "beanie", "nurse_cap", "beret", "bowtie", "backpack", "gamchha", "ghunghat")
 
 # Ready-made Indian looks. Anything in the character spec overrides these.
 LOOKS = {
@@ -248,6 +248,20 @@ LOOKS = {
                  shoes="chappal", beard="full", prop="stick", accessories=["beard", "tilak"], expression="relaxed"),
     "pilot": dict(skin="fair", hair="side_part", outfit="blazer", color="navy", pants="navy", accent="gold",
                   shoes="black", cap_color="navy", accessories=["cap", "sunglasses"]),
+    # the village pack
+    "kisan": dict(skin="dark", hair="short", outfit="kurta", color="cream", pants="white", shoes="chappal",
+                  build="slim", turban_color="mustard", moustache="thick", marks=["age_lines"],
+                  accessories=["turban", "moustache", "gamchha"]),
+    "gaon_aurat": dict(skin="wheatish", hair="bun", outfit="saree", color="green", accent="orange", shoes="chappal",
+                       accessories=["ghunghat", "bindi", "earrings"]),
+    "sarpanch": dict(skin="brown", hair="balding", outfit="kurta_jacket", color="white", pants="white",
+                     accent="maroon", shoes="chappal", build="chubby", turban_color="saffron", moustache="handlebar",
+                     accessories=["turban", "moustache"], expression="proud"),
+    "tau": dict(skin="brown", hair="balding", hair_color="grey", outfit="vest", color="white", pants="white",
+                shoes="chappal", turban_color="white", moustache="handlebar", marks=["age_lines"], prop="stick",
+                scale=0.97, accessories=["turban", "moustache"]),
+    "gaon_ladka": dict(skin="brown", hair="side_part", outfit="shirt", color="mustard", pants="khaki", shoes="chappal",
+                       build="slim", gamchha_color="red", accessories=["gamchha"]),
     "air_hostess": dict(skin="fair", hair="bun", outfit="blazer", color="red", pants="red", accent="white",
                         shoes="black", accessories=["earrings"]),
 }
@@ -1116,10 +1130,28 @@ def _front_hair(S, HH, style, hc):
             side_y=30)
 
 
+def _ghunghat_color(o, cols):
+    return color_of(o["ghunghat_color"]) if o.get("ghunghat_color") else cols["main"]
+
+
+def _gamchha(S, o, build, back):
+    """A red-and-white checked gamchha over the left shoulder, its end hanging down the chest (or the back)."""
+    gc = color_of(o.get("gamchha_color", "red"), "red")
+    bw = BUILDS.get(build, BUILDS["normal"])[0] * 62
+    top = -TORSO_H + 4
+    band = [(-bw - 6, top + 6), (-bw + 30, top - 6), (-bw + 46, top + 190), (-bw + 8, top + 200)]
+    S.poly(band, gc, INK, 4)
+    for u in (0.25, 0.5, 0.75):                      # the checks
+        S.line([(-bw - 6 + 14 * u + 2, top + 6 + 194 * u), (-bw + 30 + 16 * u, top - 6 + 196 * u)], 3, (250, 250, 246))
+    S.line([(-bw + 12, top + 2), (-bw + 26, top + 196)], 3, (250, 250, 246))
+    if not back:                                     # it goes round behind the neck
+        S.poly([(-bw + 20, top - 4), (16, top - 12), (24, top + 4), (-bw + 30, top + 10)], gc, INK, 4)
+
+
 def _back_of_head(S, HH, style, hc, acc, o, cols):
     """The head seen from behind: hair over all of it (down to the nape), long hair / braid / bun / ponytail hanging
     on the back, a cap or turban from behind. No face."""
-    covered = "turban" in acc or "cap" in acc or "beanie" in acc
+    covered = "turban" in acc or "cap" in acc or "beanie" in acc or "ghunghat" in acc
     style = HAIR_BACK.get(style, style)
     if style in ("long", "braid") and not covered:
         tail = 150 if style == "long" else 60
@@ -1156,6 +1188,11 @@ def _back_of_head(S, HH, style, hc, acc, o, cols):
                 S.poly([HH(q) for q in bezier((-16, -10), (-30, 90), (0, 150), 10) + bezier((10, 150), (34, 80), (16, -10), 10)],
                        hc, INK, OUTLINE)
                 S.dot(HH((0, -6)), 10, cols["accent"], INK, 4)
+    if "ghunghat" in acc:                           # the pallu over the head, down over the shoulders
+        gc = _ghunghat_color(o, cols)
+        S.poly([HH(q) for q in ellipse_pts(0, -4, HEAD_RX + 16, HEAD_RY + 14, 30, 180, 360)
+                + [(HEAD_RX + 30, HEAD_RY + 96), (-HEAD_RX - 30, HEAD_RY + 96)]], gc, INK, OUTLINE)
+        S.line([HH(q) for q in [(-HEAD_RX - 26, HEAD_RY + 80), (HEAD_RX + 26, HEAD_RY + 80)]], 6, cols["accent"])
     if "cap" in acc:
         cap_col = color_of(o.get("cap_color", "red"), "red")
         crown = ellipse_pts(0, 0, HEAD_RX + 5, HEAD_RY + 6, 24, 192, 348)
@@ -1365,7 +1402,10 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
 
     covered = "turban" in acc or "cap" in acc or "beanie" in acc
     back = o.get("view") == "back" or bool(p.get("hide_face"))   # seen from behind (ots shot, turn_around...)
-    if not ("turban" in acc) and not back:
+    if "ghunghat" in acc and not back:              # the pallu behind the head, falling to the shoulders
+        S.poly([HH(q) for q in ellipse_pts(0, -4, HEAD_RX + 18, HEAD_RY + 16, 30, 160, 380)
+                + [(HEAD_RX + 34, HEAD_RY + 100), (-HEAD_RX - 34, HEAD_RY + 100)]], _ghunghat_color(o, cols), INK, OUTLINE)
+    elif not ("turban" in acc) and not back:
         _back_hair(S, HH, hair, hcol)
 
     # ---- legs + feet ----
@@ -1401,6 +1441,8 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
         else:                                       # the straps over the shoulders
             for sgn in (-1, 1):
                 S.tube([(sgn * (bw_ - 18), -TORSO_H + 10), (sgn * (bw_ - 10), -TORSO_H + 150)], 12, shade(bag_col, 0.9))
+    if "gamchha" in acc:                            # the checked cloth over the left shoulder
+        _gamchha(S, o, build, back)
     if "bowtie" in acc and not back:
         bt = -TORSO_H + 14
         for sgn in (-1, 1):
@@ -1722,6 +1764,13 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
                                               (HEAD_RX - 6, -44 - j * 22), 10)], 4, shade(tc, 0.75))
         elif a in ("topi", "beanie", "nurse_cap", "beret"):
             _head_cap(S, HH, a, o)
+        elif a == "ghunghat":                       # the pallu's edge over the hair, framing the face
+            gc = _ghunghat_color(o, cols)
+            outer = ellipse_pts(0, -4, HEAD_RX + 16, HEAD_RY + 14, 30, 180, 360)
+            inner = ellipse_pts(fdx * 0.5, 4, HEAD_RX * 0.86, HEAD_RY * 0.78, 24, 196, 344)
+            S.poly([HH(q) for q in [(-HEAD_RX - 22, 70)] + outer + [(HEAD_RX + 22, 70), (HEAD_RX * 0.86, 30)]
+                    + inner[::-1] + [(-HEAD_RX * 0.86, 30)]], gc, INK, OUTLINE)
+            S.line([HH(q) for q in inner], 6, cols["accent"])
         elif a == "moustache" and not shave:
             _moustache(hline, hpoly, o.get("moustache", "normal"), hcol, fdx)
         elif a == "bindi":
@@ -1738,6 +1787,8 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     top_extra = HAIR_TOP.get(hair, 8)
     if "turban" in acc:
         top_extra = 26
+    if "ghunghat" in acc:
+        top_extra = max(top_extra, 18)
     if "topi" in acc or "nurse_cap" in acc:
         top_extra = max(top_extra, 32)
     anchors = dict(

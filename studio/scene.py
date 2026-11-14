@@ -77,7 +77,7 @@ def fit_to_angle(ob, ang):
 PEOPLE_SCALE_3 = 1.06        # ...three people side by side need the room
 PEOPLE_SCALE_4 = 0.9         # ...and four even more
 PEOPLE_SCALE = 1.22          # medium shots: people this much bigger than the painted place (x sqrt of the angle zoom)
-FOCUS_H = {"dog": 170.0, "cat": 120.0, "cow": 260.0, "goat": 170.0, "crow": 70.0, "parrot": 70.0, "rooster": 90.0,
+FOCUS_H = {"dog": 170.0, "cat": 120.0, "cow": 260.0, "buffalo": 260.0, "goat": 170.0, "crow": 70.0, "parrot": 70.0, "rooster": 90.0,
            "lizard": 690.0, "mosquito": 580.0}   # animals: camera looks lower
 
 OTS_BACK = dict(k=2.3, drop=1200.0, left=150.0, right=930.0)      # the near shoulder: big, cut off by the frame

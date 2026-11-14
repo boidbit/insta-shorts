@@ -184,7 +184,10 @@ ROLE_LOOKS = {
     "sadhu": "baba", "babaji": "baba", "jyotishi": "baba", "swami": "baba", "tantrik": "baba",
     "pujari": "pandit", "panditji": "pandit", "policewala": "police", "inspector": "police", "havaldar": "police",
     "daroga": "police", "dactor": "doctor", "groom": "dulha", "bride": "dulhan",
-    "netaji": "neta", "mantri": "neta", "politician": "neta", "sarpanch": "neta", "mla": "neta",
+    "netaji": "neta", "mantri": "neta", "politician": "neta", "sarpanch": "sarpanch", "mla": "neta",
+    "pradhan": "sarpanch", "mukhiya": "sarpanch", "pradhan_ji": "sarpanch", "kisan": "kisan", "farmer": "kisan",
+    "kaka": "kisan", "tau": "tau", "tauji": "tau", "tau_ji": "tau", "chaudhary": "tau", "tai": "gaon_aurat",
+    "gaon_wali": "gaon_aurat", "gaon_ki_bahu": "gaon_aurat", "chhora": "gaon_ladka", "gaon_ka_ladka": "gaon_ladka",
     "kaidi": "chor", "prisoner": "chor", "thief": "chor", "sasu": "saas", "saasu": "saas", "bhabhi": "bahu",
     "patni": "bahu", "biwi": "bahu", "headmaster": "principal", "barber": "nai", "hajjam": "nai",
     "delivery": "delivery_boy", "deliverywala": "delivery_boy", "autowala": "driver", "cabwala": "driver",
@@ -301,7 +304,8 @@ def _words(s):
 
 
 ANIMAL_WORDS = {"dog": "dog", "kutta": "dog", "doggy": "dog", "cat": "cat", "billi": "cat", "cow": "cow",
-                "gaay": "cow", "gai": "cow", "crow": "crow", "kauwa": "crow", "kaua": "crow", "parrot": "parrot",
+                "gaay": "cow", "gai": "cow", "buffalo": "buffalo", "bhains": "buffalo",
+                "bhainsa": "buffalo", "bhens": "buffalo", "bhais": "buffalo", "crow": "crow", "kauwa": "crow", "kaua": "crow", "parrot": "parrot",
                 "tota": "parrot", "totaa": "parrot", "monkey": "monkey", "bandar": "monkey", "goat": "goat",
                 "bakri": "goat", "bakra": "goat", "rooster": "rooster", "murga": "rooster", "murgi": "rooster",
                 "hen": "rooster", "lizard": "lizard", "chhipkali": "lizard", "chipkali": "lizard",
