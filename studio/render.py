@@ -705,15 +705,18 @@ class Renderer(Output):
         """cine: how far (logical px) to move a person whose body is on its way down or lying on the floor, so the
         whole body stays inside the picture (it would otherwise fall out of the frame). 0 = no change: standing,
         on a set piece (the bed decides), riding, or the classic camera."""
-        if getattr(self.plan, "camera", "") != "cine" or rf or st.get("on") or abs(pose.get("tilt", 0.0)) < 20:
+        lean = abs(pose.get("tilt", 0.0))
+        if getattr(self.plan, "camera", "") != "cine" or rf or st.get("on") or lean < 14:
             return 0.0
         xs = [px for op in ops for (px, _py) in op["pts"]]
         if not xs:
             return 0.0
         lo, hi, m = min(xs), max(xs), self.KEEP_MARGIN
+        w = clamp((lean - 14.0) / 12.0)             # comes in as the body tips over (no jump at one angle)
+        w = w * w * (3 - 2 * w)
         if hi - lo > LW - 2 * m:                    # longer than the picture is wide: centre it
-            return LW / 2.0 - (lo + hi) / 2.0
-        return max(0.0, m - lo) - max(0.0, hi - (LW - m))
+            return (LW / 2.0 - (lo + hi) / 2.0) * w
+        return (max(0.0, m - lo) - max(0.0, hi - (LW - m))) * w
 
     def _seated(self, c, t, st, action, pose, opts):
         """On a set piece: hips on the seat (sit), body on the mattress (lie). Any other action done
@@ -798,6 +801,10 @@ class Renderer(Output):
 
     # ------------------------------------------------------------ character state -> pose (smooth, alive)
     BLEND = 0.3           # seconds to cross-fade from one action's pose to the next
+    # cine: a person takes longer for a big change (arms down -> arms up) than for a small one, and the body leads:
+    # the hips / chest / head start first, the arms follow a beat later (overlapping action)
+    BLEND_MIN, BLEND_MAX, BLEND_PX = 0.22, 0.46, 650.0
+    BODY_KEYS = frozenset(("tilt", "lift", "shift", "dx", "head_tilt", "head_dx", "head_dy", "look_x", "look_y"))
 
     def _speaker_at(self, t, name):
         """The line someone else is saying at time t (latest started), or None."""
@@ -884,6 +891,7 @@ class Renderer(Output):
                     _expr=st["expression"], _amp=self._amp(st["talking"], t) if st["talking"] else 0.0)
         at = t - a_t0 if action not in ("walk", "run") else t
         natural = self._natural() and not c.spec.get("kind")
+        actions.SOFT_REACH = self._natural()        # arms slow into a full stretch; classic keeps the hard limit
         crouch = 0.0
         if natural and action in self.LEAPS and t - a_t0 < self.CROUCH:     # bend the knees before a jump
             crouch = math.sin(math.pi * (t - a_t0) / self.CROUCH)
@@ -976,10 +984,19 @@ class Renderer(Output):
     def _weight(self, c, t, E, pose, crouch):
         """Human weight: lean into a walk and settle back when stopping, bend before a jump, shift the weight
         from foot to foot while standing (never perfectly regular), and let the kurta hem / braid trail."""
+        lo_t, hi_t = 0.0, 1e9                       # a snap to a new spot (an entrance's start) is not speed
+        for m in c.moves:
+            if m[1] - m[0] < 0.02:
+                if m[1] <= t:
+                    lo_t = max(lo_t, m[1])
+                elif m[0] > t:
+                    hi_t = min(hi_t, m[0] - 1e-4)
+
         def vx(tt):
-            return (c.draw_pos(tt + 0.04)[0] - c.draw_pos(max(0.0, tt - 0.04))[0]) / 0.08
+            a_, b_ = max(lo_t, tt - 0.04), min(hi_t, tt + 0.04)
+            return (c.draw_pos(b_)[0] - c.draw_pos(a_)[0]) / max(1e-3, b_ - a_) if b_ > a_ else 0.0
         v = vx(t)
-        a = (vx(t + 0.06) - vx(max(0.0, t - 0.06))) / 0.12
+        a = (vx(min(hi_t, t + 0.06)) - vx(max(lo_t, t - 0.06))) / 0.12
         if abs(v) > 1 or abs(a) > 30:               # moving: lean into it, a little more when speeding up
             pose["tilt"] = pose.get("tilt", 0.0) + clamp(v * 0.0055 + a * 0.0012, -6.0, 6.0)
         if crouch:                                  # (applied after the blend from the last action: _crouch)
@@ -1024,7 +1041,8 @@ class Renderer(Output):
         """If the action (or its direction) changed less than BLEND seconds ago, cross-fade from the previous
         action's pose (still moving) to the new one. Back-to-back changes chain: a new blend starts from the
         half-finished blend that was on screen, not from the raw previous pose."""
-        B = self.BLEND
+        natural = self._natural()
+        B = self.BLEND_MAX if natural else self.BLEND
         end = t if end is None else end
         t0 = max(0.0, t - B)
         if end <= t0 + 1e-6:
@@ -1039,15 +1057,32 @@ class Renderer(Output):
                 hi = mid
             else:
                 lo = mid
-        Eo = self._eff(c, lo)
+        Eo = self._eff(c, max(t0, lo - 2e-3))     # (a step back: never the hair-thin instant between two events)
+        if self._key(Eo) == key:
+            Eo = self._eff(c, lo)
         if Eo["rf"]:
             return pose
         Eo["x"], Eo["y"] = E["x"], E["y"]
         old = self._build_pose(c, t, Eo)
         if depth < 2:
             old = self._blend_from_previous(c, t, Eo, old, end=lo, depth=depth + 1)
-        w = clamp((t - hi) / B)
+        sy = skeleton(DEFAULT_POSE)["shR"][1]       # shoulder height of the rig
+        arms = {side: [self._arm_points(src, side, shx, sy) for src in (old, pose)]
+                for side, shx in (("la", -56.0), ("ra", 56.0))}
+        u = t - hi
+        if natural:                                 # the time it takes follows how far the hands travel
+            reach = max(math.hypot(b[2] - a[2], b[3] - a[3]) for a, b in arms.values())
+            B = clamp(self.BLEND_MIN + reach / self.BLEND_PX, self.BLEND_MIN, self.BLEND_MAX)
+            if u >= B:
+                return pose
+        w = clamp(u / B)
         w = w * w * (3 - 2 * w)
+        w_body, w_arm = w, w
+        if natural:                                 # the body leads, the arms follow
+            w_body = clamp(u / (0.8 * B))
+            w_body = w_body * w_body * (3 - 2 * w_body)
+            w_arm = clamp((u - 0.12 * B) / (0.88 * B))
+            w_arm = w_arm * w_arm * (3 - 2 * w_arm)
         out = dict(pose)
         for kk in set(old) | set(pose):
             if kk.startswith("_"):
@@ -1057,34 +1092,70 @@ class Renderer(Output):
             num = (isinstance(va, (int, float)) and isinstance(vb, (int, float)) and not isinstance(va, bool)
                    and not isinstance(vb, bool))
             if num:
+                wk = w_body if kk in self.BODY_KEYS else w
                 if kk in self._ANGLES:
                     dlt = ((vb - va + 180.0) % 360.0) - 180.0
-                    out[kk] = va + dlt * w
+                    out[kk] = va + dlt * wk
                 else:
-                    out[kk] = va + (vb - va) * w
+                    out[kk] = va + (vb - va) * wk
             elif w < 0.5:
                 out[kk] = va
         # arms: move the elbow and hand along straight lines (angle blending can flip direction near 180 deg)
-        sy = skeleton(DEFAULT_POSE)["shR"][1]       # shoulder height of the rig
         for side, shx in (("la", -56.0), ("ra", 56.0)):
-            pts = []
-            for src in (old, pose):
-                a1 = src.get(side + "1", DEFAULT_POSE[side + "1"])
-                a2 = src.get(side + "2", DEFAULT_POSE[side + "2"])
-                k_ = src.get("arm_k", 1.0)
-                l1 = UA * k_ * src.get(side + "_k1", 1.0)
-                l2 = LA * k_ * src.get(side + "_k2", 1.0)
-                ex, ey = shx + l1 * math.sin(math.radians(a1)), sy + l1 * math.cos(math.radians(a1))
-                pts.append((ex, ey, ex + l2 * math.sin(math.radians(a2)), ey + l2 * math.cos(math.radians(a2))))
-            (e0x, e0y, h0x, h0y), (e1x, e1y, h1x, h1y) = pts
-            ex, ey = e0x + (e1x - e0x) * w, e0y + (e1y - e0y) * w
-            hx, hy = h0x + (h1x - h0x) * w, h0y + (h1y - h0y) * w
+            (e0x, e0y, h0x, h0y), (e1x, e1y, h1x, h1y) = arms[side]
+            ex, ey = e0x + (e1x - e0x) * w_arm, e0y + (e1y - e0y) * w_arm
+            hx, hy = h0x + (h1x - h0x) * w_arm, h0y + (h1y - h0y) * w_arm
             ak = out.get("arm_k", 1.0)
             out[side + "1"] = math.degrees(math.atan2(ex - shx, ey - sy))
             out[side + "2"] = math.degrees(math.atan2(hx - ex, hy - ey))
             out[side + "_k1"] = math.hypot(ex - shx, ey - sy) / (UA * ak)
             out[side + "_k2"] = math.hypot(hx - ex, hy - ey) / (LA * ak)
         return out
+
+    SMEAR_DT = (0.012, 0.024)   # cine: how far back (s) the faint trail of a fast hand is drawn
+    SMEAR_PX = 15.0             # rig px a hand must travel (against the body) in SMEAR_DT[0] to leave a trail
+    SMEAR_ALPHA = 0.42
+
+    def _hand_rig(self, c, t):
+        """Both hands, relative to the hips, in rig px (no camera, no size): what a smear is measured on."""
+        E = self._eff(c, t)
+        pose = self._build_pose(c, t, E)
+        if not E["rf"]:
+            pose = self._blend_from_previous(c, t, E, pose)
+        sk = skeleton(dict(DEFAULT_POSE, **{k: v for k, v in pose.items() if not k.startswith("_")}))
+        return sk["handL"], sk["handR"]
+
+    def _smear(self, c, t, P):
+        """cine: [(layer, (x, y))] faint copies of this person a moment ago, drawn under them while a hand moves
+        very fast (a slap, a punch, a hammer coming down): the eye reads it as motion blur. Nothing otherwise."""
+        if not self._natural() or P["animal"] or P["rf"] or c.spec.get("kind") or t < self.SMEAR_DT[1]:
+            return []
+        now = self._hand_rig(c, t)
+        before = self._hand_rig(c, t - self.SMEAR_DT[0])
+        fast = max(math.hypot(a[0] - b[0], a[1] - b[1]) for a, b in zip(now, before))
+        a = clamp((fast - self.SMEAR_PX) / 40.0) * self.SMEAR_ALPHA
+        if a <= 0.02:
+            return []
+        out = []
+        for i, dt in enumerate(self.SMEAR_DT):
+            G = self._prep(c, t - dt, {}, k=P["k"])
+            r = render_ops(G["ops"], self.s, self.W, self.H)
+            if r:
+                layer, pos = r
+                layer.putalpha(layer.getchannel("A").point(lambda v, m=a * (0.6 if i else 1.0): int(v * m)))
+                out.append((layer, pos))
+        return out[::-1]                        # the older (fainter) one first
+
+    @staticmethod
+    def _arm_points(src, side, shx, sy):
+        """(elbow x, y, hand x, y) of one arm of a pose, in rig coordinates."""
+        a1 = src.get(side + "1", DEFAULT_POSE[side + "1"])
+        a2 = src.get(side + "2", DEFAULT_POSE[side + "2"])
+        k_ = src.get("arm_k", 1.0)
+        l1 = UA * k_ * src.get(side + "_k1", 1.0)
+        l2 = LA * k_ * src.get(side + "_k2", 1.0)
+        ex, ey = shx + l1 * math.sin(math.radians(a1)), sy + l1 * math.cos(math.radians(a1))
+        return ex, ey, ex + l2 * math.sin(math.radians(a2)), ey + l2 * math.cos(math.radians(a2))
 
     def _look_value(self, c, t, E):
         look = E["st"]["look"]
@@ -1356,6 +1427,8 @@ class Renderer(Output):
 
         def draw_char(c):
             P = prep.get(c.name) or prep_char(c)
+            for gl, (gx, gy) in self._smear(c, t, P):     # cine: a fast hand leaves a faint trail behind it
+                img.paste(gl, (gx, gy), gl)
             r = render_ops(P["ops"], s, self.W, self.H)
             if r:
                 layer, (ox, oy) = r

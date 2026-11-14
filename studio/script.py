@@ -117,6 +117,8 @@ SET_STATES = ("open", "closed", "on", "off", "ringing", "idle", "rustle", "night
 JAIL_DOOR = {"id": "jail_door", "type": "jail_door", "x": 930, "y": 1290, "fit": True}
 SET_X = {"far_left": 120, "left": 230, "center": 540, "right": 850, "far_right": 960}
 SEAT_ACTIONS = ("sit", "lie_down", "lie", "sleep_lie", "rofl")
+PUT_WORDS = ("put", "rakh", "rakho", "rakhna", "place")       # A -> put bag desk
+TAKE_WORDS = ("take", "utha", "uthao", "uthana", "pick")       # A -> take file desk
 
 
 def parse_set(raw, placed):
@@ -124,7 +126,10 @@ def parse_set(raw, placed):
     Returns (kind, spec, problems): kind "place" (new piece) or "state" (a piece already in this place)."""
     words = raw.split()
     typ = words[0].lower()
+    typ = "table" if typ == "table_set" else typ
     rest = words[1:]
+    items = [_sets.ITEM_WORDS[w.lower()] for w in rest if w.lower() in _sets.ITEM_WORDS and typ in _sets.SURFACE]
+    rest = [w for w in rest if not (w.lower() in _sets.ITEM_WORDS and typ in _sets.SURFACE)]
     state = next((w.lower() for w in rest if w.lower() in SET_STATES), None)
     pos = next((w.lower() for w in rest if w.lower() in SET_X), None)
     flags = {w.lower() for w in rest}
@@ -144,6 +149,8 @@ def parse_set(raw, placed):
     text = [w for w in rest if w.lower() not in known]
     sid = typ if typ not in placed else "%s%d" % (typ, sum(1 for k in placed if k.startswith(typ)) + 1)
     spec["id"] = sid                                # (also when a word is unknown: the piece is still placed)
+    if items:                                       # `OBJ: desk center file chai thappa`: lying on it
+        spec["items"] = items
     if typ in ("signboard", "blackboard") and text:
         spec["text"] = " ".join(text)
     elif text:
@@ -220,6 +227,7 @@ def vocab():
         "places": sorted(BACKGROUNDS),
         "looks": sorted(LOOKS), "roles": sorted(ROLE_LOOKS),
         "extras": sorted(set(ACCESSORIES) | set(HAIR_STYLES) | set(HAIR_WORDS) | set(OUTFITS) | set(SKIN_TONES)
+                         | set(JACKET_WORDS) | set(BANYAN_WORDS)
                          | set(BUILDS)
                          | set(BUILD_WORDS) | set(HEIGHT_WORDS)
                          | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS) | set(FACE_WORDS) | set(BEHIND_WORDS)),
@@ -267,12 +275,60 @@ BEHIND_WORDS = {"peeche": True, "piche": True, "behind": True, "counter_peeche":
                 "front_side": False}
 
 
+# clothes words beyond the outfit names: a jacket over a kurta (Indian English often calls it a "vest", and so
+# do the writers: `kurta saffron vest saffron` is a neta's kurta with a Nehru jacket, not a banyan), and the banyan
+JACKET_WORDS = ("jacket", "nehru_jacket", "nehru", "waistcoat", "koti", "sadri", "modi_jacket")
+BANYAN_WORDS = ("banyan", "baniyan", "ganji", "sando", "undershirt")
+LONG_TOPS = ("kurta", "salwar", "kurta_jacket")
+
+
+def _clothes(words):
+    """(outfit, colour of the top, colour of the jacket) the words ask for, read all together, so the order and a
+    second clothes word do not throw one away: `kurta white vest grey` = kurta_jacket, white kurta, grey jacket."""
+    tops, top_col, jacket_col, last, jacket_at = [], None, None, None, None
+    said_vest = "vest" in words                          # the word itself (a banyan word is never a jacket)
+    jacket = any(w in JACKET_WORDS for w in words)
+    for i, w in enumerate(words):
+        if w in OUTFITS or w in BANYAN_WORDS:
+            tops.append("vest" if w in BANYAN_WORDS else w)
+            last = "vest" if w == "vest" else "top"
+        elif w in JACKET_WORDS:
+            last = "jacket"
+        elif w in PALETTE:
+            long_now = any(t in LONG_TOPS for t in tops)
+            if last == "jacket" or (last == "vest" and long_now):
+                if jacket_col is None:
+                    jacket_col, jacket_at = w, i
+            elif last in ("top", "vest") and top_col is None:
+                top_col = w
+            last = None
+        else:
+            last = None
+    long_top = any(t in LONG_TOPS for t in tops)
+    if jacket_col and jacket_col == top_col:            # the same colour twice: the jacket would vanish on the kurta
+        jacket_col = "white" if top_col not in ("white", "cream") else "grey"
+    if long_top and (said_vest or jacket):              # a kurta with a "vest" / jacket: the neta's Nehru jacket
+        return "kurta_jacket", top_col, jacket_col, jacket_at
+    if jacket and not tops:
+        return "kurta_jacket", top_col, jacket_col, jacket_at
+    if jacket and any(t in ("shirt", "tshirt") for t in tops):
+        return "blazer", top_col, jacket_col, jacket_at
+    if not tops:
+        return None, top_col, jacket_col, None
+    if long_top:                                        # a kurta and something short: the kurta (it is what shows)
+        return next(t for t in tops if t in LONG_TOPS), top_col, None, None
+    return tops[-1], top_col, None, None
+
+
 def cast_spec(words, index, unknown=None):
     """'aunty chubby glasses maroon female' -> character spec (with a voice).
     Words that mean nothing here are added to `unknown`."""
     spec, acc = {}, []
     female = None
-    for w in words:
+    outfit, top_col, jacket_col, jacket_at = _clothes(words)
+    for wi, w in enumerate(words):
+        if wi == jacket_at:
+            continue                                   # the jacket's colour, not the person's
         if w in ANIMAL_WORDS and "kind" not in spec:       # A = kutta brown: a dog (talks too)
             spec["kind"] = ANIMAL_WORDS[w]
         elif spec.get("kind") not in (None, "monkey") and w in PALETTE and "color" not in spec:
@@ -293,8 +349,8 @@ def cast_spec(words, index, unknown=None):
             spec["hair"] = w
         elif w in HAIR_WORDS:                          # do_choti, takla...
             spec["hair"] = HAIR_WORDS[w]
-        elif w in OUTFITS:
-            spec["outfit"] = w
+        elif w in OUTFITS or w in JACKET_WORDS or w in BANYAN_WORDS:
+            pass                                       # (all the clothes words together: _clothes above)
         elif w in SKIN_TONES:
             spec["skin"] = w
         elif w in ("slim", "normal", "chubby"):
@@ -320,6 +376,12 @@ def cast_spec(words, index, unknown=None):
         elif unknown is not None and w not in LOOKS and w not in ROLE_LOOKS and w not in PALETTE:
             unknown.append(w)
     spec.setdefault("look", "college_girl" if female else "boy")
+    if outfit:
+        spec["outfit"] = outfit
+        if top_col and spec.get("kind") is None:
+            spec["color"] = top_col
+        if jacket_col and outfit in ("kurta_jacket", "blazer"):
+            spec["accent"] = jacket_col
     if acc:
         spec["accessories"] = sorted(set(LOOKS[spec["look"]].get("accessories", [])) | set(acc))
     if female is None:
@@ -575,6 +637,26 @@ def _stage(tokens, ev, scene_cast, who):
             else:
                 unknown.append("ride %s (%s)" % (nxt or "?", ", ".join(sorted(rides.RIDES))))
                 i += 1 if nxt else 0
+        elif w in PUT_WORDS or w in TAKE_WORDS:     # A -> put bag desk / take file (table): things on furniture
+            key = "put" if w in PUT_WORDS else "take"
+            spec, j = {}, i + 1
+            while j < len(tokens) and tokens[j] in ("on", "from", "pe", "par", "se", "upar"):
+                j += 1
+            if j < len(tokens) and tokens[j] in _sets.ITEM_WORDS:
+                spec["item"] = _sets.ITEM_WORDS[tokens[j]]
+                j += 1
+            while j < len(tokens) and tokens[j] in ("on", "from", "pe", "par", "se", "upar"):
+                j += 1
+            if j < len(tokens) and (tokens[j] in _sets.SURFACE or tokens[j] == "table"):
+                spec["on"] = tokens[j]
+                j += 1
+            if "item" not in spec:
+                unknown.append("%s (kya? %s)" % (w, ", ".join(sorted(set(_sets.ITEM_WORDS.values())))))
+            else:
+                ev["action"] = key
+                ev[key] = spec
+                acts.append(key)
+            i = j - 1
         elif w in SEAT_ACTIONS and nxt in SET_TYPES:                 # A -> sit sofa / sleep_lie bed
             ev["action"] = w
             ev["on"] = nxt
@@ -949,7 +1031,13 @@ def pan_traveler(prev, who=None):
 
 PLACE_WORDS = {"sweet_shop": "mithai_shop", "halwai_shop": "mithai_shop", "mithai_ki_dukaan": "mithai_shop",
                "mobile_store": "mobile_shop", "phone_shop": "mobile_shop", "chemist": "medical_store",
-               "pharmacy": "medical_store", "medical": "medical_store", "dawai_ki_dukaan": "medical_store"}
+               "pharmacy": "medical_store", "medical": "medical_store", "dawai_ki_dukaan": "medical_store",
+               "sarkari_office": "sarkari_daftar", "govt_office": "sarkari_daftar", "daftar": "sarkari_daftar",
+               "tehsil": "sarkari_daftar", "kachehri": "sarkari_daftar", "sarkari_daftar": "sarkari_daftar",
+               "government_office": "sarkari_daftar"}
+# places whose people work at a desk: the studio puts the desk in (with its files), the babu sits behind it
+DESK_PLACES = {"sarkari_daftar": {"id": "desk", "type": "desk", "x": 540, "y": 1640, "auto": True,
+                                  "items": ["files", "register", "thappa"]}}
 from .places_plus import SHOPS as SHOP_PLACES   # noqa: E402  (a shop brings its counter: `SCENE: mithai_shop`)
 
 
@@ -1424,6 +1512,8 @@ def _parse_script(text):
                     cur["pan"] = pan
                 if bg.get("type") == "jail":
                     cur["sets"] = {"jail_door": dict(JAIL_DOOR)}
+                if bg.get("type") in DESK_PLACES:   # the babu's desk with its files
+                    cur["sets"] = {"desk": dict(DESK_PLACES[bg["type"]], items=list(DESK_PLACES[bg["type"]]["items"]))}
                 if bg.get("type") in SHOP_PLACES:   # the shop's counter, its shopkeeper goes behind it
                     cur["lines"].append(("obj", {"kind": SHOP_PLACES[bg["type"]], "at": "center", "auto": True}))
             else:
@@ -1530,10 +1620,15 @@ def _parse_script(text):
             cur["lights"] = m.group(1).lower()
             continue
         m = re.match(r"^OBJ\s*:\s*(\S+)(.*)$", line, re.I)
-        if m and m.group(1).lower() in SET_TYPES:
+        if m and m.group(1).lower() == "table" and any(w.lower() in _sets.ITEM_WORDS for w in m.group(2).split()):
+            line = "OBJ: table_set" + m.group(2)               # a table with things on it: the furniture piece
+            m = re.match(r"^OBJ\s*:\s*(\S+)(.*)$", line, re.I)
+        if m and (m.group(1).lower() in SET_TYPES or m.group(1).lower() == "table_set"):
             if cur is None:
                 cur = new_scene()
             placed = cur.setdefault("sets", {})
+            if m.group(1).lower() in ("desk", "table", "table_set") and placed.get("desk", {}).get("auto"):
+                placed.pop("desk")                  # your own desk replaces the place's own one
             kind, spec, probs = parse_set(m.group(1) + m.group(2), placed)
             warnings += probs
             if kind == "place":

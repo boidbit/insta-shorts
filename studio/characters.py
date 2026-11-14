@@ -333,7 +333,8 @@ PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick", "bag", "chai", "glass"
          "money", "newspaper", "book", "notebook", "pen", "laptop", "umbrella", "remote", "broom", "belan", "pillow",
          "gift", "balloon", "trophy", "torch", "key", "bat", "flag", "camera", "banana", "bottle", "letter",
          "toothbrush", "dumbbell", "box", "cooker", "thali", "lota", "tiffin", "mithai", "report_card", "injection",
-         "stethoscope", "milk_can", "vlog_cam", "vlog_mic", "spanner")
+         "stethoscope", "milk_can", "vlog_cam", "vlog_mic", "spanner", "file", "thappa", "pathar", "chalk",
+         "iron", "knife", "kettle", "mop", "hammer", "spade", "watering_can", "paint_roller", "tray", "needle")
 
 
 def d2r(a):
@@ -697,6 +698,52 @@ def _draw_prop2(S, prop, hand, d, n, pt):
         rect(-18, -92, 18, 10, (150, 210, 230))
         rect(-9, -116, 9, -92, (150, 210, 230), 4)
         rect(-11, -128, 11, -116, (60, 120, 200), 4)
+    elif prop == "file":                 # a khaki sarkari file, papers peeking out
+        rect(-60, -50, 64, 34, (214, 184, 120))
+        rect(-52, -58, 56, -46, (250, 248, 238), 3)
+        S.line([ab(2, -50), ab(10, -20), ab(-4, 0)], 4, (180, 40, 40))
+    elif prop == "thappa":               # a rubber stamp, the handle up
+        rect(-26, 0, 26, 18, (40, 40, 120))
+        rect(-10, -34, 10, 0, (120, 80, 50), 3)
+        S.dot(ab(0, -46), 15, (150, 30, 30), INK, 4)
+    elif prop == "pathar":               # a stone in the hand
+        S.poly([ab(-40, 16), ab(-46, -10), ab(-20, -40), ab(16, -44), ab(44, -20), ab(40, 16)], (150, 146, 140),
+               INK, 5)
+    elif prop == "chalk":
+        S.line([pt(-4, 0), pt(40, 0)], 10, (250, 250, 250))
+        S.line([pt(-4, 0), pt(40, 0)], 3, (220, 220, 220))
+    elif prop == "iron":                 # a press (istri)
+        S.poly([ab(-56, 18), ab(60, 18), ab(40, -16), ab(-40, -16)], (200, 204, 212), INK, 4)
+        S.line([ab(-26, -16), ab(-20, -44), ab(28, -44), ab(30, -16)], 8, (60, 60, 66))
+    elif prop == "knife":
+        S.line([pt(-10, 0), pt(30, 0)], 10, (90, 60, 40))
+        S.poly([pt(30, -6), pt(100, -2), pt(100, 4), pt(30, 6)], (210, 214, 220), INK, 3)
+    elif prop == "kettle":               # the chai kettle (keetli), for pouring
+        S.poly([ab(-40, 30), ab(40, 30), ab(46, -20), ab(-46, -20)], (196, 160, 80), INK, 4)
+        S.line([ab(40, 0), ab(80, -30)], 8, (196, 160, 80))
+        S.line([ab(-30, -20), ab(-26, -50), ab(26, -50), ab(30, -20)], 6, (60, 60, 66))
+    elif prop == "mop":                  # pocha: a stick and a cloth at the end
+        S.line([pt(-20, 0), pt(300, 0)], 9, (150, 104, 70))
+        S.poly([pt(290, -40), pt(330, -40), pt(340, 40), pt(280, 40)], (200, 210, 220), INK, 4)
+    elif prop == "hammer":
+        S.line([pt(-10, 0), pt(110, 0)], 10, (150, 104, 70))
+        S.poly([pt(100, -26), pt(124, -26), pt(124, 26), pt(100, 26)], (90, 90, 96), INK, 4)
+    elif prop == "spade":                # phawda
+        S.line([pt(-20, 0), pt(240, 0)], 10, (150, 104, 70))
+        S.poly([pt(240, -40), pt(310, -30), pt(310, 30), pt(240, 40)], (150, 154, 162), INK, 4)
+    elif prop == "watering_can":
+        S.poly([ab(-40, 30), ab(40, 30), ab(40, -30), ab(-40, -30)], (90, 160, 90), INK, 4)
+        S.line([ab(40, 10), ab(90, -30)], 8, (90, 160, 90))
+    elif prop == "paint_roller":
+        S.line([pt(-10, 0), pt(120, 0)], 8, (60, 60, 66))
+        S.poly([pt(120, -40), pt(150, -40), pt(150, 40), pt(120, 40)], (240, 200, 90), INK, 4)
+    elif prop == "tray":                 # a waiter's tray with two glasses
+        S.poly([ab(-80, 0), ab(80, 0), ab(70, 12), ab(-70, 12)], (200, 204, 210), INK, 4)
+        for dx in (-30, 30):
+            S.poly([ab(dx - 14, -50), ab(dx + 14, -50), ab(dx + 10, 0), ab(dx - 10, 0)], (210, 230, 240), INK, 3)
+    elif prop == "needle":               # sui-dhaga
+        S.line([pt(0, 0), pt(40, 0)], 3, (200, 200, 210))
+        S.line([pt(40, 0), pt(80, 30), pt(120, 10)], 2, (200, 40, 40))
     elif prop == "letter":
         rect(-54, -40, 54, 30, (250, 248, 240))
         S.line([ab(-54, -40), ab(0, -2), ab(54, -40)], 4)

@@ -31,7 +31,7 @@ INDOOR = set(decor.INDOOR) | {"room", "living_room", "kitchen", "bedroom", "offi
                               "school", "hostel", "library", "coaching", "exam_hall", "hospital", "bank",
                               "police_station", "jail", "gym", "salon", "canteen", "bathroom", "medical_store",
                               "mobile_shop", "mithai_shop", "ghar_darwaza", "lift", "atm", "buffet", "restaurant",
-                              "interview_room", "call_center", "startup_office"}
+                              "interview_room", "call_center", "startup_office", "sarkari_daftar"}
 RIDES = {"train", "bus", "metro", "plane", "car", "auto"}
 NIGHT_PLACES = {"night_road", "haunted_house", "graveyard", "terrace", "festival_street"}
 DUR = {"ufo": 3.8, "aadmi": 2.8, "toota_taara": 0.9, "aankhen": 2.6, "saaya": 2.6, "tasveer": 2.4, "jhapak": 1.1,

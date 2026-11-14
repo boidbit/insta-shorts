@@ -803,6 +803,7 @@ PRESETS = {
     "interview_room_25d": _lazy("scenery_2026", "interview_room_25d"),
     "call_center_25d": _lazy("scenery_2026", "call_center_25d"),
     "startup_office_25d": _lazy("scenery_2026", "startup_office_25d"),
+    "sarkari_daftar_25d": _lazy("scenery_2026", "sarkari_daftar_25d"),
 
     "kitchen_25d": _lazy("scenery_kitchen", "kitchen_25d"),
     "gali_25d": _lazy("scenery_gali", "gali_25d"),
