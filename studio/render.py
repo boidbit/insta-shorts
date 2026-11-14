@@ -747,7 +747,7 @@ class Renderer(Output):
             pose["lift"] = pose.get("lift", 0.0) + fy - (seat / k + 14.0)
         return pose
 
-    SHADOW_W = {"dog": 0.75, "cat": 0.55, "cow": 1.5, "goat": 0.7, "crow": 0.3, "parrot": 0.3, "rooster": 0.35,
+    SHADOW_W = {"dog": 0.75, "cat": 0.55, "cow": 1.5, "buffalo": 1.55, "goat": 0.7, "crow": 0.3, "parrot": 0.3, "rooster": 0.35,
                 "lizard": 0.0, "mosquito": 0.0}
 
     def _contact_shadow(self, img, P):
@@ -1269,7 +1269,10 @@ class Renderer(Output):
             for key in ("view", "facing"):
                 if key in c.ov:
                     spec[key] = c.ov[key]
-        prop = st["prop"] or ("mic" if singing else None) or pose.get("prop")
+        own = st["prop"]
+        if own and pose.get("prop") and own == c.look_prop and c.spec.get("prop") is None:
+            own = None                              # an action's own tool (the tau's lathi) beats the look's prop
+        prop = own or ("mic" if singing else None) or pose.get("prop")
         if st["prop"] == "" or pose.get("hide_prop"):
             prop = None
         expr = pose.get("face") or st["expression"]      # some actions bring their own face (yawn, sneeze...)
@@ -1277,7 +1280,7 @@ class Renderer(Output):
         if spec.get("kind") in ANIMALS:          # dog, cat, cow, crow, parrot: their own rig
             running = bool(mv and len(mv) > 6 and mv[6])
             dirn = -1 if st["facing"] == "left" else 1
-            k_an = k * (0.82 if spec["kind"] in ("dog", "cat", "cow", "goat") else 1.0)   # next to these people
+            k_an = k * (0.82 if spec["kind"] in ("dog", "cat", "cow", "buffalo", "goat") else 1.0)   # next to these people
             ops, an = build_animal(spec, action, t - a_t0, t, x, y, k_an, dirn, bool(mv), running,
                                    mouth_open if speaking else 0.0, expr)
         else:

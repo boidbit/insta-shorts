@@ -1785,6 +1785,56 @@ def nazar_utaar(t, sp, I, ph, o):
     return _side(d, pose)
 
 
+# ------------------------------------------------------------------ the village (gaon pack)
+def hookah(t, sp, I, ph, o):
+    # gud-gud: the pipe to the lips, a long pull, down again, the smoke goes out slowly
+    d = _d(o)
+    k = 0.5 - 0.5 * cos(2 * pi * t * sp / 3.2)
+    pose = _P(_stance(), hand("R", _lerp2((80, -250), (34, -352), k), (1, 1)), hand("L", (-72, -92), (-1, -0.3)),
+              look_y=0.2 * k, head_tilt=-3 * k, prop="hookah_pipe" if d > 0 else "hookah_pipe_l", face="relaxed")
+    return _side(d, pose)
+
+
+def handpump(t, sp, I, ph, o):
+    # nal chalana: both hands on the pump's handle, pushing it down and letting it up, the back in it
+    d = _d(o)
+    u = sin(2 * pi * 1.1 * sp * t)
+    return _work(d, ((118, -150 - 30 * u), (0.6, 1)), ((100, -142 - 30 * u), (0.2, 1)), _P(_hinge(10 + 6 * u)),
+                 lift=-3 * abs(u), look_y=0.5)
+
+
+def doodh_nikalna(t, sp, I, ph, o):
+    # milking the bhains: crouched by the bucket, the hands pulling down in turns
+    d = _d(o)
+    w = 2 * pi * 1.8 * sp * t
+    pose = _P(dict(ll1=-58, ll2=12, rl1=58, rl2=-12), hand("R", (116, -14 + 24 * sin(w)), (0.6, 1)),
+              hand("L", (96, -10 + 24 * sin(w + pi)), (0.2, 1)), look_y=0.6, head_tilt=4)
+    return _side(d, pose)
+
+
+def ghunghat(t, sp, I, ph, o):
+    # pulls the pallu down over the forehead, shy, the eyes down
+    d = _d(o)
+    up = _smooth(t / 0.45)
+    down = _smooth((t - 0.45) / 0.4)
+    tgt = _lerp2(_lerp2((60, -110), (40, -440), up), (36, -396), down)
+    pose = _P(_stance(), hand("R", tgt, (1, -0.2)), hand("L", (-20, -120), (-1, 1)), look_y=0.5 * down,
+              head_tilt=5 * down, look_x=-0.3 * down, face="shy" if t > 0.5 else None)
+    return _side(d, pose)
+
+
+def lathi_tek(t, sp, I, ph, o):
+    # the old man leaning on his lathi, bent a little, the other hand on the back, a slow nod
+    d = _d(o)
+    b = sin(2 * pi * 0.4 * sp * t)
+    pose = _P(_hinge(12 + 2 * b), hand("R", (132, -150 - 4 * b), (0.6, 1)), hand("L", (-60, -40), (-1, -0.4)),
+              head_dy=2 * b, look_y=-0.1, prop="lathi")
+    return _side(d, pose)
+
+
+VILLAGE_ACTIONS = {"hookah", "handpump", "doodh_nikalna", "ghunghat", "lathi_tek"}
+
+
 WORK_ACTIONS = {"write_board", "stamp", "iron", "wash_dishes", "mop", "sew", "hammer", "dig", "chop", "pour",
                 "knead", "roll_roti", "serve", "shuffle_papers", "fold_clothes", "water_plants", "paint_wall",
                 "carry_head", "wipe_table"}
@@ -1863,6 +1913,10 @@ ACTIONS = {
     "double_take": double_take, "dobara_dekh": double_take, "slow_clap": slow_clap, "dheere_taali": slow_clap,
     "mic_drop": mic_drop, "collar_up": collar_up, "collar": collar_up, "collar_khada": collar_up,
     "nazar_utaar": nazar_utaar, "nazar": nazar_utaar,
+    # the village
+    "hookah": hookah, "hukka": hookah, "gudgud": hookah, "handpump": handpump, "nal_chala": handpump,
+    "doodh_nikalna": doodh_nikalna, "doodh_nikal": doodh_nikalna, "milk": doodh_nikalna, "ghunghat": ghunghat,
+    "pallu": ghunghat, "lathi_tek": lathi_tek, "lathi": lathi_tek,
 }
 
 

@@ -184,7 +184,10 @@ ROLE_LOOKS = {
     "sadhu": "baba", "babaji": "baba", "jyotishi": "baba", "swami": "baba", "tantrik": "baba",
     "pujari": "pandit", "panditji": "pandit", "policewala": "police", "inspector": "police", "havaldar": "police",
     "daroga": "police", "dactor": "doctor", "groom": "dulha", "bride": "dulhan",
-    "netaji": "neta", "mantri": "neta", "politician": "neta", "sarpanch": "neta", "mla": "neta",
+    "netaji": "neta", "mantri": "neta", "politician": "neta", "sarpanch": "sarpanch", "mla": "neta",
+    "pradhan": "sarpanch", "mukhiya": "sarpanch", "pradhan_ji": "sarpanch", "kisan": "kisan", "farmer": "kisan",
+    "kaka": "kisan", "tau": "tau", "tauji": "tau", "tau_ji": "tau", "chaudhary": "tau", "tai": "gaon_aurat",
+    "gaon_wali": "gaon_aurat", "gaon_ki_bahu": "gaon_aurat", "chhora": "gaon_ladka", "gaon_ka_ladka": "gaon_ladka",
     "kaidi": "chor", "prisoner": "chor", "thief": "chor", "sasu": "saas", "saasu": "saas", "bhabhi": "bahu",
     "patni": "bahu", "biwi": "bahu", "headmaster": "principal", "barber": "nai", "hajjam": "nai",
     "delivery": "delivery_boy", "deliverywala": "delivery_boy", "autowala": "driver", "cabwala": "driver",
@@ -273,6 +276,7 @@ ACTION_GROUPS = [   # the Builder's action dropdown, in the order a writer looks
     ("🍵 Roz ka kaam", "eat drink cook sweep wash_hands brush_teeth read write text phone_call count_money drive "
                       "put take".split()),
     ("🧹 Kaam-kaaj", sorted(actions.WORK_ACTIONS)),
+    ("🌾 Gaon", "hookah handpump doodh_nikalna ghunghat lathi_tek".split()),
     ("🤝 Doosre ke saath", "throw catch kick slap punch box push dodge high_five handshake hug pat_back carry drag "
                           "tug hit_react".split()),
     ("🏃 Chalna / girna", "walk run jog sneak limp crouch jump jump_over climb slide slip trip skid fall spin "
@@ -301,7 +305,8 @@ def _words(s):
 
 
 ANIMAL_WORDS = {"dog": "dog", "kutta": "dog", "doggy": "dog", "cat": "cat", "billi": "cat", "cow": "cow",
-                "gaay": "cow", "gai": "cow", "crow": "crow", "kauwa": "crow", "kaua": "crow", "parrot": "parrot",
+                "gaay": "cow", "gai": "cow", "buffalo": "buffalo", "bhains": "buffalo",
+                "bhainsa": "buffalo", "bhens": "buffalo", "bhais": "buffalo", "crow": "crow", "kauwa": "crow", "kaua": "crow", "parrot": "parrot",
                 "tota": "parrot", "totaa": "parrot", "monkey": "monkey", "bandar": "monkey", "goat": "goat",
                 "bakri": "goat", "bakra": "goat", "rooster": "rooster", "murga": "rooster", "murgi": "rooster",
                 "hen": "rooster", "lizard": "lizard", "chhipkali": "lizard", "chipkali": "lizard",
@@ -1071,10 +1076,17 @@ PLACE_WORDS = {"sweet_shop": "mithai_shop", "halwai_shop": "mithai_shop", "mitha
                "pharmacy": "medical_store", "medical": "medical_store", "dawai_ki_dukaan": "medical_store",
                "sarkari_office": "sarkari_daftar", "govt_office": "sarkari_daftar", "daftar": "sarkari_daftar",
                "tehsil": "sarkari_daftar", "kachehri": "sarkari_daftar", "sarkari_daftar": "sarkari_daftar",
-               "government_office": "sarkari_daftar"}
-# places whose people work at a desk: the studio puts the desk in (with its files), the babu sits behind it
+               "government_office": "sarkari_daftar",
+               # the village pack
+               "field": "khet", "farm": "khet", "kheti": "khet", "khet_me": "khet", "chaupaal": "chaupal",
+               "panchayat": "chaupal", "bargad": "chaupal", "nal": "handpump", "hand_pump": "handpump",
+               "hadpump": "handpump", "kuan": "handpump", "mitti_ka_ghar": "kachcha_ghar", "kacha_ghar": "kachcha_ghar",
+               "gaon_ka_ghar": "kachcha_ghar", "jhopdi": "kachcha_ghar", "village_school": "gaon_school",
+               "gaon_ka_school": "gaon_school", "pathshala": "gaon_school"}
+# places that come with a piece of their own: the babu's desk (with its files), the lane's hand pump
 DESK_PLACES = {"sarkari_daftar": {"id": "desk", "type": "desk", "x": 540, "y": 1640, "auto": True,
-                                  "items": ["files", "register", "thappa"]}}
+                                  "items": ["files", "register", "thappa"]},
+               "handpump": {"id": "handpump", "type": "handpump", "x": 170, "y": 1630, "auto": True}}
 from .places_plus import SHOPS as SHOP_PLACES   # noqa: E402  (a shop brings its counter: `SCENE: mithai_shop`)
 
 
@@ -1549,8 +1561,11 @@ def _parse_script(text):
                     cur["pan"] = pan
                 if bg.get("type") == "jail":
                     cur["sets"] = {"jail_door": dict(JAIL_DOOR)}
-                if bg.get("type") in DESK_PLACES:   # the babu's desk with its files
-                    cur["sets"] = {"desk": dict(DESK_PLACES[bg["type"]], items=list(DESK_PLACES[bg["type"]]["items"]))}
+                if bg.get("type") in DESK_PLACES:   # the babu's desk with its files, the lane's pump
+                    own = dict(DESK_PLACES[bg["type"]])
+                    if "items" in own:
+                        own["items"] = list(own["items"])
+                    cur["sets"] = {own["id"]: own}
                 if bg.get("type") in SHOP_PLACES:   # the shop's counter, its shopkeeper goes behind it
                     cur["lines"].append(("obj", {"kind": SHOP_PLACES[bg["type"]], "at": "center", "auto": True}))
             else:
@@ -1666,6 +1681,8 @@ def _parse_script(text):
             placed = cur.setdefault("sets", {})
             if m.group(1).lower() in ("desk", "table", "table_set") and placed.get("desk", {}).get("auto"):
                 placed.pop("desk")                  # your own desk replaces the place's own one
+            if m.group(1).lower() == "handpump" and placed.get("handpump", {}).get("auto"):
+                placed.pop("handpump")
             kind, spec, probs = parse_set(m.group(1) + m.group(2), placed)
             warnings += probs
             if kind == "place":

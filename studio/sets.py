@@ -61,6 +61,13 @@ SPEC = {
     "washing_machine": (160, 470, 20, False, None, False),   # `OBJ: washing_machine on` spins and shakes
     "mirror": (120, 800, 20, False, None, False),
     "jail_door": (150, 1110, 10, True, None, False),     # barred cell door: closed / open / broken (kicked down)
+    # the village pack
+    "hookah": (90, 420, 20, False, None, False),         # the smoke curls up (`OBJ: hookah off` = cold)
+    "lantern": (70, 300, 20, False, None, True),         # a lalten on the ground, its flame breathing
+    "uple": (170, 220, 20, False, None, False),          # a stack of dung cakes
+    "bhoosa": (260, 380, 20, False, None, False),        # a haystack
+    "handpump": (150, 560, 20, False, None, False),      # the nal on its platform
+    "bijooka": (170, 820, 20, False, None, False),       # the scarecrow, swaying in the wind
     # seats inside the vehicles (placed by the script reader for SCENE: train / bus / metro / plane / car / auto)
     "berth": (210, 400, 20, False, 205, False),
     "bus_seat": (175, 450, 20, False, 200, False),
@@ -461,6 +468,76 @@ def d_matka(o, st, t, ob):
     o.rect(-34, -268, 34, -236, clay)
     o.ellipse(0, -268, 42, 10, (150, 76, 46, 255))
     o.rect(-20, -320, 20, -268, (206, 208, 216, 255))         # a steel glass upside down on the mouth
+
+
+def d_hookah(o, st, t, ob):
+    o.shadow(80, 12)
+    o.ellipse(0, -70, 70, 64, (160, 116, 70, 255))                 # the base (pot)
+    o.line([(-50, -90), (50, -90)], (200, 160, 80, 255), 5)
+    o.rect(-10, -300, 10, -130, (120, 90, 60, 255))                # the stem
+    o.poly([(-34, -340), (34, -340), (22, -300), (-22, -300)], (186, 84, 50, 255))   # the chillum
+    o.line([(30, -110), (110, -170), (150, -150), (170, -190)], (60, 40, 30, 255), 7)   # the pipe
+    if st not in ("off", "closed"):
+        for i in range(3):
+            u = ((t * 0.35 + i / 3.0) % 1.0)
+            o.ellipse(6 * math.sin(t * 1.7 + i), -350 - u * 160, 14 + 22 * u, 10 + 16 * u,
+                      (240, 240, 240, int(150 * (1 - u))), None)
+
+
+def d_lantern(o, st, t, ob):
+    o.shadow(60, 10)
+    o.rect(-50, -40, 50, 0, (90, 90, 96, 255))                     # the tank
+    o.ellipse(0, -130, 46, 80, (250, 236, 190, 200))               # the glass
+    on = st not in ("off", "closed")
+    if on:
+        k = 1 + 0.12 * math.sin(t * 9)
+        o.poly([(-10, -110), (10, -110), (2 * math.sin(t * 7), -110 - 46 * k)], (255, 190, 60, 255), None)
+        o.ellipse(0, -130, 120, 120, (255, 210, 120, 50), None)
+    for x in (-46, 46):
+        o.line([(x, -40), (x, -210)], (90, 90, 96, 255), 6)
+    o.rect(-56, -226, 56, -206, (90, 90, 96, 255))
+    o.line([(-30, -226), (0, -290), (30, -226)], (90, 90, 96, 255), 5)     # the handle
+
+
+def d_uple(o, st, t, ob):
+    o.shadow(170, 14)
+    for row in range(4):
+        n = 5 - row
+        for i in range(n):
+            x = (i - (n - 1) / 2.0) * 62
+            o.ellipse(x, -24 - row * 48, 34, 26, (122, 92, 62, 255), INK, 3)
+
+
+def d_bhoosa(o, st, t, ob):
+    o.shadow(260, 20)
+    hay = (226, 196, 110, 255)
+    o.poly([(-260, 0), (260, 0), (200, -260), (0, -380), (-200, -260)], hay)
+    for x in range(-220, 240, 40):
+        o.line([(x, -6), (x * 0.6, -250 - (220 - abs(x)) * 0.4)], (200, 168, 86, 255), 4)
+    o.line([(-20, -360), (0, -400), (20, -360)], (200, 168, 86, 255), 5)
+
+
+def d_handpump(o, st, t, ob):
+    o.shadow(150, 14)
+    o.rect(-150, -60, 150, 0, (190, 190, 186, 255))                 # the platform
+    o.rect(-24, -400, 24, -60, (60, 120, 80, 255))                  # the pump
+    o.rect(-34, -430, 34, -396, (60, 120, 80, 255))
+    o.line([(0, -420), (150, -404)], (60, 120, 80, 255), 14)       # the handle
+    o.line([(-20, -300), (-80, -290), (-86, -250)], (60, 120, 80, 255), 14)   # the spout
+    u = (t * 1.4) % 1.0
+    o.ellipse(-86, -230 + 160 * u * u, 6, 9, (200, 230, 255, 230), None)   # a drop
+
+
+def d_bijooka(o, st, t, ob):
+    sw = 4 * math.sin(t * 1.3)
+    o.line([(0, 0), (sw * 0.3, -700)], (120, 86, 56, 255), 14)
+    o.line([(-160 + sw, -560), (160 + sw, -560)], (120, 86, 56, 255), 12)
+    o.poly([(-100 + sw, -580), (100 + sw, -580), (76 + sw, -360), (-76 + sw, -360)], (200, 70, 60, 255))
+    o.ellipse(sw, -660, 64, 64, (236, 220, 180, 255))
+    o.poly([(-96 + sw, -700), (96 + sw, -700), (sw, -800)], (180, 150, 80, 255))
+    o.ellipse(-22 + sw, -668, 8, 8, INK, None)
+    o.ellipse(22 + sw, -668, 8, 8, INK, None)
+    o.line([(-24 + sw, -630), (24 + sw, -626)], INK, 5)
 
 
 def d_chulha(o, st, t, ob):
@@ -1058,7 +1135,8 @@ class Sets:
         hw, h_up, h_dn, _wall, _seat, _light = SPEC[typ]
         sc = float(ob.get("scale", 1.0))
         x, y, dirn, dist = self.pos(ob["id"], t)
-        animated = typ in ("clock", "fan", "tv", "tree", "bush", "phone", "chulha", "drip", "washing_machine",
+        animated = typ in ("clock", "fan", "tv", "tree", "bush", "phone", "chulha", "hookah", "lantern", "handpump",
+                           "bijooka", "drip", "washing_machine",
                            "fairy_lights", "flag_stand", "puddle")
         items = tuple(self.items(ob["id"], t)) if typ in SURFACE else ()
         shown = self.written(ob["id"], t) if typ == "blackboard" else None

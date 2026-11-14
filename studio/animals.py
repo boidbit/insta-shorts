@@ -10,7 +10,7 @@ import math
 
 from .characters import INK, Sketch, closed_ellipse, ellipse_pts, bezier
 
-ANIMALS = ("dog", "cat", "cow", "goat", "crow", "parrot", "rooster", "lizard", "mosquito")
+ANIMALS = ("dog", "cat", "cow", "buffalo", "goat", "crow", "parrot", "rooster", "lizard", "mosquito")
 
 QUAD = {
     #        body rx, ry, leg len, head r, default color, scale
@@ -18,6 +18,7 @@ QUAD = {
     "cat": dict(rx=112, ry=50, leg=110, head=54, color=(232, 150, 70), tail="curl"),
     "cow": dict(rx=250, ry=118, leg=210, head=78, color=(248, 248, 244), tail="rope"),
     "goat": dict(rx=128, ry=58, leg=128, head=50, color=(236, 230, 216), tail="stub"),
+    "buffalo": dict(rx=262, ry=124, leg=196, head=90, color=(84, 80, 86), tail="rope"),     # bhains
 }
 BIRD = {
     "crow": dict(body=(40, 52, 58), beak=(60, 60, 64), size=1.0),
@@ -145,6 +146,11 @@ def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_ope
         for ex in (-0.5, 0.35):
             poly([(hx_ + hr * (ex - 0.25), hy_ - hr * 0.6), (hx_ + hr * (ex + 0.05), hy_ - hr * 1.35),
                   (hx_ + hr * (ex + 0.35), hy_ - hr * 0.6)], col)
+    elif kind == "buffalo":             # the bhains: heavy horns curving back, droopy ears
+        for ex in (-0.5, 0.25):
+            line(bezier((hx_ + hr * ex, hy_ - hr * 0.75), (hx_ + hr * (ex - 0.9), hy_ - hr * 1.5),
+                        (hx_ + hr * (ex - 1.1), hy_ - hr * 0.6), 10), 15, (120, 116, 112))
+        poly(closed_ellipse(hx_ - hr * 0.95, hy_ - hr * 0.1, hr * 0.46, hr * 0.2, 14, 20), dk)
     elif kind == "cow":
         for ex in (-0.55, 0.45):
             line([(hx_ + hr * ex, hy_ - hr * 0.8), (hx_ + hr * (ex + 0.1), hy_ - hr * 1.3)], 12, (230, 220, 190))
@@ -161,7 +167,8 @@ def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_ope
               (hx_ + hr * 0.62, hy_ + hr * 1.6 + chew)], (220, 214, 200))
     # snout + mouth
     sn = (hx_ + hr * 0.75, hy_ + hr * 0.22)
-    snout_col = (236, 190, 190) if kind == "cow" else tuple(min(255, v + 30) for v in col)
+    snout_col = (236, 190, 190) if kind == "cow" else (128, 122, 128) if kind == "buffalo" else \
+        tuple(min(255, v + 30) for v in col)
     poly(closed_ellipse(sn[0], sn[1], hr * 0.5, hr * 0.38, 20), snout_col)
     poly(closed_ellipse(sn[0] + hr * 0.38, sn[1] - hr * 0.12, hr * 0.13, hr * 0.1, 12), INK, None)
     if speak:
@@ -174,6 +181,8 @@ def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_ope
             line([(sn[0] + hr * 0.1, sn[1] + dy), (sn[0] + hr * 0.9, sn[1] + dy * 2.4)], 3)
     # eye
     ex, ey = hx_ + hr * 0.25, hy_ - hr * 0.22
+    if kind == "buffalo":               # a dark face: the eye sits in a white
+        poly(closed_ellipse(ex, ey, hr * 0.2, hr * 0.17, 16), (246, 244, 240), INK, 3)
     if lie and action in ("sleep", "sleep_lie") or expr in ("sleepy", "happy", "laugh"):
         line(ellipse_pts(ex, ey, hr * 0.16, hr * 0.1, 8, 200, 340), 5)
     elif expr in ("angry",):

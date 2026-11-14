@@ -34,7 +34,8 @@ SHOT_ALIASES = {"closeup": "close", "close_up": "close", "twoshot": "two_shot", 
 ANGLES = [(1.0, 540.0, False), (1.25, 400.0, True), (1.25, 680.0, False), (1.4, 540.0, True)]
 # places whose drawing has writing on it (signs, boards, a nameplate): a CUT never shows them mirrored
 WRITTEN_PLACES = {"image", "ghar_darwaza", "lift", "park", "atm", "petrol_pump", "signal", "buffet", "restaurant",
-                  "interview_room", "call_center", "startup_office", "sarkari_daftar"}
+                  "interview_room", "call_center", "startup_office", "sarkari_daftar",
+                  "chaupal", "gaon_school"}
 
 
 def shot_angle(scene, framing):
@@ -76,7 +77,7 @@ def fit_to_angle(ob, ang):
 PEOPLE_SCALE_3 = 1.06        # ...three people side by side need the room
 PEOPLE_SCALE_4 = 0.9         # ...and four even more
 PEOPLE_SCALE = 1.22          # medium shots: people this much bigger than the painted place (x sqrt of the angle zoom)
-FOCUS_H = {"dog": 170.0, "cat": 120.0, "cow": 260.0, "goat": 170.0, "crow": 70.0, "parrot": 70.0, "rooster": 90.0,
+FOCUS_H = {"dog": 170.0, "cat": 120.0, "cow": 260.0, "buffalo": 260.0, "goat": 170.0, "crow": 70.0, "parrot": 70.0, "rooster": 90.0,
            "lizard": 690.0, "mosquito": 580.0}   # animals: camera looks lower
 
 OTS_BACK = dict(k=2.3, drop=1200.0, left=150.0, right=930.0)      # the near shoulder: big, cut off by the frame
@@ -115,7 +116,7 @@ CHAR_ATTRS = ("action", "expression", "prop", "label", "look", "facing", "style"
 
 
 OBJ_Y = {"truck": 1640.0, "auto": 1650.0, "car": 1640.0, "scooter": 1660.0, "cow": 1690.0, "dustbin": 1690.0,
-         "bags": 1700.0, "table": 1700.0}
+         "bags": 1700.0, "table": 1700.0, "tractor": 1650.0, "bail_gaadi": 1650.0}
 
 
 class SceneObj:
@@ -955,6 +956,42 @@ def _auto_chair(plan, c, t, set_by_id):
     return sid
 
 
+# village actions that need their thing next to the person: (piece, its distance in front, flipped when facing right)
+VILLAGE_PIECE = {"hookah": ("hookah", 140, False), "handpump": ("handpump", 262, True),
+                 "doodh_nikalna": ("bucket", 120, False)}
+
+
+def _village_piece(plan, c, t, action, set_by_id):
+    """`T -> hookah`: a hookah by the tau (the nal for `handpump`, a bucket for `doodh_nikalna`) unless one is near;
+    the person turns to it. A hand pump stands with its handle towards the person."""
+    if c.spec.get("kind") or c.spec.get("hidden") or c.rides:
+        return
+    typ, off, flips = VILLAGE_PIECE[action]
+    x0, y0 = c.pos_at(t)
+    near = [o for o in set_by_id.values() if o.get("type") == typ and abs(float(o.get("x", 540)) - x0) < off + 160]
+    pumps = [o for o in set_by_id.values() if o.get("type") == "handpump"] if typ == "handpump" else []
+    if pumps:                                           # the place's own pump: walk round to its handle
+        ob = min(pumps, key=lambda o: abs(float(o.get("x", 540)) - x0))
+        hand = -1 if ob.get("flip") else 1              # the side its handle points to
+        stand = float(ob.get("x", 540)) + hand * off * float(ob.get("scale", 1.0))
+        if abs(stand - x0) > 40:
+            dur = clamp(abs(stand - x0) / 430.0, 0.4, 1.2)
+            c.moves.append((t, t + dur, x0, y0, stand, y0, False))
+        c.events.append({"t": t, "dir": -hand, "facing": "left" if hand > 0 else "right"})
+        return
+    if near:
+        side = 1 if float(near[0].get("x", 540)) > x0 else -1
+    else:
+        side = 1 if x0 < 540 else -1                    # towards the middle of the picture
+        oid = "%s_%s" % (typ, re.sub(r"\W", "", c.name.lower()))
+        ob = {"id": oid, "type": typ, "x": round(x0 + side * off, 1), "y": round(y0 - 6.0, 1), "auto": True}
+        if flips and side > 0:
+            ob["flip"] = True
+        plan.sets.append(ob)
+        set_by_id[oid] = ob
+    c.events.append({"t": t, "dir": side, "facing": "right" if side > 0 else "left"})
+
+
 WRITE_TIME = 2.4                     # seconds the chalk takes to write the board's words
 
 
@@ -1189,6 +1226,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             for key_ in ("put", "take"):                # put down / pick up a thing on a piece of furniture
                 if isinstance(ev.get(key_), dict):
                     cursor = max(cursor, _put_take(plan, c, t, key_, ev[key_], set_by_id))
+            if ev.get("action") in VILLAGE_PIECE and not ev.get("on"):     # the hookah / nal / bucket it needs
+                _village_piece(plan, c, t, ev["action"], set_by_id)
             if ev.get("action") == "write_board" and any(o_.get("type") == "blackboard" for o_ in plan.sets):
                 cursor = max(cursor, _put_take(plan, c, t, "write", {}, set_by_id))    # at the board, chalk
             if "move" in ev:
