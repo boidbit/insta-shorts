@@ -1112,6 +1112,40 @@ class Renderer(Output):
             out[side + "_k2"] = math.hypot(hx - ex, hy - ey) / (LA * ak)
         return out
 
+    SMEAR_DT = (0.012, 0.024)   # cine: how far back (s) the faint trail of a fast hand is drawn
+    SMEAR_PX = 15.0             # rig px a hand must travel (against the body) in SMEAR_DT[0] to leave a trail
+    SMEAR_ALPHA = 0.42
+
+    def _hand_rig(self, c, t):
+        """Both hands, relative to the hips, in rig px (no camera, no size): what a smear is measured on."""
+        E = self._eff(c, t)
+        pose = self._build_pose(c, t, E)
+        if not E["rf"]:
+            pose = self._blend_from_previous(c, t, E, pose)
+        sk = skeleton(dict(DEFAULT_POSE, **{k: v for k, v in pose.items() if not k.startswith("_")}))
+        return sk["handL"], sk["handR"]
+
+    def _smear(self, c, t, P):
+        """cine: [(layer, (x, y))] faint copies of this person a moment ago, drawn under them while a hand moves
+        very fast (a slap, a punch, a hammer coming down): the eye reads it as motion blur. Nothing otherwise."""
+        if not self._natural() or P["animal"] or P["rf"] or c.spec.get("kind") or t < self.SMEAR_DT[1]:
+            return []
+        now = self._hand_rig(c, t)
+        before = self._hand_rig(c, t - self.SMEAR_DT[0])
+        fast = max(math.hypot(a[0] - b[0], a[1] - b[1]) for a, b in zip(now, before))
+        a = clamp((fast - self.SMEAR_PX) / 40.0) * self.SMEAR_ALPHA
+        if a <= 0.02:
+            return []
+        out = []
+        for i, dt in enumerate(self.SMEAR_DT):
+            G = self._prep(c, t - dt, {}, k=P["k"])
+            r = render_ops(G["ops"], self.s, self.W, self.H)
+            if r:
+                layer, pos = r
+                layer.putalpha(layer.getchannel("A").point(lambda v, m=a * (0.6 if i else 1.0): int(v * m)))
+                out.append((layer, pos))
+        return out[::-1]                        # the older (fainter) one first
+
     @staticmethod
     def _arm_points(src, side, shx, sy):
         """(elbow x, y, hand x, y) of one arm of a pose, in rig coordinates."""
@@ -1393,6 +1427,8 @@ class Renderer(Output):
 
         def draw_char(c):
             P = prep.get(c.name) or prep_char(c)
+            for gl, (gx, gy) in self._smear(c, t, P):     # cine: a fast hand leaves a faint trail behind it
+                img.paste(gl, (gx, gy), gl)
             r = render_ops(P["ops"], s, self.W, self.H)
             if r:
                 layer, (ox, oy) = r

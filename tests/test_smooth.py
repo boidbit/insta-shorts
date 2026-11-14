@@ -116,3 +116,32 @@ class Transitions(unittest.TestCase):
     def test_classic_keeps_its_fixed_blend(self):
         big = self.settle("salute", classic=True)
         self.assertAlmostEqual(big, 0.3, delta=0.02)
+
+
+class Smear(unittest.TestCase):
+    """cine: a very fast hand (a slap) leaves a faint trail; a calm one, an animal or CAMERA: classic never does."""
+
+    @staticmethod
+    def frames(classic=False):
+        from studio.render import make_video
+        from studio.script import parse_script
+        sc, _ = parse_script("HOOK: h\nMYSTERY: off\n%sCAST: A = aunty, B = uncle\nSCENE: room\n"
+                             "B: Maine kuch nahi kiya! | मैंने कुछ नहीं किया!\nA -> slap\nB -> idle\n"
+                             % ("CAMERA: classic\n" if classic else ""))
+        p = make_video(sc, 120, use_tts=False, hook="off").parts[-1]
+        out = {}
+        for i in range(int(p.duration * 30)):
+            t = i / 30.0
+            for c in p.plan.chars.values():
+                if p._smear(c, t, {"animal": None, "rf": None, "k": 1.0}):
+                    out.setdefault(c.state_at(t)["action"], []).append(t)
+        return out
+
+    def test_only_the_fast_hand(self):
+        got = self.frames()
+        self.assertIn("slap", got)
+        self.assertLessEqual(len(got["slap"]), 12)              # the swing, not the whole action
+        self.assertEqual(set(got) - {"slap"}, set())
+
+    def test_classic_never(self):
+        self.assertEqual(self.frames(classic=True), {})

@@ -480,6 +480,12 @@ Har action apna auzaar khud haath me laata hai:
 
 Prompt me ye ek "kaam-kaaj" module hai: idea me kaam ki baat ho (bartan, pocha, silai, babu, board...) to hi copy prompt me judta hai.
 
+### Smooth movement 🧈 (sirf naya `cine` camera; `CAMERA: classic` bilkul purana)
+
+- Ek action se doosre me jaana: jitna bada badlaav (haath neeche se salute tak), utna zyada time (0.22-0.46 s); chhota badlaav (nod) jaldi. Kamar / chhaati / sir pehle chalte hain, haath ek pal baad pahunchte hain — jaise insaan karta hai.
+- Tez haath (thappad, punch, hammer) ke peeche halki si parchhai (motion blur smear) — sirf usi pal, render time sirf ~5% badhta hai.
+- `tests/test_smooth.py` har action ko 1/240 s pe check karta hai ki koi jodh achanak "kood" na jaaye. Isne `kamar_dard`, `wake_up`, `get_hit`, `handshake`, `cartwheel` ke jhatke pakde — sab theek kar diye.
+
 ### Naye reaction moves 😎
 
 | Action (Hinglish naam) | Kya |
