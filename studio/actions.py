@@ -20,6 +20,13 @@ _HTOP = _HC - HEAD_RY * HEAD_SCALE
 TH_, SH_ = TH, SH
 
 
+# Soft reach (the new camera's motion; `CAMERA: classic` keeps the hard limit): an arm that stretches towards
+# something just out of reach slows down as it straightens instead of locking straight in one frame. Without it
+# the elbow snaps whenever a hand target crosses the reach limit (a square root's cliff). The renderer turns it on.
+SOFT_REACH = False
+SOFT_FROM = 0.88                    # the share of the full reach where the softening starts
+
+
 def _remap(p):
     """Reference-body point -> this rig's body coordinates."""
     x, y = p
@@ -32,7 +39,11 @@ def _remap(p):
         y2 = sy + (y + 275) / -139.0 * (_HC - sy)
     else:
         y2 = _HC + (y + 414) / -100.0 * (_HTOP - _HC)
-    x2 = x * (0.9 if y < -300 else 1.06)
+    if SOFT_REACH:                      # the two halves of the body meet smoothly (no step where a hand passes y = -300)
+        u = min(1.0, max(0.0, (y + 340.0) / 80.0))
+        x2 = x * (0.9 + 0.16 * u * u * (3 - 2 * u))
+    else:
+        x2 = x * (0.9 if y < -300 else 1.06)
     return (x2, y2)
 
 
@@ -48,6 +59,11 @@ def _ik(base, target, l1, l2, prefer):
     ux, uy = dx / dist, dy / dist
     nx, ny = -uy, ux
     D = max(abs(l1 - l2) + 1e-3, min(l1 + l2 - 1e-3, dist))
+    if SOFT_REACH:
+        full = l1 + l2
+        da = SOFT_FROM * full
+        if dist > da:               # approaches the full length smoothly and never quite gets there
+            D = da + (full - da) * 0.985 * (1.0 - math.exp(-(dist - da) / (full - da)))
     a = (l1 * l1 - l2 * l2 + D * D) / (2 * D)
     h = math.sqrt(max(0.0, l1 * l1 - a * a))
     pl = math.hypot(prefer[0], prefer[1]) or 1.0
@@ -215,9 +231,10 @@ def shock(t, sp, I, ph, o):
     jolt = sin(pi * clamp(t / 0.28)) if t < 0.28 else 0.0
     up = ease_out(clamp(t / 0.16))
     lean = o.get("lean", -1)
-    trem = 2.5 * I * sin(2 * pi * 13 * t) * math.exp(-max(0.0, t - 0.3) * 1.2) if t > 0.25 else 0.0
+    on = clamp((t - 0.25) / 0.1)                        # the trembling sets in, it does not switch on
+    trem = 2.5 * I * sin(2 * pi * 13 * t) * math.exp(-max(0.0, t - 0.3) * 1.2) * on
     held = bool(o.get("_prop"))
-    cheek = 70 + 3 * sin(2 * pi * 9 * t) * (1 if t > 0.25 else 0)
+    cheek = 70 + 3 * sin(2 * pi * 9 * t) * on
     L = hand("L", _lerp2((-80, -110), (-cheek, -358), up), (-1, 0.8))
     if held:
         R = hand("R", _lerp2((80, -110), (70, -236), up), (1, 1))
@@ -386,11 +403,14 @@ def kamar_dard(t, sp, I, ph, o):
     if t < 0.8:
         return dance(t, sp, I, ph, dict(o, style="pump"))
     e = ease_out((t - 0.8) / 0.35)
-    shake = 2.5 * sin(2 * pi * 9 * t) * math.exp(-(t - 0.8) * 1.5) * I
-    return dict(ll1=-16, ll2=10, rl1=16, rl2=-10,          # knees buckle
+    shake = 2.5 * sin(2 * pi * 9 * t) * math.exp(-(t - 0.8) * 1.5) * I * min(1.0, (t - 0.8) / 0.1)
+    bent = dict(ll1=-16, ll2=10, rl1=16, rl2=-10,          # knees buckle
                 tilt=-10 * e, shift=shake, head_tilt=14 * e, look_y=0.7 * e,
                 ra1=20 + 30 * e, ra2=-10 - 40 * e,          # hand on the lower back
                 la1=-20 - 10 * e, la2=-5 + 20 * e)          # other hand on the knee
+    if t < 1.1:                                             # the last dance pose gives way, it does not cut
+        return _mix(dance(0.8, sp, I, ph, dict(o, style="pump")), bent, (t - 0.8) / 0.3)
+    return bent
 
 
 def sing(t, sp, I, ph, o):
@@ -480,19 +500,29 @@ def _d(o):
     return 1
 
 
+_MIX_NEUTRAL = {"tilt": 0.0, "head_tilt": 0.0, "lift": 0.0, "shift": 0.0, "dx": 0.0, "head_dx": 0.0, "head_dy": 0.0,
+                "look_x": 0.0, "look_y": 0.0, "la_k1": 1.0, "la_k2": 1.0, "ra_k1": 1.0, "ra_k2": 1.0}
+
+
 def _mix(p1, p2, w):
     """Blend two poses (angles the short way round)."""
     w = clamp(w)
     w = w * w * (3 - 2 * w)
     out = dict(p2 if w >= 0.5 else p1)
     for k in set(p1) | set(p2):
-        a, b = p1.get(k), p2.get(k)
+        a, b = p1.get(k, _MIX_NEUTRAL.get(k)), p2.get(k, _MIX_NEUTRAL.get(k))
         if isinstance(a, (int, float)) and isinstance(b, (int, float)) and not isinstance(a, bool):
             if k in ("la1", "la2", "ra1", "ra2", "ll1", "ll2", "rl1", "rl2", "tilt", "head_tilt"):
                 out[k] = a + (((b - a + 180) % 360) - 180) * w
             else:
                 out[k] = a + (b - a) * w
     return out
+
+
+def _smooth(x):
+    """0..1 -> 0..1, starting and stopping gently (no speed, no push at either end)."""
+    x = clamp(x)
+    return x * x * x * (x * (6 * x - 15) + 10)
 
 
 def _once(t, t0, dur):
@@ -1187,9 +1217,12 @@ def bat(t, sp, I, ph, o):
     elif q < 0.75:
         e = ease_in((q - 0.6) / 0.15)
         tg, lean = _lerp2((-40, -330), (150, -200), e), -4 + 14 * e
-    else:
+    elif q < 1.15:
         e = ease_out((q - 0.75) / 0.4)
         tg, lean = _lerp2((150, -200), (60, -430), e), 10 - 10 * e
+    else:                                           # back to the stance for the next ball
+        e = _smooth((q - 1.15) / 0.45)
+        tg, lean = _lerp2((60, -430), (-40, -330), e), -4 * e
     return _side(d, _P(hand("R", tg, (0, 1)), hand("L", (tg[0] - 14, tg[1] + 8), (0, 1)), dict(ll1=-20, rl1=20),
                        tilt=lean, prop="bat", face="determined"))
 
@@ -1200,7 +1233,8 @@ def bowl(t, sp, I, ph, o):
     p = clamp(q / 0.6)
     a = 20 - 360 * ease_in_out_(p)
     rel = sin(pi * clamp((q - 0.4) / 0.3))
-    return _side(d, dict(ra1=a, ra2=a, la1=-60 + 40 * p, la2=-40, rl1=9 + 40 * rel, rl2=-10 * rel, ll1=-14,
+    return _side(d, dict(ra1=a, ra2=a, la1=-60 + 40 * sin(pi * q / 1.4), la2=-40, rl1=9 + 40 * rel, rl2=-10 * rel,
+                         ll1=-14,
                          tilt=10 * rel))
 
 
@@ -1429,9 +1463,14 @@ def fan_self(t, sp, I, ph, o):
 
 def swat(t, sp, I, ph, o):
     # machhar: the eyes follow something, then a clap in the air, again somewhere else
-    q = (t * sp) % 1.3
-    cx = 70 * sin(2.7 * int(t * sp / 1.3) + 1.0)
-    cy = -470 + 60 * cos(1.9 * int(t * sp / 1.3))
+    u = t * sp / 1.3
+    n, q = int(u), (u - int(u)) * 1.3
+
+    def spot(i):
+        return 70 * sin(2.7 * i + 1.0), -470 + 60 * cos(1.9 * i)
+    (x0, y0), (x1, y1) = spot(n - 1), spot(n)
+    g = _smooth(q / 0.55)                              # the hands (and the eyes) travel to the new spot first
+    cx, cy = x0 + (x1 - x0) * g, y0 + (y1 - y0) * g
     k = sin(pi * clamp((q - 0.65) / 0.25))
     return _P(hand("R", (cx + 30 + 110 * (1 - k), cy), (1, 0.2)), hand("L", (cx - 30 - 110 * (1 - k), cy), (-1, 0.2)),
               look_x=cx / 80.0, look_y=-0.7, face="angry", lift=-8 * k, ll1=-12, rl1=12)

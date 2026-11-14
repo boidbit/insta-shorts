@@ -705,15 +705,18 @@ class Renderer(Output):
         """cine: how far (logical px) to move a person whose body is on its way down or lying on the floor, so the
         whole body stays inside the picture (it would otherwise fall out of the frame). 0 = no change: standing,
         on a set piece (the bed decides), riding, or the classic camera."""
-        if getattr(self.plan, "camera", "") != "cine" or rf or st.get("on") or abs(pose.get("tilt", 0.0)) < 20:
+        lean = abs(pose.get("tilt", 0.0))
+        if getattr(self.plan, "camera", "") != "cine" or rf or st.get("on") or lean < 14:
             return 0.0
         xs = [px for op in ops for (px, _py) in op["pts"]]
         if not xs:
             return 0.0
         lo, hi, m = min(xs), max(xs), self.KEEP_MARGIN
+        w = clamp((lean - 14.0) / 12.0)             # comes in as the body tips over (no jump at one angle)
+        w = w * w * (3 - 2 * w)
         if hi - lo > LW - 2 * m:                    # longer than the picture is wide: centre it
-            return LW / 2.0 - (lo + hi) / 2.0
-        return max(0.0, m - lo) - max(0.0, hi - (LW - m))
+            return (LW / 2.0 - (lo + hi) / 2.0) * w
+        return (max(0.0, m - lo) - max(0.0, hi - (LW - m))) * w
 
     def _seated(self, c, t, st, action, pose, opts):
         """On a set piece: hips on the seat (sit), body on the mattress (lie). Any other action done
@@ -884,6 +887,7 @@ class Renderer(Output):
                     _expr=st["expression"], _amp=self._amp(st["talking"], t) if st["talking"] else 0.0)
         at = t - a_t0 if action not in ("walk", "run") else t
         natural = self._natural() and not c.spec.get("kind")
+        actions.SOFT_REACH = self._natural()        # arms slow into a full stretch; classic keeps the hard limit
         crouch = 0.0
         if natural and action in self.LEAPS and t - a_t0 < self.CROUCH:     # bend the knees before a jump
             crouch = math.sin(math.pi * (t - a_t0) / self.CROUCH)
@@ -976,10 +980,19 @@ class Renderer(Output):
     def _weight(self, c, t, E, pose, crouch):
         """Human weight: lean into a walk and settle back when stopping, bend before a jump, shift the weight
         from foot to foot while standing (never perfectly regular), and let the kurta hem / braid trail."""
+        lo_t, hi_t = 0.0, 1e9                       # a snap to a new spot (an entrance's start) is not speed
+        for m in c.moves:
+            if m[1] - m[0] < 0.02:
+                if m[1] <= t:
+                    lo_t = max(lo_t, m[1])
+                elif m[0] > t:
+                    hi_t = min(hi_t, m[0] - 1e-4)
+
         def vx(tt):
-            return (c.draw_pos(tt + 0.04)[0] - c.draw_pos(max(0.0, tt - 0.04))[0]) / 0.08
+            a_, b_ = max(lo_t, tt - 0.04), min(hi_t, tt + 0.04)
+            return (c.draw_pos(b_)[0] - c.draw_pos(a_)[0]) / max(1e-3, b_ - a_) if b_ > a_ else 0.0
         v = vx(t)
-        a = (vx(t + 0.06) - vx(max(0.0, t - 0.06))) / 0.12
+        a = (vx(min(hi_t, t + 0.06)) - vx(max(lo_t, t - 0.06))) / 0.12
         if abs(v) > 1 or abs(a) > 30:               # moving: lean into it, a little more when speeding up
             pose["tilt"] = pose.get("tilt", 0.0) + clamp(v * 0.0055 + a * 0.0012, -6.0, 6.0)
         if crouch:                                  # (applied after the blend from the last action: _crouch)
@@ -1039,7 +1052,9 @@ class Renderer(Output):
                 hi = mid
             else:
                 lo = mid
-        Eo = self._eff(c, lo)
+        Eo = self._eff(c, max(t0, lo - 2e-3))     # (a step back: never the hair-thin instant between two events)
+        if self._key(Eo) == key:
+            Eo = self._eff(c, lo)
         if Eo["rf"]:
             return pose
         Eo["x"], Eo["y"] = E["x"], E["y"]
