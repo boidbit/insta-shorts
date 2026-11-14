@@ -83,3 +83,36 @@ class Smooth(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Transitions(unittest.TestCase):
+    """cine: one action flows into the next in a time that follows how far the hands go."""
+
+    @staticmethod
+    def settle(action, classic=False):
+        from studio.render import Renderer
+        from studio.scene import split_scenes
+        from studio.script import parse_script
+        sc, _ = parse_script("HOOK: h\nMYSTERY: off\n%sCAST: A = uncle\nSCENE: room\nA: Haan ji. | हाँ जी।\n"
+                             "A -> %s\n" % ("CAMERA: classic\n" if classic else "", action))
+        r = Renderer(split_scenes(sc)[0], 120, use_tts=False)
+        c = r.plan.chars["A"]
+        t0 = next(e["t"] for e in c.events if e.get("action") == action)
+        for i in range(1, 80):
+            t = t0 + i / 120.0
+            E = r._eff(c, t)
+            raw = r._build_pose(c, t, E)
+            got = r._blend_from_previous(c, t, E, dict(raw))
+            if got is raw or all(abs(got.get(k, 0) - raw.get(k, 0)) < 1e-6 for k in ("ra1", "ra2", "la1", "la2")):
+                return t - t0
+        return 1.0
+
+    def test_a_big_change_takes_longer_than_a_small_one(self):
+        big = self.settle("salute")
+        small = self.settle("nod")
+        self.assertGreater(big, small + 0.05)
+        self.assertLessEqual(big, 0.5)
+
+    def test_classic_keeps_its_fixed_blend(self):
+        big = self.settle("salute", classic=True)
+        self.assertAlmostEqual(big, 0.3, delta=0.02)
