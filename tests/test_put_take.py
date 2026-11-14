@@ -75,3 +75,29 @@ class PutTake(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Work(unittest.TestCase):
+    def test_every_work_action_brings_a_tool_that_exists_and_moves_smoothly(self):
+        import math
+        from studio import actions
+        from studio.characters import DEFAULT_POSE, PROPS, skeleton
+        for name in sorted(actions.WORK_ACTIONS):
+            prev = None
+            for i in range(0, 6 * 120):
+                p = dict(DEFAULT_POSE)
+                p.update(actions.pose_for(name, i / 120.0, 1.0, 1.0, 0.0, {"_dir": 1}))
+                if p.get("prop"):
+                    self.assertIn(p["prop"], PROPS, name)
+                hand = skeleton(p)["handR"]
+                if prev is not None:
+                    # (a strike is fast, never a teleport: under ~40 px in 1/120 s)
+                    self.assertLess(math.hypot(hand[0] - prev[0], hand[1] - prev[1]), 40.0, (name, i / 120.0))
+                prev = hand
+
+    def test_the_prompt_has_them_in_a_module_the_page_knows(self):
+        root = os.path.join(os.path.dirname(__file__), "..")
+        prompt = open(os.path.join(root, "SCRIPT_PROMPT.md"), encoding="utf-8").read()
+        self.assertIn("<!-- module: work -->", prompt)
+        page = open(os.path.join(root, "index.html"), encoding="utf-8").read()
+        self.assertIn('work: { label: "kaam-kaaj"', page)

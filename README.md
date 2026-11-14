@@ -463,6 +463,23 @@ B -> take file
 - `A -> put bag desk` (ya `rakh`, `rakho`): door ho to pehle chal ke desk tak jaata hai, jhuk ke rakhta hai, cheez haath se nikal ke desk pe rehti hai. `A -> take file` (ya `utha`, `uthao`): desk se utha ke haath me.
 - Desk pe kaam karne wale (`clerk`, `boss`, `principal`, `judge`, `doctor`, `master_ji`, aur `babu`, `cashier`, `receptionist`, `manager`, `teacher`) apne aap desk ke peeche khade hote hain: desk unke aage. Kisi aur ko bhejna ho to CAST me `peeche`.
 
+### Kaam-kaaj ke actions 🧹🍳🔨
+
+Har action apna auzaar khud haath me laata hai:
+
+| Action (Hinglish naam) | Kya |
+|---|---|
+| `write_board` (`board_pe_likh`) | chalk se board pe likhna, line ke baad agli line |
+| `stamp` (`thappa_maar`) | file pe thappa, babu ki rhythm me |
+| `iron` (`istri`, `press`), `fold_clothes` (`kapde_tah`) | kapde press karna, tah karna |
+| `wash_dishes` (`bartan`), `mop` (`pocha`), `wipe_table` (`saaf_kar`) | bartan, pocha, table saaf |
+| `chop` (`sabzi_kaat`), `knead` (`aata_goondh`), `roll_roti` (`roti_bel`), `pour` (`chai_daal`) | rasoi ka kaam |
+| `serve` | waiter ki tray |
+| `sew` (`silai`), `hammer` (`thok`), `dig` (`khod`), `paint_wall` (`rang`) | darzi, mistri, maali, painter |
+| `water_plants` (`paani_de`), `carry_head` (`sir_pe_bojh`), `shuffle_papers` | paudhon ko paani, sir pe bojh, busy babu |
+
+Prompt me ye ek "kaam-kaaj" module hai: idea me kaam ki baat ho (bartan, pocha, silai, babu, board...) to hi copy prompt me judta hai.
+
 ### Har jagah ka apna look 🎬 (`LOOK`) aur har video me ek ajeeb cheez 👀 (`MYSTERY`)
 
 **Look (colour grading):** ab har jagah apne rang me aati hai, apne aap. Kuch likhna nahi.

@@ -1545,6 +1545,182 @@ def take(t, sp, I, ph, o):
     return _side(d, pose)
 
 
+# ------------------------------------------------------------------ everyday work (Nov 2026)
+def _work(d, R, L=None, *extra, **kw):
+    """A work pose: the right hand (and the left) at reference-body targets, facing the work (mirrored for d = -1);
+    extra = more pose parts (a lean: _hinge)."""
+    parts = list(extra) + [hand("R", R[0], R[1] if len(R) > 1 else (1, 1))]
+    if L is not None:
+        parts.append(hand("L", L[0], L[1] if len(L) > 1 else (-1, 1)))
+    kw.setdefault("ll1", -9)
+    kw.setdefault("rl1", 9)
+    return _side(d, _P(*parts, **kw))
+
+
+def write_board(t, sp, I, ph, o):
+    # chalk on the blackboard: the arm up at the board, writing in little strokes, the eyes on it
+    d = _d(o)
+    u = t * sp * 0.6
+    line, f = int(u) % 3, u - int(u)
+    y0, y1 = -470 + 30 * line, -470 + 30 * ((line + 1) % 3)
+    if f < 0.85:                                        # along the line, writing
+        x, y = 100 + 70 * (f / 0.85), y0 + 10 * sin(2 * pi * 2.6 * t * sp) * min(1.0, f / 0.1, (0.85 - f) / 0.1)
+    else:                                               # back to the start of the next line
+        g = _smooth((f - 0.85) / 0.15)
+        x, y = 170 - 70 * g, y0 + (y1 - y0) * g
+    return _work(d, ((x, y), (0.6, 1)), ((-60, -120),), look_x=0.6, look_y=-0.4, prop="chalk", face="think")
+
+
+def stamp(t, sp, I, ph, o):
+    # thappa: up, bang down on the paper, up again (a babu's rhythm)
+    d = _d(o)
+    q = (t * sp) % 0.8
+    k = _smooth(q / 0.45) if q < 0.45 else 1.0 - _smooth((q - 0.45) / 0.11)
+    return _work(d, ((150, -40 - 160 * k), (0.4, 1)), ((110, -20), (0.2, 1)), _P(_hinge(10)), prop="thappa",
+                 look_y=0.6, face="bored")
+
+
+def iron(t, sp, I, ph, o):
+    # istri: the iron pushed back and forth along the clothes on the table
+    d = _d(o)
+    w = sin(2 * pi * 0.9 * sp * t)
+    return _work(d, ((150 + 50 * w, -40), (0.4, 1)), ((70, -30),), _P(_hinge(12)), prop="iron", look_y=0.7)
+
+
+def wash_dishes(t, sp, I, ph, o):
+    # bartan: a plate in one hand, the other scrubbing round and round
+    d = _d(o)
+    a = 2 * pi * 2.2 * sp * t
+    return _work(d, ((140 + 22 * cos(a), -60 + 16 * sin(a)), (0.4, 1)), ((110, -60), (0.2, 1)), _P(_hinge(14)),
+                 props=[("plate", "L")], look_y=0.7)
+
+
+def mop(t, sp, I, ph, o):
+    # pocha: bent over, the mop sweeping the floor side to side
+    d = _d(o)
+    w = sin(2 * pi * 0.8 * sp * t)
+    return _work(d, ((60 + 40 * w, -150), (0.3, 1)), ((20 + 40 * w, -210), (0.3, 1)), _P(_hinge(26)),
+                 prop="mop", look_y=0.8, tilt=26 + 4 * w)
+
+
+def sew(t, sp, I, ph, o):
+    # silai: the cloth held in one hand, the needle pulled up and away, back down
+    d = _d(o)
+    q = (t * sp) % 1.2
+    k = _smooth(q / 0.7) if q < 0.7 else 1.0 - _smooth((q - 0.7) / 0.5)
+    return _work(d, ((60 + 60 * k, -230 - 150 * k), (0.5, 1)), ((30, -220), (0, 1)), prop="needle", look_y=0.6)
+
+
+def hammer(t, sp, I, ph, o):
+    # thokna: the hammer up over the shoulder and down on the nail
+    d = _d(o)
+    q = (t * sp) % 0.7
+    k = _smooth(q / 0.4) if q < 0.4 else 1.0 - _smooth((q - 0.4) / 0.14)
+    return _work(d, ((140 - 20 * k, -120 - 260 * k), (0.4, 1)), ((150, -100), (0.2, 1)), _P(_hinge(12)),
+                 prop="hammer", look_y=0.5, face="determined")
+
+
+def dig(t, sp, I, ph, o):
+    # phawda: swing up, dig in, pull back
+    d = _d(o)
+    q = (t * sp) % 1.3
+    k = _smooth(q / 0.6) if q < 0.6 else 1.0 - _smooth((q - 0.6) / 0.7)
+    return _work(d, ((60 + 60 * (1 - k), -150 - 260 * k), (0.4, 1)), ((20 + 50 * (1 - k), -200 - 200 * k), (0.4, 1)),
+                 _P(_hinge(22 * (1 - k))), prop="spade", look_y=0.8, face="determined")
+
+
+def chop(t, sp, I, ph, o):
+    # sabzi kaatna: the knife going up and down fast on the board, the other hand holding the sabzi
+    d = _d(o)
+    k = abs(sin(2 * pi * 2.4 * sp * t))
+    return _work(d, ((150, -20 - 60 * k), (0.4, 1)), ((90, -10), (0.2, 1)), _P(_hinge(14)), prop="knife",
+                 look_y=0.8)
+
+
+def pour(t, sp, I, ph, o):
+    # chai daalna: the kettle lifted high and tipped, the glass held low in the other hand
+    d = _d(o)
+    k = _smooth((t * sp) / 0.6)
+    return _work(d, ((140, -260 - 120 * k), (0.4, 1)), ((150, -110), (0.2, 1)), prop="kettle",
+                 props=[("glass", "L")], look_y=0.4 * k, head_tilt=-3 * k)
+
+
+def knead(t, sp, I, ph, o):
+    # aata goondhna: both hands pushing the dough down and forward, again and again
+    d = _d(o)
+    k = 0.5 - 0.5 * cos(2 * pi * 1.1 * sp * t)
+    return _work(d, ((150 + 30 * k, -40 + 20 * k), (0.3, 1)), ((120 + 30 * k, -40 + 20 * k), (0.3, 1)),
+                 _P(_hinge(14 + 8 * k)), look_y=0.8)
+
+
+def roll_roti(t, sp, I, ph, o):
+    # roti belna: the belan rolled back and forth under both hands
+    d = _d(o)
+    w = sin(2 * pi * 1.4 * sp * t)
+    return _work(d, ((160 + 40 * w, -40), (0.3, 1)), ((120 + 40 * w, -40), (0.3, 1)), _P(_hinge(14)),
+                 prop="belan", look_y=0.8)
+
+
+def serve(t, sp, I, ph, o):
+    # the waiter: the tray held up on one palm, offered forward with a little bow
+    d = _d(o)
+    k = _smooth((t * sp) / 0.6)
+    return _work(d, ((130 + 50 * k, -300), (0.4, 1)), ((-50, -120),), _P(_hinge(8 * k)), prop="tray", face="smile")
+
+
+def shuffle_papers(t, sp, I, ph, o):
+    # the babu's busy look: papers knocked straight on the desk, turned over, again
+    d = _d(o)
+    k = abs(sin(2 * pi * 1.3 * sp * t))
+    return _work(d, ((150, -40 - 50 * k), (0.4, 1)), ((110, -40 - 50 * k), (0.2, 1)), _P(_hinge(10)), prop="file",
+                 look_y=0.7, face="bored")
+
+
+def fold_clothes(t, sp, I, ph, o):
+    # kapde tah karna: both hands lift the cloth wide, bring them together, put it down
+    d = _d(o)
+    q = (t * sp) % 1.6
+    k = sin(pi * clamp(q / 1.2))
+    return _work(d, ((170 + 40 * k, -60 - 120 * k), (0.4, 1)), ((70 - 40 * k, -60 - 120 * k), (0.2, 1)),
+                 _P(_hinge(10 * (1 - k))), look_y=0.6)
+
+
+def water_plants(t, sp, I, ph, o):
+    # paudhon ko paani: the can tipped down towards the pot, moving a little
+    d = _d(o)
+    k = _smooth((t * sp) / 0.5)
+    w = sin(2 * pi * 0.5 * sp * t)
+    return _work(d, ((150 + 20 * w, -150 + 30 * k), (0.4, 1)), ((-50, -120),), _P(_hinge(10 * k)),
+                 prop="watering_can", look_y=0.7, face="smile")
+
+
+def paint_wall(t, sp, I, ph, o):
+    # deewar rangna: the roller up and down on the wall in front
+    d = _d(o)
+    w = sin(2 * pi * 0.9 * sp * t)
+    return _work(d, ((150, -330 - 140 * w), (0.6, 1)), ((-50, -120),), prop="paint_roller", look_y=-0.3 * w)
+
+
+def carry_head(t, sp, I, ph, o):
+    # sir pe bojh: a box up on the head, both hands holding it there
+    bob = 3 * abs(sin(2 * pi * 1.2 * sp * t))
+    return _P(hand("R", (60, -560 - bob), (1, -0.2)), hand("L", (-60, -560 - bob), (-1, -0.2)),
+              dict(ll1=-12, rl1=12), lift=-bob, props=[("box", "R")], head_dy=4, arms_front=False)
+
+
+def wipe_table(t, sp, I, ph, o):
+    # kapde se table saaf: the hand going round in circles on the table top
+    d = _d(o)
+    a = 2 * pi * 1.4 * sp * t
+    return _work(d, ((160 + 40 * cos(a), -20 + 14 * sin(a)), (0.4, 1)), ((-60, -120),), _P(_hinge(16)),
+                 look_y=0.8)
+
+
+WORK_ACTIONS = {"write_board", "stamp", "iron", "wash_dishes", "mop", "sew", "hammer", "dig", "chop", "pour",
+                "knead", "roll_roti", "serve", "shuffle_papers", "fold_clothes", "water_plants", "paint_wall",
+                "carry_head", "wipe_table"}
+
+
 DESI_GESTURES = {"touch_feet", "bless", "kaan_pakad", "kaan_kheench", "ghoorna", "eye_roll", "finger_wag",
                  "pinch_cheeks", "check_watch", "selfie", "scroll", "video_call", "eat_hands", "fan_self", "swat",
                  "knock", "ring_bell", "propose", "cry_hug", "pull_chair"}
@@ -1604,6 +1780,15 @@ ACTIONS = {
     "ring_bell": ring_bell, "ghanti": ring_bell, "propose": propose, "kneel": propose, "cry_hug": cry_hug,
     "pull_chair": pull_chair, "kursi_kheench": pull_chair,
     "put": put, "take": take,
+    # everyday work (and their Hinglish names)
+    "write_board": write_board, "board_pe_likh": write_board, "stamp": stamp, "thappa_maar": stamp,
+    "iron": iron, "istri": iron, "press": iron, "wash_dishes": wash_dishes, "bartan": wash_dishes,
+    "mop": mop, "pocha": mop, "sew": sew, "silai": sew, "hammer": hammer, "thok": hammer, "dig": dig,
+    "khod": dig, "chop": chop, "sabzi_kaat": chop, "pour": pour, "chai_daal": pour, "knead": knead,
+    "aata_goondh": knead, "roll_roti": roll_roti, "roti_bel": roll_roti, "serve": serve,
+    "shuffle_papers": shuffle_papers, "fold_clothes": fold_clothes, "kapde_tah": fold_clothes,
+    "water_plants": water_plants, "paani_de": water_plants, "paint_wall": paint_wall, "rang": paint_wall,
+    "carry_head": carry_head, "sir_pe_bojh": carry_head, "wipe_table": wipe_table, "saaf_kar": wipe_table,
 }
 
 

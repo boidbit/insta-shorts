@@ -57,6 +57,9 @@ HASHTAGS: #tag1 #tag2 #tag3 #tag4 #tag5
     sitting / sleeping: sit, sit_floor, lie_down, sleep, sleep_lie, wake_up
     doing things: eat, drink, cook, sweep, wash_hands, brush_teeth, read, write, text, phone_call, count_money, drive
     with another person: throw, catch, kick, slap, punch, box, push, dodge, high_five, handshake, hug, pat_back, carry, drag, tug, hit_react
+<!-- module: work -->
+    work (each brings its tool into the hand): write_board (chalk on the blackboard), stamp (thappa on a file), iron (istri), wash_dishes (bartan), mop (pocha), sew (silai), hammer, dig (phawda), chop (sabzi kaatna), pour (chai daalna from a kettle), knead (aata goondhna), roll_roti (belan), serve (a waiter's tray), shuffle_papers (the busy babu), fold_clothes, water_plants, paint_wall, carry_head (a load on the head), wipe_table
+<!-- /module -->
     desi: touch_feet (pair chhoona), bless (aashirwad), kaan_pakad (sorry, holding the ears), kaan_kheench (pulls the other's ear), ghoorna (the stare), eye_roll, finger_wag (na na na), pinch_cheeks (the aunty), check_watch (late!), selfie, scroll, video_call, eat_hands, fan_self (garmi), swat (machhar), knock, ring_bell, propose (on one knee), cry_hug, pull_chair (the prank)
 <!-- module: dance -->
     sports / gym: bat, bowl, race_start, jumping_jacks, squat, pushup, lift_weights
