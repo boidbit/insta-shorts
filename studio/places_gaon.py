@@ -138,8 +138,8 @@ def chaupal(s):
 
 
 def handpump(s):
-    """The hand pump in the lane: the green pump on its cement platform with a little puddle, matkas waiting in a
-    line, a bucket, the washing stone, mud houses with dung cakes, a buffalo tied far behind."""
+    """The hand pump in the lane: matkas waiting in a line, a bucket, the washing stone, a wet patch, mud houses with
+    dung cakes, a buffalo tied far behind. The pump is a set piece the studio puts in (so people can work it)."""
     g = G(s)
     _sky(g, (134, 200, 240), (240, 238, 226))
     _far_fields(g, 940, 1240, 17)
@@ -155,13 +155,8 @@ def handpump(s):
     g.rect(840, 700, LW, 1240, (220, 180, 130), INK, 6)
     g.poly([(820, 700), (960, 610), (1100, 700)], (160, 100, 70), INK, 6)
     _uple(g, 880, 780, 5)
-    g.rect(400, 1150, 700, 1240, (190, 190, 186), INK, 5)                      # the platform
-    g.ellipse(420, 1210, 680, 1250, (150, 200, 230))
-    px = 520                                                                   # the pump
-    g.rect(px - 22, 900, px + 22, 1160, (60, 120, 80), INK, 5)
-    g.rect(px - 32, 880, px + 32, 910, (60, 120, 80), INK, 4)
-    g.line([(px, 900), (px + 150, 850)], (60, 120, 80), 12)
-    g.line([(px - 20, 1000), (px - 70, 1010), (px - 74, 1040)], (60, 120, 80), 12)
+    g.ellipse(60, 1210, 380, 1250, (150, 200, 230))                            # the wet patch (the pump itself is
+    #                                                                            a set piece the studio puts in front)
     for i, x in enumerate((740, 790, 840)):                                    # matkas waiting their turn
         g.ellipse(x - 26, 1180, x + 26, 1240, (200, 110, 60) if i != 1 else (180, 180, 186), INK, 4)
         g.rect(x - 12, 1170, x + 12, 1184, (170, 90, 50), INK, 3)

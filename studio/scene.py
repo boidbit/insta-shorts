@@ -969,6 +969,16 @@ def _village_piece(plan, c, t, action, set_by_id):
     typ, off, flips = VILLAGE_PIECE[action]
     x0, y0 = c.pos_at(t)
     near = [o for o in set_by_id.values() if o.get("type") == typ and abs(float(o.get("x", 540)) - x0) < off + 160]
+    pumps = [o for o in set_by_id.values() if o.get("type") == "handpump"] if typ == "handpump" else []
+    if pumps:                                           # the place's own pump: walk round to its handle
+        ob = min(pumps, key=lambda o: abs(float(o.get("x", 540)) - x0))
+        hand = -1 if ob.get("flip") else 1              # the side its handle points to
+        stand = float(ob.get("x", 540)) + hand * off * float(ob.get("scale", 1.0))
+        if abs(stand - x0) > 40:
+            dur = clamp(abs(stand - x0) / 430.0, 0.4, 1.2)
+            c.moves.append((t, t + dur, x0, y0, stand, y0, False))
+        c.events.append({"t": t, "dir": -hand, "facing": "left" if hand > 0 else "right"})
+        return
     if near:
         side = 1 if float(near[0].get("x", 540)) > x0 else -1
     else:

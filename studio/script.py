@@ -1083,9 +1083,10 @@ PLACE_WORDS = {"sweet_shop": "mithai_shop", "halwai_shop": "mithai_shop", "mitha
                "hadpump": "handpump", "kuan": "handpump", "mitti_ka_ghar": "kachcha_ghar", "kacha_ghar": "kachcha_ghar",
                "gaon_ka_ghar": "kachcha_ghar", "jhopdi": "kachcha_ghar", "village_school": "gaon_school",
                "gaon_ka_school": "gaon_school", "pathshala": "gaon_school"}
-# places whose people work at a desk: the studio puts the desk in (with its files), the babu sits behind it
+# places that come with a piece of their own: the babu's desk (with its files), the lane's hand pump
 DESK_PLACES = {"sarkari_daftar": {"id": "desk", "type": "desk", "x": 540, "y": 1640, "auto": True,
-                                  "items": ["files", "register", "thappa"]}}
+                                  "items": ["files", "register", "thappa"]},
+               "handpump": {"id": "handpump", "type": "handpump", "x": 170, "y": 1630, "auto": True}}
 from .places_plus import SHOPS as SHOP_PLACES   # noqa: E402  (a shop brings its counter: `SCENE: mithai_shop`)
 
 
@@ -1560,8 +1561,11 @@ def _parse_script(text):
                     cur["pan"] = pan
                 if bg.get("type") == "jail":
                     cur["sets"] = {"jail_door": dict(JAIL_DOOR)}
-                if bg.get("type") in DESK_PLACES:   # the babu's desk with its files
-                    cur["sets"] = {"desk": dict(DESK_PLACES[bg["type"]], items=list(DESK_PLACES[bg["type"]]["items"]))}
+                if bg.get("type") in DESK_PLACES:   # the babu's desk with its files, the lane's pump
+                    own = dict(DESK_PLACES[bg["type"]])
+                    if "items" in own:
+                        own["items"] = list(own["items"])
+                    cur["sets"] = {own["id"]: own}
                 if bg.get("type") in SHOP_PLACES:   # the shop's counter, its shopkeeper goes behind it
                     cur["lines"].append(("obj", {"kind": SHOP_PLACES[bg["type"]], "at": "center", "auto": True}))
             else:
@@ -1677,6 +1681,8 @@ def _parse_script(text):
             placed = cur.setdefault("sets", {})
             if m.group(1).lower() in ("desk", "table", "table_set") and placed.get("desk", {}).get("auto"):
                 placed.pop("desk")                  # your own desk replaces the place's own one
+            if m.group(1).lower() == "handpump" and placed.get("handpump", {}).get("auto"):
+                placed.pop("handpump")
             kind, spec, probs = parse_set(m.group(1) + m.group(2), placed)
             warnings += probs
             if kind == "place":
