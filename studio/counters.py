@@ -117,13 +117,14 @@ def place_behind(plan, place, cine, mode="2d", mirror=True):
     "preset" hand-made 2.5D set, None = no painted counters). mirror: the set is mirrored for a reverse shot (a 2.5D
     set with writing on it is not). Returns the painted counters in use (indices into painted(place, mode))."""
     angle = dict(plan.angle or {}, mirror=bool(mirror and (plan.angle or {}).get("mirror")))
-    if not cine or plan.framing in ("inside", "wide"):   # (over the shoulder: the seller is still behind it)
+    if not cine or plan.framing == "inside":       # (over the shoulder: the seller is still behind it)
         return []
+    desk_only = plan.framing == "wide"              # a wide shot: only a desk piece (painted counters are drawn small)
     people = [c for c in plan.chars.values() if not c.spec.get("hidden") and not c.spec.get("kind")
               and c.spec.get("behind") is not False and not c.spec.get("view") == "back" and not c.rides]
     taken, used = set(), []
     spots = []                                      # (kind, ref, x) of every counter in this shot
-    for o in plan.objects.values():
+    for o in ([] if desk_only else plan.objects.values()):
         base = "thela" if o.kind in objects.THELAS else ("counter" if o.kind in objects.SHOP_COUNTERS else
                                                          ("table" if o.kind == "table" else None))
         if base:
@@ -132,7 +133,7 @@ def place_behind(plan, place, cine, mode="2d", mirror=True):
         if ob.get("type") in DESK_SETS:
             spots.append(("set", ob, OBJ_WHO["desk"] if ob["type"] == "desk" else OBJ_WHO["table"],
                           float(ob.get("x", 540))))
-    for i, c in enumerate(painted(place, mode)):
+    for i, c in enumerate([] if desk_only else painted(place, mode)):
         spots.append(("paint", i, c, frame_point(c["x"], c["y"], angle)[0]))
     if not spots:
         return []

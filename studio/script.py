@@ -1031,7 +1031,13 @@ def pan_traveler(prev, who=None):
 
 PLACE_WORDS = {"sweet_shop": "mithai_shop", "halwai_shop": "mithai_shop", "mithai_ki_dukaan": "mithai_shop",
                "mobile_store": "mobile_shop", "phone_shop": "mobile_shop", "chemist": "medical_store",
-               "pharmacy": "medical_store", "medical": "medical_store", "dawai_ki_dukaan": "medical_store"}
+               "pharmacy": "medical_store", "medical": "medical_store", "dawai_ki_dukaan": "medical_store",
+               "sarkari_office": "sarkari_daftar", "govt_office": "sarkari_daftar", "daftar": "sarkari_daftar",
+               "tehsil": "sarkari_daftar", "kachehri": "sarkari_daftar", "sarkari_daftar": "sarkari_daftar",
+               "government_office": "sarkari_daftar"}
+# places whose people work at a desk: the studio puts the desk in (with its files), the babu sits behind it
+DESK_PLACES = {"sarkari_daftar": {"id": "desk", "type": "desk", "x": 540, "y": 1640, "auto": True,
+                                  "items": ["files", "register", "thappa"]}}
 from .places_plus import SHOPS as SHOP_PLACES   # noqa: E402  (a shop brings its counter: `SCENE: mithai_shop`)
 
 
@@ -1506,6 +1512,8 @@ def _parse_script(text):
                     cur["pan"] = pan
                 if bg.get("type") == "jail":
                     cur["sets"] = {"jail_door": dict(JAIL_DOOR)}
+                if bg.get("type") in DESK_PLACES:   # the babu's desk with its files
+                    cur["sets"] = {"desk": dict(DESK_PLACES[bg["type"]], items=list(DESK_PLACES[bg["type"]]["items"]))}
                 if bg.get("type") in SHOP_PLACES:   # the shop's counter, its shopkeeper goes behind it
                     cur["lines"].append(("obj", {"kind": SHOP_PLACES[bg["type"]], "at": "center", "auto": True}))
             else:
@@ -1619,6 +1627,8 @@ def _parse_script(text):
             if cur is None:
                 cur = new_scene()
             placed = cur.setdefault("sets", {})
+            if m.group(1).lower() in ("desk", "table", "table_set") and placed.get("desk", {}).get("auto"):
+                placed.pop("desk")                  # your own desk replaces the place's own one
             kind, spec, probs = parse_set(m.group(1) + m.group(2), placed)
             warnings += probs
             if kind == "place":

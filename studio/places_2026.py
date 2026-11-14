@@ -402,9 +402,64 @@ def startup_office(s):
     return g.done()
 
 
+def sarkari_daftar(s):
+    """A government office: pale green walls with the paint peeling, a wooden almirah bursting with files tied in
+    red cloth, the 'KHIDKI NO. 3' sign and 'LUNCH 1:00 - 2:00' notice, a wall calendar, a barred window, a tube
+    light and a slow ceiling fan. The babu's desk (with its files, register and thappa) is put in by the studio."""
+    g = G(s, color=(196, 214, 190))
+    y_floor = 1290
+    g.rect(0, 0, LW, y_floor, (190, 210, 184))
+    g.rect(0, 900, LW, y_floor, (150, 176, 146))                             # the darker dado below
+    g.line([(0, 900), (LW, 900)], (120, 140, 116), 6)
+    rnd = random.Random(31)
+    for _ in range(9):                                                       # damp patches, peeling paint
+        x, y, r = rnd.randint(40, 1040), rnd.randint(200, 860), rnd.randint(30, 70)
+        g.ellipse(x - r, y - r * 0.6, x + r, y + r * 0.6, (172, 190, 164))
+        g.ellipse(x - r * 0.4, y - r * 0.2, x + r * 0.3, y + r * 0.3, (226, 222, 204))
+    g.rect(40, 300, 360, 1180, (120, 84, 54), INK, 6)                        # the almirah full of files
+    g.line([(200, 300), (200, 1180)], INK, 4)
+    for row in range(5):
+        y = 340 + row * 165
+        g.line([(52, y + 140), (348, y + 140)], INK, 4)
+        x = 60
+        while x < 330:
+            w = rnd.randint(40, 70)
+            c = rnd.choice([(230, 206, 140), (214, 186, 120), (240, 224, 170), (200, 170, 110)])
+            g.rect(x, y + 20 + rnd.randint(0, 25), min(x + w, 340), y + 138, c, INK, 3)
+            g.line([(x + w * 0.5, y + 40), (x + w * 0.5, y + 138)], (190, 40, 40), 4)      # the red tie
+            x += w + 4
+    g.rect(470, 170, 870, 280, (250, 246, 230), INK, 5)                      # the counter sign
+    _txt(g, 670, 225, "KHIDKI NO. 3", 52, (40, 60, 140))
+    g.rect(520, 330, 820, 420, (255, 236, 150), INK, 4)                      # the lunch notice
+    _txt(g, 670, 362, "LUNCH 1:00 - 2:00", 30, (180, 40, 40))
+    _txt(g, 670, 398, "KAL AANA", 24, (60, 60, 66))
+    g.rect(900, 300, 1040, 480, (250, 250, 246), INK, 4)                     # the wall calendar
+    g.rect(900, 300, 1040, 350, (200, 50, 50), INK, 4)
+    _txt(g, 970, 326, "1998", 26, (255, 255, 255))
+    for i in range(4):
+        for j in range(4):
+            g.rect(912 + j * 32, 362 + i * 28, 936 + j * 32, 384 + i * 28, (230, 230, 226))
+    g.rect(470, 520, 870, 820, (200, 226, 236), INK, 6)                      # the barred window
+    for x in range(510, 870, 45):
+        g.line([(x, 520), (x, 820)], (80, 84, 90), 7)
+    g.line([(470, 670), (870, 670)], (80, 84, 90), 6)
+    g.note_light(670, 670, 160, (255, 250, 220))
+    g.rect(920, 560, 1040, 900, (110, 110, 116), INK, 5)                     # a tired steel cupboard
+    g.rect(930, 700, 960, 720, (200, 200, 206), INK, 2)
+    g.rect(380, 60, 960, 84, (250, 250, 240), INK, 3)                        # the tube light
+    g.note_light(670, 72, 220, (240, 250, 255))
+    g.rect(0, y_floor, LW, LH, (176, 166, 150))                              # the old mosaic floor
+    for y in range(y_floor + 30, LH, 60):
+        for x in range((y // 60) % 2 * 30, LW, 60):
+            g.circle(x, y, 4, (150, 140, 126))
+    g.line([(0, y_floor), (LW, y_floor)], INK, 5)
+    return g.done()
+
+
 NEW = {"ghar_darwaza": ghar_darwaza, "lift": lift, "park": park, "atm": atm, "petrol_pump": petrol_pump,
        "signal": signal, "buffet": buffet, "restaurant": restaurant, "interview_room": interview_room,
-       "call_center": call_center, "startup_office": startup_office}
+       "call_center": call_center, "startup_office": startup_office, "sarkari_daftar": sarkari_daftar}
 HORIZON = {"ghar_darwaza": 1280, "lift": 1300, "park": 1060, "atm": 1290, "petrol_pump": 1250, "signal": 1120,
-           "buffet": 1290, "restaurant": 1290, "interview_room": 1280, "call_center": 1290, "startup_office": 1280}
+           "buffet": 1290, "restaurant": 1290, "interview_room": 1280, "call_center": 1290, "startup_office": 1280,
+           "sarkari_daftar": 1290}
 OUTDOOR = {"park", "petrol_pump", "signal"}

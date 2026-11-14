@@ -396,7 +396,7 @@ Script me: `B -> touch_feet` phir `A -> bless`; `A (kaan_pakad, embarrassed): So
 
 ### Nayi jagahein: roz ki zindagi 🚪🌳🍛
 
-`ghar_darwaza` (flat ka darwaza: SHARMA ki nameplate, ghanti, toran, joote ka rack, seedhiyan; rishtedaar, delivery, padosi), `lift` (steel ki deewar, sheesha, 7th floor ka button panel: awkward silence), `park` (walking track, bench, jhoola-slide, peeche flats: morning walk aur gossip), `buffet` (shaadi ka khana: PANEER / DAL / PULAO / GULAB JAMUN, shamiyana, laal carpet), `restaurant` (booth, MENU board ke daam, latakti lights, shaam ki sadak wali khidki), `atm` ("Balance: Rs 47", CCTV ON, slips se bhara dabba), `petrol_pump` (DESI PETROLEUM, 107.48 ka board, do machine), `signal` (laal batti, 88 ka countdown, zebra crossing, flyover, "EMI sirf Rs 999" hoarding), `interview_room` (HR / MANAGER / CEO ke card, "Round 7 ??"), `call_center` (raat ke 2 baje, CALLS 487 / 600 ka target), `startup_office` (HUSTLE neon, bean bags, sticky notes, Q4 OKRs).
+`sarkari_daftar` (files ka almirah, KHIDKI NO. 3, babu ki desk apne aap), `ghar_darwaza` (flat ka darwaza: SHARMA ki nameplate, ghanti, toran, joote ka rack, seedhiyan; rishtedaar, delivery, padosi), `lift` (steel ki deewar, sheesha, 7th floor ka button panel: awkward silence), `park` (walking track, bench, jhoola-slide, peeche flats: morning walk aur gossip), `buffet` (shaadi ka khana: PANEER / DAL / PULAO / GULAB JAMUN, shamiyana, laal carpet), `restaurant` (booth, MENU board ke daam, latakti lights, shaam ki sadak wali khidki), `atm` ("Balance: Rs 47", CCTV ON, slips se bhara dabba), `petrol_pump` (DESI PETROLEUM, 107.48 ka board, do machine), `signal` (laal batti, 88 ka countdown, zebra crossing, flyover, "EMI sirf Rs 999" hoarding), `interview_room` (HR / MANAGER / CEO ke card, "Round 7 ??"), `call_center` (raat ke 2 baje, CALLS 487 / 600 ka target), `startup_office` (HUSTLE neon, bean bags, sticky notes, Q4 OKRs).
 
 - 2D aur 2.5D dono me. **2.5D me har ek ka apna set** (`studio/style25d/scenery_2026.py`): jagah ki parten gehrai me, aur upar uski apni zindagi:
   - darwaza: toran ke patte hilte hain, ghanti ki laal batti, seedhi ki tubelight jhapakti hai, bulb ke paas makkhi
@@ -479,6 +479,14 @@ Har action apna auzaar khud haath me laata hai:
 | `water_plants` (`paani_de`), `carry_head` (`sir_pe_bojh`), `shuffle_papers` | paudhon ko paani, sir pe bojh, busy babu |
 
 Prompt me ye ek "kaam-kaaj" module hai: idea me kaam ki baat ho (bartan, pocha, silai, babu, board...) to hi copy prompt me judta hai.
+
+### Sarkari daftar 🏛️ aur kuch situations
+
+- `SCENE: sarkari_daftar` (ya `sarkari_office`, `govt_office`, `daftar`, `tehsil`, `kachehri`): hari peeli deewar, files se thasaathas almirah, "KHIDKI NO. 3", "LUNCH 1:00 - 2:00 / KAL AANA", 1998 ka calendar, jaali wali khidki, tube light, dheema pankha (2.5D me pankha ghoomta hai, tube light tim-timati hai, ek kagaz hawa me udta hai). Babu ki desk (files, register, thappa ke saath) studio khud rakhta hai; clerk / babu khud uske peeche baithta hai. Apni `OBJ: desk ...` likho to wo is desk ki jagah le leti hai.
+- Desk ab daftar wali hai: aage lakdi ka panel aur drawer, peeche wale ki taange nahi dikhti. Wide shot me bhi babu desk ke peeche rehta hai.
+- Board pe likhna: `OBJ: blackboard center 2+2=5` aur `T -> write_board` — teacher board ke paas jaata hai aur chalk chalte chalte akshar ek-ek karke aate hain.
+- Bed pe leta hua: `H -> sleep_lie bed` — camera poora leta hua aadmi dikhata hai (sir nahi katta), aur jo andar aata hai (wife) wo bed ke us paar khadi hoti hai, uske upar nahi.
+- Prompt me naya niyam: joke ko jo jagah / cheez / action chahiye wo studio me nahi hai to joke badlo.
 
 ### Har jagah ka apna look 🎬 (`LOOK`) aur har video me ek ajeeb cheez 👀 (`MYSTERY`)
 

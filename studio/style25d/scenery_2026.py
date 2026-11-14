@@ -429,7 +429,46 @@ def startup_office_25d(s, zmax=1.0):
                 "vignette": 0.22}, 820, 1280)
 
 
+def sarkari_daftar_25d(s, zmax=1.0):
+    k = 0.5 * s
+
+    def tube(cv, t):                                    # the tube light flickers now and then
+        bad = (t % 5.0) < 0.18 or 3.1 < (t % 5.0) < 3.16
+        if not bad:
+            cv.glow(670, 72, 260, (240, 250, 255), 90)
+
+    def fan(cv, t):                                     # the slow ceiling fan
+        cx, cy = 230, 130
+        cv.line([(cx, 0), (cx, cy)], (60, 60, 66, 255), 6)
+        for i in range(3):
+            a = t * 3.2 + i * 2.094
+            cv.poly([(cx, cy), (cx + 170 * math.cos(a) - 14 * math.sin(a), cy + 22 * math.sin(a) + 6),
+                     (cx + 170 * math.cos(a) + 14 * math.sin(a), cy + 22 * math.sin(a) - 6)],
+                    (120, 120, 126, 230), INK, 2)
+        cv.ell(cx, cy, 26, 14, (90, 90, 96, 255), INK, 2)
+
+    def paper(cv, t):                                   # a loose sheet lifts in the fan's wind and settles
+        u = (t * 0.22) % 1.0
+        x = 420 + 520 * u                               # (up by the window, over the people's heads)
+        y = 560 - 220 * math.sin(math.pi * u)
+        a = math.radians(30 * math.sin(t * 4))
+        pts = [(x + dx * math.cos(a) - dy * math.sin(a), y + dx * math.sin(a) + dy * math.cos(a))
+               for dx, dy in ((-30, -20), (30, -20), (30, 20), (-30, 20))]
+        cv.poly(pts, (250, 248, 236, 230), INK, 2)
+    life = [_anim(k, tube, "tube", "screen"), _anim(k, fan, "fan"), _anim(k, paper, "paper"),
+            Layer(EMPTY, 0.3 * s, 1.0, motes(((470, 520), (870, 820), 260), 0.3 * s, 26, 33), "dust", mode="screen")]
+
+    def front(cv):
+        cv.rect(-40, 1720, 420, 1960, (230, 206, 140, 255), (160, 130, 80, 255), 4)    # a pile of files
+        cv.rect(-40, 1680, 400, 1730, (214, 186, 120, 255), (160, 130, 80, 255), 4)
+        cv.line([(180, 1680), (180, 1960)], (190, 40, 40, 255), 10)
+        cv.rect(820, 1660, 940, 1880, (240, 240, 236, 255), (170, 170, 176, 255), 4)   # a chai glass
+    return _set("sarkari_daftar", s, zmax, life, _blur_front(k, front), {"ambient": [236, 250, 236], "dir": 1,
+                "vignette": 0.34}, 820, 1290)
+
+
 SETS = {"ghar_darwaza_25d": ghar_darwaza_25d, "lift_25d": lift_25d, "park_25d": park_25d, "atm_25d": atm_25d,
         "petrol_pump_25d": petrol_pump_25d, "signal_25d": signal_25d, "buffet_25d": buffet_25d,
         "restaurant_25d": restaurant_25d, "interview_room_25d": interview_room_25d,
-        "call_center_25d": call_center_25d, "startup_office_25d": startup_office_25d}
+        "call_center_25d": call_center_25d, "startup_office_25d": startup_office_25d,
+        "sarkari_daftar_25d": sarkari_daftar_25d}

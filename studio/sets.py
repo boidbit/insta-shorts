@@ -290,7 +290,17 @@ def d_table(o, st, t, ob):
 
 
 def d_desk(o, st, t, ob):
-    _table(o, ob, (160, 110, 68, 255), drawer=True)
+    """An office desk with a wooden front: whoever works behind it shows from the waist up (a babu at his desk)."""
+    o.shadow(290)
+    front, dark = (150, 102, 62, 255), (122, 82, 50, 255)
+    o.rect(-270, -330, 270, -12, front)
+    o.rect(-270, -40, 270, -12, dark)
+    for x0 in (-250, 80):                                                   # two drawer columns
+        o.rect(x0, -310, x0 + 170, -60, dark)
+        for y in (-300, -218, -136):
+            o.rect(x0 + 10, y, x0 + 160, y + 72, front)
+            o.rect(x0 + 65, y + 30, x0 + 105, y + 42, (230, 200, 90, 255))
+    o.rect(-290, -350, 290, -316, (160, 110, 68, 255))
 
 
 def d_sofa(o, st, t, ob):
@@ -480,7 +490,14 @@ def d_blackboard(o, st, t, ob):
     txt = str(ob.get("text", ""))
     if txt:
         size = min(110, 640 / max(3, len(txt)))
-        o.text(0, -590, txt, size, (240, 240, 232, 255))
+        shown = ob.get("_shown")                    # being written with chalk: the letters appear one by one
+        if shown is not None and shown < len(txt):
+            full_w = len(txt) * size * 0.55
+            part = txt[:shown]
+            if part.strip():
+                o.text(-full_w / 2 + len(part) * size * 0.55 / 2, -590, part, size, (240, 240, 232, 255))
+        else:
+            o.text(0, -590, txt, size, (240, 240, 232, 255))
     o.rect(-120, -372, -60, -360, (240, 240, 232, 255), None)   # chalk on the ledge
 
 
@@ -1015,6 +1032,20 @@ class Sets:
                 out.remove(ev["remove"])
         return out
 
+    def written(self, oid, t):
+        """How many letters of a blackboard's text show at time t: all of them, unless somebody writes it
+        (a "write" event: empty before, appearing during, complete after)."""
+        ob = self.objs[oid]
+        txt = str(ob.get("text", ""))
+        writes = [ev for ev in self.events if ev["set"] == oid and ev.get("write")]
+        if not txt or not writes:
+            return None
+        w = writes[0]
+        if t < w["t"]:
+            return 0
+        u = (t - w["t"]) / float(w["write"])
+        return None if u >= 1.0 else int(len(txt) * u)
+
     def seat_height(self, oid):
         ob = self.objs.get(oid)
         if not ob:
@@ -1030,7 +1061,10 @@ class Sets:
         animated = typ in ("clock", "fan", "tv", "tree", "bush", "phone", "chulha", "drip", "washing_machine",
                            "fairy_lights", "flag_stand", "puddle")
         items = tuple(self.items(ob["id"], t)) if typ in SURFACE else ()
-        key = (ob["id"], st, items) if not animated else None
+        shown = self.written(ob["id"], t) if typ == "blackboard" else None
+        if shown is not None:
+            ob = dict(ob, _shown=shown)
+        key = (ob["id"], st, items, shown) if not animated else None
         if key and key in self._cache:
             return self._cache[key]
         extra = 180 if items else 0                     # room above the top for what lies on it

@@ -33,7 +33,7 @@ SHOT_ALIASES = {"closeup": "close", "close_up": "close", "twoshot": "two_shot", 
 ANGLES = [(1.0, 540.0, False), (1.25, 400.0, True), (1.25, 680.0, False), (1.4, 540.0, True)]
 # places whose drawing has writing on it (signs, boards, a nameplate): a CUT never shows them mirrored
 WRITTEN_PLACES = {"image", "ghar_darwaza", "lift", "park", "atm", "petrol_pump", "signal", "buffet", "restaurant",
-                  "interview_room", "call_center", "startup_office"}
+                  "interview_room", "call_center", "startup_office", "sarkari_daftar"}
 
 
 def shot_angle(scene, framing):
@@ -391,8 +391,13 @@ class Char:
         if rf:
             return rf["hip"][0], rf["hip"][1] - 250 * rf["scale"]
         x, y = self.draw_pos(t)
+        k = self.scale * self.depth_at(t)[0]
+        st = self.state_at(t)
+        if st["action"] in LIE_ACTIONS and st.get("on"):         # lying on a bed: the whole body, not the feet
+            head = next((e["dir"] for e in reversed(self.events) if "dir" in e and e["t"] <= t + 1e-9), -1)
+            return x + head * LIE_HALF * k, y - 260.0 * k
         h = FOCUS_H.get(self.spec.get("kind"), 560.0)            # a dog's head is not where a person's is
-        return x, y - h * self.scale * self.depth_at(t)[0]
+        return x, y - h * k
 
     def state_at(self, t):
         st = dict(action="idle", action_t0=0.0, expression=self.spec.get("expression", self.look_face or "neutral"),
@@ -674,6 +679,8 @@ LIE_ACTIONS = ("lie_down", "lie", "sleep_lie", "rofl")
 # a body on its way to the floor: seconds after the action starts when it really goes down (faint wobbles first)
 FALL_ACTIONS = {"faint": 0.6, "fall": 0.15, "slip": 0.1, "trip": 0.25, "lie_down": 0.0, "lie": 0.0,
                 "sleep_lie": 0.0, "rofl": 0.0}
+LIE_HALF = 470.0            # half the length of a body lying on a bed (its feet are where it "stands")
+LIE_ZOOM = 1.02             # cine: the tightest shot of somebody lying on a bed (the whole body stays in the picture)
 STAND_MIN = 170.0           # a standing person's centre keeps this far from the frame's edges
 STAND_GAP = 240.0           # ...and this far from the next person
 
@@ -708,6 +715,26 @@ def stand_up_in_frame(chars, set_by_id):
                 dur = clamp(0.35 + abs(to - fx) / 1500.0, 0.4, 0.85)
                 c.moves.append((t2, t2 + dur, fx, fy, float(to), fy, False, "out"))
                 c.moves.sort(key=lambda m: m[0])
+
+
+def round_the_bed(chars, set_by_id):
+    """cine: somebody lies on a bed and somebody else would stand where the bed is (walks in to the middle): they
+    stand on its far side instead - the bed hides their legs - not over the lying body."""
+    for ob in set_by_id.values():
+        if ob.get("type") not in ("bed", "khaat"):
+            continue
+        on_it = [c for c in chars.values() if any(e.get("on") == ob["id"] for e in c.events)]
+        if not any(e.get("action") in LIE_ACTIONS and e.get("on") == ob["id"] for c in on_it for e in c.events):
+            continue
+        k_ = float(ob.get("scale", 1.0))
+        hw = _sets.SPEC[ob["type"]][0] * k_ * 0.9
+        bx, by = float(ob.get("x", 540)), float(ob.get("y", 1700))
+        for c in chars.values():
+            if c in on_it or c.spec.get("hidden") or c.spec.get("kind") or c.rides or c.depth:
+                continue
+            if any(abs(x - bx) < hw for x in [c.x] + [m[4] for m in c.moves]):
+                dy = (by - 80.0 * k_) - c.y
+                c.depth.append((0.0, 0.9, dy, 0.9, dy, 0.01))
 
 
 def _card_over_faces(plan, t):
@@ -909,6 +936,27 @@ def _surface(set_by_id, name):
 PUT_TIME = 2.0                       # seconds a put / take takes on the timeline (a walk over + the reach)
 
 
+WRITE_TIME = 2.4                     # seconds the chalk takes to write the board's words
+
+
+def _do_write(plan, c, t, set_by_id):
+    """`T -> write_board`: walk to the side of the blackboard, face it, and its words appear as the chalk goes."""
+    ob = next((o for o in set_by_id.values() if o.get("type") == "blackboard"), None)
+    if ob is None:
+        return
+    x0, y0 = c.pos_at(t)
+    bx = float(ob.get("x", 540))
+    side = -1 if x0 < bx else 1
+    stand = bx + side * (230 * float(ob.get("scale", 1.0)) + 70)
+    dur = 0.0
+    if abs(x0 - stand) > 70:
+        dur = clamp(abs(x0 - stand) / 430.0, 0.45, 1.2)
+        c.moves.append((t, t + dur, x0, y0, stand, y0, False))
+        c.events.append({"t": t, "action": "idle"})
+    c.events.append({"t": t + dur, "action": "write_board", "dir": -side, "facing": "left" if side > 0 else "right"})
+    plan.set_events.append({"t": t + dur + 0.15, "set": ob["id"], "write": WRITE_TIME})
+
+
 def _put_take(plan, c, t, key, spec, set_by_id):
     """`A -> put bag desk` / `A -> take file`: noted now, done in _resolve_put_take once everybody stands where the
     shot puts them (counters move people). Returns when the action is done (the cursor)."""
@@ -928,6 +976,9 @@ def _resolve_put_take(plan):
 def _do_put_take(plan, c, t, key, spec, set_by_id):
     """Walk up to the piece if it is not within reach, reach out, and the thing goes from the hand onto it (or from
     it into the hand)."""
+    if key == "write":
+        _do_write(plan, c, t, set_by_id)
+        return
     ob = _surface(set_by_id, spec.get("on"))
     item = spec["item"]
     held = _sets.HELD_AS.get(item, item)
@@ -1114,6 +1165,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             for key_ in ("put", "take"):                # put down / pick up a thing on a piece of furniture
                 if isinstance(ev.get(key_), dict):
                     cursor = max(cursor, _put_take(plan, c, t, key_, ev[key_], set_by_id))
+            if ev.get("action") == "write_board" and any(o_.get("type") == "blackboard" for o_ in plan.sets):
+                cursor = max(cursor, _put_take(plan, c, t, "write", {}, set_by_id))    # at the board, chalk
             if "move" in ev:
                 m = ev["move"]
                 x0, y0 = c.pos_at(t)
@@ -1331,6 +1384,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     # ---- camera segments ----
     if cine:                                        # off a bed: back inside the picture
         stand_up_in_frame(chars, set_by_id)
+        round_the_bed(chars, set_by_id)             # ...and nobody stands over somebody lying on it
     plan.camera, plan.rolls, plan.drift = ("cine" if cine else "classic"), [], False
     plan.auto_react = bool(meta.get("auto_react", True))
     own_camera_ = bool(cam_events) or any(not e_.get("auto") for e_ in shot_events) \
@@ -1342,6 +1396,12 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         else:
             auto_camera(plan, chars, cam_events, shakes)
         cam_events[:] = [c_ for c_ in cam_events if not any(h0 <= c_["t"] <= h1 for h0, h1 in cam_hold)]
+        for c_ in cam_events:                       # somebody lying on a bed: never so close that the head is cut
+            f_ = c_.get("focus")
+            if isinstance(f_, str) and f_ in chars:
+                st_ = chars[f_].state_at(c_["t"] + 0.05)
+                if st_["action"] in LIE_ACTIONS and st_.get("on"):
+                    c_["zoom"] = min(c_.get("zoom", 1.0), LIE_ZOOM)
         plan.rolls = [r for r in plan.rolls if not any(h0 <= r[0] <= h1 for h0, h1 in cam_hold)]
     cam_events += shot_events
     segs = []
