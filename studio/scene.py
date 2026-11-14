@@ -1,4 +1,5 @@
 """Compile a scene.json dict into a render plan (timeline, speech, audio, camera)."""
+import re
 import math
 import os
 import sys
@@ -936,6 +937,24 @@ def _surface(set_by_id, name):
 PUT_TIME = 2.0                       # seconds a put / take takes on the timeline (a walk over + the reach)
 
 
+def _auto_chair(plan, c, t, set_by_id):
+    """`A (sit)` with no seat named and none in the place: a chair where they are (nobody sits on thin air).
+    The same person sitting down again at the same spot uses the same chair. Returns its id (None: no chair)."""
+    if c.spec.get("kind") or c.spec.get("hidden") or c.rides:
+        return None
+    x0, y0 = c.pos_at(t)
+    sid = "chair_" + re.sub(r"\W", "", c.name.lower())
+    ob = set_by_id.get(sid)
+    if ob is not None:
+        if abs(float(ob["x"]) - x0) < 60:
+            return sid
+        sid += "_%d" % sum(1 for k in set_by_id if k.startswith(sid))
+    ob = {"id": sid, "type": "chair", "x": round(x0, 1), "y": round(y0 - 1.0, 1), "auto": True}
+    plan.sets.append(ob)
+    set_by_id[sid] = ob
+    return sid
+
+
 WRITE_TIME = 2.4                     # seconds the chalk takes to write the board's words
 
 
@@ -1146,14 +1165,18 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                     e[key] = ev[key]
             if "emotion" in ev:
                 e["expression"] = ev["emotion"]
+            if e.get("action") == "sit" and not e.get("on"):     # sits with nothing under them: a chair
+                e["on"] = _auto_chair(plan, c, t, set_by_id)
+                if e["on"] is None:
+                    e.pop("on")
             if len(e) > 1:
                 c.events.append(e)
             if ev.get("depth") in DEPTHS:
                 k0, dy0 = c.depth_at(t)
                 k1, dy1 = DEPTHS[ev["depth"]]
                 c.depth.append((t, k0, dy0, k1, dy1))
-            if ev.get("on") in set_by_id:            # sit / lie on a set piece: snap onto it
-                ob = set_by_id[ev["on"]]
+            if e.get("on") in set_by_id:             # sit / lie on a set piece: snap onto it
+                ob = set_by_id[e["on"]]
                 x0, y0 = c.pos_at(t)
                 dx = float(ev.get("on_dx", 0))
                 if ob.get("type") in ("bed", "khaat") and ev.get("action", "") in ("lie_down", "lie", "sleep_lie", "rofl"):

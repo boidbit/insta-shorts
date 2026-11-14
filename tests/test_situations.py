@@ -94,3 +94,22 @@ class Prompt(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Chair(unittest.TestCase):
+    def test_sitting_on_nothing_brings_a_chair(self):
+        v, w = video("HOOK: x\nMYSTERY: off\nCAST: A = uncle, B = clerk\nSCENE: office\n"
+                     "B (sit, bored): File halki hai. | फ़ाइल हल्की है।\nA (grin): Achha? | अच्छा?\n")
+        self.assertEqual(w, [])
+        plan = v.parts[-1].plan
+        chairs = [o for o in plan.sets if o.get("type") == "chair" and o.get("auto")]
+        self.assertEqual(len(chairs), 1)
+        b = plan.chars["B"]
+        sit = next(e for e in b.events if e.get("action") == "sit")
+        self.assertEqual(sit["on"], chairs[0]["id"])
+        self.assertAlmostEqual(b.pos_at(sit["t"] + 0.1)[0], chairs[0]["x"], delta=1)
+
+    def test_a_named_seat_is_used(self):
+        v, _ = video("HOOK: x\nMYSTERY: off\nCAST: A = uncle\nSCENE: room\nOBJ: sofa center\n"
+                     "A -> sit sofa\nA: Aaram. | आराम।\n")
+        self.assertFalse([o for o in v.parts[-1].plan.sets if o.get("auto") and o.get("type") == "chair"])
