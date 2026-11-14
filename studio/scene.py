@@ -1158,7 +1158,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 dx = float(ev.get("on_dx", 0))
                 if ob.get("type") in ("bed", "khaat") and ev.get("action", "") in ("lie_down", "lie", "sleep_lie", "rofl"):
                     head = 1 if ob.get("flip") else -1           # head on the pillow end
-                    dx = dx or -head * 400 * float(ob.get("scale", 1.0))
+                    reach = LIE_HALF * c.scale if cine else 400 * float(ob.get("scale", 1.0))   # cine: the
+                    dx = dx or -head * reach                     # middle of the body on the middle of the bed
                     c.events.append({"t": t, "dir": head})
                 c.moves.append((t, t + 0.001, x0, y0, float(ob.get("x", 540)) + dx, float(ob.get("y", 1700)) + 1,
                                 False))
