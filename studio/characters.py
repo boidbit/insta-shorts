@@ -348,7 +348,8 @@ PROPS = ("spoon", "phone", "mic", "cup", "ball", "stick", "bag", "chai", "glass"
          "gift", "balloon", "trophy", "torch", "key", "bat", "flag", "camera", "banana", "bottle", "letter",
          "toothbrush", "dumbbell", "box", "cooker", "thali", "lota", "tiffin", "mithai", "report_card", "injection",
          "stethoscope", "milk_can", "vlog_cam", "vlog_mic", "spanner", "file", "thappa", "pathar", "chalk",
-         "iron", "knife", "kettle", "mop", "hammer", "spade", "watering_can", "paint_roller", "tray", "needle")
+         "iron", "knife", "kettle", "mop", "hammer", "spade", "watering_can", "paint_roller", "tray", "needle",
+         "lathi", "hookah_pipe", "hookah_pipe_l")
 
 
 def d2r(a):
@@ -755,6 +756,13 @@ def _draw_prop2(S, prop, hand, d, n, pt):
         S.poly([ab(-80, 0), ab(80, 0), ab(70, 12), ab(-70, 12)], (200, 204, 210), INK, 4)
         for dx in (-30, 30):
             S.poly([ab(dx - 14, -50), ab(dx + 14, -50), ab(dx + 10, 0), ab(dx - 10, 0)], (210, 230, 240), INK, 3)
+    elif prop == "lathi":                # the old man's stick, straight down to the ground
+        S.line([ab(-6, -90), ab(10, 560)], 11, (140, 98, 62))
+        S.line([ab(-6, -90), ab(-2, -60)], 13, (110, 76, 48))
+    elif prop in ("hookah_pipe", "hookah_pipe_l"):   # the pipe from the mouth down to the hookah in front
+        sg = -1 if prop.endswith("_l") else 1
+        S.line([ab(0, 0), ab(sg * 50, 90), ab(sg * 110, 210), ab(sg * 150, 330)], 6, (70, 46, 30))
+        S.dot(ab(0, -4), 6, (200, 160, 80), INK, 2)
     elif prop == "needle":               # sui-dhaga
         S.line([pt(0, 0), pt(40, 0)], 3, (200, 200, 210))
         S.line([pt(40, 0), pt(80, 30), pt(120, 10)], 2, (200, 40, 40))

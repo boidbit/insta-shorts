@@ -1269,7 +1269,10 @@ class Renderer(Output):
             for key in ("view", "facing"):
                 if key in c.ov:
                     spec[key] = c.ov[key]
-        prop = st["prop"] or ("mic" if singing else None) or pose.get("prop")
+        own = st["prop"]
+        if own and pose.get("prop") and own == c.look_prop and c.spec.get("prop") is None:
+            own = None                              # an action's own tool (the tau's lathi) beats the look's prop
+        prop = own or ("mic" if singing else None) or pose.get("prop")
         if st["prop"] == "" or pose.get("hide_prop"):
             prop = None
         expr = pose.get("face") or st["expression"]      # some actions bring their own face (yawn, sneeze...)

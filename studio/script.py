@@ -276,6 +276,7 @@ ACTION_GROUPS = [   # the Builder's action dropdown, in the order a writer looks
     ("🍵 Roz ka kaam", "eat drink cook sweep wash_hands brush_teeth read write text phone_call count_money drive "
                       "put take".split()),
     ("🧹 Kaam-kaaj", sorted(actions.WORK_ACTIONS)),
+    ("🌾 Gaon", "hookah handpump doodh_nikalna ghunghat lathi_tek".split()),
     ("🤝 Doosre ke saath", "throw catch kick slap punch box push dodge high_five handshake hug pat_back carry drag "
                           "tug hit_react".split()),
     ("🏃 Chalna / girna", "walk run jog sneak limp crouch jump jump_over climb slide slip trip skid fall spin "
