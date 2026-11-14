@@ -74,6 +74,7 @@ PLACE_LOOK = {
     "ghar_darwaza": "ghar", "lift": "daftar", "park": "kudrat", "atm": "chamak", "petrol_pump": "sadak",
     "signal": "sadak", "buffet": "utsav", "restaurant": "sunehra", "interview_room": "daftar", "call_center": "daftar",
     "startup_office": "chamak", "sarkari_daftar": "daftar",
+    "khet": "kudrat", "chaupal": "sunehra", "handpump": "sunehra", "kachcha_ghar": "ghar", "gaon_school": "padhai",
     "beach": "samundar", "desert": "registan", "mountain_road": "pahad",
 }
 # the music's mood on top of the place (multiplies / adds to the place's look)

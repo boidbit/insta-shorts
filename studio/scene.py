@@ -34,7 +34,8 @@ SHOT_ALIASES = {"closeup": "close", "close_up": "close", "twoshot": "two_shot", 
 ANGLES = [(1.0, 540.0, False), (1.25, 400.0, True), (1.25, 680.0, False), (1.4, 540.0, True)]
 # places whose drawing has writing on it (signs, boards, a nameplate): a CUT never shows them mirrored
 WRITTEN_PLACES = {"image", "ghar_darwaza", "lift", "park", "atm", "petrol_pump", "signal", "buffet", "restaurant",
-                  "interview_room", "call_center", "startup_office", "sarkari_daftar"}
+                  "interview_room", "call_center", "startup_office", "sarkari_daftar",
+                  "chaupal", "gaon_school"}
 
 
 def shot_angle(scene, framing):

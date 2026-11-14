@@ -1071,7 +1071,13 @@ PLACE_WORDS = {"sweet_shop": "mithai_shop", "halwai_shop": "mithai_shop", "mitha
                "pharmacy": "medical_store", "medical": "medical_store", "dawai_ki_dukaan": "medical_store",
                "sarkari_office": "sarkari_daftar", "govt_office": "sarkari_daftar", "daftar": "sarkari_daftar",
                "tehsil": "sarkari_daftar", "kachehri": "sarkari_daftar", "sarkari_daftar": "sarkari_daftar",
-               "government_office": "sarkari_daftar"}
+               "government_office": "sarkari_daftar",
+               # the village pack
+               "field": "khet", "farm": "khet", "kheti": "khet", "khet_me": "khet", "chaupaal": "chaupal",
+               "panchayat": "chaupal", "bargad": "chaupal", "nal": "handpump", "hand_pump": "handpump",
+               "hadpump": "handpump", "kuan": "handpump", "mitti_ka_ghar": "kachcha_ghar", "kacha_ghar": "kachcha_ghar",
+               "gaon_ka_ghar": "kachcha_ghar", "jhopdi": "kachcha_ghar", "village_school": "gaon_school",
+               "gaon_ka_school": "gaon_school", "pathshala": "gaon_school"}
 # places whose people work at a desk: the studio puts the desk in (with its files), the babu sits behind it
 DESK_PLACES = {"sarkari_daftar": {"id": "desk", "type": "desk", "x": 540, "y": 1640, "auto": True,
                                   "items": ["files", "register", "thappa"]}}
