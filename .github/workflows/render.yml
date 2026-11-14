@@ -286,15 +286,24 @@ jobs:
           LIST: ${{ steps.pick.outputs.list }}
           TAG: reel-${{ inputs.request_id || github.run_id }}
           DRAFT: ${{ inputs.draft_id }}
+          FILE: ${{ inputs.file }}
         run: |
           shopt -s nullglob
-          files=(out/*.mp4 out/*.png out/*.post.txt)
+          # every reel keeps its script (to read later on the page, change and make again): the script text the
+          # video was made from (page / sound / a scripts/*.txt file) and the scene it became
+          if [ -f scenes/generated/web_script.txt ]; then
+            cp scenes/generated/web_script.txt out/script.txt
+          elif [ "${FILE##*.}" = "txt" ] && [ -f "$FILE" ]; then
+            cp "$FILE" out/script.txt
+          fi
+          for f in $LIST; do [ -f "$f" ] && cp "$f" "out/$(basename "$f" .json).scene.json"; done
+          files=(out/*.mp4 out/*.png out/*.post.txt out/script.txt out/*.scene.json)
           first=$(echo $LIST | awk '{print $1}')
           TITLE="$(python -c 'import sys; from studio.util import load_scene; s = load_scene(sys.argv[1]); print(s.get("hook") or s.get("vars", {}).get("hook") or "Reel")' "$first")"
           cat out/*.post.txt > notes.md 2>/dev/null || true
           [ -s notes.md ] || echo "$TITLE" > notes.md
-          if [ "$STAGE" = "sound_video" ] && [ -f scenes/generated/web_script.txt ]; then
-            { echo; echo "<!-- script -->"; cat scenes/generated/web_script.txt; } >> notes.md    # to change and make again
+          if [ -f out/script.txt ]; then
+            { echo; echo "<!-- script -->"; cat out/script.txt; } >> notes.md    # to read, change and make again
           fi
           gh release create "$TAG" "${files[@]}" --title "$TITLE" --notes-file notes.md --target "$GITHUB_SHA" --latest=false
           echo "Release: $TAG" >> "$GITHUB_STEP_SUMMARY"

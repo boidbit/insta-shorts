@@ -449,6 +449,16 @@
           <textarea class="post" id="post"></textarea>
           <div class="btns"><button id="copy">📋 Caption copy</button></div>
         </details>
+        <details id="relScriptBox" class="hidden">
+          <summary>📜 Is video ki script</summary>
+          <textarea class="post" id="relScript" readonly rows="10"></textarea>
+          <div class="btns">
+            <button id="relScriptCopy">📋 Script copy</button>
+            <button id="relScriptOpen">📝 Apni script me kholo</button>
+            <button id="relScriptCards">🧩 Builder me kholo</button>
+          </div>
+        </details>
+        <p id="relScriptNone" class="hint hidden"></p>
       </div>
     </aside>
   </div>
@@ -1504,14 +1514,54 @@ function showRelease(rel) {
   }));
   const [post, script] = (rel.body || "").replace(/\r\n/g, "\n").split("<!-- script -->");
   $("post").value = post.trim();
-  if (script && script.trim()) {
-    $("videos").append(btn("✏️ Is video ki script badlo (Builder), phir dobara banao", "Script cards me kholo", () => {
-      drafts.script = script.trim() + "\n";
-      setMode("cards");
-      $("cards").scrollIntoView({ block: "start", behavior: "smooth" });
-    }, "small wide"));
+  showReelScript((script || "").trim(), assets);
+  if (!(script || "").trim()) {                  // an older reel: its script was saved later (assets/reel_scripts.json)
+    oldScripts().then((all) => { if (all[rel.tag_name]) showReelScript(all[rel.tag_name].trim(), assets); });
   }
 }
+let _oldScripts = null;
+const oldScripts = () => (_oldScripts = _oldScripts || fetch("assets/reel_scripts.json", { cache: "no-store" })
+  .then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
+
+// every reel keeps the script it was made from (release notes, after "<!-- script -->"): read it, copy it, or open
+// it to change it and make the video again
+function showReelScript(script, assets) {
+  $("relScriptBox").classList.toggle("hidden", !script);
+  $("relScript").value = script;
+  const scene = assets.find((a) => a.name.endsWith(".scene.json"));
+  const none = $("relScriptNone");
+  none.classList.toggle("hidden", !!script);
+  none.replaceChildren();
+  if (!script) {
+    none.append(scene
+      ? el("span", {}, ["Is video ki likhi script nahi hai (AI ne seedha scene banaya tha). ",
+                         el("a", { href: scene.browser_download_url, target: "_blank", rel: "noopener",
+                                   textContent: "⬇️ Scene file (JSON)" })])
+      : "Is purani video ki script save nahi hui thi (ab se har video ki script yahan save hoti hai).");
+  }
+}
+const openReelScript = (where) => {
+  const text = $("relScript").value.trim() + "\n";
+  if (where === "cards") {
+    drafts.script = text;
+    setMode("cards");
+    $("cards").scrollIntoView({ block: "start", behavior: "smooth" });
+    return;
+  }
+  if (scriptText().trim() && !confirm("Box me jo likha hai uski jagah is video ki script aa jayegi. Theek hai?")) return;
+  drafts.script = text;
+  setMode("script");
+  $("text").value = text;
+  showLint();
+  $("text").scrollIntoView({ block: "start", behavior: "smooth" });
+};
+$("relScriptCards").addEventListener("click", () => openReelScript("cards"));
+$("relScriptOpen").addEventListener("click", () => openReelScript("script"));
+$("relScriptCopy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("relScript").value); $("relScriptCopy").textContent = "✅ Copy ho gaya"; }
+  catch { $("relScript").select(); document.execCommand("copy"); $("relScriptCopy").textContent = "✅ Copy ho gaya"; }
+  setTimeout(() => { $("relScriptCopy").textContent = "📋 Script copy"; }, 1600);
+});
 
 // ---------------------------------------------------------------- gallery
 async function loadGallery() {

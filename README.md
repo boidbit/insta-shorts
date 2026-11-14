@@ -444,6 +444,12 @@ UPI: Rs 2000 | Sharma ji | Payment failed
 - `UPI`: amount, kisko, aur hara tick (ya "failed / declined / nahi" ho to laal cross).
 - Page ke Builder me "📱 Screen card" me bhi ye chaaron hain.
 
+### Har video ki script save 📜
+
+Page pe "📼 Pichli reels" me koi bhi reel kholo: video ke neeche **"📜 Is video ki script"** me wahi script hoti hai jisse wo bani thi. 📋 copy karo, "📝 Apni script me kholo" ya "🧩 Builder me kholo", badlo aur dobara banao.
+- Ab har nayi reel ke release me script (`script.txt`, notes me bhi) aur scene (`*.scene.json`) dono save hote hain.
+- Purani 66 reels ki script unke GitHub run ke log se nikaal ke `assets/reel_scripts.json` me rakhi hai; page wahan se dikhata hai. (7 purani reels kisi file ya AI ke seedhe scene se bani thin, unki likhi script thi hi nahi.)
+
 ### Har jagah ka apna look 🎬 (`LOOK`) aur har video me ek ajeeb cheez 👀 (`MYSTERY`)
 
 **Look (colour grading):** ab har jagah apne rang me aati hai, apne aap. Kuch likhna nahi.
