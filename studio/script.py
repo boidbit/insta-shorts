@@ -254,7 +254,44 @@ def vocab():
         "marks": list(MARKS),
         "skin": list(SKIN_TONES), "outfits": list(OUTFITS), "colors": sorted(PALETTE), "accessories": list(ACCESSORIES),
         "builds": list(BUILDS),
+        # the action picker: groups of actions, and the other names each action also answers to (istri = iron)
+        "action_groups": [[label, [a for a in names if a in actions.ACTIONS]] for label, names in ACTION_GROUPS],
+        "action_aliases": _action_aliases(),
     }
+
+
+ACTION_GROUPS = [   # the Builder's action dropdown, in the order a writer looks for them
+    ("🗣️ Baat-cheet", "talk point point_self wave salute namaste bow nod shake_head shrug facepalm clap thumbs_up "
+                     "fist_pump hands_on_hips arms_crossed scratch_head rub_hands whisper listen argue think "
+                     "look_around look_up look_down look_back peek hide turn_around stretch yawn sneeze shiver sulk "
+                     "stomp proud shy shh flex".split()),
+    ("😲 Reaction", "double_take slow_clap mic_drop collar_up nazar_utaar laugh rofl cry shock scared cringe dizzy "
+                   "faint celebrate".split()),
+    ("🙏 Desi", "touch_feet bless kaan_pakad kaan_kheench ghoorna eye_roll finger_wag pinch_cheeks check_watch selfie "
+               "scroll video_call eat_hands fan_self swat knock ring_bell propose cry_hug pull_chair".split()),
+    ("🪑 Baithna / sona", "sit sit_floor lie_down sleep sleep_lie wake_up get_up".split()),
+    ("🍵 Roz ka kaam", "eat drink cook sweep wash_hands brush_teeth read write text phone_call count_money drive "
+                      "put take".split()),
+    ("🧹 Kaam-kaaj", sorted(actions.WORK_ACTIONS)),
+    ("🤝 Doosre ke saath", "throw catch kick slap punch box push dodge high_five handshake hug pat_back carry drag "
+                          "tug hit_react".split()),
+    ("🏃 Chalna / girna", "walk run jog sneak limp crouch jump jump_over climb slide slip trip skid fall spin "
+                         "cartwheel moonwalk".split()),
+    ("💃 Dance / gaana", "dance naagin bhangra aeroplane thumka dance_walk kamar_dard sing garba hookstep floss disco "
+                        "sway".split()),
+    ("🏏 Khel / gym", "bat bowl race_start jumping_jacks squat pushup lift_weights".split()),
+]
+
+
+def _action_aliases():
+    """{action: [its other names]}: the first name an action has in actions.ACTIONS is its own, the rest point to it."""
+    first, out = {}, {}
+    for name, fn in actions.ACTIONS.items():
+        if fn in first:
+            out.setdefault(first[fn], []).append(name)
+        else:
+            first[fn] = name
+    return out
 
 
 def _words(s):
