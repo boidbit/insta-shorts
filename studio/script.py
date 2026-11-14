@@ -220,6 +220,7 @@ def vocab():
         "places": sorted(BACKGROUNDS),
         "looks": sorted(LOOKS), "roles": sorted(ROLE_LOOKS),
         "extras": sorted(set(ACCESSORIES) | set(HAIR_STYLES) | set(HAIR_WORDS) | set(OUTFITS) | set(SKIN_TONES)
+                         | set(JACKET_WORDS) | set(BANYAN_WORDS)
                          | set(BUILDS)
                          | set(BUILD_WORDS) | set(HEIGHT_WORDS)
                          | set(GENDER_WORDS) | set(PALETTE) | set(HAIR_COLORS) | set(FACE_WORDS) | set(BEHIND_WORDS)),
@@ -267,12 +268,60 @@ BEHIND_WORDS = {"peeche": True, "piche": True, "behind": True, "counter_peeche":
                 "front_side": False}
 
 
+# clothes words beyond the outfit names: a jacket over a kurta (Indian English often calls it a "vest", and so
+# do the writers: `kurta saffron vest saffron` is a neta's kurta with a Nehru jacket, not a banyan), and the banyan
+JACKET_WORDS = ("jacket", "nehru_jacket", "nehru", "waistcoat", "koti", "sadri", "modi_jacket")
+BANYAN_WORDS = ("banyan", "baniyan", "ganji", "sando", "undershirt")
+LONG_TOPS = ("kurta", "salwar", "kurta_jacket")
+
+
+def _clothes(words):
+    """(outfit, colour of the top, colour of the jacket) the words ask for, read all together, so the order and a
+    second clothes word do not throw one away: `kurta white vest grey` = kurta_jacket, white kurta, grey jacket."""
+    tops, top_col, jacket_col, last, jacket_at = [], None, None, None, None
+    said_vest = "vest" in words                          # the word itself (a banyan word is never a jacket)
+    jacket = any(w in JACKET_WORDS for w in words)
+    for i, w in enumerate(words):
+        if w in OUTFITS or w in BANYAN_WORDS:
+            tops.append("vest" if w in BANYAN_WORDS else w)
+            last = "vest" if w == "vest" else "top"
+        elif w in JACKET_WORDS:
+            last = "jacket"
+        elif w in PALETTE:
+            long_now = any(t in LONG_TOPS for t in tops)
+            if last == "jacket" or (last == "vest" and long_now):
+                if jacket_col is None:
+                    jacket_col, jacket_at = w, i
+            elif last in ("top", "vest") and top_col is None:
+                top_col = w
+            last = None
+        else:
+            last = None
+    long_top = any(t in LONG_TOPS for t in tops)
+    if jacket_col and jacket_col == top_col:            # the same colour twice: the jacket would vanish on the kurta
+        jacket_col = "white" if top_col not in ("white", "cream") else "grey"
+    if long_top and (said_vest or jacket):              # a kurta with a "vest" / jacket: the neta's Nehru jacket
+        return "kurta_jacket", top_col, jacket_col, jacket_at
+    if jacket and not tops:
+        return "kurta_jacket", top_col, jacket_col, jacket_at
+    if jacket and any(t in ("shirt", "tshirt") for t in tops):
+        return "blazer", top_col, jacket_col, jacket_at
+    if not tops:
+        return None, top_col, jacket_col, None
+    if long_top:                                        # a kurta and something short: the kurta (it is what shows)
+        return next(t for t in tops if t in LONG_TOPS), top_col, None, None
+    return tops[-1], top_col, None, None
+
+
 def cast_spec(words, index, unknown=None):
     """'aunty chubby glasses maroon female' -> character spec (with a voice).
     Words that mean nothing here are added to `unknown`."""
     spec, acc = {}, []
     female = None
-    for w in words:
+    outfit, top_col, jacket_col, jacket_at = _clothes(words)
+    for wi, w in enumerate(words):
+        if wi == jacket_at:
+            continue                                   # the jacket's colour, not the person's
         if w in ANIMAL_WORDS and "kind" not in spec:       # A = kutta brown: a dog (talks too)
             spec["kind"] = ANIMAL_WORDS[w]
         elif spec.get("kind") not in (None, "monkey") and w in PALETTE and "color" not in spec:
@@ -293,8 +342,8 @@ def cast_spec(words, index, unknown=None):
             spec["hair"] = w
         elif w in HAIR_WORDS:                          # do_choti, takla...
             spec["hair"] = HAIR_WORDS[w]
-        elif w in OUTFITS:
-            spec["outfit"] = w
+        elif w in OUTFITS or w in JACKET_WORDS or w in BANYAN_WORDS:
+            pass                                       # (all the clothes words together: _clothes above)
         elif w in SKIN_TONES:
             spec["skin"] = w
         elif w in ("slim", "normal", "chubby"):
@@ -320,6 +369,12 @@ def cast_spec(words, index, unknown=None):
         elif unknown is not None and w not in LOOKS and w not in ROLE_LOOKS and w not in PALETTE:
             unknown.append(w)
     spec.setdefault("look", "college_girl" if female else "boy")
+    if outfit:
+        spec["outfit"] = outfit
+        if top_col and spec.get("kind") is None:
+            spec["color"] = top_col
+        if jacket_col and outfit in ("kurta_jacket", "blazer"):
+            spec["accent"] = jacket_col
     if acc:
         spec["accessories"] = sorted(set(LOOKS[spec["look"]].get("accessories", [])) | set(acc))
     if female is None:

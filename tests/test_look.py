@@ -164,3 +164,31 @@ class HandleAndCoverTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Clothes(unittest.TestCase):
+    """All clothes words of a CAST entry are read together (a second one used to throw the first away)."""
+
+    def spec(self, words):
+        from studio.characters import resolve_spec
+        sc, w = parse_script("HOOK: x\nCAST: A = %s\nSCENE: office\nA: Haan | हाँ\n" % words)
+        self.assertEqual(w, [])
+        return resolve_spec(sc["characters"]["A"])
+
+    def test_a_kurta_with_a_vest_is_the_neta_s_jacket_not_a_banyan(self):
+        s = self.spec("uncle short kurta saffron chubby tilak vest saffron moustache")
+        self.assertEqual((s["outfit"], s["color"]), ("kurta_jacket", "saffron"))
+        self.assertNotEqual(s["accent"], "saffron")              # the jacket shows on the kurta
+        s = self.spec("uncle kurta white vest grey")
+        self.assertEqual((s["outfit"], s["color"], s["accent"]), ("kurta_jacket", "white", "grey"))
+        self.assertEqual(self.spec("uncle kurta jacket maroon")["accent"], "maroon")
+
+    def test_a_banyan_is_still_a_banyan(self):
+        self.assertEqual(self.spec("uncle vest")["outfit"], "vest")
+        self.assertEqual(self.spec("uncle banyan white")["outfit"], "vest")
+        self.assertEqual(self.spec("chaiwala")["outfit"], "vest")
+
+    def test_a_shirt_with_a_jacket_is_a_blazer(self):
+        s = self.spec("boy shirt jacket navy")
+        self.assertEqual((s["outfit"], s["accent"]), ("blazer", "navy"))
+        self.assertNotEqual(s.get("color"), "navy")
