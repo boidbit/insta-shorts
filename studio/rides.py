@@ -32,8 +32,12 @@ RIDES = {
             "back": dict(hip=(-52, -80), r=0.2, hands=None, feet=[(-18, -52), (-26, -50)])},
     "truck": {"driver": dict(hip=(206, -124), r=0.21, hands=[(246, -128), (240, -126)], feet=[(240, -78), (232, -76)]),
               "back": dict(hip=(148, -124), r=0.21, hands=None, feet=[(184, -78), (176, -76)])},
+    "tractor": {"driver": dict(hip=(-60, -212), r=0.3, hands=[(56, -246), (48, -244)], feet=[(10, -132), (2, -130)])},
+    "bail_gaadi": {"driver": dict(hip=(-20, -152), r=0.27, hands=[(80, -196), (72, -192)], feet=[(40, -110), (30, -108)]),
+                   "back": dict(hip=(-200, -152), r=0.27, hands=None, feet=[(-150, -110), (-160, -108)])},
 }
-HALF_LENGTH = {"bike": 170, "scooter": 150, "cycle": 170, "auto": 190, "car": 260, "truck": 320}
+HALF_LENGTH = {"bike": 170, "scooter": 150, "cycle": 170, "auto": 190, "car": 260, "truck": 320, "tractor": 240,
+               "bail_gaadi": 330}
 CRANK = dict(bb=(0, -58), length=40)
 
 

@@ -497,6 +497,28 @@ Prompt me ye ek "kaam-kaaj" module hai: idea me kaam ki baat ho (bartan, pocha, 
 | `collar_up` (`collar`, `collar_khada`) | collar khada, do baar flick: swag |
 | `nazar_utaar` (`nazar`) | mutthi chehre ke aas-paas teen chakkar, phir jhatak ke "thoo thoo" |
 
+### 🌾 Gaon pack: gaon ki jagah, log, bhains, tractor
+
+**Jagah** (2D aur 2.5D dono):
+
+| `SCENE:` | Kya hai | Aur naam |
+|---|---|---|
+| `khet` | sarson aur gehu, mend wala raasta, tubewell ka paani, bijooka (2.5D: paani chamakta hai, sarson hilti hai) | field, farm, kheti |
+| `chaupal` | bada bargad, chabutra, hookah, khaat, GRAM PANCHAYAT board (2.5D: hookah ka dhuan, patte girte hain) | panchayat, bargad |
+| `handpump` | gali ka nal, matke line me, balti, kapde dhone ka pathar (2.5D: boondein tapakti hain) | nal, hand_pump, kuan |
+| `kachcha_ghar` | mitti ka ghar andar se: chulha, lalten, aale me diya, peetal ke bartan (2.5D: aag aur dhuan) | mitti_ka_ghar, jhopdi |
+| `gaon_school` | ped ke neeche class, blackboard, tat-patti, PRATHMIK VIDYALAYA, ghanta | pathshala, village_school |
+
+**Log** (CAST me): `kisan` (pagdi, gamchha), `gaon_aurat` (saree + ghunghat: tai, chachi, gaon_wali), `sarpanch` (pradhan, mukhiya), `tau` (dhoti-banyan, pagdi, lathi: chaudhary, tauji), `gaon_ladka` (chhora). Extras: `gamchha`, `ghunghat` (kisi pe bhi laga sakte ho, jaise `A = aunty ghunghat`). Sheher se lauta beta: `college_boy sunglasses`.
+
+**Jaanwar aur gaadi:** `B = bhains` (bol bhi sakti hai), `K -> ride tractor`, `K -> ride bail_gaadi` (`A -> ride bail_gaadi back` = peeche baithna), `OBJ: bail_gaadi go right`.
+
+**Cheezein** (`OBJ:`): `hookah`, `lantern`, `uple`, `bhoosa`, `handpump`, `bijooka`.
+
+**Actions:** `hookah` (gud-gud, paas me hookah apne aap aata hai), `handpump` (nal chalana, nal apne aap), `doodh_nikalna` (balti apne aap), `ghunghat` (pallu kheenchna), `lathi_tek` (lathi pe jhukna). Builder me bhi "🌾 Gaon" group aur ✨ suggestion (hukka, bhains, nal, pallu, lathi).
+
+**Prompt:** gaon ka saara saaman prompt ke ek alag "gaon" hisse me hai: page use tabhi jodta hai jab idea me gaon, khet, tau, sarpanch, bhains jaise shabd hon (sheher wali scripts ka prompt chhota hi rehta hai).
+
 ### Sarkari daftar 🏛️ aur kuch situations
 
 - `SCENE: sarkari_daftar` (ya `sarkari_office`, `govt_office`, `daftar`, `tehsil`, `kachehri`): hari peeli deewar, files se thasaathas almirah, "KHIDKI NO. 3", "LUNCH 1:00 - 2:00 / KAL AANA", 1998 ka calendar, jaali wali khidki, tube light, dheema pankha (2.5D me pankha ghoomta hai, tube light tim-timati hai, ek kagaz hawa me udta hai). Babu ki desk (files, register, thappa ke saath) studio khud rakhta hai; clerk / babu khud uske peeche baithta hai. Apni `OBJ: desk ...` likho to wo is desk ki jagah le leti hai.

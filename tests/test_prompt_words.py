@@ -77,13 +77,13 @@ class PromptWordTests(unittest.TestCase):
             self.assertNotIn(w, EXPRESSIONS, w)
 
     def test_places_times_weather(self):
-        places = words(line("- Places: ").split("(street and")[0])
+        places = words(line("- Places: ").split("(street and")[0]) + words(line("- Village places: ").split("(gaon")[0])
         self.assertEqual(sorted(places), sorted(script.BACKGROUNDS))
         for w in ("day", "night", "evening", "sunset", "dawn", "rain", "fog", "snow", "fireflies", "leaves"):
             self.assertIn(w, script.TIMES + script.WEATHER)
 
     def test_set_pieces_and_states(self):
-        pieces = words(line("Pieces: "))
+        pieces = words(line("Pieces: ")) + words(line("- Village pieces: ").split(". Animal")[0])
         self.assertEqual(sorted(pieces), sorted(script.SET_TYPES))
         for w in words(line("States: ").replace(":", ",").replace(";", ",")):
             if w not in pieces:

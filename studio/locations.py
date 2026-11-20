@@ -990,3 +990,7 @@ from .places_2026 import HORIZON as _HORIZON_2026, NEW as _PLACES_2026   # noqa:
 
 LOCATIONS.update(_PLACES_2026)
 LOC_HORIZON.update(_HORIZON_2026)
+from .places_gaon import HORIZON as _HORIZON_GAON, NEW as _PLACES_GAON   # noqa: E402  (khet, chaupal, handpump...)
+
+LOCATIONS.update(_PLACES_GAON)
+LOC_HORIZON.update(_HORIZON_GAON)

@@ -26,9 +26,9 @@ PAD = 30
 # 4.2 x 1.5, bike 2.1 x 1.2, cow 2 x 1.45, person 1.7 m...). An object is drawn at (character scale / PERSON_R), so
 # a vehicle is always in proportion to the people next to it, and a rider is as big as somebody standing.
 PERSON_R = {"truck": 0.21, "auto": 0.34, "car": 0.27, "bike": 0.35, "scooter": 0.36, "cycle": 0.39,
-            "cow": 0.44, "dustbin": 0.43, "bags": 0.62, "table": 0.50}
+            "cow": 0.44, "dustbin": 0.43, "bags": 0.62, "table": 0.50, "tractor": 0.30, "bail_gaadi": 0.27}
 SPRITE_LEN = {"truck": 640, "auto": 380, "car": 520, "bike": 340, "scooter": 300, "cycle": 340,
-              "cow": 430, "dustbin": 170, "bags": 280, "table": 380}
+              "cow": 430, "dustbin": 170, "bags": 280, "table": 380, "tractor": 480, "bail_gaadi": 640}
 # a thela is drawn at 250 units a metre and a person (~1.7 m) is ~800 units: 0.95 * 250 / (800 / 1.7) = 0.5
 # (the carts and the shop counters are added below, where they are drawn)
 REF_SCALE = 0.95                                 # a typical character's scale
@@ -183,6 +183,57 @@ def _cycle(s, c, part="all"):
     p.rrect(-34, -194, 22, -178, 7, (44, 40, 44))                                    # saddle
     p.circle(bb[0], bb[1], 12, (150, 152, 160), INK, 4)
     return p, [(rear[0], rear[1], 60), (front[0], front[1], 60)]
+
+
+def _tractor(s, c):
+    """A tractor, facing right: the big rear wheel under its mudguard, the bonnet with the exhaust pipe, the open seat
+    and the steering wheel (somebody can ride it: rides.py)."""
+    p = Pen(s, 480, 360)
+    dark = shade(c, 0.75)
+    p.rrect(-150, -180, -10, -150, 10, dark)                                        # rear mudguard
+    p.poly([(-150, -165), (-170, -100), (-150, -100)], dark)
+    p.rect(-60, -150, 80, -90, (70, 72, 80))                                        # chassis
+    p.poly([(0, -200), (210, -190), (230, -150), (230, -96), (0, -96)], c)          # the bonnet
+    for x in range(40, 200, 36):
+        p.line([(x, -180), (x, -110)], dark, 4)                                     # the grille's slats
+    p.rect(214, -170, 236, -142, (255, 232, 140), INK, 4)                           # headlight
+    p.rect(150, -290, 166, -198, (60, 60, 66))                                      # exhaust pipe
+    p.rect(146, -300, 170, -288, (60, 60, 66))
+    p.rrect(-96, -214, -24, -196, 6, (44, 40, 44))                                  # seat
+    p.line([(-40, -196), (-40, -150)], (60, 60, 66), 8)
+    p.line([(30, -196), (50, -246)], INK, 7)                                        # steering column...
+    p.line([(28, -252), (72, -240)], INK, 9)                                        # ...and wheel
+    p.rect(-20, -130, 40, -110, (60, 60, 66))                                       # the step
+    return p, [(-80, -100, 100), (170, -52, 52)]
+
+
+def _bail_gaadi(s, c):
+    """A bullock cart (bail gaadi), facing right: two white bullocks with their horns and the yoke, the wooden
+    cart on its two big spoked wheels (somebody can ride it: rides.py)."""
+    p = Pen(s, 640, 330)
+    wood, dark = c, shade(c, 0.72)
+    white = (244, 240, 230)
+    p.line([(-40, -150), (100, -190)], dark, 12)                                    # the shaft to the yoke
+    for dx, sh in ((26, 0.9), (0, 1.0)):                                            # the two bullocks (far one first)
+        col = tuple(int(v * sh) for v in white)
+        for x in (100, 125, 205, 230):
+            p.rect(x + dx - 9, -120, x + dx + 9, -4, col, INK, 4)                    # legs
+            p.rect(x + dx - 10, -14, x + dx + 10, 0, (60, 52, 50), INK, 3)          # hooves
+        p.rrect(80 + dx, -210, 250 + dx, -110, 40, col)                            # body
+        p.poly([(110 + dx, -210), (140 + dx, -246), (170 + dx, -210)], col)        # the hump
+        p.poly([(240 + dx, -220), (268 + dx, -244), (298 + dx, -228), (296 + dx, -170), (250 + dx, -160)], col)  # head
+        p.line([(262 + dx, -240), (250 + dx, -282)], (200, 180, 140), 8)           # horns
+        p.line([(280 + dx, -240), (294 + dx, -282)], (200, 180, 140), 8)
+        p.circle(280 + dx, -214, 5, INK, INK, 2)
+        p.line([(82 + dx, -190), (60 + dx, -150), (64 + dx, -110)], INK, 5)      # tail
+    p.rect(90, -232, 280, -218, dark)                                              # the yoke across their necks
+    p.rect(-300, -150, 20, -126, wood)                                              # the cart's floor...
+    p.rect(-300, -200, -284, -150, wood)                                            # ...and its sides
+    p.rect(0, -200, 16, -150, wood)
+    for x in range(-280, 0, 40):
+        p.line([(x, -200), (x, -150)], dark, 4)
+    p.line([(-300, -196), (16, -196)], dark, 6)
+    return p, [(-140, -74, 74)]
 
 
 def _cow(s, c):
@@ -503,6 +554,8 @@ OBJECTS = {            # kind: (drawer, default colour, default scale, spins its
     "dustbin": (_dustbin, (70, 130, 170), 1.0),
     "bags": (_bags, (38, 38, 46), 1.0),
     "table": (_table, (160, 112, 76), 1.0),
+    "tractor": (_tractor, (200, 50, 46), 1.0),
+    "bail_gaadi": (_bail_gaadi, (160, 112, 70), 1.0),
 }
 for _v, (_sign, _sc, _tc, _tarp) in THELA.items():       # thela (sabzi), thela_kulche, thela_fruits...
     OBJECTS["thela" if _v == "sabzi" else "thela_" + _v] = (
@@ -523,7 +576,8 @@ ALIASES = {"garbage_truck": "truck", "kachra_gaadi": "truck", "gaadi": "truck", 
            "kulche_thela": "thela_kulche", "fruit_thela": "thela_fruits", "chaat_thela": "thela_chaat",
            "momos_thela": "thela_momos", "golgappe_thela": "thela_golgappe", "sabzi_thela": "thela",
            "chai_thela": "thela_chai", "juice_thela": "thela_ganna", "dukaan": "counter", "dukan": "counter",
-           "shop_counter": "counter"}
+           "shop_counter": "counter", "trekter": "tractor", "tracter": "tractor", "bailgaadi": "bail_gaadi",
+           "bail_gadi": "bail_gaadi", "bailgadi": "bail_gaadi", "bullock_cart": "bail_gaadi", "bail": "bail_gaadi"}
 
 
 def thela_kind(variant):
@@ -536,7 +590,7 @@ def counter_kind(variant):
     """`mithai` -> "counter_mithai" (None if the word is not a shop)."""
     v = SHOP_WORDS.get(str(variant).lower())
     return None if v is None else ("counter" if v == "general" else "counter_" + v)
-VEHICLES = ("truck", "auto", "car", "scooter", "bike", "cycle")
+VEHICLES = ("truck", "auto", "car", "scooter", "bike", "cycle", "tractor", "bail_gaadi")
 SPLIT = ("truck", "auto", "car")               # drawn in two parts so a driver can show through the windows
 
 

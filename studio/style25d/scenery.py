@@ -804,6 +804,11 @@ PRESETS = {
     "call_center_25d": _lazy("scenery_2026", "call_center_25d"),
     "startup_office_25d": _lazy("scenery_2026", "startup_office_25d"),
     "sarkari_daftar_25d": _lazy("scenery_2026", "sarkari_daftar_25d"),
+    "khet_25d": _lazy("scenery_gaon", "khet_25d"),
+    "chaupal_25d": _lazy("scenery_gaon", "chaupal_25d"),
+    "handpump_25d": _lazy("scenery_gaon", "handpump_25d"),
+    "kachcha_ghar_25d": _lazy("scenery_gaon", "kachcha_ghar_25d"),
+    "gaon_school_25d": _lazy("scenery_gaon", "gaon_school_25d"),
 
     "kitchen_25d": _lazy("scenery_kitchen", "kitchen_25d"),
     "gali_25d": _lazy("scenery_gali", "gali_25d"),

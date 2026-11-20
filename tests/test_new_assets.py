@@ -35,8 +35,9 @@ class LookTests(unittest.TestCase):
         self.assertEqual((o["outfit"], o["color"]), ("kurta_jacket", "white"))
         self.assertIn("topi", o["accessories"])
         self.assertNotIn("cap", o["accessories"])                   # not a sports cap
-        for word in ("netaji", "mantri", "sarpanch"):
+        for word in ("netaji", "mantri"):
             self.assertEqual(cast(word)[0]["look"], "neta")
+        self.assertEqual(cast("sarpanch")[0]["look"], "sarpanch")       # the village pack has its own sarpanch
 
     def test_every_new_look_draws_and_has_a_picture(self):
         for look in NEW_LOOKS:
