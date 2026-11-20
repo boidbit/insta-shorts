@@ -107,6 +107,18 @@ class NoCastNeeded(unittest.TestCase):
         self.assertEqual(sc["series"]["title"], "Sultan Bhai")
         self.assertEqual(sc["scenes"][0]["background"]["type"], "gaon")          # the script's place stays
 
+    def test_the_bhains_stands_clear_of_the_dog_that_walks_in(self):
+        from studio.render import Sequence
+        from studio import animals
+        sc, w = parse_script("HOOK: x\nSCENE: gaon\nSultan -> enter left\nSultan (swag): Ae bhains! | ऐ भैंस!\n"
+                             "Bhains (akad): Hat ja! | हट जा!\n")
+        r = Sequence(sc, 1080, False, None, None).parts[0]
+        dog, bh = r.plan.chars["Sultan"], r.plan.chars["Bhains"]
+        t = r.plan.duration - 0.5
+        nose_dog = dog.draw_pos(t)[0] + animals.extent("dog", dog.scale)[0]
+        nose_bh = bh.draw_pos(t)[0] - animals.extent("buffalo", bh.scale)[0]
+        self.assertGreater(nose_bh - nose_dog, 60)
+
     def test_cast_still_wins(self):
         sc, w = parse_script("HOOK: x\nCAST: Sultan = boy, Bhains = uncle\nSCENE: room\nSultan: Haan. | हाँ।\n"
                              "Bhains: Na. | ना।\n")
