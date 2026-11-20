@@ -21,8 +21,10 @@ SYSTEM = """You turn Hinglish (Hindi written in Latin letters, mixed with Englis
 text-to-speech voice. For every input line, write exactly the same words, in the same order, as they are spoken, in
 Devanagari script. English words stay English words, written in Devanagari the way an Indian speaker says them
 (phone -> फ़ोन, insurance -> इंश्योरेंस). Numbers become Hindi words (10 hazar -> दस हज़ार). Keep the punctuation
-(? ! . , ...). Drop emojis. Do not translate, explain, add or remove words. Return ONLY a JSON array of strings: one
-string per input line, same order, same count."""
+(? ! . , ...). Drop emojis. Do not translate, explain, add or remove words. This is street talk: keep slang, rough
+words and broken grammar exactly as they are, never make them proper or polite (abey -> अबे, be -> बे, yaar -> यार,
+bhai -> भाई, kya bolta -> क्या बोलता, tere ko -> तेरे को); a word that can be read two ways is read the way this line
+means it. Return ONLY a JSON array of strings: one string per input line, same order, same count."""
 
 
 def needs_hindi(text):

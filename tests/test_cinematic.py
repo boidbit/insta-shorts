@@ -138,3 +138,23 @@ class Subtitles(unittest.TestCase):
         sc, _ = parse_script(TWO % "")
         v = make_video(scene.apply_options(sc, dialogue="bubble"), 160, use_tts=False, hook="off")
         self.assertTrue(all(sp["bubble"] for sp in v.parts[-1].plan.speech))
+
+
+class Devanagari(unittest.TestCase):
+    def test_the_writer_and_the_studio_keep_the_slang(self):
+        root = os.path.join(os.path.dirname(__file__), "..")
+        with open(os.path.join(root, "SCRIPT_PROMPT.md"), encoding="utf-8") as f:
+            prompt = f.read()
+        self.assertIn("<Hinglish> | <the same words in Devanagari>", prompt)        # dialogue-only mode too
+        self.assertIn("abey = अबे", prompt)
+        from studio import hindi
+        self.assertIn("never make them proper", hindi.SYSTEM)
+        with open(os.path.join(root, "index.html"), encoding="utf-8") as f:
+            self.assertIn("| देवनागरी bhi do", f.read())
+
+    def test_a_pasted_dialogue_keeps_its_devanagari(self):
+        sc, w = parse_script("HOOK: h\nCAST: K = kutta, D = doctor\nSCENE: hospital\n"
+                             "K (smug): Abey chup | अबे चुप\nD (scared): Kya hua? | क्या हुआ?\n")
+        self.assertEqual(w, [])
+        says = [e for e in sc["scenes"][0]["timeline"] if "say" in e]
+        self.assertEqual(says[0]["speak"], "अबे चुप")
