@@ -77,7 +77,7 @@ def fit_to_angle(ob, ang):
 PEOPLE_SCALE_3 = 1.06        # ...three people side by side need the room
 PEOPLE_SCALE_4 = 0.9         # ...and four even more
 PEOPLE_SCALE = 1.22          # medium shots: people this much bigger than the painted place (x sqrt of the angle zoom)
-FOCUS_H = {"dog": 170.0, "cat": 120.0, "cow": 260.0, "buffalo": 260.0, "goat": 170.0, "crow": 70.0, "parrot": 70.0, "rooster": 90.0,
+FOCUS_H = {"dog": 170.0, "cat": 120.0, "cow": 400.0, "buffalo": 380.0, "goat": 220.0, "crow": 70.0, "parrot": 70.0, "rooster": 90.0,
            "lizard": 690.0, "mosquito": 580.0}   # animals: camera looks lower
 
 OTS_BACK = dict(k=2.3, drop=1200.0, left=150.0, right=930.0)      # the near shoulder: big, cut off by the frame
@@ -687,6 +687,31 @@ STAND_MIN = 170.0           # a standing person's centre keeps this far from the
 STAND_GAP = 240.0           # ...and this far from the next person
 
 
+BIG_ANIMALS = ("cow", "buffalo", "goat")
+ANIMAL_GAP = 110.0          # px between a big animal's nose and the person it stands by
+
+
+def _make_room_for_big_animals(chars):
+    """A cow / bhains / goat is drawn at its real size: placed by its slot it would stand on the person next to it.
+    It goes beside the nearest person instead, its head towards them, a gap between (the person steps aside if
+    the animal would leave the picture)."""
+    from . import animals
+    people = [c for c in chars.values() if not c.spec.get("kind") and not c.spec.get("hidden")]
+    for a in chars.values():
+        if a.spec.get("kind") not in BIG_ANIMALS or "x" in a.spec or not people:
+            continue
+        p = min(people, key=lambda c: abs(c.x - a.x))
+        side = 1.0 if a.x >= p.x else -1.0
+        front, back = animals.extent(a.spec["kind"], a.scale)
+        want = p.x + side * (front + ANIMAL_GAP)
+        over = (want + back - (LW + 120.0)) if side > 0 else (-120.0 - (want - back))
+        if over > 0 and "x" not in p.spec:                  # slide both towards the middle
+            step = min(over, (p.x - 150.0) if side > 0 else (LW - 150.0 - p.x))
+            p.x -= side * max(0.0, step)
+            want -= side * max(0.0, step)
+        a.x = want
+
+
 def stand_up_in_frame(chars, set_by_id):
     """cine: somebody lying on a bed (or sofa) has their feet at its far end - often at the edge of the picture.
     When they get up (any action that is not lying), they step to the nearest free spot inside the frame."""
@@ -1121,6 +1146,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         y = spec.get("y", GROUND_Y)
         chars[name] = Char(name, spec, float(x), float(y), i)
         chars[name].scale *= world * float(spec.get("depth_k", 1.0))    # (a driving shot's back seat: further)
+    _make_room_for_big_animals(chars)
     if framing == "ots":
         place_over_shoulder(chars)
         for c_ in chars.values():               # the speaker facing us a bit bigger too (still well behind the back)

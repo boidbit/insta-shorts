@@ -46,13 +46,69 @@ def build_animal(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mo
     return _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_open, expr)
 
 
+# how big each one is next to the people (a cow / bhains is a big animal: ~1.3 m at the shoulder)
+SIZE = {"dog": 0.82, "cat": 0.82, "cow": 1.2, "buffalo": 1.25, "goat": 1.0}
+# the body's outline (body-local, x forward, y down, in units of rx / ry), drawn as a smooth closed curve
+BODY = {
+    "cow": [(0.72, -0.95), (0.5, -1.34), (0.26, -0.96), (-0.4, -0.92), (-0.82, -0.9), (-1.0, -0.55), (-1.03, 0.0),
+            (-0.92, 0.5), (-0.6, 0.86), (0.0, 1.02), (0.55, 0.92), (0.9, 0.5), (1.0, 0.0), (0.93, -0.55)],
+    "buffalo": [(0.6, -0.98), (0.1, -1.0), (-0.5, -0.96), (-0.86, -0.88), (-1.03, -0.5), (-1.05, 0.05),
+                (-0.95, 0.56), (-0.62, 0.94), (0.0, 1.12), (0.55, 1.0), (0.92, 0.56), (1.03, 0.0), (0.96, -0.56)],
+    "goat": [(0.6, -0.92), (0.0, -0.88), (-0.7, -0.96), (-1.0, -0.55), (-1.0, 0.05), (-0.85, 0.55), (-0.5, 0.8),
+             (0.1, 0.9), (0.6, 0.86), (0.95, 0.45), (1.0, -0.1), (0.9, -0.6)],
+    "dog": [(0.55, -0.92), (0.0, -0.86), (-0.6, -0.94), (-0.98, -0.6), (-1.02, 0.0), (-0.86, 0.45), (-0.5, 0.55),
+            (0.0, 0.62), (0.45, 0.96), (0.85, 0.76), (1.0, 0.2), (0.95, -0.45)],
+    "cat": [(0.6, -0.86), (0.0, -0.96), (-0.6, -1.0), (-1.0, -0.6), (-1.02, 0.1), (-0.8, 0.7), (-0.3, 0.86),
+            (0.3, 0.86), (0.8, 0.66), (1.0, 0.1), (0.9, -0.5)],
+}
+HOOVES = ("cow", "buffalo", "goat")
+LEG_W = {"cow": 0.66, "buffalo": 0.7, "goat": 0.6, "dog": 0.56, "cat": 0.6}       # thigh width, in ry
+NECK_W = {"cow": 1.1, "buffalo": 1.2, "goat": 0.85, "dog": 0.82, "cat": 0.78}     # neck width at the body, in ry
+HEAD_AT = {"cow": (0.55, -0.62), "buffalo": (0.58, -0.5), "goat": (0.5, -1.15), "dog": (0.35, -1.25),
+           "cat": (0.25, -1.08)}                                                   # (x in hr past rx, y in ry)
+
+
+def extent(kind, scale):
+    """(front, back): how far a four-legged animal reaches in front of its x (to the nose) and behind it (to the
+    rump), in logical px at character scale `scale`."""
+    P = QUAD.get(kind)
+    if P is None:
+        return 0.0, 0.0
+    k = scale * SIZE.get(kind, 1.0)
+    return (P["rx"] + P["head"] * (HEAD_AT[kind][0] + 1.3)) * k, (P["rx"] * 1.05 + 30) * k
+
+
+def _spline(pts, n=6):
+    """A smooth closed curve through the points (Catmull-Rom)."""
+    out, m = [], len(pts)
+    for i in range(m):
+        p0, p1, p2, p3 = pts[(i - 1) % m], pts[i], pts[(i + 1) % m], pts[(i + 2) % m]
+        for j in range(n):
+            u = j / float(n)
+            u2, u3 = u * u, u * u * u
+            out.append(tuple(0.5 * (2 * p1[c] + (-p0[c] + p2[c]) * u + (2 * p0[c] - 5 * p1[c] + 4 * p2[c] - p3[c]) * u2
+                                    + (-p0[c] + 3 * p1[c] - 3 * p2[c] + p3[c]) * u3) for c in (0, 1)))
+    return out
+
+
+def _taper(n, w0, w1):
+    return [w0 + (w1 - w0) * j / float(max(1, n - 1)) for j in range(n)]
+
+
+def _mix(c, d, u):
+    return tuple(int(c[i] + (d[i] - c[i]) * u) for i in range(3))
+
+
 def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_open, expr):
     kind = spec.get("kind", "dog")
     P = QUAD.get(kind, QUAD["dog"])
     col = _col(spec, P["color"])
-    dk = tuple(int(v * 0.72) for v in col)
-    rx, ry, leg, hr = P["rx"], P["ry"], P["leg"], P["head"]
-    S = Sketch(x0, ground_y, k, 0, 0, 0, 0)
+    dk = tuple(int(v * 0.74) for v in col)
+    light = _mix(col, (255, 255, 255), 0.2)
+    shade_ = tuple(int(v * 0.86) for v in col)
+    rx, ry, hr = P["rx"], P["ry"], P["head"]
+    leg = P["leg"]
+    S = Sketch(x0, ground_y, k * SIZE.get(kind, 1.0) / 0.82, 0, 0, 0, 0)
     D = dirn
 
     def X(p):
@@ -64,8 +120,13 @@ def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_ope
     def line(pts, w, c=INK):
         S.line([X(p) for p in pts], w, c)
 
-    sit = action == "sit"
-    lie = action in ("lie_down", "lie", "sleep", "sleep_lie")
+    def limb(pts, widths, fill):
+        S.limb([X(p) for p in pts], widths, fill, 5)
+
+    cattle = kind in HOOVES
+    sit = action == "sit" and not cattle
+    lie = action in ("lie_down", "lie", "sleep", "sleep_lie") or (action == "sit" and cattle)   # cattle sit = lie
+    graze = action == "eat" and cattle and not lie
     speak = action in ("bark", "meow", "moo", "speak", "caw") or mouth_open > 0.1
     jump = action in ("jump", "shock")
     gait_f = 3.0 if running else 1.8
@@ -75,125 +136,277 @@ def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_ope
         lift = -120 * abs(math.sin(math.pi * min(1.0, at / 0.45))) if at < 0.45 else 0.0
     if moving:
         lift -= 6 * abs(math.sin(ph))
+    breathe = 0.0 if moving else 3 * math.sin(t * 2.2)
     body_y = -(leg + ry * 0.5) + lift
-    tilt = 0.0
-    if sit:
-        tilt = -24
+    tilt = -24.0 if sit else 0.0
     if lie:
         body_y = -ry * 0.95
     bc = (0.0, body_y)
 
-    def B(p):                          # body-local -> local, with body tilt (sitting)
+    def B(p):                          # body-local -> local, with the body's tilt (sitting)
         a = math.radians(tilt)
         x, y = p
         return (bc[0] + x * math.cos(a) - y * math.sin(a), bc[1] + x * math.sin(a) + y * math.cos(a))
 
-    # legs: back pair at -rx*0.6, front pair at +rx*0.6 (forward = +x)
+    # ---- legs: [hip/shoulder ... hoof] with knees, hocks and fetlocks
+    thick = LEG_W[kind] * ry
     legs = []
-    for i, (hx, off) in enumerate(((-rx * 0.62, 0.0), (-rx * 0.48, math.pi), (rx * 0.52, math.pi), (rx * 0.66, 0.0))):
-        top = B((hx, ry * 0.4))
-        if lie:
-            foot = (top[0] + (40 if hx > 0 else -30), 0.0)
-        elif sit and hx < 0:
-            foot = (top[0] + 50, 0.0)
+    for i, (hx, off, front) in enumerate(((-rx * 0.6, 0.0, False), (-rx * 0.46, math.pi, False),
+                                          (rx * 0.5, math.pi, True), (rx * 0.64, 0.0, True))):
+        top = B((hx, ry * 0.3))
+        L = -top[1]
+        sw = 30 * math.sin(ph + off) if moving else 0.0
+        raise_ = max(0.0, 26 * math.sin(ph + off + math.pi / 2)) if moving else 0.0
+        if lie:                                         # folded under the body
+            pts = [top, (top[0] + (0.2 if front else 0.1) * rx, -ry * 0.25), (top[0] + (0.48 if front else 0.36) * rx, -12)]
+            wid = [thick, thick * 0.5, thick * 0.38]
+        elif sit and not front:                          # the haunches on the ground, the paw forward
+            pts = [top, (top[0] + 0.12 * rx, -ry * 0.35), (top[0] + 0.5 * rx, -10)]
+            wid = [thick * 1.15, thick * 0.6, thick * 0.38]
+        elif jump and at < 0.45:
+            pts = [top, (top[0] + (24 if front else -24), top[1] + L * 0.4), (top[0] + (40 if front else -40), top[1] + L * 0.7)]
+            wid = [thick, thick * 0.45, thick * 0.34]
+        elif front:
+            foot = (top[0] + sw, -raise_)
+            knee = (top[0] + sw * 0.55 + 6, top[1] + L * 0.55 - raise_ * 0.5)
+            fet = (foot[0] + 4, -L * 0.13 - raise_)
+            pts, wid = [top, knee, fet, foot], [thick, thick * 0.46, thick * 0.32, thick * 0.34]
         else:
-            sw = 28 * math.sin(ph + off) if moving else 0.0
-            foot = (top[0] + sw, 0.0 + lift if jump else 0.0)
-            if jump:
-                foot = (top[0] + (20 if hx > 0 else -20), top[1] + leg * 0.75)
-        knee = ((top[0] + foot[0]) / 2 + (8 if hx > 0 else -8), (top[1] + foot[1]) / 2)
-        legs.append((top, knee, foot, i))
-    for top, knee, foot, i in legs[::-1]:
+            foot = (top[0] + sw, -raise_)
+            stifle = (top[0] + L * 0.14 + sw * 0.3, top[1] + L * 0.28)
+            hock = (top[0] - L * 0.1 + sw * 0.7, top[1] + L * 0.62 - raise_ * 0.6)
+            fet = (foot[0] + 4, -L * 0.13 - raise_)
+            pts, wid = [top, stifle, hock, fet, foot], [thick * 1.2, thick * 0.78, thick * 0.4, thick * 0.32, thick * 0.34]
+        legs.append((pts, wid, i))
+
+    def foot_end(pts, c):
+        fx, fy = pts[-1]
+        w = thick * 0.34
+        if cattle:                                       # a cloven hoof
+            poly([(fx - w * 0.6, fy), (fx + w * 0.8, fy), (fx + w * 0.62, fy - w * 0.9), (fx - w * 0.55, fy - w * 0.9)],
+                 (58, 50, 46), INK, 4)
+            line([(fx + w * 0.1, fy), (fx + w * 0.05, fy - w * 0.6)], 3, (150, 140, 130))
+        else:                                            # a paw with its toes
+            poly(closed_ellipse(fx + w * 0.3, fy - w * 0.35, w * 0.95, w * 0.5, 16), c, INK, 4)
+            for dx in (0.05, 0.45, 0.85):
+                line([(fx + w * dx, fy - w * 0.1), (fx + w * dx, fy - w * 0.35)], 3)
+
+    for pts, wid, i in legs:                             # the far pair first, a shade darker
         if i in (1, 2):
-            line([top, knee, foot], 15, dk)
-    # tail
-    wag = math.sin(t * (14 if action == "wag" else 5)) * (22 if action in ("wag", "idle") else 8)
-    root = B((-rx * 0.95, -ry * 0.2))
-    if P["tail"] == "up":
-        line(bezier(root, (root[0] - 60, root[1] - 30 + wag * 0.5), (root[0] - 70 + wag, root[1] - 110)), 13, dk)
-    elif P["tail"] == "stub":
-        line([root, (root[0] - 34, root[1] - 40 + wag * 0.4)], 12, dk)
+            limb(pts, wid, dk)
+            foot_end(pts, dk)
+
+    # ---- tail
+    wag = math.sin(t * (14 if action == "wag" else 4)) * (22 if action in ("wag", "idle") else 8)
+    root = B((-rx * 0.97, -ry * 0.62))
+    if P["tail"] == "rope":                              # cattle: a long rope with a tuft, swishing
+        tip = (root[0] - 34 + wag * 0.8, root[1] + leg * 0.95 + ry * 0.4)
+        path = bezier(root, (root[0] - 40, root[1] + 60), tip, 8)
+        path = path[::2] + [tip]
+        limb(path, _taper(len(path), 11, 6), col)
+        poly(_spline([(tip[0] - 12, tip[1] - 26), (tip[0] + 12, tip[1] - 26), (tip[0] + 16, tip[1] + 22),
+                      (tip[0], tip[1] + 44), (tip[0] - 16, tip[1] + 22)]), (46, 40, 38), INK, 3)
+    elif P["tail"] == "up":
+        path = bezier(root, (root[0] - 60, root[1] - 30 + wag * 0.5), (root[0] - 70 + wag, root[1] - 120), 6)
+        limb(path, _taper(len(path), 18, 4), col)
     elif P["tail"] == "curl":
-        line(bezier(root, (root[0] - 90, root[1] + 10), (root[0] - 80 + wag, root[1] - 120)) +
-             bezier((root[0] - 80 + wag, root[1] - 120), (root[0] - 60 + wag, root[1] - 170), (root[0] - 30 + wag, root[1] - 150))[1:], 11, col)
+        path = bezier(root, (root[0] - 100, root[1] + 20), (root[0] - 80 + wag, root[1] - 120), 6)[:-1] + \
+            bezier((root[0] - 80 + wag, root[1] - 120), (root[0] - 64 + wag, root[1] - 176), (root[0] - 30 + wag, root[1] - 158), 4)
+        limb(path, _taper(len(path), 16, 6), col)
     else:
-        tip = (root[0] - 30 + wag * 0.4, root[1] + 150)
-        line([root, tip], 7, dk)
-        poly(closed_ellipse(tip[0], tip[1] + 10, 12, 20, 12), (60, 50, 44), INK, 3)
-    # body
-    poly([B(q) for q in closed_ellipse(0, 0, rx, ry, 40)], col)
-    if kind == "cow":
-        for (sx, sy, r) in ((-80, -20, 46), (60, 30, 38), (130, -40, 30)):
-            poly([B(q) for q in closed_ellipse(sx, sy, r, r * 0.8, 20)], (40, 40, 44), None)
-        poly([B(q) for q in closed_ellipse(-40, ry * 0.85, 34, 20, 16)], (240, 170, 180), INK, 4)
-    for top, knee, foot, i in legs:
-        if i in (0, 3):
-            line([top, knee, foot], 16, col if kind != "cow" else (236, 236, 232))
-            S.dot(X(foot), 10, INK)
-    # head
+        limb([root, (root[0] - 30, root[1] - 36 + wag * 0.4), (root[0] - 40, root[1] - 64 + wag * 0.6)], [16, 12, 6], col)
+
+    # ---- the head's place
+    ax, ay = HEAD_AT[kind]
     if lie:
-        hcen = B((rx + hr * 0.5, -ry * 0.1))
+        hcen = B((rx + hr * 0.45, -ry * 0.55))
     elif sit:
         hcen = B((rx * 0.95, -ry - hr * 0.6))
+    elif graze:                                          # head down to the grass, chewing
+        hcen = (B((rx + hr * 0.95, 0))[0], -hr * 0.85)
     else:
-        hcen = B((rx + hr * 0.45, -ry * 0.9))
-    bob = 6 * math.sin(ph * 2) if moving else 2 * math.sin(t * 2)
-    hcen = (hcen[0], hcen[1] + bob)
-    hx_, hy_ = hcen
-    if kind == "dog":
-        poly(closed_ellipse(hx_ - hr * 0.45, hy_ - hr * 0.15, hr * 0.32, hr * 0.7, 16, 18), dk)       # ear
-    elif kind == "cat":
-        for ex in (-0.5, 0.35):
-            poly([(hx_ + hr * (ex - 0.25), hy_ - hr * 0.6), (hx_ + hr * (ex + 0.05), hy_ - hr * 1.35),
-                  (hx_ + hr * (ex + 0.35), hy_ - hr * 0.6)], col)
-    elif kind == "buffalo":             # the bhains: heavy horns curving back, droopy ears
-        for ex in (-0.5, 0.25):
-            line(bezier((hx_ + hr * ex, hy_ - hr * 0.75), (hx_ + hr * (ex - 0.9), hy_ - hr * 1.5),
-                        (hx_ + hr * (ex - 1.1), hy_ - hr * 0.6), 10), 15, (120, 116, 112))
-        poly(closed_ellipse(hx_ - hr * 0.95, hy_ - hr * 0.1, hr * 0.46, hr * 0.2, 14, 20), dk)
-    elif kind == "cow":
-        for ex in (-0.55, 0.45):
-            line([(hx_ + hr * ex, hy_ - hr * 0.8), (hx_ + hr * (ex + 0.1), hy_ - hr * 1.3)], 12, (230, 220, 190))
-        poly(closed_ellipse(hx_ - hr * 0.9, hy_ - hr * 0.4, hr * 0.42, hr * 0.2, 14, -20), col)
-    if kind == "goat":                  # two curved horns and floppy ears
-        for ex in (-0.45, 0.05):
-            line(bezier((hx_ + hr * ex, hy_ - hr * 0.7), (hx_ + hr * (ex - 0.6), hy_ - hr * 1.7),
-                        (hx_ + hr * (ex - 1.0), hy_ - hr * 1.0), 10), 11, (170, 150, 118))
-        poly(closed_ellipse(hx_ - hr * 0.7, hy_ + hr * 0.05, hr * 0.42, hr * 0.17, 14, 30), dk)
-    poly(closed_ellipse(hx_, hy_, hr, hr * 0.92, 32), col)
-    if kind == "goat":                  # the beard under the chin, chewing all the time
-        chew = 4 * math.sin(t * 9)
-        poly([(hx_ + hr * 0.45, hy_ + hr * 0.75), (hx_ + hr * 0.85, hy_ + hr * 0.7),
-              (hx_ + hr * 0.62, hy_ + hr * 1.6 + chew)], (220, 214, 200))
-    # snout + mouth
-    sn = (hx_ + hr * 0.75, hy_ + hr * 0.22)
-    snout_col = (236, 190, 190) if kind == "cow" else (128, 122, 128) if kind == "buffalo" else \
-        tuple(min(255, v + 30) for v in col)
-    poly(closed_ellipse(sn[0], sn[1], hr * 0.5, hr * 0.38, 20), snout_col)
-    poly(closed_ellipse(sn[0] + hr * 0.38, sn[1] - hr * 0.12, hr * 0.13, hr * 0.1, 12), INK, None)
-    if speak:
-        poly(closed_ellipse(sn[0] + hr * 0.05, sn[1] + hr * 0.3, hr * 0.28, hr * (0.12 + 0.18 * max(0.4, mouth_open)), 16),
-             (120, 30, 40))
-    else:
-        line([(sn[0] - hr * 0.2, sn[1] + hr * 0.28), (sn[0] + hr * 0.25, sn[1] + hr * 0.3)], 5)
-    if kind == "cat":
-        for dy in (-6, 6):
-            line([(sn[0] + hr * 0.1, sn[1] + dy), (sn[0] + hr * 0.9, sn[1] + dy * 2.4)], 3)
-    # eye
-    ex, ey = hx_ + hr * 0.25, hy_ - hr * 0.22
-    if kind == "buffalo":               # a dark face: the eye sits in a white
-        poly(closed_ellipse(ex, ey, hr * 0.2, hr * 0.17, 16), (246, 244, 240), INK, 3)
-    if lie and action in ("sleep", "sleep_lie") or expr in ("sleepy", "happy", "laugh"):
-        line(ellipse_pts(ex, ey, hr * 0.16, hr * 0.1, 8, 200, 340), 5)
-    elif expr in ("angry",):
-        S.dot(X((ex, ey)), hr * 0.11, INK)
-        line([(ex - hr * 0.22, ey - hr * 0.3), (ex + hr * 0.15, ey - hr * 0.16)], 6)
-    else:
-        S.dot(X((ex, ey)), hr * 0.12, INK)
-    head_top = X((hx_, hy_ - hr * 1.1))
-    anchors = dict(head_top=S.T(head_top), head_center=S.T(X(hcen)), mouth=S.T(X(sn)),
-                   feet=S.T((0, 0)), hand_l=S.T(X(sn)), hand_r=S.T(X(sn)))
+        hcen = B((rx + hr * ax, ry * ay))
+    bob = 6 * math.sin(ph * 2) if moving else (2 * math.sin(t * 2) + (3 * math.sin(t * 9) if graze else 0.0))
+    hx_, hy_ = hcen[0], hcen[1] + bob
+
+    def H(u, v):
+        return (hx_ + u * hr, hy_ + v * hr)
+
+    # ---- neck (under the body's outline at one end, under the head at the other)
+    base = B((rx * 0.72, -ry * 0.22))
+    neck_end = H(-0.35, 0.15)
+    limb([base, ((base[0] + neck_end[0]) / 2, (base[1] + neck_end[1]) / 2 - 6), neck_end],
+         [NECK_W[kind] * ry, NECK_W[kind] * ry * 0.82, hr * 0.95], col)
+
+    # ---- body: the outline, light on the back, shade under the belly, the kind's own marks
+    body = [B((u * rx, v * ry + (breathe * 0.4 if v > 0.5 else 0.0))) for u, v in _spline(BODY[kind], 6)]
+    poly(body, col, INK, 6)
+    poly([B(q) for q in closed_ellipse(-rx * 0.08, -ry * 0.5, rx * 0.72, ry * 0.26, 28)], light, None)
+    poly([B(q) for q in closed_ellipse(0.0, ry * 0.62, rx * 0.58, ry * 0.24, 28)], shade_, None)
+    if kind == "cow":                                    # the desi cow's patches and its hump
+        for (sx, sy, r) in ((-0.42, -0.12, 0.2), (0.18, 0.18, 0.16), (-0.75, 0.3, 0.12)):
+            poly([B((sx * rx + q[0], sy * ry + q[1])) for q in _spline([(-r * rx, 0), (-r * rx * 0.3, -r * rx * 0.8),
+                  (r * rx * 0.6, -r * rx * 0.6), (r * rx, 0.1 * r * rx), (0, r * rx * 0.7)], 4)], (70, 60, 56), None)
+        poly([B(q) for q in _spline([(0.28 * rx, -0.95 * ry), (0.5 * rx, -1.3 * ry), (0.7 * rx, -0.95 * ry)], 4)],
+             light, None)
+    elif kind == "cat":                                  # tabby stripes
+        for u in (-0.6, -0.3, 0.0, 0.3):
+            line([B((u * rx, -0.98 * ry)), B(((u + 0.06) * rx, -0.45 * ry))], 7, dk)
+    elif kind == "dog":                                  # a darker saddle
+        poly([B(q) for q in _spline([(-0.7 * rx, -0.85 * ry), (0.0, -0.95 * ry), (0.45 * rx, -0.8 * ry),
+                                     (0.2 * rx, -0.35 * ry), (-0.55 * rx, -0.35 * ry)], 4)], dk, None)
+    elif kind == "buffalo":                              # the bony hip and the ribs under the dark hide
+        line(ellipse_pts(B((-0.68 * rx, -0.62 * ry))[0], B((-0.68 * rx, -0.62 * ry))[1], 34, 22, 8, 180, 330), 4, light)
+        for u in (0.05, 0.22, 0.39):
+            line(bezier(B((u * rx, -0.3 * ry)), B(((u + 0.04) * rx, 0.1 * ry)), B((u * rx, 0.45 * ry)), 6), 3, shade_)
+    if cattle and not lie:                               # the udder
+        uc = B((-0.42 * rx, 0.92 * ry))
+        poly(closed_ellipse(uc[0], uc[1] + 10, rx * 0.15, ry * 0.2, 20), (232, 170, 176) if kind != "buffalo"
+             else (150, 120, 126), INK, 4)
+        for dx in (-0.08, 0.0, 0.08):
+            line([(uc[0] + dx * rx, uc[1] + ry * 0.24), (uc[0] + dx * rx, uc[1] + ry * 0.36)], 6, (214, 150, 158))
+    if kind == "cow" and not lie:                        # the dewlap hanging under the neck
+        nb = B((0.92 * rx, 0.28 * ry))
+        jaw = H(0.0, 0.62)
+        poly(_spline([nb, ((nb[0] + jaw[0]) / 2 - 10, (nb[1] + jaw[1]) / 2 + ry * 0.42), jaw,
+                      ((nb[0] + jaw[0]) / 2, (nb[1] + jaw[1]) / 2)], 5), col, INK, 4)
+
+    for pts, wid, i in legs:                             # the near pair
+        if i in (0, 3):
+            limb(pts, wid, col if kind not in ("cow",) else _mix(col, (255, 255, 255), 0.05))
+            foot_end(pts, col)
+
+    # ---- head
+    mouth = _head(kind, H, hr, poly, line, limb, col, dk, light, t, speak, mouth_open, expr, action, lie, graze, at)
+    head_top = X(H(0.0, -1.2))
+    anchors = dict(head_top=S.T(head_top), head_center=S.T(X((hx_, hy_))), mouth=S.T(X(mouth)),
+                   feet=S.T((0, 0)), hand_l=S.T(X(mouth)), hand_r=S.T(X(mouth)))
     return S.ops, anchors
+
+
+def _eye(H, hr, poly, line, at_uv, expr, closed, kind, big=0.17, iris=None, slit=None):
+    """An eye with its white, pupil, shine and lid; closed (asleep / happy) is an arc; angry gets a brow."""
+    cx, cy = H(*at_uv)
+    if closed:
+        line(ellipse_pts(cx, cy, hr * big, hr * big * 0.6, 8, 200, 340), 5)
+        return
+    r = hr * big * (1.25 if expr in ("shock", "surprised", "scared") else 1.0)
+    poly(closed_ellipse(cx, cy, r, r * 0.86, 18), (250, 248, 242), INK, 3)
+    if iris:
+        poly(closed_ellipse(cx + r * 0.15, cy, r * 0.68, r * 0.62, 16), iris, None)
+    if slit == "v":                                      # the cat's slit
+        poly(closed_ellipse(cx + r * 0.18, cy, r * 0.16, r * 0.56, 12), (20, 20, 22), None)
+    elif slit == "h":                                    # the goat's bar
+        poly(closed_ellipse(cx + r * 0.15, cy, r * 0.5, r * 0.15, 12), (20, 20, 22), None)
+    else:
+        poly(closed_ellipse(cx + r * 0.2, cy + r * 0.05, r * 0.5, r * 0.52, 14), (24, 22, 24), None)
+    poly(closed_ellipse(cx + r * 0.05, cy - r * 0.25, r * 0.17, r * 0.17, 8), (255, 255, 255), None)
+    line(ellipse_pts(cx, cy, r * 1.05, r * 0.95, 8, 195, 345), 4)          # the lid
+    if expr in ("angry", "shout"):
+        line([(cx - r * 1.2, cy - r * 1.5), (cx + r * 0.9, cy - r * 0.9)], 6)
+    elif kind == "cow" and expr not in ("sleepy",):     # lashes
+        for a in (210, 240, 270):
+            ex_, ey_ = cx + r * 1.05 * math.cos(math.radians(a)), cy + r * 0.95 * math.sin(math.radians(a))
+            line([(ex_, ey_), (ex_ + r * 0.25 * math.cos(math.radians(a)), ey_ + r * 0.3 * math.sin(math.radians(a)))], 3)
+
+
+def _head(kind, H, hr, poly, line, limb, col, dk, light, t, speak, mouth_open, expr, action, lie, graze, at):
+    """Draws the head (facing +x) and returns where its mouth is."""
+    closed = (lie and action in ("sleep", "sleep_lie")) or expr in ("sleepy", "happy", "laugh")
+    chew = 0.04 * math.sin(t * 9) if (graze or kind == "goat") else 0.0
+    if kind in ("cow", "buffalo"):
+        horn = (226, 214, 180) if kind == "cow" else (104, 100, 98)
+        if kind == "buffalo":                            # the bhains's heavy crescent horns, swept back
+            for dv, c in ((0.06, tuple(int(v * 0.8) for v in horn)), (0.0, horn)):
+                path = [H(-0.2, -0.6 + dv), H(-0.85, -1.0 + dv), H(-1.45, -0.75 + dv), H(-1.52, -0.25 + dv)]
+                limb(path, [hr * 0.32, hr * 0.26, hr * 0.15, hr * 0.05], c)
+                for j in (1, 2):
+                    a, b = path[j], path[j + 1]
+                    line([((a[0] * 2 + b[0]) / 3, (a[1] * 2 + b[1]) / 3 - 8), ((a[0] * 2 + b[0]) / 3 + 6, (a[1] * 2 + b[1]) / 3 + 8)],
+                         3, tuple(int(v * 0.7) for v in horn))
+            ear = [(-0.45, -0.25), (-1.1, -0.02), (-1.16, 0.18), (-0.95, 0.27), (-0.45, 0.1)]
+        else:                                            # the cow's short horns, curving up
+            for du, c in ((0.18, tuple(int(v * 0.85) for v in horn)), (0.0, horn)):
+                limb([H(-0.25 + du, -0.7), H(-0.38 + du, -1.12), H(-0.18 + du, -1.42)], [hr * 0.22, hr * 0.14, hr * 0.05], c)
+            ear = [(-0.45, -0.36), (-1.22, -0.58), (-1.32, -0.36), (-1.16, -0.15), (-0.5, -0.1)]
+        poly(_spline([H(*q) for q in ear], 4), dk, INK, 4)
+        poly(_spline([H(*q) for q in ((-0.6, -0.55), (-0.1, -0.86), (0.45, -0.62), (0.95, -0.08), (1.15, 0.36),
+                                      (1.02, 0.76), (0.55, 0.86), (0.0, 0.7), (-0.5, 0.42))], 5), col, INK, 6)
+        poly(_spline([H(*q) for q in ((-0.4, -0.55), (0.1, -0.78), (0.45, -0.58), (0.2, -0.35), (-0.3, -0.3))], 4), light, None)
+        muzzle = (236, 186, 180) if kind == "cow" else (118, 112, 118)
+        mc = H(0.92, 0.42 + chew)
+        poly(closed_ellipse(mc[0], mc[1], hr * 0.38, hr * 0.35, 22), muzzle, INK, 4)
+        for du in (0.08, -0.14):
+            n = H(0.92 + du, 0.3 + chew)
+            poly(closed_ellipse(n[0], n[1], hr * 0.07, hr * 0.05, 10), (60, 44, 44), None)
+        mouth = H(0.88, 0.7 + chew)
+        if speak:
+            poly(closed_ellipse(mouth[0], mouth[1], hr * 0.24, hr * (0.08 + 0.16 * max(0.4, mouth_open)), 16), (110, 30, 40), INK, 3)
+        else:
+            line([H(0.66, 0.68 + chew), H(1.06, 0.66 + chew)], 4)
+        if kind == "cow":                                # a curl of hair on the forehead
+            line(bezier(H(0.15, -0.72), H(0.35, -0.95), H(0.3, -0.6), 6), 4, dk)
+        _eye(H, hr, poly, line, (0.25, -0.22), expr, closed, kind, 0.17 if kind == "cow" else 0.19)
+        return mouth
+    if kind == "goat":
+        for du, c in ((0.16, (150, 132, 104)), (0.0, (176, 156, 122))):    # horns swept back
+            limb([H(-0.2 + du, -0.6), H(-0.62 + du, -1.2), H(-1.05 + du, -1.05)], [hr * 0.2, hr * 0.13, hr * 0.04], c)
+        poly(_spline([H(*q) for q in ((-0.35, -0.2), (-0.92, 0.3), (-0.88, 0.58), (-0.6, 0.42), (-0.25, 0.05))], 4),
+             dk, INK, 4)                                 # the long ear, hanging
+        poly(_spline([H(*q) for q in ((-0.55, -0.5), (-0.05, -0.76), (0.5, -0.46), (1.06, 0.1), (1.0, 0.46),
+                                      (0.6, 0.56), (0.0, 0.5), (-0.5, 0.3))], 5), col, INK, 6)
+        nose = H(0.98, 0.14)
+        poly(closed_ellipse(nose[0], nose[1], hr * 0.1, hr * 0.07, 10), (70, 56, 56), None)
+        poly([H(0.6, 0.5), H(0.88, 0.5), H(0.74, 1.25 + chew * 3)], _mix(col, (255, 255, 255), 0.3), INK, 3)   # beard
+        mouth = H(0.9, 0.38)
+        if speak:
+            poly(closed_ellipse(mouth[0], mouth[1], hr * 0.16, hr * (0.06 + 0.12 * max(0.4, mouth_open)), 14), (110, 30, 40), INK, 3)
+        else:
+            line([H(0.7, 0.38), H(0.98, 0.34)], 4)
+        _eye(H, hr, poly, line, (0.22, -0.2), expr, closed, kind, 0.2, iris=(226, 190, 70), slit="h")
+        return mouth
+    if kind == "dog":
+        poly(_spline([H(*q) for q in ((-0.8, -0.2), (-0.5, -0.8), (0.2, -0.86), (0.62, -0.42), (1.15, -0.16),
+                                      (1.26, 0.24), (1.0, 0.5), (0.4, 0.6), (-0.3, 0.7), (-0.8, 0.36))], 5), col, INK, 6)
+        poly(_spline([H(*q) for q in ((0.55, -0.1), (1.15, -0.12), (1.2, 0.3), (0.65, 0.4))], 4), light, None)  # the muzzle
+        nose = H(1.18, -0.02)
+        poly(closed_ellipse(nose[0], nose[1], hr * 0.17, hr * 0.13, 14), (30, 26, 28), INK, 3)
+        mouth = H(0.95, 0.42)
+        if speak:
+            poly(_spline([H(0.6, 0.38), H(1.12, 0.36), H(1.0, 0.36 + 0.5 * max(0.4, mouth_open)), H(0.7, 0.62)], 4),
+                 (110, 30, 40), INK, 3)
+            poly(closed_ellipse(*H(0.86, 0.6), hr * 0.14, hr * 0.1, 12), (230, 110, 120), None)
+        else:
+            line([H(1.1, 0.34), H(0.92, 0.42), H(0.62, 0.4)], 4)
+            if action in ("wag", "idle") or expr in ("happy", "laugh", "smile"):         # the tongue out, panting
+                poly(_spline([H(0.8, 0.4), H(0.96, 0.42), H(0.94, 0.72 + 0.05 * math.sin(t * 8)), H(0.82, 0.7)], 4),
+                     (232, 110, 122), INK, 3)
+        poly(_spline([H(*q) for q in ((-0.5, -0.62), (-0.98, -0.42), (-1.02, 0.36), (-0.76, 0.46), (-0.4, -0.2))], 4),
+             dk, INK, 4)                                 # the floppy ear
+        _eye(H, hr, poly, line, (0.32, -0.3), expr, closed, kind, 0.18)
+        return mouth
+    # cat: the face turned a little to us
+    for (a, b, c) in (((-0.6, -0.55), (-0.62, -1.38), (-0.05, -0.8)), ((0.15, -0.82), (0.58, -1.42), (0.78, -0.52))):
+        poly([H(*a), H(*b), H(*c)], col, INK, 5)
+        poly([H(a[0] * 0.8 + c[0] * 0.2, a[1] * 0.8 + c[1] * 0.2 - 0.05), H(b[0] * 0.9 + c[0] * 0.1, b[1] * 0.85),
+              H(a[0] * 0.2 + c[0] * 0.8, a[1] * 0.2 + c[1] * 0.8 - 0.05)], (236, 170, 176), None)
+    poly(_spline([H(*q) for q in ((-0.86, 0.0), (-0.76, -0.6), (0.0, -0.86), (0.76, -0.6), (0.92, 0.0),
+                                  (0.72, 0.56), (0.0, 0.76), (-0.7, 0.56))], 5), col, INK, 6)
+    poly(_spline([H(*q) for q in ((-0.2, 0.2), (0.35, 0.05), (0.85, 0.2), (0.5, 0.62), (0.0, 0.6))], 4), light, None)
+    nose = H(0.35, 0.22)
+    poly([(nose[0] - hr * 0.09, nose[1] - hr * 0.05), (nose[0] + hr * 0.09, nose[1] - hr * 0.05), (nose[0], nose[1] + hr * 0.06)],
+         (230, 140, 150), INK, 2)
+    mouth = H(0.35, 0.42)
+    if speak:
+        poly(closed_ellipse(mouth[0], mouth[1], hr * 0.16, hr * (0.06 + 0.12 * max(0.4, mouth_open)), 14), (110, 30, 40), INK, 3)
+    else:
+        line([H(0.18, 0.4), H(0.35, 0.32), H(0.52, 0.4)], 3)
+    for side in (-1, 1):                                 # whiskers
+        for dv in (-0.05, 0.08):
+            line([H(0.35 + side * 0.3, 0.3 + dv), H(0.35 + side * 1.0, 0.24 + dv * 2.2)], 2)
+    for u in (0.02, 0.62):
+        _eye(H, hr, poly, line, (u, -0.18), expr, closed, kind, 0.17, iris=(140, 200, 90), slit="v")
+    return mouth
 
 
 def _bird(spec, action, at, t, x0, ground_y, k, dirn, moving, mouth_open, expr):
