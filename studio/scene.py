@@ -687,6 +687,27 @@ STAND_MIN = 170.0           # a standing person's centre keeps this far from the
 STAND_GAP = 240.0           # ...and this far from the next person
 
 
+def turn_to_each_other(chars, framing):
+    """cine: with two or more people in the shot, everybody stands turned to the others (seen from the side, the
+    way people really talk) instead of facing the camera. Anyone the script turns itself (`A -> saamne` / `side`)
+    keeps that; a dance or a selfie still faces us (render.FRONT_ACTIONS)."""
+    if framing in ("inside", "ots"):
+        return
+    people = [c for c in chars.values() if not c.spec.get("kind") and not c.spec.get("hidden")
+              and c.spec.get("view") is None and not c.rides]
+    if len([c for c in chars.values() if not c.spec.get("hidden")]) < 2:
+        return
+    for c in people:
+        if any("view" in e for e in c.events):
+            continue
+        c.events.insert(0, {"t": 0.0, "view": "side"})
+        c.auto_side = True                          # (the renderer turns them to us in their own close-up)
+
+
+TIGHT_GAP = 0.12            # cine: seconds between one line and the next
+TIGHT_END = 0.6             # cine: share of the plain beat after a scene's last line (the reaction shot plays in it)
+TIGHT_TAIL = 0.5            # cine: seconds a scene runs on after everything is over (classic: 0.9)
+TIGHT_HOLD = 0.7            # cine: share of an action's wait (walk in, dance, sit down) before the next line
 BIG_ANIMALS = ("cow", "buffalo", "goat")
 ANIMAL_GAP = 110.0          # px between a big animal's nose and the person it stands by
 
@@ -866,7 +887,7 @@ def auto_camera_cine(plan, chars, cam_events, shakes, rolls):
         for m in c.moves:
             if m[1] - m[0] < 0.25 or max(abs(m[4] - m[2]), abs(m[5] - m[3])) < MOVE_MIN:
                 continue
-            if any(a <= m[0] <= b for a, b in talk):
+            if any(a <= m[0] < b - 0.05 for a, b in talk):     # (a walk that starts as a line ends is after it)
                 continue
             movers.append((m[0], m[1], c.name))
     for (m0, m1, name) in movers:
@@ -1181,7 +1202,11 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
 
     lead = float(scene.get("lead_in", 0.0))        # "hook first": the story starts after the hook card
     cursor = lead
-    gap = float(meta.get("line_gap", 0.35))
+    # cine keeps it tight: the next line comes right after the last (a real conversation has no 1/3 s of air
+    # between every line), and the waits for a walk / a dance / sitting down are shorter (the next line starts
+    # while they finish). CAMERA: classic keeps the old timing.
+    gap = TIGHT_GAP if cine else float(meta.get("line_gap", 0.35))
+    looped = bool(scene.get("_looped") or scene.get("loop"))   # a LOOP reel's end beat is its loop: kept whole
     dialogue = meta.get("dialogue", "bubble")       # bubble | subtitle | both | none: how the spoken words show
     plan.sfx = []
     plan.overlays = []
@@ -1333,8 +1358,15 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             cursor = max(cursor, t + step)
             plan_end = max(plan_end, t + span)
         if "hold" in ev:
-            cursor = max(cursor, t + float(ev["hold"]))
-            plan_end = max(plan_end, t + float(ev["hold"]))
+            hold_k = 1.0
+            moving_ = any(k_ in ev for k_ in ("move", "entry", "leave", "ride", "getoff", "obj"))
+            if cine and ("action" in ev or "on" in ev) and not moving_ and ev.get("action") != "throw" \
+                    and not ev.get("slowmo") and not ev.get("freeze"):
+                hold_k = TIGHT_HOLD                 # (a walk / an entrance keeps its full time: the next move waits)
+            elif cine and set(ev) <= {"hold", "t"} and not looped:   # the plain beat at the end of a scene
+                hold_k = TIGHT_END
+            cursor = max(cursor, t + float(ev["hold"]) * hold_k)
+            plan_end = max(plan_end, t + float(ev["hold"]) * hold_k)
 
         if "sfx" in ev:
             p = audio.sfx_path(ev["sfx"])
@@ -1467,10 +1499,12 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         plan.duration = float(meta["duration"])
     else:
         last = max(plan_end, float(meta.get("min_duration", 4.0)))
-        plan.duration = round(last + float(meta.get("tail", 0.9)), 2)
+        plan.duration = round(last + float(meta.get("tail", TIGHT_TAIL if cine and not looped else 0.9)), 2)
     plan.n_frames = int(round(plan.duration * plan.fps))
 
     # ---- camera segments ----
+    if cine:
+        turn_to_each_other(chars, plan.framing)     # a conversation: people face each other, not the lens
     if cine:                                        # off a bed: back inside the picture
         stand_up_in_frame(chars, set_by_id)
         round_the_bed(chars, set_by_id)             # ...and nobody stands over somebody lying on it

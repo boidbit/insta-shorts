@@ -899,6 +899,8 @@ class Renderer(Output):
         elif natural and action in self.LEAPS:
             at = t - a_t0 - self.CROUCH
         pose = actions.pose_for(action, at, st["speed"], st["intensity"], c.phase, opts)
+        if natural and action in ("idle", "talk") and not E["rf"] and not st.get("on"):
+            pose = self._mood(c, t, st, pose, action == "talk")      # the feeling in the whole body
         if E["rf"]:                                 # on a vehicle: the seat decides the pose
             pose = dict(E["rf"]["pose"])
         elif st.get("on"):
@@ -910,6 +912,42 @@ class Renderer(Output):
         if natural and not E["rf"] and not st.get("on"):
             self._weight(c, t, E, pose, crouch)
         return pose
+
+    # moves made to be seen from the front: a person turned to the side faces us again while doing them
+    FRONT_ACTIONS = frozenset(actions.DANCES | actions.SING_ACTIONS | {
+        "selfie", "video_call", "cartwheel", "spin", "jumping_jacks", "flex", "double_take", "slow_clap",
+        "collar_up", "clap", "shrug", "celebrate", "facepalm", "mic_drop", "salute", "namaste", "wave", "cry",
+        "laugh", "rofl", "shock", "scared", "dizzy", "faint", "fall", "lie_down", "lie", "sleep_lie", "turn_around"})
+    CLOSE_ZOOM = 1.45       # a shot this close on one person: they face us (their expression reads)
+
+    def _close_on(self, c, t):
+        """Is the camera's current shot a close-up that follows this person? (decided per shot, never mid-shot)"""
+        cur = None
+        for seg in getattr(self.plan, "cam_segments", None) or []:
+            if seg[0] <= t + 1e-6:
+                cur = seg
+            else:
+                break
+        if not cur or len(cur) < 8:
+            return False
+        who = cur[6] if cur[6] is not None else cur[7]      # (t0, t1, z0, z1, c0, c1, follows, followed)
+        z = cur[3] if t > cur[1] else max(cur[2], cur[3])     # once the move is over: where it ended
+        return who == c.name and z >= self.CLOSE_ZOOM
+
+    MOOD_IN = 0.35          # seconds a new feeling takes to reach the body
+
+    def _mood(self, c, t, st, pose, talking):
+        """cine: blend the body language of the current feeling in (and the last one out) over MOOD_IN."""
+        changes = [e for e in c.events if "expression" in e and e["t"] <= t + 1e-9]
+        if not changes:
+            return actions.mood_pose(pose, st["expression"], t, c.phase, 1.0, talking)
+        t0 = changes[-1]["t"]
+        u = clamp((t - t0) / self.MOOD_IN)
+        u = u * u * (3 - 2 * u)
+        prev = changes[-2]["expression"] if len(changes) > 1 else c.spec.get("expression", c.look_face or "neutral")
+        if u < 1.0 and prev in actions.MOODS and prev != st["expression"]:
+            pose = actions.mood_pose(pose, prev, t, c.phase, 1.0 - u, talking)
+        return actions.mood_pose(pose, st["expression"], t, c.phase, u, talking)
 
     # foot lock: (rig px the body travels per gait cycle = two steps, share of the cycle a foot is on the ground,
     # how far below the hip the feet are: knees a little bent so the stride can reach, step height)
@@ -1260,7 +1298,8 @@ class Renderer(Output):
         blink = self._blinking(c, t) or pose.pop("_face_change", False)
         spec = dict(c.spec)
         spec["facing"] = st["facing"]
-        if st.get("view") == "side" and not c.spec.get("kind") and not rf:   # `A -> side`: turned to the other one
+        if st.get("view") == "side" and not c.spec.get("kind") and not rf and action not in self.FRONT_ACTIONS \
+                and not (getattr(c, "auto_side", False) and self._close_on(c, t)):
             spec["view"] = "side"
             if spec["facing"] == "front":
                 other = self._partner(c, t, x)

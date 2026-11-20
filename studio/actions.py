@@ -1785,6 +1785,71 @@ def nazar_utaar(t, sp, I, ph, o):
     return _side(d, pose)
 
 
+# ------------------------------------------------------------------ moods: the feeling shows in the whole body
+def _mood_angry(t, ph):
+    tap = max(0.0, sin(2 * pi * 0.45 * t + ph)) ** 6           # now and then a stamp of the foot
+    return _P(hand("R", (66, -96), (1, -0.4)), hand("L", (-66, -96), (-1, -0.4)), dict(ll1=-12, rl1=12 + 10 * tap,
+              rl2=4 + 12 * tap), tilt=4, head_dy=4, lift=-4 * tap, look_y=0.15)
+
+
+def _mood_sad(t, ph):
+    s = sin(2 * pi * 0.25 * t + ph)
+    return _P(hand("R", (30, -40), (1, 0.6)), hand("L", (-30, -40), (-1, 0.6)), dict(ll1=-7, rl1=7), tilt=6,
+              head_dy=10, head_tilt=4 + 2 * s, look_y=0.6)
+
+
+def _mood_happy(t, ph):
+    b = abs(sin(2 * pi * 1.1 * t + ph))
+    return _P(hand("R", (96, -150 - 10 * b), (1, 0.3)), hand("L", (-96, -150 - 10 * b), (-1, 0.3)),
+              dict(ll1=-10, rl1=10), lift=-8 * b, head_tilt=3 * sin(2 * pi * 0.55 * t + ph), look_y=-0.1)
+
+
+def _mood_shock(t, ph):
+    return _P(hand("R", (44, -236), (1, 1)), hand("L", (-44, -236), (-1, 1)), dict(ll1=-12, rl1=12), tilt=-5,
+              head_dy=-4, look_y=-0.05)
+
+
+def _mood_scared(t, ph):
+    sh = 2.2 * sin(2 * pi * 9 * t)
+    return _P(hand("R", (30, -250), (1, 1)), hand("L", (-30, -250), (-1, 1)), dict(ll1=-6, rl1=6), tilt=5,
+              head_dy=8, shift=sh, look_x=0.4 * sin(2 * pi * 0.4 * t + ph))
+
+
+def _mood_nervous(t, ph):
+    r = sin(2 * pi * 1.6 * t)
+    return _P(hand("R", (14 + 6 * r, -170), (1, 1)), hand("L", (-14 + 6 * r, -168), (-1, 1)),
+              dict(ll1=-8, rl1=8), shift=6 * sin(2 * pi * 0.5 * t + ph), head_dy=4, look_y=0.3)
+
+
+def _mood_proud(t, ph):
+    return _P(hand("R", (72, -92), (1, -0.3)), hand("L", (-72, -92), (-1, -0.3)), dict(ll1=-13, rl1=13), tilt=-3,
+              head_dy=-5, look_y=-0.3)
+
+
+def _mood_bored(t, ph):
+    return _P(hand("R", (40, -60), (1, 0.4)), hand("L", (-40, -60), (-1, 0.4)), dict(ll1=-4, rl1=14, rl2=10),
+              shift=8, head_tilt=8, look_y=0.2)
+
+
+MOODS = {"angry": _mood_angry, "shout": _mood_angry, "sad": _mood_sad, "cry": _mood_sad, "hurt": _mood_sad,
+         "happy": _mood_happy, "laugh": _mood_happy, "excited": _mood_happy, "lol": _mood_happy,
+         "shock": _mood_shock, "surprised": _mood_shock, "scared": _mood_scared, "nervous": _mood_nervous,
+         "embarrassed": _mood_nervous, "proud": _mood_proud, "smug": _mood_proud, "bored": _mood_bored}
+MOOD_KEEP_TALK = ("ra1", "ra2", "ra_k1", "ra_k2")   # while talking, the gesturing hand stays the talk's own
+
+
+def mood_pose(base, expr, t, ph, w, talking=False):
+    """The idle / talk pose with the feeling `expr` in the body (blend weight w 0..1): gussa = fists and a stamp,
+    dukh = slumped shoulders, khushi = a bounce, darr = hands up and a shiver... `base` when there is none."""
+    fn = MOODS.get(expr)
+    if fn is None or w <= 0.0:
+        return base
+    m = fn(t, ph)
+    if talking:
+        m = {k: v for k, v in m.items() if k not in MOOD_KEEP_TALK}
+    return _mix(base, dict(base, **m), w * (0.75 if talking else 1.0))
+
+
 # ------------------------------------------------------------------ the village (gaon pack)
 def hookah(t, sp, I, ph, o):
     # gud-gud: the pipe to the lips, a long pull, down again, the smoke goes out slowly
