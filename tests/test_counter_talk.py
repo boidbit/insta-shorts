@@ -94,8 +94,9 @@ class CounterTalk(unittest.TestCase):
         plan, _ = plan_of("HOOK: h\nCAST: B = college_boy, C = chaiwala\nSCENE: chai_tapri\nB: Ek cutting! | एक कटिंग!\n"
                           "C (smile): Abhi lo. | अभी लो।\nB (shock): Itni chhoti?! | इतनी छोटी?!\n")
         kinds = [sh["kind"] for sh in plan.counter_shots]
-        self.assertEqual(kinds[:2], ["open", "reverse"])
-        self.assertIn("ots", kinds)
+        self.assertEqual(kinds[0], "open")
+        self.assertIn("reverse", kinds)                                    # (cine's tight timing: no 0.5 s shot
+        self.assertIn("ots", kinds)                                        #  of the first line's last words)
         self.assertNotIn("profile", kinds)                                 # the chaiwala is far: no side two-shot
 
 

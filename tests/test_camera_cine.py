@@ -300,7 +300,7 @@ class RenderTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"STUDIO_CAMERA": "cine"}):
             b = make_video(sc, self.W, use_tts=False, style="2d")
             fb = b.frame(b.duration - 0.3)
-        self.assertEqual(a.duration, b.duration)                    # the story's timing is the same
+        self.assertLessEqual(b.duration, a.duration)                # cine is as long or tighter (scene.TIGHT_*)
         self.assertNotEqual(fa.tobytes(), fb.tobytes())
 
 

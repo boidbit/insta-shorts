@@ -487,6 +487,26 @@ Prompt me ye ek "kaam-kaaj" module hai: idea me kaam ki baat ho (bartan, pocha, 
 - Tez haath (thappad, punch, hammer) ke peeche halki si parchhai (motion blur smear) — sirf usi pal, render time sirf ~5% badhta hai.
 - `tests/test_smooth.py` har action ko 1/240 s pe check karta hai ki koi jodh achanak "kood" na jaaye. Isne `kamar_dard`, `wake_up`, `get_hit`, `handshake`, `cartwheel` ke jhatke pakde — sab theek kar diye.
 
+### Cinematic (sirf naya `cine` camera; `CAMERA: classic` bilkul purana)
+
+- **Tight pacing:** ek line ke baad agli turant (gap 0.35 s se 0.12 s). Naachne, baithne jaise action ka wait ~30% kam, aur scene ke end ka khaali samay kam. Chalna aur aana-jaana poora time lete hain, aur LOOP reel ka end waisa hi rehta hai.
+- **Ek doosre ki taraf mude hue:** do ya zyada log hon toh sab baat karte waqt ek doosre ki taraf mude rehte hain (side view), camera ki taraf nahi. Jab camera kisi ke chehre pe close jaata hai, wo camera ki taraf mud jaata hai taaki expression dikhe. Naach, selfie, salute, rona, hasna jaise move saamne se hote hain. `A -> saamne` likho toh wo saamne hi rahega. Side view me ghunghat aur gamchha bhi dikhte hain.
+- **Feeling poore shareer me:** khade ya bolte waqt feeling body me dikhti hai:
+  - gussa (`angry`, `shout`): kamar pe mutthi, beech-beech me paer patakna
+  - dukh (`sad`, `cry`): jhuke kandhe, sir neeche
+  - khushi (`happy`, `laugh`, `excited`): halka uchhalna
+  - shock: haath upar
+  - darr (`scared`): kaanpna
+  - ghabrahat (`nervous`): haath malna
+  - akad (`proud`, `smug`): seena aage
+  - bore: ek taraf jhukna
+
+  Feeling badalne pe body dheere se badalti hai (0.35 s), jhatke se nahi.
+
+### CUT ab wahi karta hai jo likha hai 🎥
+
+`CUT close B` (ya sirf `CUT B`) = poore shot me camera B pe close, `CUT two_shot` = bolne wale dono ek saath. Aise shot me auto camera beech me nahi aata. `CUT` (khaali), `CUT wide`, `CUT reverse`, `CUT ots` pehle jaise. Jahan CUT nahi hai, wahan auto camera khud har bolne wale pe jaata hai.
+
 ### Naye reaction moves 😎
 
 | Action (Hinglish naam) | Kya |

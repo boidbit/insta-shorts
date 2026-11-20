@@ -94,7 +94,7 @@ class Transitions(unittest.TestCase):
         from studio.scene import split_scenes
         from studio.script import parse_script
         sc, _ = parse_script("HOOK: h\nMYSTERY: off\n%sCAST: A = uncle\nSCENE: room\nA: Haan ji. | हाँ जी।\n"
-                             "A -> %s\n" % ("CAMERA: classic\n" if classic else "", action))
+                             "wait 0.6\nA -> %s\n" % ("CAMERA: classic\n" if classic else "", action))
         r = Renderer(split_scenes(sc)[0], 120, use_tts=False)
         c = r.plan.chars["A"]
         t0 = next(e["t"] for e in c.events if e.get("action") == action)

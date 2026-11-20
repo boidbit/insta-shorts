@@ -51,8 +51,10 @@ class CutTests(unittest.TestCase):
         self.assertEqual({s["background"]["type"] for s in shots}, {"street"})            # same place for all of them
 
     def test_bad_framing_warns_and_scene_can_carry_one(self):
-        _, warns = parse_script("CAST: A = dost\nSCENE: street\nA (smile): hi | हाय\nCUT closeup\nA (smile): hi | हाय\nHOOK: h\nCTA: c\n")
+        _, warns = parse_script("CAST: A = dost\nSCENE: street\nA (smile): hi | हाय\nCUT sideways\nA (smile): hi | हाय\nHOOK: h\nCTA: c\n")
         self.assertTrue(any("framing" in w for w in warns))
+        _, warns = parse_script("CAST: A = dost\nSCENE: street\nA (smile): hi | हाय\nCUT closeup\nA (smile): hi | हाय\nHOOK: h\nCTA: c\n")
+        self.assertFalse(any("framing" in w for w in warns))         # `CUT closeup` is a shot now (writer_shot)
         sc, warns = parse_script("CAST: A = dost\nSCENE: street | title | wide\nA (smile): hi | हाय\nHOOK: h\nCTA: c\n")
         self.assertEqual(sc["scenes"][0]["framing"], "wide")
         self.assertEqual(sc["scenes"][0]["title"], "title")

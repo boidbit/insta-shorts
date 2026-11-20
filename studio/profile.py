@@ -112,6 +112,12 @@ def draw_side(o, p, cols, expr, mouth_open, t, x0, ground_y, k, blink=False, pro
             S.poly(X([(6, top - 2), (front_x - 2, top + 4), (front_x - 8, top + 50)]), skin, INK, 4)
         if outfit == "salwar":                 # the dupatta down the back
             S.tube(X([(back_x + 4, top + 10), (back_x - 16, -30)]), 26, accent)
+    if "gamchha" in acc:                       # the checked gamchha over the shoulder, its end down the chest
+        gc = color_of(o.get("gamchha_color", "red"), "red")
+        S.poly(X([(-10, top - 6), (14, top - 8), (front_x + 2, top + 150), (front_x - 22, top + 158)]), gc, INK, 4)
+        for u in (0.3, 0.6):
+            S.line(X([(-10 + (front_x - 12) * u, top - 6 + 164 * u), (14 + (front_x - 12) * u, top - 8 + 164 * u)]), 3,
+                   (250, 250, 246))
 
     # ---- the near arm, its hand and what it holds ----
     S.limb([shoulder, elb_n, hand_n], [ARM_W, ARM_W - 3, ARM_W - 7], skin)
@@ -146,7 +152,7 @@ def draw_side(o, p, cols, expr, mouth_open, t, x0, ground_y, k, blink=False, pro
     def hpoly(pts, fill=None, outline=None, w=OUTLINE):
         S.poly([HF(q) for q in pts], fill, outline, w * FACE * HEAD_SCALE)
 
-    covered = "turban" in acc or "cap" in acc or "beanie" in acc
+    covered = "turban" in acc or "cap" in acc or "beanie" in acc or "ghunghat" in acc
     if not covered:
         _hair_behind(S, HH, hair, hcol, accent)
     S.poly([HH(q) for q in closed_ellipse(0, 0, HEAD_RX * 1.02, HEAD_RY, 64)], skin, INK, OUTLINE + 1)
@@ -291,6 +297,12 @@ def draw_side(o, p, cols, expr, mouth_open, t, x0, ground_y, k, blink=False, pro
         bcol = color_of(o.get("cap_color", "black"), "black")
         dome = ellipse_pts(0, -6, HEAD_RX + 6, HEAD_RY + 8, 24, 175, 345)
         S.poly([HH(q) for q in dome + [(HEAD_RX * 0.92, -30), (-HEAD_RX - 6, -24)]], bcol, INK, 6)
+    if "ghunghat" in acc:                      # the pallu over the head, down the back to the shoulder
+        gcol = color_of(o["ghunghat_color"]) if o.get("ghunghat_color") else main
+        crown = ellipse_pts(-6, -6, HEAD_RX + 16, HEAD_RY + 14, 24, 160, 330)
+        edge = [(HEAD_RX * 0.5, -34), (HEAD_RX * 0.2, 44), (-HEAD_RX * 0.3, HEAD_RY + 70), (-HEAD_RX - 30, HEAD_RY + 96)]
+        S.poly([HH(q) for q in crown + edge], gcol, INK, 6)
+        S.line([HH(q) for q in [crown[-1]] + edge[:3]], 6, accent)
     if "topi" in acc:
         tcol = color_of(o.get("cap_color", "white"), "white")
         S.poly([HH(q) for q in [(-HEAD_RX * 0.9, -40), (-HEAD_RX * 0.6, -HEAD_RY - 18), (HEAD_RX * 0.5, -HEAD_RY - 22),

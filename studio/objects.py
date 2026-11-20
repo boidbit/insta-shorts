@@ -100,6 +100,19 @@ def _truck(s, c, part="all"):
     p.rrect(-150, -204, -20, -146, 8, (244, 242, 236))                              # white label with a bin pictogram
     p.rect(-104, -190, -66, -158, (96, 150, 110), INK, 4)
     p.rect(-110, -196, -60, -190, (96, 150, 110), INK, 4)
+    for (x, yy, r, cc) in ((-280, -262, 22, (90, 140, 60)), (-236, -266, 26, (60, 60, 66)), (-180, -262, 20, (200, 160, 90)),
+                           (-120, -264, 24, (70, 110, 170)), (-60, -262, 20, (220, 220, 214)), (0, -264, 22, (150, 90, 60))):
+        p.circle(x, yy, r, cc, INK, 3)                                              # garbage heaped over the top
+    p.rect(-312, -262, 96, -252, dark)                                               # the box's top rim (over the heap)
+    for y in (-150, -138, -126, -114):                                              # the grille
+        p.line([(286, y), (304, y)], (70, 72, 80), 3)
+    p.line([(250, -224), (276, -232), (282, -206)], INK, 4)                         # side mirror
+    p.rrect(272, -240, 292, -206, 5, (60, 62, 70))
+    p.rect(176, -96, 216, -84, (60, 62, 70))                                        # the cab's step
+    p.rect(250, -96, 296, -80, (250, 250, 240), INK, 3)                             # number plate
+    p.rect(256, -92, 290, -84, (60, 60, 66), None)
+    p.rect(-240, -82, -224, -40, (40, 40, 46))                                      # mud flap
+    p.line([(-280, -230), (-280, -110)], (255, 255, 255, 120), 6)                   # a shine on the box
     return p, [(-190, -52, 52), (-60, -52, 52), (212, -52, 52)]
 
 
@@ -121,6 +134,20 @@ def _auto(s, c, part="all"):
     p.poly([(120, -384), (178, -362), (120, -352)], (36, 38, 46))                   # roof peak over the windscreen
     p.poly([(126, -100), (176, -100), (188, -66), (122, -60)], shade(c, 0.85))      # front mudguard
     p.circle(174, -114, 11, (255, 232, 140), INK, 4)
+    p.poly([(-158, -128), (-158, -330), (-146, -340), (-146, -128)], (36, 38, 46))   # the black canvas at the back
+    p.line([(-140, -230), (-40, -230)], (190, 190, 196), 6)                         # a grab rail
+    p.rect(-176, -120, -158, -70, (40, 40, 46), INK, 3)                             # spare wheel behind
+    p.line([(128, -330), (160, -350), (172, -336)], INK, 4)                         # side mirror
+    p.rrect(160, -362, 186, -334, 5, (60, 62, 70))
+    p.rrect(46, -156, 84, -128, 6, (40, 40, 46), INK, 3)                            # the fare meter
+    p.rect(52, -150, 78, -138, (230, 80, 60), None)
+    p.rect(-120, -110, -40, -88, (250, 250, 240), INK, 3)                           # number plate
+    p.rect(-114, -104, -46, -94, (60, 60, 66), None)
+    p.line([(100, -352), (100, -320)], INK, 2)                                      # nimbu-mirchi on the roof edge
+    p.circle(100, -316, 7, (240, 220, 70), INK, 2)
+    for dx in (-6, 0, 6):
+        p.line([(100 + dx, -308), (100 + dx * 1.4, -284)], (40, 140, 60), 4)
+    p.line([(-120, -76), (110, -76)], shade(c, 0.8), 4)                             # a stripe along the body
     return p, [(-95, -36, 36), (136, -36, 36)]
 
 
@@ -141,6 +168,22 @@ def _car(s, c, part="all"):
         p.poly(w, glass)
     p.rect(214, -102, 236, -78, (255, 232, 140), INK, 4)
     p.rect(-236, -104, -222, -80, (220, 70, 70), INK, 3)
+    for x in (-142, 142):                                                           # wheel arches
+        p.poly([(x - 58, -34), (x - 50, -76), (x, -88), (x + 50, -76), (x + 58, -34)], shade(c, 0.7), None)
+    p.line([(4, -118), (4, -36)], shade(c, 0.7), 4)                                 # door lines
+    p.line([(-104, -118), (-110, -40)], shade(c, 0.7), 4)
+    p.line([(136, -116), (130, -48)], shade(c, 0.7), 4)
+    for x in (-60, 70):                                                             # door handles
+        p.rrect(x, -100, x + 30, -92, 3, (60, 62, 70))
+    p.line([(132, -124), (156, -140), (168, -126)], INK, 4)                         # side mirror
+    p.rrect(152, -146, 176, -124, 5, shade(c, 0.85))
+    p.rrect(-246, -60, 246, -38, 10, (70, 72, 80))                                  # bumpers
+    p.rect(200, -96, 240, -70, (60, 62, 70))                                        # grille
+    for y in (-90, -82, -76):
+        p.line([(204, y), (236, y)], (130, 132, 140), 2)
+    p.rect(-226, -58, -180, -44, (250, 250, 240), INK, 3)                           # number plate
+    p.line([(-60, -246), (90, -246)], (255, 255, 255, 140), 4)                      # roof shine
+    p.line([(-20, -230), (-40, -130)], (255, 255, 255, 110), 6)                     # glass shine
     return p, [(-142, -40, 40), (142, -40, 40)]
 
 
@@ -151,6 +194,14 @@ def _scooter(s, c):
     p.line([(86, -148), (76, -232)], INK, 9)                                                                # fork
     p.line([(46, -234), (108, -234)], INK, 9)                                                               # handlebar
     p.circle(88, -218, 11, (255, 232, 140), INK, 4)
+    p.poly([(60, -92), (90, -150), (110, -150), (100, -92)], shade(c, 0.85))       # the front shield
+    p.rect(-4, -98, 60, -88, (50, 50, 56))                                          # floorboard mat
+    for x in (56, 96):                                                              # mirrors
+        p.line([(x, -234), (x - 6, -262)], INK, 4)
+        p.ellipse(x - 18, -280, x + 6, -260, (170, 200, 220), INK, 3)
+    p.rect(-128, -100, -96, -78, (250, 250, 240), INK, 3)                           # number plate
+    p.ellipse(-96, -120, -60, -86, (200, 60, 50), INK, 3)                           # tail light
+    p.line([(-100, -160), (-114, -150)], (190, 190, 196), 5)                        # grab rail
     return p, [(-96, -38, 38), (100, -38, 38)]
 
 
@@ -167,6 +218,15 @@ def _bike(s, c, part="all"):
     p.circle(128, -150, 17, (255, 232, 140), INK, 4)                                 # headlight
     p.line([(-12, -60), (-128, -72)], (130, 132, 140), 9)                            # exhaust
     p.rect(26, -66, 50, -58, (60, 60, 66), None)                                     # foot peg
+    p.line([(-112, -46), (-12, -66)], (50, 50, 56), 4)                              # chain
+    p.poly([(-160, -76), (-120, -102), (-70, -96), (-100, -80)], shade(c, 0.8))     # rear mudguard
+    p.poly([(96, -98), (130, -104), (156, -84), (140, -80)], shade(c, 0.8))         # front mudguard
+    p.line([(92, -200), (82, -236)], INK, 4)                                        # mirror
+    p.ellipse(68, -252, 96, -232, (170, 200, 220), INK, 3)
+    p.rect(-170, -114, -136, -94, (250, 250, 240), INK, 3)                          # number plate
+    p.ellipse(-168, -138, -144, -118, (220, 60, 50), INK, 3)                        # tail light
+    p.line([(0, -150), (50, -154)], (255, 255, 255, 150), 5)                        # tank shine
+    p.rect(-120, -118, -70, -84, (40, 40, 46), INK, 3)                              # side box
     return p, [(-112, -46, 46), (118, -46, 46)]
 
 
@@ -182,6 +242,15 @@ def _cycle(s, c, part="all"):
     p.line([(68, -208), (100, -206)], INK, 8)                                        # handlebar
     p.rrect(-34, -194, 22, -178, 7, (44, 40, 44))                                    # saddle
     p.circle(bb[0], bb[1], 12, (150, 152, 160), INK, 4)
+    p.line([(-8, -178), (-120, -116)], fr, 5)                                       # the carrier...
+    p.line([(-130, -118), (-40, -118)], fr, 6)
+    p.rrect(-128, -150, -50, -118, 8, (200, 160, 90), INK, 3)                       # ...with a tiffin bag on it
+    p.circle(70, -214, 7, (200, 200, 206), INK, 2)                                  # bell
+    p.rect(92, -212, 140, -176, (190, 150, 90), INK, 3)                             # a front basket
+    for x in (100, 112, 124):
+        p.line([(x, -210), (x, -178)], (160, 120, 70), 2)
+    p.line([(-160, -70), (-108, -122), (-60, -110)], fr, 4)                         # mudguards
+    p.line([(70, -112), (112, -122), (160, -84)], fr, 4)
     return p, [(rear[0], rear[1], 60), (front[0], front[1], 60)]
 
 
@@ -204,6 +273,15 @@ def _tractor(s, c):
     p.line([(30, -196), (50, -246)], INK, 7)                                        # steering column...
     p.line([(28, -252), (72, -240)], INK, 9)                                        # ...and wheel
     p.rect(-20, -130, 40, -110, (60, 60, 66))                                       # the step
+    for i in range(3):                                                              # the front weights
+        p.rect(226 + i * 2, -120 + i * 12, 246, -110 + i * 12, (60, 62, 70), INK, 2)
+    p.rect(-200, -112, -150, -96, (70, 72, 80))                                     # the hitch for a trolley
+    p.circle(-206, -104, 9, (70, 72, 80), INK, 3)
+    p.rrect(-20, -232, 30, -204, 6, shade(c, 0.85))                                 # fuel tank under the wheel
+    p.rect(-140, -196, -120, -184, (255, 200, 80), INK, 2)                          # mudguard lamp
+    for (x, y, r) in ((-130, -40, 10), (-40, -20, 8), (190, -14, 7)):              # dried mud
+        p.circle(x, y, r, (150, 110, 70, 200), None)
+    p.line([(20, -190), (200, -182)], (255, 255, 255, 110), 6)                      # bonnet shine
     return p, [(-80, -100, 100), (170, -52, 52)]
 
 
@@ -233,6 +311,16 @@ def _bail_gaadi(s, c):
     for x in range(-280, 0, 40):
         p.line([(x, -200), (x, -150)], dark, 4)
     p.line([(-300, -196), (16, -196)], dark, 6)
+    p.poly([(-300, -196), (-296, -250), (-268, -272), (-232, -262), (-226, -196)], (226, 196, 110), INK, 4)   # hay
+    for x in range(-292, -232, 12):
+        p.line([(x, -200), (x + 6, -252)], (200, 168, 86), 2)
+    for (x, cc) in ((-60, (214, 196, 160)), (-24, (200, 180, 140))):               # grain sacks
+        p.rrect(x - 30, -250, x + 18, -196, 14, cc, INK, 4)
+        p.line([(x - 22, -238), (x + 10, -238)], (150, 130, 100), 3)
+    for dx in (26, 0):
+        p.circle(256 + dx, -168, 10, (220, 180, 60), INK, 3)                        # neck bells
+        p.line([(292 + dx, -196), (330 + dx, -190), (118, -200)], (140, 60, 40), 2)  # nose ropes to the driver
+        p.rect(110 + dx, -214, 180 + dx, -206, (200, 60, 60))                       # a red cloth on the back
     return p, [(-140, -74, 74)]
 
 
@@ -471,6 +559,25 @@ def _thela(s, c, variant="sabzi"):
             p.circle(x, y + yy, 6, (120, 70, 40), None)
         for i in range(3):                                                           # a stack of bhature
             p.ellipse(160, y - 22 - i * 10, 226, y - i * 10, (240, 200, 120), INK, 3)
+    # what every thela has: a bulb hanging from the tarp, nimbu-mirchi against nazar, the price board on the box,
+    # a water can hanging off the side, a roll of plastic bags, a little steel bowl for the money
+    p.line([(170, -506), (170, -470)], INK, 3)
+    p.ellipse(158, -476, 182, -446, (255, 236, 150), INK, 3)
+    p.line([(-170, -506), (-170, -476)], INK, 2)
+    p.circle(-170, -470, 8, (240, 220, 70), INK, 2)
+    for dx in (-7, 0, 7):
+        p.line([(-170 + dx, -462), (-170 + dx * 1.4, -436)], (40, 140, 60), 4)
+    p.rect(-120, top + 8, 120, top + 44, (250, 246, 232), INK, 3)                    # the price board
+    for i in range(3):
+        p.line([(-104 + i * 76, top + 26), (-60 + i * 76, top + 26)], (60, 60, 66), 3)
+    p.rrect(206, -200, 246, -140, 8, (60, 140, 200), INK, 3)                         # the water can
+    p.rect(218, -208, 234, -198, (40, 90, 150), INK, 2)
+    p.rect(-226, -188, -196, -156, (240, 240, 240, 220), INK, 2)                     # plastic bags
+    p.line([(-218, -188), (-212, -198), (-206, -188)], INK, 2)
+    for x in (-196, 196):                                                            # shine on the poles
+        p.line([(x - 2, top - 20), (x - 2, -490)], (230, 230, 236), 3)
+    for x in (-150, 150):                                                            # wheel guards
+        p.poly([(x - 76, -150), (x - 60, -170), (x + 60, -170), (x + 76, -150)], (90, 92, 100), None)
     return p, [(-150, -64, 64), (150, -64, 64)]
 
 
