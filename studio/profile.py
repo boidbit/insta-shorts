@@ -220,6 +220,10 @@ def draw_side(o, p, cols, expr, mouth_open, t, x0, ground_y, k, blink=False, pro
         hline(bezier((70, 28), (58, 44), (60, 62), 8), 3.5, line_c)
     if "mole" in marks:
         hpoly(closed_ellipse(60, 40, 4.5, 4.5, 10), (70, 46, 36), None)
+    if "patti" in marks:                       # the crossed band-aid on the forehead
+        for ang in (28, -28):
+            band = [rot(q, math.radians(ang)) for q in ((-20, -7), (20, -7), (20, 7), (-20, 7))]
+            hpoly([(48 + q[0], -60 + q[1]) for q in band], (238, 206, 164), INK, 3)
     if "freckles" in marks:
         for (x, y) in ((60, 18), (70, 22), (52, 24), (64, 28)):
             hpoly(closed_ellipse(x, y, 2.3, 2.3, 8), shade(skin, 0.72), None)
@@ -310,6 +314,10 @@ def draw_side(o, p, cols, expr, mouth_open, t, x0, ground_y, k, blink=False, pro
     if "nurse_cap" in acc:
         S.poly([HH(q) for q in [(-30, -HEAD_RY + 4), (-24, -HEAD_RY - 26), (34, -HEAD_RY - 26), (40, -HEAD_RY + 4)]],
                WHITE, INK, 5)
+    if "tedha_chashma" in acc:                 # the mad doctor's thick round lens, crooked, from the side
+        hpoly(closed_ellipse(ex + 6, ey + 4, 27, 26, 20), (226, 240, 250), INK, 8)
+        hline([(ex - 4, ey - 12), (ex + 14, ey + 14)], 3)
+        hline([(ex - 21, ey), (-6, ey - 8)], 6)
     if "glasses" in acc or "sunglasses" in acc:
         sun = "sunglasses" in acc
         hpoly(closed_ellipse(ex + 4, ey, 22, 20, 20), (22, 22, 28) if sun else None, INK, 5)
@@ -391,6 +399,19 @@ def _hair_behind(S, HH, style, hc, accent):
 def _hair_cap(S, HH, style, hc):
     """The hair over the top and the back of the head, the fringe at the front."""
     if style == "bald":
+        S.line([HH((HEAD_RX * 0.1, -HEAD_RY + 18)), HH((HEAD_RX * 0.35, -HEAD_RY + 12))], 5, WHITE)
+        return
+    if style == "wild":                                # bald on top, the frizz flying out behind, strands sticking up
+        spikes = []
+        for i in range(13):
+            a = math.radians(90 + 190 * i / 12)
+            r = 1.0 if i % 2 else 0.7
+            spikes.append((-HEAD_RX * 0.25 + (HEAD_RX + 34) * r * math.cos(a), -6 + (HEAD_RY + 22) * r * math.sin(a) * 0.8))
+        S.poly([HH(q) for q in spikes + [(-HEAD_RX * 0.2, -HEAD_RY * 0.5), (0, 10)]], hc, INK, OUTLINE)
+        for (x0_, x1_, y1_) in ((-30, -50, -HEAD_RY - 44), (-6, 4, -HEAD_RY - 54), (18, 36, -HEAD_RY - 36)):
+            pts = bezier((x0_, -HEAD_RY + 6), (x0_ + (x1_ - x0_) * 0.2, -HEAD_RY - 30), (x1_, y1_), 8)
+            S.line([HH(q) for q in pts], 6, INK)
+            S.line([HH(q) for q in pts], 3, hc)
         S.line([HH((HEAD_RX * 0.1, -HEAD_RY + 18)), HH((HEAD_RX * 0.35, -HEAD_RY + 12))], 5, WHITE)
         return
     if style == "balding":                             # a ring over the ear and round the back

@@ -1,0 +1,150 @@
+"""Series and kirdaar by their people's names (the short prompt's talk: "Sultan (akad): ..."), the kirdaar files,
+the dog's three angles, the new looks, the short prompt file and the page's pickers.
+python -m unittest discover -s tests"""
+import json
+import os
+import re
+import sys
+import unittest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from studio import script                                  # noqa: E402
+from studio.animals import build_animal                    # noqa: E402
+from studio.script import parse_script                     # noqa: E402
+
+ROOT = os.path.join(os.path.dirname(__file__), "..")
+
+
+def page():
+    with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as f:
+        return f.read()
+
+
+class SeriesNames(unittest.TestCase):
+    def test_names_work_like_letters_and_the_series_line_can_be_anywhere(self):
+        t = ("HOOK: x\nCAST: Papa = boy, Mummy = aunty\nPapa (gussa): Bill dekha? | बिल देखा?\n"
+             "Mummy (smug): Haan. | हाँ।\nPapa -> facepalm\nSERIES: sharma_parivar 2\n")
+        sc, w = parse_script(t)
+        self.assertEqual(w, [])
+        self.assertEqual(sorted(sc["characters"]), ["M", "P"])           # no extra "Papa" / "Mummy" people
+        self.assertEqual(sc["scenes"][0]["background"]["type"], "living_room")   # the series' own place, from the start
+
+    def test_the_series_i_made_without_asking_are_gone(self):
+        for sid in ("sheru_mohalla", "gaon_ke_tau", "pappu_class"):
+            self.assertIsNone(script.load_series(sid))
+
+    def test_feeling_words_of_the_short_prompt_all_work(self):
+        with open(os.path.join(ROOT, "SHORT_PROMPT.md"), encoding="utf-8") as f:
+            text = f.read()
+        words = re.search(r"Feeling sirf ek shabd: (.*?)\.\n", text).group(1).split(", ")
+        self.assertIn("akad", words)
+        for w_ in words:
+            sc, w = parse_script("HOOK: x\nCAST: A = uncle\nSCENE: room\nA (%s): Haan. | हाँ।\n" % w_)
+            self.assertEqual(w, [], w_)
+
+
+class Kirdaar(unittest.TestCase):
+    def test_each_alone_by_any_of_its_names(self):
+        for kid, said, kind, look in (("sultan", "Sultan Bhai", "dog", None), ("paglet", "Doctor Paglet", None, "pagla_doctor"),
+                                      ("daddu", "Dada Daddu", None, "dada")):
+            d = script.load_kirdaar(kid)
+            self.assertTrue(d["line"] and d["aadat"] and d["hashtag"], kid)
+            sc, w = parse_script("HOOK: x\nKIRDAAR: %s\n%s (gussa): Haan. | हाँ।\n%s -> saamne\n" % (said, said, said))
+            self.assertEqual(w, [], kid)
+            self.assertEqual(list(sc["characters"]), [d["name"]], kid)    # only them, nobody else
+            spec = sc["characters"][d["name"]]
+            self.assertEqual(spec.get("kind"), kind, kid)
+            if look:
+                self.assertEqual(spec["look"], look, kid)
+            self.assertEqual(sc["scenes"][0]["background"]["type"], d["place"], kid)
+            self.assertIn(d["hashtag"], sc["post"]["hashtags"])
+
+    def test_the_same_face_every_episode(self):
+        one = parse_script("HOOK: a\nKIRDAAR: Paglet\nPaglet: Haan. | हाँ।\n")[0]["characters"]["Paglet"]
+        two = parse_script("HOOK: b\nSCENE: gully\nKIRDAAR: Paglet 4\nCAST: A = uncle\nA: Na. | ना।\n"
+                           "Doctor Paglet (pagal): Injection! | इंजेक्शन!\n")[0]["characters"]["Paglet"]
+        for k in ("face", "eyes", "nose", "brows", "look", "hair"):
+            self.assertEqual(one.get(k), two.get(k), k)
+
+    def test_a_crossover(self):
+        sc, w = parse_script("HOOK: x\nKIRDAAR: Sultan, Paglet part 2\nSultan (akad): Abey! | अबे!\n"
+                             "Paglet (pagal): Injection lagega! | इंजेक्शन लगेगा!\n")
+        self.assertEqual(w, [])
+        self.assertEqual(sorted(sc["characters"]), ["Paglet", "Sultan"])
+        self.assertEqual(sc["series"]["label"], "Sultan Bhai × Doctor Paglet • Part 2")
+        self.assertEqual(sc["post"]["hashtags"][:2], ["#sultanbhai", "#doctorpaglet"])
+
+    def test_swag_and_pagla(self):
+        sultan = script.cast_spec(script.load_kirdaar("sultan")["words"].split(), 0)
+        self.assertEqual(set(sultan["accessories"]) & {"sunglasses", "chain", "cap"}, {"sunglasses", "chain", "cap"})
+        daddu = script.cast_spec(script.load_kirdaar("daddu")["words"].split(), 0)
+        self.assertEqual(daddu["prop"], "lathi")
+        from studio.characters import LOOKS
+        pg = LOOKS["pagla_doctor"]
+        self.assertEqual((pg["hair"], pg["prop"], pg["expression"]), ("wild", "injection", "pagla"))
+        self.assertIn("tedha_chashma", pg["accessories"])
+
+    def test_unknown_kirdaar_says_so(self):
+        sc, w = parse_script("HOOK: x\nKIRDAAR: Gabbar\nCAST: A = uncle\nSCENE: room\nA: Haan. | हाँ।\n")
+        self.assertTrue(any("Gabbar" in x for x in w))
+
+
+class DogAngles(unittest.TestCase):
+    def spot(self, view, acc=()):
+        spec = {"kind": "dog", "pose_view": view, "accessories": list(acc)}
+        ops, an = build_animal(spec, "bark", 0.3, 1.0, 500, 1500, 0.82, 1, False, False, 0.7, "neutral")
+        return ops, an
+
+    def test_three_angles_draw_differently(self):
+        side, a_side = self.spot("side")
+        turn, a_turn = self.spot("turn")
+        front, a_front = self.spot("front")
+        xs = lambda ops: [p[0] for op in ops for p in op["pts"]]
+        self.assertGreater(max(xs(side)) - min(xs(side)), 2 * (max(xs(front)) - min(xs(front))))   # front: narrow
+        self.assertAlmostEqual(a_front["head_center"][0], 500, delta=5)                           # head over the body
+        self.assertGreater(a_side["head_center"][0], 600)                                          # profile: head ahead
+        self.assertNotEqual(len(side), len(turn))
+
+    def test_swag_on_every_angle(self):
+        for view in ("side", "turn", "front"):
+            plain, _ = self.spot(view)
+            swag, _ = self.spot(view, ("sunglasses", "chain", "cap"))
+            self.assertGreater(len(swag), len(plain) + 5, view)
+
+    def test_renderer_picks_the_angle(self):
+        from studio.render import Renderer
+        self.assertTrue(hasattr(Renderer, "_dog_view"))
+
+
+class Page(unittest.TestCase):
+    def test_the_short_prompt(self):
+        with open(os.path.join(ROOT, "SHORT_PROMPT.md"), encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("| wahi line Devanagari me", text)
+        self.assertIn("Sultan, Paglet, Daddu", text)
+        self.assertTrue(text.rstrip().endswith("Mera idea:"))
+        self.assertLess(len(text), 3000)
+        self.assertIn('id="copyShort"', page())
+        self.assertIn('fetch("SHORT_PROMPT.md"', page())
+
+    def test_the_lists_and_the_pickers(self):
+        s = page()
+        vocab = json.loads(re.search(r'<script type="application/json" id="vocab">(.*?)</script>', s, re.S).group(1))
+        self.assertEqual(sorted(x["id"] for x in vocab["series"]), ["office_gang", "sharma_parivar"])
+        self.assertEqual(sorted(x["id"] for x in vocab["kirdaar"]), ["daddu", "paglet", "sultan"])
+        for needle in ("function seriesBox", "function kirdaarBox", "function kirdaarPick", "function extrasPicker",
+                       "🎒 Haath me", "🔊 Awaaz", "✨ Effect"):
+            self.assertIn(needle, s)
+
+    def test_the_prompt_module(self):
+        from studio import director
+        with open(os.path.join(ROOT, "SCRIPT_PROMPT.md"), encoding="utf-8") as f:
+            text = f.read()
+        self.assertNotIn("KIRDAAR:", director.prompt_text(text, keep=()))
+        self.assertIn("KIRDAAR: Sultan", director.prompt_text(text, keep=("series",)))
+        self.assertNotIn("sheru_mohalla", text)
+
+
+if __name__ == "__main__":
+    unittest.main()

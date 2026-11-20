@@ -934,6 +934,23 @@ class Renderer(Output):
         z = cur[3] if t > cur[1] else max(cur[2], cur[3])     # once the move is over: where it ended
         return who == c.name and z >= self.CLOSE_ZOOM
 
+    DOG_SIDE_ACTIONS = frozenset({"walk", "run", "lie_down", "lie", "sleep", "sleep_lie", "eat"})
+
+    def _dog_view(self, c, t, st, action, moving):
+        """The dog's angle: in profile while it walks, lies or listens; its head turned to us while it talks (from just
+        before the line to just after, so it does not flick between two close lines); all of it facing us in its own
+        close-up or when the script turns it (`Sultan -> saamne`). `Sultan -> side` keeps it in profile."""
+        if moving or action in self.DOG_SIDE_ACTIONS or not self._natural():     # (classic: the old profile dog)
+            return "side"
+        v = (c.ov or {}).get("view") or st.get("view")
+        if v == "side":
+            return "side"
+        if v == "front" or self._close_on(c, t):
+            return "front"
+        if any(sp["start"] - 0.12 <= t < sp["end"] + 0.35 for sp in c.speech):
+            return "turn"
+        return "side"
+
     MOOD_IN = 0.35          # seconds a new feeling takes to reach the body
 
     def _mood(self, c, t, st, pose, talking):
@@ -1318,6 +1335,8 @@ class Renderer(Output):
         speaking = bool(st["talking"]) and st["talking"].get("bubble") != "thought"   # thoughts: lips shut
         if spec.get("kind") in ANIMALS:          # dog, cat, cow, crow, parrot: their own rig
             running = bool(mv and len(mv) > 6 and mv[6])
+            if spec["kind"] == "dog":
+                spec["pose_view"] = self._dog_view(c, t, st, action, bool(mv))
             dirn = -1 if st["facing"] == "left" else 1
             k_an = k * (0.82 if spec["kind"] in ("dog", "cat", "cow", "buffalo", "goat") else 1.0)   # (the four-legged
             # rig scales each kind to its real size itself: animals.SIZE)
