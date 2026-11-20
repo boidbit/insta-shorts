@@ -5,6 +5,9 @@ the lizard on the wall and the mosquito buzzing round the heads (their own littl
 Character spec:  { "kind": "dog", "color": [180, 130, 80], "x": 300, "facing": "right" }
 Actions:         idle, walk / run (automatic while moving), sit, lie_down / sleep, jump, bark (= meow, moo,
                  caw, speak), wag, eat, fly (birds), peck (birds), shock
+The dog has three angles (spec["pose_view"], chosen by the renderer): "side" (the whole dog in profile), "turn" (the
+body in profile, the head turned to us: while it talks) and "front" (all of it facing us: its own close-up, or
+`Sultan -> saamne`). Its accessories: sunglasses, chain (a gold chain), cap (worn backwards).
 """
 import math
 
@@ -142,6 +145,11 @@ def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_ope
     if lie:
         body_y = -ry * 0.95
     bc = (0.0, body_y)
+    view = spec.get("pose_view") if kind == "dog" else None
+    acc = set(spec.get("accessories") or ())
+    if view == "front" and not lie:
+        return _dog_front(S, X, poly, line, limb, P, col, dk, light, t, at, action, speak, mouth_open, expr,
+                          lift, sit, acc, spec)
 
     def B(p):                          # body-local -> local, with the body's tilt (sitting)
         a = math.radians(tilt)
@@ -234,7 +242,8 @@ def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_ope
 
     # ---- neck (under the body's outline at one end, under the head at the other)
     base = B((rx * 0.72, -ry * 0.22))
-    neck_end = H(-0.35, 0.15)
+    turn = view == "turn" and not lie and not graze
+    neck_end = H(-0.1, 0.45) if turn else H(-0.35, 0.15)
     limb([base, ((base[0] + neck_end[0]) / 2, (base[1] + neck_end[1]) / 2 - 6), neck_end],
          [NECK_W[kind] * ry, NECK_W[kind] * ry * 0.82, hr * 0.95], col)
 
@@ -276,10 +285,184 @@ def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_ope
             limb(pts, wid, col if kind not in ("cow",) else _mix(col, (255, 255, 255), 0.05))
             foot_end(pts, col)
 
+    if "chain" in acc and kind == "dog":            # the gold chain round the neck, its pendant at the throat
+        _side_chain(S, X, line, base, neck_end, NECK_W[kind] * ry * 0.86)
     # ---- head
-    mouth = _head(kind, H, hr, poly, line, limb, col, dk, light, t, speak, mouth_open, expr, action, lie, graze, at)
+    if turn:                                        # the head turned to us (it is talking)
+        mouth = _front_head(H, hr, poly, line, col, dk, light, t, speak, mouth_open, expr, action)
+        _front_acc(S, X, H, hr, poly, line, acc, spec, chain=False)
+    else:
+        mouth = _head(kind, H, hr, poly, line, limb, col, dk, light, t, speak, mouth_open, expr, action, lie, graze, at)
+        if kind == "dog":
+            _side_acc(S, X, H, hr, poly, line, acc, spec)
     head_top = X(H(0.0, -1.2))
     anchors = dict(head_top=S.T(head_top), head_center=S.T(X((hx_, hy_))), mouth=S.T(X(mouth)),
+                   feet=S.T((0, 0)), hand_l=S.T(X(mouth)), hand_r=S.T(X(mouth)))
+    return S.ops, anchors
+
+
+CAP_COLOR = (214, 44, 52)
+SHADES = (24, 24, 32)
+
+
+def _cap_col(spec):
+    c = spec.get("cap_color")
+    return tuple(c[:3]) if isinstance(c, (list, tuple)) else CAP_COLOR
+
+
+def _side_chain(S, X, line, base, end, width):
+    """A thick gold chain across the neck (seen from the side), the pendant hanging at the throat."""
+    from .characters import GOLD
+    dx, dy = end[0] - base[0], end[1] - base[1]
+    n = math.hypot(dx, dy) or 1.0
+    ux, uy = dx / n, dy / n
+    px, py = -uy, ux
+    m = (base[0] + dx * 0.5, base[1] + dy * 0.5)
+    a = (m[0] + px * width * 0.55, m[1] + py * width * 0.55)
+    b = (m[0] - px * width * 0.55, m[1] - py * width * 0.55)
+    if a[1] > b[1]:
+        a, b = b, a                                  # b: the lower end, the throat
+    pts = bezier(a, (m[0] - ux * 14, m[1] - uy * 14), b, 10)
+    line(pts, 10)
+    for q in pts:
+        S.dot(X(q), 5.5, GOLD, None)
+    tip = (b[0] + 6, b[1] + 20)
+    line([b, tip], 4, GOLD)
+    S.dot(X(tip), 15, GOLD, INK, 4)
+    S.dot(X(tip), 6, (180, 136, 40), None)
+
+
+def _side_acc(S, X, H, hr, poly, line, acc, spec):
+    """The dog's swag in profile: wrap-round shades over its eye, a cap on backwards."""
+    if "cap" in acc:
+        cc = _cap_col(spec)
+        poly(_spline([H(-1.45, -0.62), H(-1.4, -0.48), H(-0.6, -0.46), H(-0.62, -0.62)], 3),
+             tuple(int(v * 0.75) for v in cc), INK, 4)                   # the brim, pointing back
+        dome = [H(-0.72, -0.5)] + [H(-0.05 + 0.68 * math.cos(math.radians(a)), -0.55 + 0.55 * math.sin(math.radians(a)))
+                                   for a in range(180, 361, 20)] + [H(0.64, -0.5)]
+        poly(dome, cc, INK, 5)
+        line([H(-0.7, -0.52), H(0.62, -0.52)], 6, tuple(int(v * 0.7) for v in cc))
+        S.dot(X(H(-0.05, -1.08)), 7, tuple(int(v * 0.8) for v in cc), INK, 3)
+    if "sunglasses" in acc:
+        line([H(0.08, -0.4), H(-0.5, -0.4)], 6)                          # the arm, back to the ear
+        poly(_spline([H(0.04, -0.52), H(0.62, -0.54), H(0.66, -0.18), H(0.36, -0.05), H(0.08, -0.16)], 4),
+             SHADES, INK, 4)
+        poly([H(0.7, -0.5), H(0.9, -0.48), H(0.86, -0.26), H(0.72, -0.24)], SHADES, INK, 3)    # the far lens
+        line([H(0.62, -0.47), H(0.72, -0.46)], 5)
+        line([H(0.16, -0.38), H(0.32, -0.46)], 4, (150, 150, 176))      # glint
+
+
+def _front_acc(S, X, H, hr, poly, line, acc, spec, chain=True):
+    """The dog's swag from the front: two black lenses, the cap's front with its strap gap, the chain on the chest."""
+    from .characters import GOLD
+    if chain and "chain" in acc:
+        pts = bezier(H(-0.62, 0.62), H(0.0, 1.42), H(0.62, 0.62), 14)
+        line(pts, 10)
+        for q in pts:
+            S.dot(X(q), 5.5, GOLD, None)
+        S.dot(X(H(0.0, 1.06)), 17, GOLD, INK, 4)
+        S.dot(X(H(0.0, 1.06)), 7, (180, 136, 40), None)
+    if "cap" in acc:
+        cc = _cap_col(spec)
+        dome = [H(-0.8, -0.5)] + [H(0.8 * math.cos(math.radians(a)), -0.52 + 0.6 * math.sin(math.radians(a)))
+                                  for a in range(180, 361, 15)] + [H(0.8, -0.5)]
+        poly(dome, cc, INK, 5)
+        line([H(-0.8, -0.54), H(0.8, -0.54)], 9, tuple(int(v * 0.7) for v in cc))
+        poly([H(-0.2, -0.56)] + [H(0.2 * math.cos(math.radians(a)), -0.56 + 0.22 * math.sin(math.radians(a)))
+                                 for a in range(180, 361, 30)], spec.get("_fur") or (186, 134, 84), INK, 3)
+        S.dot(X(H(0.0, -1.12)), 7, tuple(int(v * 0.8) for v in cc), INK, 3)
+    if "sunglasses" in acc:
+        for sgn in (-1, 1):
+            c = (sgn * 0.36, -0.2)
+            poly(_spline([H(c[0] - 0.3, c[1] - 0.16), H(c[0] + 0.3, c[1] - 0.18), H(c[0] + 0.26, c[1] + 0.14),
+                          H(c[0], c[1] + 0.22), H(c[0] - 0.26, c[1] + 0.14)], 4), SHADES, INK, 4)
+            line([H(c[0] - 0.18, c[1] - 0.06), H(c[0] - 0.06, c[1] - 0.12)], 4, (150, 150, 176))
+        line([H(-0.08, -0.32), H(0.08, -0.32)], 6)
+        line([H(-0.66, -0.34), H(-0.9, -0.38)], 5)
+        line([H(0.66, -0.34), H(0.9, -0.38)], 5)
+
+
+def _front_head(H, hr, poly, line, col, dk, light, t, speak, mouth_open, expr, action):
+    """The dog's head facing us: both floppy ears, two eyes, the muzzle in the middle. Returns the mouth."""
+    closed = expr in ("sleepy", "happy", "laugh")
+    poly(_spline([H(*q) for q in ((-0.9, -0.1), (-0.78, -0.7), (0.0, -0.94), (0.78, -0.7), (0.9, -0.1),
+                                  (0.72, 0.56), (0.0, 0.8), (-0.72, 0.56))], 5), col, INK, 6)
+    poly(closed_ellipse(*H(0.0, -0.5), hr * 0.34, hr * 0.22, 16), light, None)
+    for sgn in (-1, 1):                                  # the floppy ears, hanging at the sides
+        poly(_spline([H(sgn * q[0], q[1]) for q in ((0.55, -0.78), (1.12, -0.5), (1.22, 0.34), (0.98, 0.5),
+                                                    (0.74, -0.08))], 4), dk, INK, 4)
+    poly(closed_ellipse(*H(0.0, 0.34), hr * 0.52, hr * 0.4, 22), light, INK, 4)          # the muzzle
+    nose = H(0.0, 0.1)
+    poly(closed_ellipse(nose[0], nose[1], hr * 0.2, hr * 0.14, 16), (30, 26, 28), INK, 3)
+    poly(closed_ellipse(nose[0] - hr * 0.06, nose[1] - hr * 0.05, hr * 0.06, hr * 0.03, 8), (120, 120, 130), None)
+    mouth = H(0.0, 0.52)
+    if speak:
+        poly(closed_ellipse(mouth[0], mouth[1], hr * 0.26, hr * (0.08 + 0.18 * max(0.4, mouth_open)), 18),
+             (110, 30, 40), INK, 3)
+        poly(closed_ellipse(mouth[0], mouth[1] + hr * 0.1 * max(0.4, mouth_open), hr * 0.14, hr * 0.08, 12),
+             (230, 110, 120), None)
+    else:
+        line([H(0.0, 0.24), H(0.0, 0.38)], 4)
+        line(bezier(H(-0.26, 0.4), H(-0.12, 0.5), H(0.0, 0.38), 6), 4)
+        line(bezier(H(0.0, 0.38), H(0.12, 0.5), H(0.26, 0.4), 6), 4)
+        if action in ("wag", "idle") or expr in ("happy", "laugh", "smile"):         # the tongue out, panting
+            poly(_spline([H(-0.1, 0.46), H(0.1, 0.46), H(0.1, 0.72 + 0.05 * math.sin(t * 8)), H(-0.1, 0.72)], 4),
+                 (232, 110, 122), INK, 3)
+    plain = "neutral" if expr in ("angry", "shout") else expr
+    for sgn in (-1, 1):
+        _eye(H, hr, poly, line, (sgn * 0.36, -0.2), plain, closed, "dog", 0.18)
+        if expr in ("angry", "shout", "determined", "evil", "disgust"):
+            line([H(sgn * 0.62, -0.52), H(sgn * 0.14, -0.36)], 6)
+        elif expr in ("sad", "cry", "scared", "nervous", "hurt"):
+            line([H(sgn * 0.6, -0.36), H(sgn * 0.16, -0.5)], 5)
+        elif expr in ("shock", "surprised", "excited"):
+            line(ellipse_pts(*H(sgn * 0.36, -0.46), hr * 0.2, hr * 0.08, 8, 200, 340), 5)
+    return mouth
+
+
+def _dog_front(S, X, poly, line, limb, P, col, dk, light, t, at, action, speak, mouth_open, expr, lift, sit, acc,
+               spec):
+    """The whole dog facing us: chest, the two front legs, the hind paws (or the haunches, sitting) and the tail
+    wagging up behind one side, the head on top."""
+    ry, leg, hr = P["ry"], P["leg"], P["head"]
+    cy = (-(leg * 0.86 + ry * 0.3) if sit else -(leg + ry * 0.35)) + lift
+    wag = math.sin(t * (14 if action == "wag" else 4)) * (22 if action in ("wag", "idle") else 8)
+    tail = bezier((40, cy - 30), (110, cy - 60 + wag * 0.4), (96 + wag, cy - 160), 6)
+    limb(tail, _taper(len(tail), 18, 4), col)
+    paw_w = 26
+
+    def paw(x, y, c, w=paw_w):
+        poly(closed_ellipse(x, y, w, w * 0.6, 16), c, INK, 4)
+        for dx in (-0.35, 0.0, 0.35):
+            line([(x + w * dx, y + w * 0.1), (x + w * dx, y + w * 0.5)], 3)
+
+    if sit:                                              # the haunches either side, the hind paws turned out
+        for sgn in (-1, 1):
+            poly(closed_ellipse(sgn * 66, -54 + lift, 54, 50, 22), col, INK, 5)
+            paw(sgn * 98, -12 + lift, col, 30)
+    else:
+        for sgn in (-1, 1):                              # the hind legs, further back (a shade darker)
+            limb([(sgn * 56, cy + 10), (sgn * 60, -leg * 0.45), (sgn * 60, -12)], [30, 24, 22], dk)
+            paw(sgn * 60, -12 + lift * 0.0, dk, 22)
+    poly(_spline([(0, cy - 82), (60, cy - 60), (74, cy + 6), (52, cy + 70), (0, cy + 84), (-52, cy + 70), (-74, cy + 6),
+                  (-60, cy - 60)], 5), col, INK, 6)      # the chest
+    poly(closed_ellipse(0, cy + 14, 38, 54, 20), light, None)
+    for sgn in (-1, 1):                                  # the front legs
+        top = (sgn * 34, cy + 30)
+        foot = (sgn * 36, -14 + (lift if sit else lift))
+        limb([top, (sgn * 35, (top[1] + foot[1]) / 2), foot], [38, 28, 26], col)
+        paw(foot[0], foot[1], col)
+    bob = 2 * math.sin(t * 2) + (3 * math.sin(t * 16) if speak else 0.0)
+    hy = cy - 76 - hr * 0.55 + bob
+    limb([(0, cy - 40), (0, hy + hr * 0.3)], [74, 66], col)
+
+    def H(u, v):
+        return (u * hr, hy + v * hr)
+
+    spec = dict(spec, _fur=col)
+    mouth = _front_head(H, hr, poly, line, col, dk, light, t, speak, mouth_open, expr, action)
+    _front_acc(S, X, H, hr, poly, line, acc, spec)
+    anchors = dict(head_top=S.T(X(H(0.0, -1.2))), head_center=S.T(X(H(0.0, 0.0))), mouth=S.T(X(mouth)),
                    feet=S.T((0, 0)), hand_l=S.T(X(mouth)), hand_r=S.T(X(mouth)))
     return S.ops, anchors
 

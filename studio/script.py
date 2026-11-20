@@ -68,7 +68,7 @@ import re
 import zlib
 
 from . import actions, audio, crowd, decor, drive, gemini_music, look, mystery, objects, rides, styles, theme, vehicles
-from .characters import (ACCESSORIES, EXPRESSIONS, FACE_PARTS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, HAIR_WORDS,
+from .characters import (ACCESSORIES, ACCESSORY_WORDS, EXPRESSIONS, FACE_PARTS, FACE_WORDS, HAIR_COLORS, HAIR_STYLES, HAIR_WORDS,
                          LOOKS, MARKS, OUTFITS, PALETTE, face_word,
                          SKIN_TONES)
 from .util import asset_path
@@ -183,7 +183,8 @@ ROLE_LOOKS = {
     "sweeper": "safai_wala", "safaiwala": "safai_wala", "safai_karmachari": "safai_wala",
     "sadhu": "baba", "babaji": "baba", "jyotishi": "baba", "swami": "baba", "tantrik": "baba",
     "pujari": "pandit", "panditji": "pandit", "policewala": "police", "inspector": "police", "havaldar": "police",
-    "daroga": "police", "dactor": "doctor", "groom": "dulha", "bride": "dulhan",
+    "daroga": "police", "dactor": "doctor", "pagla_doctor": "pagla_doctor", "paglet": "pagla_doctor",
+    "jholachhap": "pagla_doctor", "groom": "dulha", "bride": "dulhan",
     "netaji": "neta", "mantri": "neta", "politician": "neta", "sarpanch": "sarpanch", "mla": "neta",
     "pradhan": "sarpanch", "mukhiya": "sarpanch", "pradhan_ji": "sarpanch", "kisan": "kisan", "farmer": "kisan",
     "kaka": "kisan", "tau": "tau", "tauji": "tau", "tau_ji": "tau", "chaudhary": "tau", "tai": "gaon_aurat",
@@ -229,7 +230,7 @@ def vocab():
     return {
         "places": sorted(BACKGROUNDS),
         "looks": sorted(LOOKS), "roles": sorted(ROLE_LOOKS),
-        "extras": sorted(set(ACCESSORIES) | set(HAIR_STYLES) | set(HAIR_WORDS) | set(OUTFITS) | set(SKIN_TONES)
+        "extras": sorted(set(ACCESSORIES) | set(ACCESSORY_WORDS) | set(HAIR_STYLES) | set(HAIR_WORDS) | set(OUTFITS) | set(SKIN_TONES)
                          | set(JACKET_WORDS) | set(BANYAN_WORDS)
                          | set(BUILDS)
                          | set(BUILD_WORDS) | set(HEIGHT_WORDS)
@@ -260,7 +261,7 @@ def vocab():
         # the action picker: groups of actions, and the other names each action also answers to (istri = iron)
         "action_groups": [[label, [a for a in names if a in actions.ACTIONS]] for label, names in ACTION_GROUPS],
         "action_aliases": _action_aliases(),
-        "series": _series_list(),
+        "series": _series_list(), "kirdaar": _kirdaar_list(),
     }
 
 
@@ -401,6 +402,8 @@ def cast_spec(words, index, unknown=None):
             spec["behind"] = BEHIND_WORDS[w]
         elif w in ACCESSORIES:
             acc.append(w)
+        elif w in ACCESSORY_WORDS:                     # gold_chain, pagla_chashma...
+            acc.append(ACCESSORY_WORDS[w])
         elif w in HAIR_STYLES:
             spec["hair"] = w
         elif w in HAIR_WORDS:                          # do_choti, takla...
@@ -429,6 +432,8 @@ def cast_spec(words, index, unknown=None):
             spec["color"] = w
         elif w in HAIR_COLORS and "hair_color" not in spec:
             spec["hair_color"] = w
+        elif w in PROPS and "prop" not in spec and spec.get("kind") is None:
+            spec["prop"] = w                           # Daddu = dada lathi: what they always carry
         elif unknown is not None and w not in LOOKS and w not in ROLE_LOOKS and w not in PALETTE:
             unknown.append(w)
     spec.setdefault("look", "college_girl" if female else "boy")
@@ -593,7 +598,9 @@ def ots_back(sc, before, order, cast):
 
 # plain words a writer (or a chat AI) often uses for a feeling or an action -> the studio's own word, so a script
 # written with "happy", "gussa", "running" still acts (the writer prompt then needs fewer rules)
-FEEL_WORDS = { "bore": "bored", "darr": "scared", "dar": "scared", "sharam": "shy", "ghabrahat": "nervous",
+FEEL_WORDS = {"bore": "bored", "pagal": "pagla", "crazy": "pagla", "akad": "smug", "akkad": "smug",
+              "hasi": "laugh", "hansi": "laugh", "chalak": "sly", "chaalak": "sly", "chilla": "shout", "chillana": "shout",
+              "attitude": "swag", "darr": "scared", "dar": "scared", "sharam": "shy", "ghabrahat": "nervous",
 
     "staring": "stare", "judging": "side_eye", "sideeye": "side_eye",
     "laar": "drool", "drooling": "drool", "lalach": "money_eyes", "paisa": "money_eyes", "sharminda": "embarrassed",
@@ -1485,6 +1492,96 @@ def apply_series(text):
     return text, info, []
 
 
+KIRDAAR_DIR = "kirdaar"
+KIRDAAR_RE = re.compile(r"^\s*(?:KIRDAAR|KIRDAR|CHARACTERS?)\s*:\s*(.+?)\s*$", re.I | re.M)
+
+
+def load_kirdaar(name):
+    """kirdaar/<id>.json -> dict, or None: one recurring character, kept on its own. {"name", "title", "words",
+    "also": [other names], "about", "aadat", "line", "place", "hashtag"}. Found by its file id or any of its names."""
+    import json
+    key = re.sub(r"[^a-z0-9_]+", "_", name.strip().lower()).strip("_")
+    folder = asset_path(KIRDAAR_DIR)
+    files = sorted(f for f in os.listdir(folder) if f.endswith(".json")) if os.path.isdir(folder) else []
+    for f in files:
+        try:
+            with open(os.path.join(folder, f), encoding="utf-8") as fh:
+                data = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict) or not data.get("name") or not data.get("words"):
+            continue
+        names = [data["name"]] + list(data.get("also") or [])
+        if key == f[:-5] or key in {re.sub(r"[^a-z0-9_]+", "_", n.lower()).strip("_") for n in names}:
+            return dict(data, id=f[:-5])
+    return None
+
+
+def _kirdaar_list():
+    """[{id, name, title, about, aadat, line}] of kirdaar/*.json: the page's character picker."""
+    folder = asset_path(KIRDAAR_DIR)
+    out = []
+    for f in sorted(os.listdir(folder)) if os.path.isdir(folder) else []:
+        if f.endswith(".json"):
+            d = load_kirdaar(f[:-5])
+            if d:
+                out.append(dict({k: d.get(k, "") for k in ("id", "name", "title", "about", "aadat", "line")},
+                                also=list(d.get("also") or [])))
+    return out
+
+
+def apply_kirdaar(text):
+    """`KIRDAAR: Sultan, Paglet` (or `KIRDAAR: Sultan part 3`): each named character comes in from kirdaar/ with its
+    own fixed look and face, whatever else is in the script; together only when the script names more than one (a
+    crossover). Lines are written with the character's name (`Sultan (akad): ...`, `Sultan Bhai -> saamne`).
+    Returns (text, info or None, warnings)."""
+    m = KIRDAAR_RE.search(text)
+    if not m:
+        return text, None, []
+    body = m.group(1)
+    part = None
+    pm = re.search(r"\s+(?:part|ep|episode|#)?\s*(\d+)\s*$", body, re.I)
+    if pm:
+        part, body = int(pm.group(1)), body[:pm.start()]
+    wanted = [w.strip() for w in re.split(r"\s*(?:,|&|\+|\baur\b|\band\b|\bx\b|×)\s*", body, flags=re.I) if w.strip()]
+    text = text[:m.start()] + text[m.end():]
+    found, warns = [], []
+    for w in wanted:
+        d = load_kirdaar(w)
+        if d is None:
+            warns.append("KIRDAAR %r: kirdaar/ folder me nahi mila (naam ki file banao)" % w)
+        elif d["id"] not in [x["id"] for x in found]:
+            found.append(d)
+    if not found:
+        return text, None, warns
+    cl = re.search(r"^\s*CAST\s*:\s*(.*)$", text, re.M | re.I)
+    have = {p_.split("=")[0].strip().lower() for p_ in cl.group(1).split(",") if "=" in p_} if cl else set()
+    extra = []
+    for d in found:
+        key = d["name"]
+        aliases = [a for a in [d["name"]] + list(d.get("also") or []) if a]
+        pat = r"^(\s*)(%s)(\s*(?:\(|:|->))" % "|".join(re.escape(a) for a in sorted(aliases, key=len, reverse=True))
+        text = re.sub(pat, lambda m_: m_.group(1) + key + m_.group(3), text, flags=re.M | re.I)
+        if key.lower() not in have:
+            extra.append("%s = %s" % (key, series_words("kirdaar_" + d["id"], key, d["words"])))
+    add = []
+    if extra and cl:
+        cl = re.search(r"^\s*CAST\s*:\s*(.*)$", text, re.M | re.I)
+        text = text[:cl.end()] + (", " if cl.group(1).strip() else "") + ", ".join(extra) + text[cl.end():]
+    elif extra:
+        add.append("CAST: " + ", ".join(extra))
+    if found[0].get("place") and not re.search(r"^\s*SCENE\s*:", text, re.M | re.I):
+        add.append("SCENE: %s" % found[0]["place"])
+    if add:
+        hook = re.search(r"^\s*HOOK\s*:.*$", text, re.M | re.I)
+        at = hook.end() if hook else 0
+        text = text[:at] + ("\n" if hook else "") + "\n".join(add) + ("" if hook else "\n") + text[at:]
+    title = " × ".join(d.get("title") or d["name"] for d in found)
+    tags = [d["hashtag"] for d in found if d.get("hashtag")]
+    return text, {"name": "+".join(d["id"] for d in found), "title": title, "part": part,
+                  "hashtag": tags[0] if tags else None, "hashtags": tags, "kirdaar": [d["id"] for d in found]}, warns
+
+
 def parse_script(text):
     """Return (scene dict, warnings)."""
     text, flat = unflatten(text)
@@ -1492,11 +1589,16 @@ def parse_script(text):
         scene, warns = parse_script(text)
         return scene, ["script ek hi line me aaya tha (line break kho gaye); lines apne aap alag ki"] + warns
     text, series_info, series_warn = apply_series(text)
-    if series_info or series_warn:
+    text, kir_info, kir_warn = apply_kirdaar(text)
+    if series_info or series_warn or kir_info or kir_warn:
         scene, warns = _parse_script(text)
-        if series_info:
-            _series_badge(scene, series_info)
-        return scene, series_warn + warns
+        if series_info or kir_info:
+            _series_badge(scene, series_info or kir_info)
+        if kir_info:
+            post = scene.setdefault("post", {})
+            tags = post.get("hashtags") or []
+            post["hashtags"] = kir_info["hashtags"] + [h for h in tags if h not in kir_info["hashtags"]]
+        return scene, series_warn + kir_warn + warns
     return _parse_script(text)
 
 

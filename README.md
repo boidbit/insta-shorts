@@ -518,11 +518,32 @@ Builder → Characters ke upar "📺 Series" chuno, phir lines me series ke **na
 |---|---|---|
 | `sharma_parivar` | Papa, Mummy, Bittu, Dadi | living_room |
 | `office_gang` | Boss, Riya, Intern, Kapoor | office |
-| `sheru_mohalla` | Sheru (mohalle ka don kutta), Doctor, Chotu (chaiwala) | gully |
-| `gaon_ke_tau` | Tau, Tai, Bablu (sheher se lauta), Sarpanch | chaupal |
-| `pappu_class` | Pappu, Masterji, Pinky | classroom |
 
-Script me: `SERIES: sheru_mohalla 3` (kahin bhi likho, studio use upar le aata hai) aur `Sheru (akad): ...`. Nayi series: `series/<naam>.json` (inhi jaisi).
+Script me: `SERIES: sharma_parivar 3` (kahin bhi likho, studio use upar le aata hai) aur lines me naam (`Papa (gussa): ...`). Nayi series: `series/<naam>.json` (inhi jaisi).
+
+### 🧑 Kirdaar: apne-apne alag characters
+
+Har pakka character ki apni file `kirdaar/<naam>.json` me hai: look, aadat, pakki line, jagah, hashtag. Har character akela rehta hai. Do ko saath laana ho (crossover), to bas dono ke naam likho.
+
+| Kirdaar | Look | Aadat |
+|---|---|---|
+| **Sultan** (Sultan Bhai) | brown kutta, kaala chashma, sone ki chain, ulti laal topi | gully ka don, sab pe akad; injection se darta hai |
+| **Paglet** (Doctor Paglet) | bikhre safed baal, tedha tuta chashma, maathe pe patti, gale me stethoscope, haath me injection | har ilaaj: "Injection lagega!" |
+| **Daddu** (Dada Daddu) | dada, gamchha, mooch, lathi | "humare zamane me...", aakhri twist unka |
+
+```
+HOOK: Sultan ka toll tax 🐕
+KIRDAAR: Sultan            ← akela Sultan (part ke saath: KIRDAAR: Sultan part 3)
+KIRDAAR: Sultan, Paglet    ← crossover
+Sultan Bhai (akad): Ye Sultan Bhai ka area hai! | ये सुल्तान भाई का एरिया है!
+```
+
+- Lines me naam likho (`Sultan`, `Sultan Bhai`, `Paglet`, `Doctor Paglet`, `Daddu` sab chalte hain). CAST me jodne ki zarurat nahi.
+- Builder me Characters ke upar "🧑 Kirdaar" ke checkbox hain. Paste ki hui lines me inka naam ho to box apne aap tick ho jaata hai.
+- Video ke upar "Sultan Bhai × Doctor Paglet • Part 2" jaisa tag aata hai, aur unke hashtag post me jud jaate hain.
+- **Kutte ke 3 angle:** chalte/sunte waqt side se; bolte waqt muh camera ki taraf; apne close-up me (ya `Sultan -> saamne`) poora saamne. `Sultan -> side` = hamesha side. (Purana `CAMERA: classic` me sirf side.)
+- Naye shabd jo kisi pe bhi lagte hain: `chain`, `tedha_chashma`, `gale_stethoscope`, baal `wild` (`pagal_baal`), nishaan `patti`, look `pagla_doctor`, feeling `pagla` / `swag` (akad); CAST me koi cheez (`lathi`, `phone`...) = haath me hamesha.
+- Naya kirdaar: `kirdaar/` me ek aur file (inhi jaisi).
 
 ### CUT ab wahi karta hai jo likha hai 🎥
 

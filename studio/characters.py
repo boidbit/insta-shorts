@@ -64,12 +64,13 @@ HAIR_COLORS = {
 }
 
 HAIR_STYLES = ("short", "side_part", "spiky", "curly", "balding", "bald", "long", "braid", "bun", "ponytail",
-               "bob", "two_plaits", "side_braid", "mohawk", "man_bun", "curly_open")
+               "bob", "two_plaits", "side_braid", "mohawk", "man_bun", "curly_open", "wild")
 HAIR_WORDS = {"do_choti": "two_plaits", "two_braids": "two_plaits", "plaits": "two_plaits", "choti": "braid",
               "fishtail": "side_braid", "manbun": "man_bun", "curls": "curly_open", "curly_long": "curly_open",
-              "bob_cut": "bob", "ganja": "bald", "takla": "bald"}
+              "bob_cut": "bob", "ganja": "bald", "takla": "bald", "pagal_baal": "wild", "bikhre_baal": "wild",
+              "einstein": "wild", "frizzy": "wild"}
 # how a new hairdo looks from behind (the back of the head is drawn like this one)
-HAIR_BACK = {"bob": "long", "two_plaits": "braid", "side_braid": "braid", "mohawk": "spiky", "man_bun": "bun",
+HAIR_BACK = {"bob": "long", "two_plaits": "braid", "side_braid": "braid", "mohawk": "spiky", "man_bun": "bun", "wild": "curly",
              "curly_open": "curly"}
 OUTFITS = ("tshirt", "shirt", "kurta", "salwar", "saree", "uniform", "blazer", "vest", "kurta_jacket", "stripes", "sweater")
 BUILDS = {"slim": (0.9, 0.0), "normal": (1.0, 6.0), "chubby": (1.2, 44.0)}
@@ -86,7 +87,7 @@ AUTO_SHAPES, AUTO_EYES, AUTO_BROWS = ("oval", "round", "long", "square"), ("dot"
     ("normal", "thick", "thin")
 LIP_STYLES = ("normal", "thin", "full", "smirk")
 EAR_STYLES = {"normal": (14, 21), "big": (20, 29), "small": (10, 15)}
-MARKS = ("age_lines", "mole", "dimple", "freckles")
+MARKS = ("age_lines", "mole", "dimple", "freckles", "patti")          # patti: a crossed band-aid on the forehead
 BEARD_STYLES = ("none", "stubble", "goatee", "full")
 MOUSTACHE_STYLES = ("none", "thin", "normal", "thick", "handlebar")
 # every part of a face a script (or the page's face card) can choose: key -> the choices
@@ -114,13 +115,17 @@ FACE_WORDS.update({
     "blush": ("cheeks", "blush"), "rosy_cheeks": ("cheeks", "blush"), "lashes": ("lashes", True),
     "eyelashes": ("lashes", True), "palkein": ("lashes", True),
     "wrinkles": ("marks", "age_lines"), "jhurriyan": ("marks", "age_lines"), "til": ("marks", "mole"),
-    "dimples": ("marks", "dimple"),
+    "dimples": ("marks", "dimple"), "bandaid": ("marks", "patti"), "band_aid": ("marks", "patti"),
     "stubble": ("beard", "stubble"), "goatee": ("beard", "goatee"), "full_beard": ("beard", "full"),
     "dadhi": ("beard", "full"), "pencil_moustache": ("moustache", "thin"), "handlebar": ("moustache", "handlebar"),
     "clean_shaven": ("shave", True), "clean_shave": ("shave", True),
 })
 ACCESSORIES = ("glasses", "sunglasses", "cap", "turban", "moustache", "beard", "bindi", "tilak", "earrings", "tuft",
-               "topi", "beanie", "nurse_cap", "beret", "bowtie", "backpack", "gamchha", "ghunghat")
+               "topi", "beanie", "nurse_cap", "beret", "bowtie", "backpack", "gamchha", "ghunghat",
+               "chain", "tedha_chashma", "gale_stethoscope")
+# other words for them (a script may say any of these)
+ACCESSORY_WORDS = {"gold_chain": "chain", "sone_ki_chain": "chain", "pagla_chashma": "tedha_chashma",
+                   "crooked_glasses": "tedha_chashma", "steth": "gale_stethoscope", "neck_stethoscope": "gale_stethoscope"}
 
 # Ready-made Indian looks. Anything in the character spec overrides these.
 LOOKS = {
@@ -248,6 +253,10 @@ LOOKS = {
                  shoes="chappal", beard="full", prop="stick", accessories=["beard", "tilak"], expression="relaxed"),
     "pilot": dict(skin="fair", hair="side_part", outfit="blazer", color="navy", pants="navy", accent="gold",
                   shoes="black", cap_color="navy", accessories=["cap", "sunglasses"]),
+    # the pagla doctor (Doctor Paglet): hair in every direction, crooked taped glasses, a giant injection
+    "pagla_doctor": dict(skin="wheatish", hair="wild", hair_color="grey", outfit="blazer", color="white", pants="purple",
+                         accent="lime", shoes="red", build="slim", prop="injection", marks=["patti"],
+                         accessories=["tedha_chashma", "gale_stethoscope"], expression="pagla"),
     # the village pack
     "kisan": dict(skin="dark", hair="short", outfit="kurta", color="cream", pants="white", shoes="chappal",
                   build="slim", turban_color="mustard", moustache="thick", marks=["age_lines"],
@@ -294,6 +303,8 @@ EXPRESSIONS = {
     "neutral": ("dot", "flat", None),
     "smile": ("dot", "smile", None),
     "smug": ("relaxed", "smile", None),
+    "pagla": ("wide", "grin", "up"),                 # the mad doctor's face: eyes too wide, a grin too big
+    "swag": ("relaxed", "smirk", None),
     "sly": ("half", "smirk", None),
     "shock": ("wide", "open", "up"),
     "shout": ("wide", "shout", "angry"),
@@ -1041,7 +1052,7 @@ def _hand(S, wrist, fore_angle, side, skin, finger=False):
     S.poly(closed_ellipse(thumb[0], thumb[1], 6.5, 11, 16, -fore_angle + s * 40), skin, INK, 4)
 
 
-HAIR_TOP = {"spiky": 34, "curly": 26, "bun": 48, "ponytail": 8, "mohawk": 50, "man_bun": 42, "curly_open": 40,
+HAIR_TOP = {"wild": 44, "spiky": 34, "curly": 26, "bun": 48, "ponytail": 8, "mohawk": 50, "man_bun": 42, "curly_open": 40,
             "bob": 16}         # how far the hair rises over the head (for speech bubbles and the camera)
 
 
@@ -1126,6 +1137,23 @@ def _front_hair(S, HH, style, hc):
         crest = [(-24, -HEAD_RY + 14), (-34, -HEAD_RY - 18), (-16, -HEAD_RY - 4), (-10, -HEAD_RY - 50),
                  (2, -HEAD_RY - 12), (14, -HEAD_RY - 48), (20, -HEAD_RY - 8), (36, -HEAD_RY - 22), (24, -HEAD_RY + 14)]
         S.poly([HH(q) for q in crest], shade(hc, 1.25) if sum(hc) < 150 else hc, INK, OUTLINE)
+    elif style == "wild":                               # the mad scientist: bald on top, frizz flying out at the sides
+        for sgn in (-1, 1):
+            spikes = []
+            for i in range(13):                         # a jagged cloud over the ear, sticking far out
+                a_ = math.radians(-120 + 240 * i / 12)
+                r = 62 if i % 2 else 40
+                spikes.append((sgn * (HEAD_RX - 6 + r * math.cos(a_) + 22), -30 + r * 0.95 * math.sin(a_)))
+            S.poly([HH(q) for q in spikes], hc, INK, OUTLINE)
+            for (dx_, dy_) in ((30, -40), (44, -10), (28, 16)):
+                S.line([HH((sgn * (HEAD_RX + dx_ - 14), dy_)), HH((sgn * (HEAD_RX + dx_ + 6), dy_ - 8))], 3,
+                       shade(hc, 0.75))
+        for (x0_, x1_, y1_) in ((-14, -34, -HEAD_RY - 46), (6, 12, -HEAD_RY - 56), (22, 44, -HEAD_RY - 38)):
+            S.line([HH(q) for q in bezier((x0_, -HEAD_RY + 6), (x0_ + (x1_ - x0_) * 0.2, -HEAD_RY - 30), (x1_, y1_), 8)],
+                   6, INK)
+            S.line([HH(q) for q in bezier((x0_, -HEAD_RY + 6), (x0_ + (x1_ - x0_) * 0.2, -HEAD_RY - 30), (x1_, y1_), 8)],
+                   3, hc)
+        S.line([HH((-30, -HEAD_RY + 18)), HH((-14, -HEAD_RY + 10))], 5, WHITE)
     elif style == "man_bun":                            # combed back, tied up on top
         cap([(80, -30), (54, -60), (20, -72), (-20, -72), (-54, -60), (-80, -30)])
         for x in (-30, 0, 30):
@@ -1304,6 +1332,12 @@ def _face_marks(hline, hpoly, marks, skin, fdx):
                 hpoly(closed_ellipse(fdx + sgn * x, y, 2.3, 2.3, 8), shade(skin, 0.72), None)
     if "mole" in marks:
         hpoly(closed_ellipse(fdx + 30, 46, 4.5, 4.5, 10), (70, 46, 36), None)
+    if "patti" in marks:                                # a band-aid stuck on crooked: a cross on the forehead
+        for ang in (28, -28):
+            band = [rot(q, math.radians(ang)) for q in ((-26, -8), (26, -8), (26, 8), (-26, 8))]
+            hpoly([(fdx + 34 + q[0], -58 + q[1]) for q in band], (238, 206, 164), INK, 3)
+        for q in ((-4, -2), (4, 2), (-2, 4), (3, -4)):
+            hpoly(closed_ellipse(fdx + 34 + q[0], -58 + q[1], 1.6, 1.6, 6), (196, 160, 120), None)
 
 
 def _head_cap(S, HH, kind, o):
@@ -1451,6 +1485,20 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
                 S.tube([(sgn * (bw_ - 18), -TORSO_H + 10), (sgn * (bw_ - 10), -TORSO_H + 150)], 12, shade(bag_col, 0.9))
     if "gamchha" in acc:                            # the checked cloth over the left shoulder
         _gamchha(S, o, build, back)
+    if "gale_stethoscope" in acc and not back:     # round the neck, the ends hanging down the chest
+        bw_ = BUILDS.get(build, BUILDS["normal"])[0] * 40
+        for sgn in (-1, 1):
+            S.line(bezier((sgn * 30, -TORSO_H - 4), (sgn * (bw_ + 14), -TORSO_H + 60), (sgn * 18, -TORSO_H + 130), 10),
+                   8, (40, 44, 56))
+        S.dot((-18, -TORSO_H + 134), 13, (190, 196, 206), INK, 4)
+        S.dot((18, -TORSO_H + 128), 7, (190, 196, 206), INK, 3)
+    if "chain" in acc and not back:                # a thick gold chain with a big pendant
+        pts = bezier((-34, -TORSO_H + 2), (0, -TORSO_H + 110), (34, -TORSO_H + 2), 16)
+        S.line(pts, 9, INK)
+        for q in pts[1:-1]:
+            S.dot(q, 5, GOLD, None)
+        S.dot((0, -TORSO_H + 64), 16, GOLD, INK, 4)
+        S.dot((0, -TORSO_H + 64), 7, shade(GOLD, 0.8), None)
     if "bowtie" in acc and not back:
         bt = -TORSO_H + 14
         for sgn in (-1, 1):
@@ -1751,6 +1799,19 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
             hline([(-5 + fdx, -6), (5 + fdx, -6)], 5)
             hline([(-62 + fdx, -8), (-96, -14)], 5)
             hline([(62 + fdx, -8), (96, -14)], 5)
+        elif a == "tedha_chashma":                  # thick round glasses, crooked, one lens cracked, tape on the bridge
+            for sgn in (-1, 1):
+                cx, cy = _eye_center(sgn, fdx)
+                cy += 7 * sgn
+                hpoly(closed_ellipse(cx, cy, 36, 34, 28), (226, 240, 250), None)
+                ring = closed_ellipse(cx, cy, 36, 34, 28)
+                hline(ring + [ring[0]], 9)
+                if sgn > 0:                         # the crack
+                    hline([(cx - 20, cy - 22), (cx - 4, cy - 6), (cx - 12, cy + 4), (cx + 8, cy + 22)], 3)
+            hline([(-36 + fdx, -12), (36 + fdx, 2)], 7)
+            hpoly([(fdx - 10, -18), (fdx + 10, -14), (fdx + 8, 6), (fdx - 12, 2)], WHITE, INK, 3)    # the tape
+            hline([(-70 + fdx, -14), (-98, -24)], 6)
+            hline([(70 + fdx, 2), (98, -6)], 6)
         elif a == "sunglasses":
             for sgn in (-1, 1):
                 cx, cy = _eye_center(sgn, fdx)
