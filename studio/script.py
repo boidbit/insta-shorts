@@ -1530,8 +1530,9 @@ def _kirdaar_list():
         if f.endswith(".json"):
             d = load_kirdaar(f[:-5])
             if d:
+                kind = next((ANIMAL_WORDS[w] for w in d["words"].split() if w in ANIMAL_WORDS), None)
                 out.append(dict({k: d.get(k, "") for k in ("id", "name", "title", "about", "aadat", "line")},
-                                also=list(d.get("also") or [])))
+                                also=list(d.get("also") or []), animal=kind))
     return out
 
 

@@ -156,6 +156,13 @@ class DogAngles(unittest.TestCase):
 
 
 class Page(unittest.TestCase):
+    def test_animals_get_animal_actions(self):
+        s = page()
+        for needle in ("function suggestAnimalActs", "const lineAnimal", "lineAnimal(it))"):
+            self.assertIn(needle, s)
+        vocab = json.loads(re.search(r'<script type="application/json" id="vocab">(.*?)</script>', s, re.S).group(1))
+        self.assertEqual({k["id"]: k["animal"] for k in vocab["kirdaar"]}, {"sultan": "dog", "paglet": None, "daddu": None})
+
     def test_the_short_prompt(self):
         with open(os.path.join(ROOT, "SHORT_PROMPT.md"), encoding="utf-8") as f:
             text = f.read()
