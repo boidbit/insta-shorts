@@ -372,8 +372,8 @@
         </label>
         <label>Dialogue text
           <select id="dialogue">
+            <option value="subtitle">Neeche chhote subtitle (bade akshar) 🔤</option>
             <option value="bubble">Bubble me 💬</option>
-            <option value="subtitle">Neeche subtitle</option>
             <option value="both">Bubble + subtitle</option>
             <option value="none">Koi text nahi (sirf awaaz)</option>
           </select>
@@ -1667,6 +1667,7 @@ function renderSaved() {
 try { builder = Object.assign(builder, JSON.parse(store.get("builder") || "{}")); } catch {}
 const saveBuilder = () => store.set("builder", JSON.stringify(builder));
 if (store.get("tts_v") !== "2") { store.set("tts", ""); store.set("tts_v", "2"); }   // Gemini is the default voice again
+if (store.get("dialogue_v") !== "2") { store.set("dialogue", ""); store.set("dialogue_v", "2"); }   // short subtitles are the default now
 for (const id of ["dialogue", "intro", "loop", "mascot", "tts", "color", "ctaStyle"]) {      // the video options are remembered
   const v = store.get(id);
   if (v && [...$(id).options].some((o) => o.value === v)) $(id).value = v;
@@ -2317,7 +2318,7 @@ function writeBox(open) {
   writeNote = "";
   return el("div", {}, [el("details", { className: "cbox write", open }, [
     el("summary", { textContent: "✍️ Saari baat ek saath likho / paste karo" }),
-    el("p", { className: "chelp", textContent: "Har line: Naam: baat. Feeling chaho to (gussa), (hasi)… Naya naam = naya aadmi apne aap (Guard, PA, Sharma ji). Devanagari ki zarurat nahi." }),
+    el("p", { className: "chelp", textContent: "Har line: Naam: baat. Feeling chaho to (gussa), (hasi)… Naya naam = naya aadmi apne aap (Guard, PA, Sharma ji). Line ke baad | देवनागरी bhi do (jaise: Kutta (smug): Abey chup | अबे चुप) toh awaaz pakka sahi bolegi, slang samet; na do toh video banate waqt apne aap banegi." }),
     ta, el("div", { className: "lrow" }, [go])]), note]);
 }
 function addBar() {                         // ➕ Line, and the rarer cards in one menu

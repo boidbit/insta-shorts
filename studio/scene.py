@@ -727,6 +727,36 @@ def writer_shot(plan, chars, shot, focus, cam_events):
     cam_events.append({"t": 0.05, "zoom": round(z + 0.1, 2), "focus": target, "dur": max(0.4, plan.duration - 0.1)})
 
 
+SUB_WORDS, SUB_CHARS = 4, 21    # cine subtitles: at most this many words / letters on screen at once
+
+
+def subtitle_chunks(text, t, dur, span):
+    """A spoken line as short subtitles: [(words, from, to)], each piece on screen for its share of the line
+    (by its letters), the last one until the line ends."""
+    words, pieces, cur = str(text).split(), [], []
+    for w in words:
+        if cur and (len(cur) >= SUB_WORDS or len(" ".join(cur + [w])) > SUB_CHARS):
+            pieces.append(" ".join(cur))
+            cur = []
+        cur.append(w)
+        if w[-1:] in ",.?!" and len(cur) >= 2:      # a pause in the line ends a piece
+            pieces.append(" ".join(cur))
+            cur = []
+    if cur:
+        pieces.append(" ".join(cur))
+    if len(pieces) > 1 and " " not in pieces[-1] and len(pieces[-2]) + len(pieces[-1]) < SUB_CHARS + 6:
+        pieces[-2:] = [pieces[-2] + " " + pieces[-1]]          # never a lone last word ("hai!")
+    if len(pieces) <= 1:
+        return [(text, t, t + span)]
+    total = float(sum(len(p) for p in pieces))
+    out, a = [], t
+    for i, p in enumerate(pieces):
+        b = t + span if i == len(pieces) - 1 else a + dur * len(p) / total
+        out.append((p, a, b))
+        a = b
+    return out
+
+
 TIGHT_GAP = 0.12            # cine: seconds between one line and the next
 TIGHT_END = 0.6             # cine: share of the plain beat after a scene's last line (the reaction shot plays in it)
 TIGHT_TAIL = 0.5            # cine: seconds a scene runs on after everything is over (classic: 0.9)
@@ -1230,7 +1260,9 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     # while they finish). CAMERA: classic keeps the old timing.
     gap = TIGHT_GAP if cine else float(meta.get("line_gap", 0.35))
     looped = bool(scene.get("_looped") or scene.get("loop"))   # a LOOP reel's end beat is its loop: kept whole
-    dialogue = meta.get("dialogue", "bubble")       # bubble | subtitle | both | none: how the spoken words show
+    # bubble | subtitle | both | none: how the spoken words show. cine: short subtitles at the bottom (a few words
+    # at a time, as they are said) unless the page asks for bubbles; classic: bubbles, as before
+    dialogue = meta.get("dialogue") or ("subtitle" if cine else "bubble")
     plan.sfx = []
     plan.overlays = []
     plan.effects = []
@@ -1372,12 +1404,15 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                     prev["end"] = t + 0.1
                     prev["cut"] = t + 0.1 - prev["start"]
             if subtitle:                            # voice-over / subtitle mode: the words at the bottom while spoken
-                plan.overlays.append({"text": text, "style": "subtitle", "from": t,
-                                      "pos": "bottom" if ev.get("subtitle") else          # (narrator)
-                                      "upper" if c.spec.get("kind") in FOCUS_H else "lower",  # not over a dog's body
-                                      "to": t + span})
-                if frz is not None:                 # story time stands still: no fade, just there
-                    plan.overlays[-1]["anim"] = "none"
+                pos_ = ("bottom" if ev.get("subtitle") else                                # (narrator)
+                        "upper" if c.spec.get("kind") in FOCUS_H else "lower")             # not over a dog's body
+                short_ = cine and frz is None and not ev.get("subtitle")    # (a narrator keeps a whole caption)
+                pieces = subtitle_chunks(text, t, dur, span) if short_ else [(text, t, t + span)]
+                for txt_, a_, b_ in pieces:         # cine: a few words at a time, as they are said
+                    plan.overlays.append({"text": txt_, "style": "subline" if short_ else "subtitle",
+                                          "from": a_, "pos": pos_, "to": b_})
+                    if frz is not None:             # story time stands still: no fade, just there
+                        plan.overlays[-1]["anim"] = "none"
             cursor = max(cursor, t + step)
             plan_end = max(plan_end, t + span)
         if "hold" in ev:
@@ -1734,7 +1769,7 @@ def apply_options(scene, dialogue=None, hook=None):
     hook: over (the hook card over the first line, the default) | first (hook card first, then the story) | off."""
     import copy
     scene = copy.deepcopy(scene)
-    if dialogue and dialogue != "bubble":
+    if dialogue:
         scene.setdefault("meta", {})["dialogue"] = dialogue
     if hook == "off":
         drop = lambda ovs: [o for o in ovs if o.get("style") != "hook"]      # noqa: E731

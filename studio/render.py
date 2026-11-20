@@ -200,7 +200,7 @@ class OverlayLayer:
                 im = self._image(o)
             pos = o.get("pos", "top")
             px, py = POS[pos] if isinstance(pos, str) else pos
-            default_anim = {"lyric": "fade", "subtitle": "fade", "hook": "punch"}.get(o.get("style"), "pop")
+            default_anim = {"lyric": "fade", "subtitle": "fade", "hook": "punch", "subline": "pop"}.get(o.get("style"), "pop")
             anim = o.get("anim", default_anim)
             lt = t - t0
             sc, al = 1.0, 1.0
@@ -2030,7 +2030,8 @@ def main(argv=None):
                          "to gemini / edge if it fails); edge = edge-tts per line; auto (default) = gemini if a key is set")
     ap.add_argument("--frame", type=float, default=None, help="render one PNG frame at this time (seconds)")
     ap.add_argument("--dialogue", choices=DIALOGUE_MODES, default=None,
-                    help="spoken words: bubble (default) | subtitle (at the bottom) | both | none (voice only)")
+                    help="spoken words: subtitle (short, at the bottom; the cine default) | bubble (classic default) | "
+                         "both | none (voice only)")
     ap.add_argument("--style", choices=["2d", "2.5d"], default=None,
                     help="look: 2d (default) | 2.5d (kitchen, gully, chai_tapri, kirana, terrace as layered sets)")
     ap.add_argument("--cover", action="store_true", help="save the cover picture (PNG) instead of the video")
