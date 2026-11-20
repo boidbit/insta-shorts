@@ -92,3 +92,24 @@ class CloseUp(unittest.TestCase):
         self.assertTrue(p._close_on(c, (s[0] + s[1]) / 2))
         other = next(o for o in p.plan.chars.values() if o is not c)
         self.assertFalse(p._close_on(other, (s[0] + s[1]) / 2))
+
+
+class WriterCut(unittest.TestCase):
+    def test_cut_close_and_two_shot_are_kept_whole(self):
+        from studio import scene as S
+        sc, w = parse_script("HOOK: h\nMYSTERY: off\nCAST: A = uncle, B = aunty\nSCENE: room\nA: Pehle. | पहले।\n"
+                             "CUT close B\nB: Close. | क्लोज़।\nA: Haan. | हाँ।\nCUT A\nA: Ab main. | अब मैं।\n"
+                             "CUT two_shot\nB: Dono. | दोनों।\nA: Haan. | हाँ।\n")
+        self.assertEqual(w, [])
+        v = make_video(sc, 120, use_tts=False, hook="off")
+        close_b, close_a, two = v.parts[1].plan, v.parts[2].plan, v.parts[3].plan
+        for pl, who in ((close_b, "B"), (close_a, "A")):
+            zs = [S.camera_at(pl, t)[0] for t in (0.3, pl.duration / 2, pl.duration - 0.1)]
+            self.assertTrue(all(z >= 1.65 for z in zs), zs)                    # close all through
+            self.assertEqual(pl.cam_segments[0][6], who)
+        zs = [S.camera_at(two, t)[0] for t in (0.3, two.duration - 0.1)]
+        self.assertTrue(all(z < 1.45 for z in zs), zs)                         # never one face alone
+
+    def test_unknown_cut_words_still_warn(self):
+        _sc, w = parse_script("HOOK: h\nCAST: A = uncle\nSCENE: room\nCUT sideways\nA: Haan. | हाँ।\n")
+        self.assertTrue(any("CUT" in x for x in w))

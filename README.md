@@ -503,6 +503,10 @@ Prompt me ye ek "kaam-kaaj" module hai: idea me kaam ki baat ho (bartan, pocha, 
 
   Feeling badalne pe body dheere se badalti hai (0.35 s), jhatke se nahi.
 
+### CUT ab wahi karta hai jo likha hai 🎥
+
+`CUT close B` (ya sirf `CUT B`) = poore shot me camera B pe close, `CUT two_shot` = bolne wale dono ek saath. Aise shot me auto camera beech me nahi aata. `CUT` (khaali), `CUT wide`, `CUT reverse`, `CUT ots` pehle jaise. Jahan CUT nahi hai, wahan auto camera khud har bolne wale pe jaata hai.
+
 ### Naye reaction moves 😎
 
 | Action (Hinglish naam) | Kya |

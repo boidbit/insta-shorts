@@ -704,6 +704,29 @@ def turn_to_each_other(chars, framing):
         c.auto_side = True                          # (the renderer turns them to us in their own close-up)
 
 
+def writer_shot(plan, chars, shot, focus, cam_events):
+    """`CUT close B` / `CUT B` / `CUT two_shot`: the whole shot is the one the script asked for (a close-up on B,
+    or the two who speak together), with a slow push in; the automatic camera keeps out of it."""
+    names = [sp["who"] for sp in plan.speech if sp.get("who") in chars and not chars[sp["who"]].spec.get("hidden")]
+    if focus not in chars:
+        focus = names[0] if names else next((n for n, c in chars.items() if not c.spec.get("hidden")), None)
+    if focus is None:
+        return
+    z = SHOT_ZOOM.get(shot, 1.7)
+    if shot == "two_shot":
+        pair = list(dict.fromkeys(names))[:2]
+        if len(pair) < 2:
+            pair = [n for n, c in chars.items() if not c.spec.get("hidden")][:2]
+        pts = [chars[n].focus_at(0.0) for n in pair] or [chars[focus].focus_at(0.0)]
+        xs = [p[0] for p in pts]
+        target = [sum(xs) / len(xs), sum(p[1] for p in pts) / len(pts)]
+        z = round(clamp(LW / (abs(max(xs) - min(xs)) + 440.0), 1.0, 1.35), 2)
+    else:
+        target = focus
+    cam_events.append({"t": 0.0, "zoom": z, "focus": target, "dur": 0.001})
+    cam_events.append({"t": 0.05, "zoom": round(z + 0.1, 2), "focus": target, "dur": max(0.4, plan.duration - 0.1)})
+
+
 TIGHT_GAP = 0.12            # cine: seconds between one line and the next
 TIGHT_END = 0.6             # cine: share of the plain beat after a scene's last line (the reaction shot plays in it)
 TIGHT_TAIL = 0.5            # cine: seconds a scene runs on after everything is over (classic: 0.9)
@@ -1512,6 +1535,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.auto_react = bool(meta.get("auto_react", True))
     own_camera_ = bool(cam_events) or any(not e_.get("auto") for e_ in shot_events) \
         or not meta.get("auto_camera", True)        # directed by the script (not the studio's own opening)
+    if scene.get("cut_shot") and plan.framing == "medium" and not cam_events:
+        writer_shot(plan, chars, scene["cut_shot"], scene.get("cut_focus"), cam_events)   # no automatic camera
     if meta.get("auto_camera", True) and not cam_events and plan.framing == "medium":     # wide / inside are composed shots
         if cine:
             auto_camera_cine(plan, chars, cam_events, shakes, plan.rolls)

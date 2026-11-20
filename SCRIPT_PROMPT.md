@@ -80,6 +80,7 @@ If the joke needs a place, thing or action not listed here, change the joke to o
   - optional camera: wide, medium, close, two_shot (use only for a special moment), zoom (a snap zoom onto this face and back), reveal (starts close on this face and pulls back: a big entrance)
   - optional timing: slowmo (the next second at 0.4x: `A -> fall shock slowmo thud`), freeze (the picture stops in grey with a record scratch; a NARRATOR line right after is said over it: "Haan, ye main hoon"), interrupt (on a spoken line: cuts in before the other one finishes: `B (interrupt, angry): ...`)
   - optional depth: near (steps towards the camera, bigger), far (steps back), mid (back to normal): `B -> near smug`. Not together with `close`.
+  - a shot the camera keeps whole: `CUT close B` (or just `CUT B`: on B the whole shot), `CUT two_shot` (the two speakers together). Use it for one beat (a reaction, the punch line); everywhere else the camera cuts by itself.
 <!-- /module -->
   - with a target: `A -> throw B` (a chappal flies from A and hits B; B must be in the same shot), `A -> sit sofa` / `A -> lie_down bed` (on a set piece).
 - Voice-over: `NARRATOR: <Hinglish> | <Devanagari>` is a voice with no body (shown as a subtitle). Not in CAST, not a character.

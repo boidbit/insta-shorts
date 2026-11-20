@@ -1588,6 +1588,7 @@ def _parse_script(text):
             continue
         if m:                                       # a new shot in the same place: a hard cut, its own set of characters
             frame, reverse, back, pov = "", False, None, None
+            cut_shot, cut_focus = None, None             # `CUT close B` / `CUT two_shot` / `CUT B`: the writer's shot
             drive_base = _drive_base(cur["background"].get("type"))
             for w in re.split(r"[\s,]+", m.group(1).strip()):
                 lw = w.lower()
@@ -1601,8 +1602,12 @@ def _parse_script(text):
                     frame = lw
                 elif lw in OTS_WORDS and not frame:
                     frame = "ots"
+                elif SHOT_ALIASES.get(lw, lw) in ("close", "two_shot") and not cut_shot:
+                    cut_shot = SHOT_ALIASES.get(lw, lw)
                 elif lw in ANGLE_WORDS:
                     reverse = True
+                elif w in cast and frame != "ots" and cut_focus is None:
+                    cut_focus = w                    # `CUT B`: the shot is on B
                 elif w in cast or (frame == "ots" and re.match(r"^[A-Z]\w*$", w) and back is None):
                     back = w
                 else:
@@ -1631,6 +1636,10 @@ def _parse_script(text):
                 cur["reverse"] = True
             if frame == "ots":
                 cur["back"] = back
+            if cut_shot or cut_focus:
+                cur["cut_shot"] = cut_shot or "close"
+                if cut_focus:
+                    cur["cut_focus"] = cut_focus
             continue
         m = re.match(r"^(NOTIFY|NOTIFICATION|LOADING|COUNTER|TIMECARD|CHAPTER|ENDCARD|WHATSAPP|INSTA|ORDER|UPI)\s*:\s*(.*)$",
                      line, re.I)
@@ -1993,6 +2002,10 @@ def _parse_script(text):
             item["angle"] = sc["shot"]
         if sc.get("reverse"):
             item["reverse"] = True
+        if sc.get("cut_shot"):                      # the writer's own shot: the camera does exactly this
+            item["cut_shot"] = sc["cut_shot"]
+            if sc.get("cut_focus"):
+                item["cut_focus"] = sc["cut_focus"]
         if pov_place:                               # a driving shot is composed: the camera stays on it whole
             item["meta"] = {"people_scale": pov_place["scale"], "auto_camera": False}
             item["angle"] = {"zoom": 1.0, "x": 540.0, "mirror": False}
