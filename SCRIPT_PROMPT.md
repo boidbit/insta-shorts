@@ -129,7 +129,7 @@ WRONG: A -> wink | smile      RIGHT: A -> shrug grin pop      (one action + one 
 
 # Natural desi comedy (the most important part)
 
-- Talk like real Indians at home, in the office, in the gali: everyday Hinglish, half sentences, "arre", "matlab", "sun na", "haan toh", "yaar", a question answered with a question, a word repeated in disbelief ("Chai? Sahab, CHAI?"). Not filmy, not shuddh Hindi, not textbook English, no speeches.
+- Talk like real Indians on Reels: raw, punchy, street-smart Hinglish with the regional flavour that fits the character (UP/Bihar tapori swag, a Haryanvi tau's kadak tone, Dilli slang, Gen-Z Hinglish): half sentences, "abey", "arre", "matlab", "sun na", "yaar", a question answered with a question, a word repeated in disbelief ("Chai? Sahab, CHAI?"). Never filmy, kitaabi / shuddh Hindi or textbook English, no speeches. Contrasting characters talk differently, so the clash is funny by itself.
 - Not every line is a joke. The first lines are normal talk that shows what each person wants and how they are; the laugh grows from the gap between what they say and the situation: a misunderstanding, sarcasm, stubbornness, an escalation. The LAST spoken line is the strongest.
 - Every character sounds like themselves, the same in every line (Hindi and English mixed the way that person would):
   - Gen-Z: chill, deadpan, internet words (literally, vibe, red flag, toxic, bro), polite but savage.
@@ -153,7 +153,7 @@ WRONG: A -> wink | smile      RIGHT: A -> shrug grin pop      (one action + one 
 1. HOOK = the promise of THIS video: everything it says happens in the story. It grabs attention in one glance.
 2. The first spoken line sets up the situation (who, where, what problem), funny or dramatic, said in the first second by somebody already in the place. No "hello", no introductions.
 3. Build: setup -> escalation -> twist, without skipping logical steps (when a condition is set, the characters say it clearly). The punch line is the LAST spoken line and a surprise. Silently think of three different premises / punch lines and use the least expected one that still feels inevitable. Avoid worn-out jokes (mummy ki chappal, "bill kaun dega", "exam me fail" as the whole joke) unless you turn them upside down. Give the punch line a reaction (sound + action, maybe shake); a `wait 1` before it can help it land.
-4. Length follows the video: a quick reel (15-20 s) has 3-5 spoken lines, the default (20-35 s) 5-8; a deeper setup, dark twist or satire may use up to 10 spoken lines and 40 seconds. A spoken line is one natural breath of talk, usually 25-70 letters in Roman; a setup or twist line may go to ~100 (that fills a speech bubble); a longer thought becomes two lines (the same person may speak twice). Never two long ones in a row; all spoken lines together under ~400 letters for 35 seconds. Never so short that the meaning is unclear; no padding.
+4. Length follows the video: a quick reel (15-20 s) has 3-5 spoken lines, the default (20-35 s) 5-8, a dark twist or satire up to 10 and 40 s. A spoken line is one breath (25-70 letters, a twist up to ~100); a longer thought becomes two lines. All lines together under ~400 letters for 35 s. No padding.
 5. Every spoken line has ` | ` followed by the same sentence in Devanagari.
 6. Max 4 characters, all in CAST. 4 only when the joke needs a group (a family at dinner, an office team, a friends' gang); 2-3 are usually funnier and easier to follow. The camera cuts by itself (to each speaker, to the listener's reaction, over the shoulder in a talk across a counter), so most scripts need few or no CUT lines. Write `CUT` for a comic beat or a special view: `CUT wide` (everybody at once, e.g. for the last reaction), `CUT ots` for a tense face-off, `CUT reverse`; a shot shows ONLY those who speak or act in it. Never write CUT in a talk across a counter. A new SCENE only when the story moves to another place or time.
 6a. Write for the camera, which directs itself: after a beat it shows the listener, so end a beat on a line that deserves a reaction and write the reaction when it matters (`B -> facepalm`, `B (shock): ...`). Rapid questioning reads best as three or more very short lines back and forth. An `angry`, `shout`, `evil` or `scared` line tilts the frame. `A -> exit left fast` followed by the other one's reaction is a complete ending.
@@ -220,8 +220,8 @@ HASHTAGS: #sarkaridaftar #pension #bank #desicomedy #darkcomedy
 # Before you answer, check every line
 
 - Brackets hold only allowed acting words (at most one action and one expression); every spoken line has ` | ` + Devanagari.
-- Length: most spoken lines 25-70 letters, none over ~100, all together under ~400 (fewer for a quick reel).
-- Voice: would a real person say this line, and does each character sound like themselves?
+- Length: lines 25-70 letters, none over ~100, all under ~400 (fewer for a quick reel).
+- Voice: raw desi, never kitaabi; would a real person say this line, and does each character sound like themselves and unlike the others?
 - CAST uses only roles/looks/extras from the lists, no brackets. Nobody walks in during the first 2 seconds.
 - The HOOK's promise happens; a CTA (if any) fits; the last spoken line is the twist; every shot ends on something worth seeing.
 - Clarity and logic: read the lines as a first-time viewer. Does any line contradict an earlier one (who owes whom, who is where, who knows what)? Does the punch line follow from the premise? Fix it before answering.

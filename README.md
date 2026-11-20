@@ -245,7 +245,7 @@ Page pe "Approve: Video banao" ke upar ye options hain (page yaad rakhta hai):
 
 | Option | Kya karta hai | Command line |
 |---|---|---|
-| Dialogue text | `Bubble me` (pehle jaisa), `Neeche subtitle` (bubble nahi, shabd neeche, Instagram caption se upar), `Bubble + subtitle`, `Koi text nahi` (sirf awaaz) | `--dialogue bubble/subtitle/both/none` |
+| Dialogue text | `Neeche chhote subtitle` (default: bubble nahi, line 3-4 shabd ke tukdon me bade akshar me neeche, jaise boli jaaye; Instagram caption se upar), `Bubble me` (purana tarika), `Bubble + subtitle`, `Koi text nahi` (sirf awaaz) | `--dialogue bubble/subtitle/both/none` |
 | Hook card | `Pehli line ke saath` (pehle jaisa), `Pehle hook, phir baat` (hook card 1.7s akela, phir kahani), `Hook card nahi` | `--hook over/first/off` |
 
 GitHub Actions me ye `dialogue` aur `intro` inputs hain. Style ka input `style`: `auto` (script ki `STYLE:` line, warna 2D) / `2d` / `2.5d`; page apna chuna hua style bhejta hai.

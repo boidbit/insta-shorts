@@ -193,23 +193,28 @@ class VideoOptionTests(unittest.TestCase):
         scene, _ = parse_script(JUNGLE)
         return scene, [compile_scene(s, use_tts=False) for s in split_scenes(apply_options(scene, **opt))]
 
-    def test_default_is_bubbles(self):
-        _, ps = self.plan()
+    def test_default_is_short_subtitles(self):
+        _, ps = self.plan()                                     # cine: short subtitles, no bubbles
+        self.assertFalse(any(sp["bubble"] for sp in ps[0].speech))
+        self.assertTrue(any(o.get("style") == "subline" for o in ps[0].overlays))
+        _, ps = self.plan(dialogue="bubble")                    # the page can still ask for bubbles
         self.assertTrue(all(sp["bubble"] for sp in ps[0].speech))
-        self.assertFalse(any(o.get("style") == "subtitle" for o in ps[0].overlays))
+        self.assertFalse(any(o.get("style") in ("subtitle", "subline") for o in ps[0].overlays))
 
     def test_subtitle_both_none(self):
         _, ps = self.plan(dialogue="subtitle")
         self.assertFalse(any(sp["bubble"] for sp in ps[0].speech))
-        subs = [o for o in ps[0].overlays if o.get("style") == "subtitle"]
-        self.assertEqual(len(subs), len(ps[0].speech))
+        subs = [o for o in ps[0].overlays if o.get("style") in ("subtitle", "subline")]
+        for sp in ps[0].speech:                                 # every line has its piece(s) while it is said
+            self.assertTrue(any(sp["start"] - 1e-6 <= o["from"] < sp["end"] for o in subs))
         self.assertEqual(subs[0]["pos"], "lower")               # above Instagram's caption area
         _, ps = self.plan(dialogue="both")
         self.assertTrue(all(sp["bubble"] for sp in ps[0].speech))
-        self.assertEqual(len([o for o in ps[0].overlays if o.get("style") == "subtitle"]), len(ps[0].speech))
+        self.assertGreaterEqual(len([o for o in ps[0].overlays if o.get("style") in ("subtitle", "subline")]),
+                                len(ps[0].speech))
         _, ps = self.plan(dialogue="none")
         self.assertFalse(any(sp["bubble"] for sp in ps[0].speech))
-        self.assertFalse(any(o.get("style") == "subtitle" for o in ps[0].overlays))
+        self.assertFalse(any(o.get("style") in ("subtitle", "subline") for o in ps[0].overlays))
 
     def test_hook_first_delays_the_story(self):
         from studio.scene import HOOK_LEAD, apply_options

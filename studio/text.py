@@ -245,6 +245,9 @@ STYLES = {
                   shadow=0, max_w=900),
     "subtitle": dict(size=56, px=0, py=0, r=0, bg=None, fg=(255, 255, 255), border=None, ow=0, stroke=7,
                      shadow=0, max_w=900),
+    # cine's short subtitles: a few words at a time, big and bold the way reels caption a line
+    "subline": dict(size=74, px=0, py=0, r=0, bg=None, fg=(255, 255, 255), border=None, ow=0, stroke=11,
+                    shadow=4, max_w=940),
 }
 
 

@@ -72,7 +72,7 @@ class PromptTests(unittest.TestCase):
                 self.assertIn(must, text, (name, must))
         s = read("SCRIPT_PROMPT.md")
         self.assertIn("Dark comedy craft", s)
-        self.assertIn("up to 10 spoken lines and 40 seconds", s)
+        self.assertIn("up to 10 and 40 s", s)
         self.assertIn("three different premises", s)
         self.assertIn("Story facts first", s)                        # the logic rule (who owes whom stays the same)
         self.assertIn("contradict an earlier one", s)                # ...and the logic check before answering

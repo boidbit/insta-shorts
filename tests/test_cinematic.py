@@ -113,3 +113,28 @@ class WriterCut(unittest.TestCase):
     def test_unknown_cut_words_still_warn(self):
         _sc, w = parse_script("HOOK: h\nCAST: A = uncle\nSCENE: room\nCUT sideways\nA: Haan. | हाँ।\n")
         self.assertTrue(any("CUT" in x for x in w))
+
+
+class Subtitles(unittest.TestCase):
+    def test_short_subtitles_by_default_in_cine(self):
+        p = video().parts[-1]
+        subs = [o for o in p.plan.overlays if o.get("style") == "subline"]
+        self.assertTrue(subs)
+        self.assertTrue(all(len(o["text"]) <= scene.SUB_CHARS + 6 for o in subs))
+        self.assertFalse(any(sp["bubble"] for sp in p.plan.speech))           # no bubbles
+        q = video(True).parts[-1]                                              # classic: bubbles, as before
+        self.assertTrue(all(sp["bubble"] for sp in q.plan.speech))
+        self.assertFalse([o for o in q.plan.overlays if o.get("style") in ("subline", "subtitle")])
+
+    def test_the_pieces_follow_the_line(self):
+        pieces = scene.subtitle_chunks("Tau, sheher mein sab kuch online milta hai!", 1.0, 3.0, 3.1)
+        self.assertEqual(" ".join(p for p, _, _ in pieces), "Tau, sheher mein sab kuch online milta hai!")
+        self.assertEqual(pieces[0][1], 1.0)
+        self.assertAlmostEqual(pieces[-1][2], 4.1)
+        self.assertTrue(all(a < b for _, a, b in pieces))
+        self.assertFalse(any(" " not in p for p, _, _ in pieces[1:]))            # no lone last word
+
+    def test_the_page_can_still_ask_for_bubbles(self):
+        sc, _ = parse_script(TWO % "")
+        v = make_video(scene.apply_options(sc, dialogue="bubble"), 160, use_tts=False, hook="off")
+        self.assertTrue(all(sp["bubble"] for sp in v.parts[-1].plan.speech))
