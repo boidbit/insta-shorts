@@ -90,6 +90,32 @@ class Kirdaar(unittest.TestCase):
         self.assertTrue(any("Gabbar" in x for x in w))
 
 
+class NoCastNeeded(unittest.TestCase):
+    """A script with no CAST and no KIRDAAR line (as a chat AI writes it): the names alone decide who is who."""
+
+    def test_kirdaar_and_animals_by_their_names(self):
+        sc, w = parse_script("HOOK: x\nSCENE: gaon\nSultan -> enter left\nSultan (swag): Ae bhains! | ऐ भैंस!\n"
+                             "Bhains (akad): Hat ja! | हट जा!\nKutta: Bhau! | भौ!\nMummy: Chup! | चुप!\n")
+        self.assertEqual(w, [])
+        ch = sc["characters"]
+        self.assertEqual(ch["Sultan"]["kind"], "dog")
+        self.assertIn("sunglasses", ch["Sultan"]["accessories"])
+        self.assertEqual(ch["Bhains"]["kind"], "buffalo")
+        self.assertEqual(ch["Bhains"]["voice"]["name"], "hi-IN-SwaraNeural")     # the bhains is a she
+        self.assertEqual(ch["Kutta"]["kind"], "dog")
+        self.assertEqual(ch["Mummy"]["look"], "aunty")
+        self.assertEqual(sc["series"]["title"], "Sultan Bhai")
+        self.assertEqual(sc["scenes"][0]["background"]["type"], "gaon")          # the script's place stays
+
+    def test_cast_still_wins(self):
+        sc, w = parse_script("HOOK: x\nCAST: Sultan = boy, Bhains = uncle\nSCENE: room\nSultan: Haan. | हाँ।\n"
+                             "Bhains: Na. | ना।\n")
+        self.assertEqual(w, [])
+        self.assertIsNone(sc["characters"]["Sultan"].get("kind"))
+        self.assertIsNone(sc["characters"]["Bhains"].get("kind"))
+        self.assertNotIn("series", sc)
+
+
 class DogAngles(unittest.TestCase):
     def spot(self, view, acc=()):
         spec = {"kind": "dog", "pose_view": view, "accessories": list(acc)}

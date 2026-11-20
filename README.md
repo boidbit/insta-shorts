@@ -543,6 +543,8 @@ Sultan Bhai (akad): Ye Sultan Bhai ka area hai! | ये सुल्तान �
 - Video ke upar "Sultan Bhai × Doctor Paglet • Part 2" jaisa tag aata hai, aur unke hashtag post me jud jaate hain.
 - **Kutte ke 3 angle:** chalte/sunte waqt side se; bolte waqt muh camera ki taraf; apne close-up me (ya `Sultan -> saamne`) poora saamne. `Sultan -> side` = hamesha side. (Purana `CAMERA: classic` me sirf side.)
 - Naye shabd jo kisi pe bhi lagte hain: `chain`, `tedha_chashma`, `gale_stethoscope`, baal `wild` (`pagal_baal`), nishaan `patti`, look `pagla_doctor`, feeling `pagla` / `swag` (akad); CAST me koi cheez (`lathi`, `phone`...) = haath me hamesha.
+- `KIRDAAR:` line bhool gaye? Koi baat nahi: lines me `Sultan` / `Paglet` / `Daddu` (ya unke doosre naam) bolte hain aur CAST me nahi hain, to wo apne aap aa jaate hain.
+- Bina CAST ke naam hi kaafi hai: `Bhains:` bhains banti hai (aurat ki awaaz), `Kutta:` kutta, `Billi:` billi, `Mummy:` mummy, `Doctor:` doctor. CAST me likha ho to wahi chalta hai.
 - Naya kirdaar: `kirdaar/` me ek aur file (inhi jaisi).
 
 ### CUT ab wahi karta hai jo likha hai 🎥

@@ -377,6 +377,9 @@ def _clothes(words):
     return tops[-1], top_col, None, None
 
 
+SHE_ANIMALS = {"bhains", "bhens", "bhais", "gaay", "gai", "billi", "bakri", "murgi", "chhipkali", "chipkali"}
+
+
 def cast_spec(words, index, unknown=None):
     """'aunty chubby glasses maroon female' -> character spec (with a voice).
     Words that mean nothing here are added to `unknown`."""
@@ -388,6 +391,8 @@ def cast_spec(words, index, unknown=None):
             continue                                   # the jacket's colour, not the person's
         if w in ANIMAL_WORDS and "kind" not in spec:       # A = kutta brown: a dog (talks too)
             spec["kind"] = ANIMAL_WORDS[w]
+            if w in SHE_ANIMALS and female is None:     # bhains, gaay, billi, bakri: she talks in a woman's voice
+                female = True
         elif spec.get("kind") not in (None, "monkey") and w in PALETTE and "color" not in spec:
             spec["color"] = w                          # kutta brown: the fur, not a skin tone
         elif w in LOOKS and "look" not in spec:
@@ -1530,14 +1535,36 @@ def _kirdaar_list():
     return out
 
 
+def name_words(name):
+    """The cast words a speaker's own name gives when no CAST line casts them: `Bhains:` is a buffalo, `Kutta:` a
+    dog, `Mummy:` the aunty look, `Doctor:` a doctor. Any other name: nothing (a plain person)."""
+    low = name.strip().lower()
+    if low in ANIMAL_WORDS or low in ROLE_LOOKS or low in LOOKS:
+        return [low]
+    return []
+
+
 def apply_kirdaar(text):
     """`KIRDAAR: Sultan, Paglet` (or `KIRDAAR: Sultan part 3`): each named character comes in from kirdaar/ with its
     own fixed look and face, whatever else is in the script; together only when the script names more than one (a
     crossover). Lines are written with the character's name (`Sultan (akad): ...`, `Sultan Bhai -> saamne`).
     Returns (text, info or None, warnings)."""
     m = KIRDAAR_RE.search(text)
-    if not m:
-        return text, None, []
+    if not m:                                   # no KIRDAAR line: a kirdaar who speaks by name (and is not in
+        cl = re.search(r"^\s*CAST\s*:\s*(.*)$", text, re.M | re.I)    # the CAST) comes in all the same
+        cast_names = {p_.split("=")[0].strip().lower() for p_ in cl.group(1).split(",") if "=" in p_} if cl else set()
+        spoke = []
+        for k in _kirdaar_list():
+            names = [k["name"]] + k["also"]
+            if any(n.lower() in cast_names for n in names):
+                continue
+            pat = r"^\s*(%s)\s*(?:\(|:|->)" % "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True))
+            if re.search(pat, text, re.M | re.I):
+                spoke.append(k["name"])
+        if not spoke:
+            return text, None, []
+        text = "KIRDAAR: %s\n%s" % (", ".join(spoke), text)
+        m = KIRDAAR_RE.search(text)
     body = m.group(1)
     part = None
     pm = re.search(r"\s+(?:part|ep|episode|#)?\s*(\d+)\s*$", body, re.I)
@@ -1910,9 +1937,9 @@ def _parse_script(text):
                     order.remove(pan["who"])
                 order.insert(0 if pan["dir"] == "right" else len(order), pan["who"])
         for name in order:
-            if declared and name not in cast:
+            if declared and name not in cast and not name_words(name):
                 warnings.append("%s CAST me nahi hai: CAST line me '%s = <role/look>' jodo" % (name, name))
-            add_cast(name, [])
+            add_cast(name, name_words(name))
         back = None
         if sc.get("framing") == "ots":
             back = ots_back(sc, scenes[:si], order, cast)
