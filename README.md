@@ -503,6 +503,27 @@ Prompt me ye ek "kaam-kaaj" module hai: idea me kaam ki baat ho (bartan, pocha, 
 
   Feeling badalne pe body dheere se badalti hai (0.35 s), jhatke se nahi.
 
+### ✍️ 2-step: pehle comedy, phir video
+
+1. Page pe "🤖 ... Prompt copy karo" kholo → **"✍️ Chhota prompt (sirf baatcheet)"** (idea box me jo likha hai wo saath judta hai; prompt `SHORT_PROMPT.md` me hai). Kisi bhi AI app me paste karo. Wo deta hai: `HOOK`, `SCENE`, aur `Naam (feeling): Hinglish | देवनागरी` lines (aur kuch hone wali baat ho to `Naam -> action`). Hasi na aaye to "aur funny karo".
+2. 🧩 Builder → "✍️ Saari baat ek saath likho" me paste → "➕ Cards banao" → "✨ Auto action" → video. Devanagari jo AI ne di, awaaz wahi bolti hai.
+
+Builder me line kholo (⋯) to "➕ Saath me" me dropdown: 🎒 haath me kya hai, 🔊 awaaz, ✨ effect (chip ✕ se hatao); kuch aur ho to neeche ke box me likh ke Enter.
+
+### 📺 Series: wahi log har episode me
+
+Builder → Characters ke upar "📺 Series" chuno, phir lines me series ke **naam** likho (letter bhi chalte hain); chehre, kapde, jagah, hashtag series se aate hain. Series:
+
+| Series | Log | Jagah |
+|---|---|---|
+| `sharma_parivar` | Papa, Mummy, Bittu, Dadi | living_room |
+| `office_gang` | Boss, Riya, Intern, Kapoor | office |
+| `sheru_mohalla` | Sheru (mohalle ka don kutta), Doctor, Chotu (chaiwala) | gully |
+| `gaon_ke_tau` | Tau, Tai, Bablu (sheher se lauta), Sarpanch | chaupal |
+| `pappu_class` | Pappu, Masterji, Pinky | classroom |
+
+Script me: `SERIES: sheru_mohalla 3` (kahin bhi likho, studio use upar le aata hai) aur `Sheru (akad): ...`. Nayi series: `series/<naam>.json` (inhi jaisi).
+
 ### CUT ab wahi karta hai jo likha hai 🎥
 
 `CUT close B` (ya sirf `CUT B`) = poore shot me camera B pe close, `CUT two_shot` = bolne wale dono ek saath. Aise shot me auto camera beech me nahi aata. `CUT` (khaali), `CUT wide`, `CUT reverse`, `CUT ots` pehle jaise. Jahan CUT nahi hai, wahan auto camera khud har bolne wale pe jaata hai.

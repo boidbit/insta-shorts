@@ -1,0 +1,13 @@
+{
+  "title": "Sheru Mohalla",
+  "about": "Mohalle ka don Sheru (kutta), jo sabse panga leta hai: doctor sahab, Chotu chaiwala, aur har naya aadmi.",
+  "cast": {
+    "S": "kutta brown",
+    "D": "doctor glasses",
+    "C": "chaiwala moustache"
+  },
+  "names": {"S": "Sheru", "D": "Doctor", "C": "Chotu"},
+  "place": "gully",
+  "color": "golden",
+  "hashtag": "#sherumohalla"
+}

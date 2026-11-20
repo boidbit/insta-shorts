@@ -260,6 +260,7 @@ def vocab():
         # the action picker: groups of actions, and the other names each action also answers to (istri = iron)
         "action_groups": [[label, [a for a in names if a in actions.ACTIONS]] for label, names in ACTION_GROUPS],
         "action_aliases": _action_aliases(),
+        "series": _series_list(),
     }
 
 
@@ -285,6 +286,19 @@ ACTION_GROUPS = [   # the Builder's action dropdown, in the order a writer looks
                         "sway".split()),
     ("🏏 Khel / gym", "bat bowl race_start jumping_jacks squat pushup lift_weights".split()),
 ]
+
+
+def _series_list():
+    """[{id, title, about, names}] of series/*.json: the page's series picker."""
+    out = []
+    folder = asset_path(SERIES_DIR)
+    for f in sorted(os.listdir(folder)) if os.path.isdir(folder) else []:
+        if f.endswith(".json"):
+            data = load_series(f[:-5])
+            if data:
+                out.append({"id": f[:-5], "title": data.get("title") or f[:-5], "about": data.get("about", ""),
+                            "names": data.get("names") or {}})
+    return out
 
 
 def _action_aliases():
@@ -579,7 +593,8 @@ def ots_back(sc, before, order, cast):
 
 # plain words a writer (or a chat AI) often uses for a feeling or an action -> the studio's own word, so a script
 # written with "happy", "gussa", "running" still acts (the writer prompt then needs fewer rules)
-FEEL_WORDS = {
+FEEL_WORDS = { "bore": "bored", "darr": "scared", "dar": "scared", "sharam": "shy", "ghabrahat": "nervous",
+
     "staring": "stare", "judging": "side_eye", "sideeye": "side_eye",
     "laar": "drool", "drooling": "drool", "lalach": "money_eyes", "paisa": "money_eyes", "sharminda": "embarrassed",
     "happy": "smile", "khush": "smile", "cheerful": "smile", "smiling": "smile", "gusse": "angry", "ghussa": "angry",
@@ -1426,10 +1441,25 @@ def apply_series(text):
     if not m:
         return text, None, []
     name, part = m.group(1).lower(), int(m.group(2)) if m.group(2) else None
+    line_ = m.group(0).strip("\n")             # the SERIES line goes to the top (under HOOK), wherever it was written
+    text = text[:m.start()] + text[m.end():]
+    hook = re.search(r"^\s*HOOK\s*:.*$", text, re.M | re.I)
+    text = (text[:hook.end()] + "\n" + line_ + text[hook.end():]) if hook else (line_ + "\n" + text)
+    m = SERIES_RE.search(text)
     data = load_series(name)
     if not data:
         return text, None, ["SERIES %r: series/%s.json nahi mili (series/ folder me family ki file banao)" % (name, name)]
     cast = {str(k): series_words(name, str(k), str(v)) for k, v in data["cast"].items()}
+    alias = {str(v).strip().lower(): str(k) for k, v in (data.get("names") or {}).items() if str(k) in cast}
+    if alias:                                   # "Sheru (akad): ..." / "Tau -> hookah": the series' names work too
+        def by_name(m_):
+            return m_.group(1) + alias[m_.group(2).lower()] + m_.group(3)
+        pat = r"^(\s*)(%s)(\s*(?:\(|:|->))" % "|".join(re.escape(a) for a in sorted(alias, key=len, reverse=True))
+        text = re.sub(pat, by_name, text, flags=re.M | re.I)
+        cl = re.search(r"^(\s*CAST\s*:\s*)(.*)$", text, re.M | re.I)
+        if cl:                                  # a CAST entry under a series name is that series' person: dropped
+            keep = [p_ for p_ in cl.group(2).split(",") if p_.strip() and p_.split("=")[0].strip().lower() not in alias]
+            text = text[:cl.start()] + (cl.group(1) + ", ".join(p_.strip() for p_ in keep) if keep else "") + text[cl.end():]
     speakers = set(SPEAKER_RE.findall(text))
     used = [k for k in cast if k in speakers] or list(cast)        # always in the series' own order
     cast_line = re.search(r"^\s*CAST\s*:\s*(.*)$", text, re.M | re.I)

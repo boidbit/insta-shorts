@@ -1,0 +1,14 @@
+{
+  "title": "Gaon Ke Tau",
+  "about": "Haryanvi tau ka gaon: Tau ka hookah aur gyaan, Tai ki daant, sheher se lauta Bablu, aur Sarpanch ji ke vaade.",
+  "cast": {
+    "T": "tau",
+    "A": "gaon_aurat saree maroon",
+    "B": "college_boy sunglasses tshirt",
+    "S": "sarpanch"
+  },
+  "names": {"T": "Tau", "A": "Tai", "B": "Bablu", "S": "Sarpanch"},
+  "place": "chaupal",
+  "color": "golden",
+  "hashtag": "#gaonketau"
+}
