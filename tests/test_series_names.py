@@ -92,7 +92,7 @@ class Kirdaar(unittest.TestCase):
             self.assertTrue(d["boli"], kid)
             a = d["awaaz"]
             self.assertTrue(a["gemini"] and a["andaaz"], kid)
-            self.assertGreater(int(a["rate"].strip("+%")), 0, kid)            # all of them talk fast
+            self.assertGreaterEqual(int(a["rate"].strip("+%")), 0, kid)      # none of them slow (Sultan: unhurried swag)
             voices[kid] = a["gemini"]
             for order in ("HOOK: a\nKIRDAAR: %s\nCAST: A = uncle\nSCENE: room\nA: Haan. | हाँ।\n%s: Na. | ना।\n",
                           "HOOK: b\nKIRDAAR: %s\nSCENE: room\n%s: Na. | ना।\n"):
@@ -117,8 +117,9 @@ class Kirdaar(unittest.TestCase):
         with open(os.path.join(ROOT, "SCRIPT_PROMPT.md"), encoding="utf-8") as f:
             module = director.prompt_text(f.read(), keep=("series",))
         for text in (short, module):
-            for w in ("apun", "Haryanvi", "tension ka virus"):
+            for w in ("apun", "Haryanvi", "1-2"):              # a flavour, not a word list stuffed into every line
                 self.assertIn(w, text)
+        self.assertNotIn("bhai log, kya re, hafta", short + module)
 
     def test_a_kirdaar_look_is_never_recoloured(self):
         sc, w = parse_script("HOOK: x\nSCENE: chaupal\nSultan: Kya re! | क्या रे!\nPaglet: Injection! | इंजेक्शन!\n"
