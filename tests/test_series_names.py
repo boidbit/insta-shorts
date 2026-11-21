@@ -85,6 +85,41 @@ class Kirdaar(unittest.TestCase):
         self.assertEqual((pg["hair"], pg["prop"], pg["expression"]), ("wild", "injection", "pagla"))
         self.assertIn("tedha_chashma", pg["accessories"])
 
+    def test_own_voice_and_boli_every_episode(self):
+        voices = {}
+        for kid in ("sultan", "paglet", "daddu"):
+            d = script.load_kirdaar(kid)
+            self.assertTrue(d["boli"], kid)
+            a = d["awaaz"]
+            self.assertTrue(a["gemini"] and a["andaaz"], kid)
+            self.assertGreater(int(a["rate"].strip("+%")), 0, kid)            # all of them talk fast
+            voices[kid] = a["gemini"]
+            for order in ("HOOK: a\nKIRDAAR: %s\nCAST: A = uncle\nSCENE: room\nA: Haan. | हाँ।\n%s: Na. | ना।\n",
+                          "HOOK: b\nKIRDAAR: %s\nSCENE: room\n%s: Na. | ना।\n"):
+                sc, w = parse_script(order % (d["name"], d["name"]))
+                v = sc["characters"][d["name"]]["voice"]
+                self.assertEqual((v["gemini"], v["pitch"], v["rate"]), (a["gemini"], a["pitch"], a["rate"]), kid)
+        self.assertEqual(len(set(voices.values())), 3)                          # three different voices
+
+    def test_the_manner_goes_to_gemini(self):
+        from studio import gemini_tts
+        p = gemini_tts.build_payload([{"voice": "Charon", "text": "Apun Sultan!"}, {"voice": "Kore", "text": "Hat!"}],
+                                     gemini_tts.DEFAULT_STYLE, {"Charon": "a cocky tapori don"})
+        text = p["contents"][0]["parts"][0]["text"]
+        self.assertIn("Speaker1 sounds like a cocky tapori don.", text)
+        one = gemini_tts.build_payload([{"voice": "Charon", "text": "Apun!"}], "", {"Charon": "a cocky tapori don"})
+        self.assertIn("The speaker sounds like a cocky tapori don.", one["contents"][0]["parts"][0]["text"])
+
+    def test_the_prompts_carry_the_boli(self):
+        with open(os.path.join(ROOT, "SHORT_PROMPT.md"), encoding="utf-8") as f:
+            short = f.read()
+        from studio import director
+        with open(os.path.join(ROOT, "SCRIPT_PROMPT.md"), encoding="utf-8") as f:
+            module = director.prompt_text(f.read(), keep=("series",))
+        for text in (short, module):
+            for w in ("apun", "Haryanvi", "tension ka virus"):
+                self.assertIn(w, text)
+
     def test_unknown_kirdaar_says_so(self):
         sc, w = parse_script("HOOK: x\nKIRDAAR: Gabbar\nCAST: A = uncle\nSCENE: room\nA: Haan. | हाँ।\n")
         self.assertTrue(any("Gabbar" in x for x in w))

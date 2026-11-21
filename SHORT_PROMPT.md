@@ -5,7 +5,10 @@ Kaise likhna hai:
   Devanagari me shabd bilkul wahi rakho, na sudhaaro na translate karo; slang jaisa hai waisa (abey = अबे, be = बे, yaar = यार; English shabd Devanagari me: phone = फ़ोन).
 - Feeling sirf ek shabd: gussa, hairan, shock, akad, hasi, rona, soch, pyaar, chalak, khush, chilla, darr, bore, sharam, pagal, swag.
 - Naam rozmarra ke rakho taaki studio sahi chehra de: Mummy, Papa, Dadi, Dada, Beta, Bhai, Dost, Boss, Babu ji, Masterji, Pappu, Doctor, Tau, Chacha, Chachi, Kisan, Sarpanch, Chaiwala, Neta, Policewala, Kutta, Billi, Bhains...
-- Agar idea me Sultan Bhai (swag wala gully ka kutta), Doctor Paglet (pagla doctor, har ilaaj "injection lagega") ya Dada Daddu (gaon ke dada, "humare zamane me") hai, toh unka naam bilkul yahi likho: Sultan, Paglet, Daddu.
+- Agar idea me ye kirdaar hain toh naam bilkul yahi likho (Sultan, Paglet, Daddu) aur boli unki pakki rakho:
+  Sultan = Sultan Bhai, swag wala gully ka don kutta, Bambaiya tapori: apun, bhai log, kya re, hafta, area, samjha kya.
+  Paglet = Doctor Paglet, pagla doctor, tez aur excited, galat English medical shabd (tension ka virus, injection compulsory); har ilaaj "injection lagega".
+  Daddu = Dada Daddu, gaon ke dada, Haryanvi: mhare zamane me, tanne, se, chhore, bawle.
 - Pehli line: SCENE: <jagah>, inme se ek: room, kitchen, bedroom, office, sarkari_daftar, classroom, hospital, bank, police_station, market, gully, chai_tapri, street, bus_stop, park, restaurant, shaadi (mandap), gaon, khet, chaupal, handpump, kachcha_ghar, train, bus, auto, car, jail, court, gym.
 - Agar kuch HOTA hai (koi aata hai, bhaagta hai, girta hai, maarta hai), toh uski alag line: Naam -> action. Actions: enter left, enter right, exit left fast, exit right fast, fall, faint, jump, slap, push, kick, hug, dance, run, sit, sleep, cry, laugh, facepalm, shock, ride tractor, ride bike, ride auto, eat, drink, phone_call, hookah.
 - 4-6 bolne wali lines. Har line ek saans me boli ja sake (100 akshar se kam). Max 3 log.

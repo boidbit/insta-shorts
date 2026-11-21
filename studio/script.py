@@ -1531,7 +1531,7 @@ def _kirdaar_list():
             d = load_kirdaar(f[:-5])
             if d:
                 kind = next((ANIMAL_WORDS[w] for w in d["words"].split() if w in ANIMAL_WORDS), None)
-                out.append(dict({k: d.get(k, "") for k in ("id", "name", "title", "about", "aadat", "line")},
+                out.append(dict({k: d.get(k, "") for k in ("id", "name", "title", "about", "aadat", "line", "boli")},
                                 also=list(d.get("also") or []), animal=kind))
     return out
 
@@ -1607,7 +1607,8 @@ def apply_kirdaar(text):
     title = " × ".join(d.get("title") or d["name"] for d in found)
     tags = [d["hashtag"] for d in found if d.get("hashtag")]
     return text, {"name": "+".join(d["id"] for d in found), "title": title, "part": part,
-                  "hashtag": tags[0] if tags else None, "hashtags": tags, "kirdaar": [d["id"] for d in found]}, warns
+                  "hashtag": tags[0] if tags else None, "hashtags": tags, "kirdaar": [d["id"] for d in found],
+                  "voices": {d["name"]: dict(d["awaaz"]) for d in found if isinstance(d.get("awaaz"), dict)}}, warns
 
 
 def parse_script(text):
@@ -1623,6 +1624,10 @@ def parse_script(text):
         if series_info or kir_info:
             _series_badge(scene, series_info or kir_info)
         if kir_info:
+            for name, v in kir_info["voices"].items():     # their own voice and way of talking, every episode
+                c = scene.get("characters", {}).get(name)
+                if c is not None:
+                    c["voice"] = dict(c.get("voice") or {}, **v)
             post = scene.setdefault("post", {})
             tags = post.get("hashtags") or []
             post["hashtags"] = kir_info["hashtags"] + [h for h in tags if h not in kir_info["hashtags"]]

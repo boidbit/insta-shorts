@@ -1,11 +1,23 @@
 {
   "name": "Sultan",
-  "also": ["Sultan Bhai", "Sultan bhai", "SultanBhai"],
+  "also": [
+    "Sultan Bhai",
+    "Sultan bhai",
+    "SultanBhai"
+  ],
   "title": "Sultan Bhai",
   "words": "kutta brown sunglasses chain cap",
   "about": "Gully ka don kutta: kaala chashma, sone ki chain, ulti topi. Sab pe akad, apna 'area' bolta hai.",
   "aadat": "Har baat me akad, khud ko 'bhai' bolta hai. Kamzori: injection se darta hai, biscuit pe pighal jaata hai.",
   "line": "Sultan Bhai ka area hai, yahan permission leke saans lo.",
   "place": "gully",
-  "hashtag": "#sultanbhai"
+  "hashtag": "#sultanbhai",
+  "boli": "Bambaiya tapori don: 'apun', 'bhai log', 'kya re', 'hafta', 'area', 'samjha kya'; chhoti, punchy lines, har baat me akad.",
+  "awaaz": {
+    "gemini": "Charon",
+    "name": "hi-IN-MadhurNeural",
+    "pitch": "-4Hz",
+    "rate": "+12%",
+    "andaaz": "a cocky Bambaiya tapori street don: swaggering, punchy, confident, quick"
+  }
 }

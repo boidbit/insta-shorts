@@ -1,11 +1,23 @@
 {
   "name": "Daddu",
-  "also": ["Dada Daddu", "Dadda", "Daddu ji"],
+  "also": [
+    "Dada Daddu",
+    "Dadda",
+    "Daddu ji"
+  ],
   "title": "Dada Daddu",
   "words": "dada gamchha thick_moustache lathi",
   "about": "Gaon ke Dada Daddu: safed kurta, kandhe pe gamchha, haath me lathi. Purani baatein, par sabse chalaak.",
-  "aadat": "Har baat pe 'humare zamane me...'. Kanjoos, phone se pareshaan, par aakhri twist hamesha unka.",
-  "line": "Humare zamane me toh...",
+  "aadat": "Har baat pe 'mhare zamane me...'. Kanjoos, phone se pareshaan, par aakhri twist hamesha unka.",
+  "line": "Mhare zamane me toh...",
   "place": "chaupal",
-  "hashtag": "#dadadaddu"
+  "hashtag": "#dadadaddu",
+  "boli": "Haryanvi gaon wale dada: 'mhare zamane me', 'tanne', 'se', 'chhore', 'bawle', 'ke kare se'; seedhi, chubhti baat.",
+  "awaaz": {
+    "gemini": "Algenib",
+    "name": "hi-IN-MadhurNeural",
+    "pitch": "-6Hz",
+    "rate": "+10%",
+    "andaaz": "a sharp old Haryanvi village grandpa: rustic accent, gruff, witty and brisk, never slow"
+  }
 }

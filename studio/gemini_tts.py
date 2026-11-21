@@ -93,7 +93,7 @@ def read_wav(path):
 
 
 # ------------------------------------------------------------------ the single API call
-def build_payload(lines, style=DEFAULT_STYLE):
+def build_payload(lines, style=DEFAULT_STYLE, notes=None):
     """lines: [{"voice": "Kore", "text": "..."}] in speaking order. 1 voice -> single-speaker request,
     2 voices -> multi-speaker request (Gemini allows at most 2 speakers)."""
     voices = []
@@ -110,6 +110,13 @@ def build_payload(lines, style=DEFAULT_STYLE):
         body = "\n\n".join("%s: %s" % (label[ln["voice"]], ln["text"]) for ln in lines)
         speech = {"multiSpeakerVoiceConfig": {"speakerVoiceConfigs": [
             {"speaker": label[v], "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": v}}} for v in voices]}}
+    notes = notes or {}
+    if notes:                                   # a character's own way of talking (kirdaar: Sultan Bhai's swagger)
+        if len(voices) == 1:
+            how = "The speaker sounds like %s." % notes[voices[0]] if voices[0] in notes else ""
+        else:
+            how = " ".join("%s sounds like %s." % (label[v], notes[v]) for v in voices if v in notes)
+        style = ((style or "").strip() + " " + how).strip()
     text = (style.strip() + "\n\n" + body) if style else body
     return {"contents": [{"parts": [{"text": text}]}],
             "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": speech}}
@@ -349,8 +356,14 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
             voices.append(it["voice"])
     remap = {v: voices[i if i < 2 else i % 2] for i, v in enumerate(voices)}
     lines = [{"voice": remap[it["voice"]], "text": it["text"]} for it in items]
+    notes = {}
+    for it in items:                                # the first character on a voice gives its manner
+        how = (it.get("spec") or {}).get("andaaz")
+        if how and remap[it["voice"]] not in notes:
+            notes[remap[it["voice"]]] = how
 
-    key = hashlib.sha1(json.dumps([model, style, lines], ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
+    key = hashlib.sha1(json.dumps([model, style, lines] + ([notes] if notes else []),
+                                  ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
     d = os.path.join(cache_dir, "gemini_" + key)
     os.makedirs(d, exist_ok=True)
     full = os.path.join(d, "full.wav")
@@ -371,7 +384,7 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
             print("  [gemini] 1 request for %d lines (%s)%s" % (len(items), model,
                                                                " - try %d" % (attempt + 1) if attempt else ""),
                   file=sys.stderr)
-            x = request_audio(build_payload(lines, style), model)
+            x = request_audio(build_payload(lines, style, notes), model)
             bad = take_problem(x, texts)
             if not bad:
                 break
