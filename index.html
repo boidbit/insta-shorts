@@ -184,6 +184,22 @@
   .ladv { display: flex; flex-direction: column; gap: 6px; border-top: 1px dashed var(--line); padding-top: 6px; }
   .ladv label { font-size: 13px; }
   .lkind { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .rolebtn { display: flex; align-items: center; gap: 6px; justify-content: space-between; text-align: left;
+    grid-column: 1 / -1; font-weight: 700; }
+  .rolebtn { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; min-height: 48px; }
+  .rolebtn > span:first-child { display: flex; align-items: center; gap: 8px; }
+  .rolebtn img { width: 30px; height: 36px; object-fit: contain; }
+  .rolebtn small { font-weight: 400; color: var(--muted); }
+  .rolepick { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 12px; padding: 8px; background: var(--card, #fff); }
+  .rolepick input { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+  .rolepick .rgrid { max-height: 340px; overflow-y: auto; }
+  .rolepick h5 { margin: 8px 0 4px; font-size: 13px; }
+  .rolepick .rtiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; }
+  .rtile { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--line);
+    border-radius: 10px; background: transparent; font-size: 12px; cursor: pointer; min-height: 72px; }
+  .rtile img { width: 44px; height: 54px; object-fit: contain; }
+  .rtile .remo { font-size: 32px; line-height: 54px; }
+  .rtile.on { border-color: var(--accent, #e85d3a); border-width: 2px; }
   .lact { flex: 1 1 140px; min-width: 0; }
   .lsug { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 13px; }
   .feel.sug { border-color: var(--line); background: var(--card, transparent); }
@@ -2153,6 +2169,64 @@ function placeBox(get) {                    // get(make): the SCENE item (the to
   });
   return el("div", { className: "cplace" }, [img, el("div", { className: "pf" }, [sel, times, title])]);
 }
+// 🎭 who a character is: a button with the picture; tapped, a search box and every role in groups, with pictures
+const ROLE_GROUPS = [
+  ["👨‍👩‍👧 Ghar ke log", ["mummy", "papa", "dadi", "dada", "beta", "beti", "bhai", "behen", "didi", "chacha", "chachi", "bhabhi",
+    "sasu", "mama", "bachcha", "padosi", "padosan", "dost", "ladki", "ladka"]],
+  ["💼 Kaam wale", ["boss", "manager", "teacher", "masterji", "principal", "student", "doctor", "nurse", "policewala", "daroga",
+    "guard", "chowkidar", "chaiwala", "thelewala", "golgappewala", "kulchewala", "sabziwala", "dukaandaar", "halwai", "chemist",
+    "doodhwala", "delivery_boy", "driver", "autowala", "conductor", "tt", "clerk", "babu", "waiter", "mechanic", "safai_wala",
+    "nai", "netaji", "judge", "pilot", "air_hostess", "fauji", "influencer", "food_blogger", "food_blogger_girl", "landlord"]],
+  ["🌾 Gaon", ["kisan", "tau", "tai", "sarpanch", "gaon_aurat", "gaon_ladka"]],
+  ["🎉 Khaas", ["dulha", "dulhan", "pandit", "baba", "jyotishi", "chor", "bhoot", "nri_mama", "sardar_ji", "gym_bro"]],
+  ["🐾 Jaanwar", ["kutta", "billi", "gaay", "bhains", "bakri", "bandar", "murga", "tota", "kauwa", "chhipkali", "machhar"]],
+];
+const ROLE_EMOJI = { kutta: "🐕", dog: "🐕", doggy: "🐕", billi: "🐈", cat: "🐈", gaay: "🐄", gai: "🐄", cow: "🐄", bhains: "🐃",
+  bhainsa: "🐃", buffalo: "🐃", bakri: "🐐", bakra: "🐐", goat: "🐐", bandar: "🐒", monkey: "🐒", murga: "🐓", murgi: "🐓",
+  rooster: "🐓", hen: "🐓", tota: "🦜", totaa: "🦜", parrot: "🦜", kauwa: "🐦‍⬛", kaua: "🐦‍⬛", crow: "🐦‍⬛", chhipkali: "🦎",
+  chipkali: "🦎", lizard: "🦎", machhar: "🦟", machchhar: "🦟", macchar: "🦟", mosquito: "🦟" };
+function roleTile(r, on, pickIt) {
+  const pic = ROLE_EMOJI[r] ? el("span", { className: "remo", textContent: ROLE_EMOJI[r] }) : lookImg(r);
+  const b = el("button", { type: "button", className: "rtile" + (on ? " on" : ""), title: r }, [pic, r.replace(/_/g, " ")]);
+  b.addEventListener("click", () => pickIt(r));
+  return b;
+}
+function rolePicker(value, onPick) {
+  const all = ROLE_WORDS();
+  const pic = ROLE_EMOJI[value] ? el("span", { textContent: ROLE_EMOJI[value] }) : lookImg(value);
+  const btnEl = el("button", { type: "button", className: "rolebtn", title: "Kaun hai: tap karke chuno" },
+    [el("span", {}, [pic, value ? value.replace(/_/g, " ") : "🎭 Kaun hai? chuno"]), el("small", { textContent: "badlo ▾" })]);
+  const wrap = el("div", { style: "display: contents" }, [btnEl]);
+  let panel = null;
+  const pickIt = (r) => {
+    value = r;
+    btnEl.firstChild.replaceChildren(ROLE_EMOJI[r] ? el("span", { textContent: ROLE_EMOJI[r] }) : lookImg(r), r.replace(/_/g, " "));
+    if (panel) { panel.remove(); panel = null; }
+    onPick(r);
+  };
+  btnEl.addEventListener("click", () => {
+    if (panel) { panel.remove(); panel = null; return; }
+    const q = el("input", { type: "search", placeholder: "🔍 Dhundho: guard, doctor, kutta, mla…", autocomplete: "off" });
+    const grid = el("div", { className: "rgrid" });
+    const show = () => {
+      const t = q.value.trim().toLowerCase().replace(/\s+/g, "_");
+      if (!t) {
+        grid.replaceChildren(...ROLE_GROUPS.map(([title, list]) => [el("h5", { textContent: title }),
+          el("div", { className: "rtiles" }, list.filter((r) => all.includes(r)).map((r) => roleTile(r, r === value, pickIt)))]).flat(),
+          el("h5", { textContent: "🔎 Aur bhi bahut hain: upar likh ke dhundho" }));
+        return;
+      }
+      const hits = all.filter((r) => r.includes(t)).sort((a, b) => (a.startsWith(t) ? 0 : 1) - (b.startsWith(t) ? 0 : 1) || a.localeCompare(b));
+      grid.replaceChildren(hits.length ? el("div", { className: "rtiles" }, hits.slice(0, 60).map((r) => roleTile(r, r === value, pickIt)))
+        : el("p", { className: "chelp", textContent: `"${q.value}" nahi mila. Jaise: guard, doctor, mummy, kutta, neta likho.` }));
+    };
+    q.addEventListener("input", show);
+    panel = el("div", { className: "rolepick" }, [q, grid]);
+    btnEl.after(panel);
+    show();
+  });
+  return wrap;
+}
 function charRow(c, cast, i) {
   const changed = () => { delete c.origWords; touch(cast); cardsChanged(); };
   const img = lookImg(roleOf(c));
@@ -2172,15 +2246,8 @@ function charRow(c, cast, i) {
     return d;
   };
   if (c.saved) return fold([img, el("div", { className: "fields" }, [name, el("span", { className: "lkind", textContent: `⭐ @${c.saved} (saved)` }), del])]);
-  const roles = ROLE_WORDS();
-  const role = el("input", { type: "text", value: c.f.role || "", placeholder: "Role: type karo (guard, mla, dost…)",
-    title: "Kaun hai: likhna shuru karo, list se chuno" });
-  role.setAttribute("list", "cardRoles");
-  role.addEventListener("change", () => {
-    const v = role.value.trim().toLowerCase().replace(/\s+/g, "_");
-    if (!roles.includes(v)) { role.classList.add("bad"); role.title = `"${role.value}" role nahi hai: list me se chuno`; return; }
-    role.classList.remove("bad");
-    c.f.role = v; role.value = v;
+  const role = rolePicker(c.f.role || "", (v) => {
+    c.f.role = v;
     img.src = `assets/looks/${lookOf(v)}.png`; img.style.visibility = "";
     changed();
   });
