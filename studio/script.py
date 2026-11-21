@@ -377,6 +377,9 @@ def _clothes(words):
     return tops[-1], top_col, None, None
 
 
+SHE_ANIMALS = {"bhains", "bhens", "bhais", "gaay", "gai", "billi", "bakri", "murgi", "chhipkali", "chipkali"}
+
+
 def cast_spec(words, index, unknown=None):
     """'aunty chubby glasses maroon female' -> character spec (with a voice).
     Words that mean nothing here are added to `unknown`."""
@@ -388,6 +391,8 @@ def cast_spec(words, index, unknown=None):
             continue                                   # the jacket's colour, not the person's
         if w in ANIMAL_WORDS and "kind" not in spec:       # A = kutta brown: a dog (talks too)
             spec["kind"] = ANIMAL_WORDS[w]
+            if w in SHE_ANIMALS and female is None:     # bhains, gaay, billi, bakri: she talks in a woman's voice
+                female = True
         elif spec.get("kind") not in (None, "monkey") and w in PALETTE and "color" not in spec:
             spec["color"] = w                          # kutta brown: the fur, not a skin tone
         elif w in LOOKS and "look" not in spec:
@@ -400,6 +405,8 @@ def cast_spec(words, index, unknown=None):
             spec["role"] = w
         elif w in BEHIND_WORDS:                        # peeche: behind the nearest counter / thela; aage: in front
             spec["behind"] = BEHIND_WORDS[w]
+        elif w == "pakka":                             # a kirdaar: the look is never varied
+            spec["fixed"] = True
         elif w in ACCESSORIES:
             acc.append(w)
         elif w in ACCESSORY_WORDS:                     # gold_chain, pagla_chashma...
@@ -493,7 +500,7 @@ def vary_faces(cast):
     or the look already says is kept. (`CAMERA: classic`: not used, the faces stay as they were.)"""
     i = 0
     for name, spec in cast.items():
-        if spec.get("hidden") or spec.get("kind"):
+        if spec.get("hidden") or spec.get("kind") or spec.get("fixed"):
             continue
         look = spec.get("look", "boy")
         base = LOOKS.get(look, {})
@@ -527,7 +534,7 @@ def vary_bodies(cast):
     (uncle chubby, dada slim) keeps it and only gets a height; children and the old keep their size."""
     used = []
     for name, spec in cast.items():
-        if spec.get("hidden") or spec.get("kind"):
+        if spec.get("hidden") or spec.get("kind") or spec.get("fixed"):
             continue
         base = LOOKS.get(spec.get("look", "boy"), {})
         fixed_build = "build" in spec or "build" in base
@@ -554,8 +561,14 @@ def vary_cast(cast):
     skin tone, unless the script chose them. Only what the script left open is changed."""
     seen = {}                                   # look -> [(hair, skin), ...] already on screen
     colors = []                                 # shirt colours already on screen
+    for spec in cast.values():                  # a kirdaar's look is fixed: the others make way for it
+        if spec.get("fixed") and not spec.get("kind"):
+            base = LOOKS.get(spec.get("look", "boy"), {})
+            seen.setdefault(spec.get("look", "boy"), []).append((spec.get("hair", base.get("hair")),
+                                                                 spec.get("skin", base.get("skin"))))
+            colors.append(spec.get("color", base.get("color", "blue")))
     for name, spec in cast.items():
-        if spec.get("hidden") or spec.get("kind"):    # a voice / an animal: nothing to vary
+        if spec.get("hidden") or spec.get("kind") or spec.get("fixed"):    # a voice / an animal / a kirdaar
             continue
         look = spec.get("look", "boy")
         base = LOOKS.get(look, {})
@@ -1525,9 +1538,19 @@ def _kirdaar_list():
         if f.endswith(".json"):
             d = load_kirdaar(f[:-5])
             if d:
-                out.append(dict({k: d.get(k, "") for k in ("id", "name", "title", "about", "aadat", "line")},
-                                also=list(d.get("also") or [])))
+                kind = next((ANIMAL_WORDS[w] for w in d["words"].split() if w in ANIMAL_WORDS), None)
+                out.append(dict({k: d.get(k, "") for k in ("id", "name", "title", "about", "aadat", "line", "boli")},
+                                also=list(d.get("also") or []), animal=kind))
     return out
+
+
+def name_words(name):
+    """The cast words a speaker's own name gives when no CAST line casts them: `Bhains:` is a buffalo, `Kutta:` a
+    dog, `Mummy:` the aunty look, `Doctor:` a doctor. Any other name: nothing (a plain person)."""
+    low = name.strip().lower()
+    if low in ANIMAL_WORDS or low in ROLE_LOOKS or low in LOOKS:
+        return [low]
+    return []
 
 
 def apply_kirdaar(text):
@@ -1536,8 +1559,22 @@ def apply_kirdaar(text):
     crossover). Lines are written with the character's name (`Sultan (akad): ...`, `Sultan Bhai -> saamne`).
     Returns (text, info or None, warnings)."""
     m = KIRDAAR_RE.search(text)
-    if not m:
-        return text, None, []
+    if not m:                                   # no KIRDAAR line: a kirdaar who speaks by name (and is not in
+        cl = re.search(r"^\s*CAST\s*:\s*(.*)$", text, re.M | re.I)    # the CAST) comes in all the same
+        cast_names = {p_.split("=")[0].strip().lower() for p_ in cl.group(1).split(",") if "=" in p_} if cl else set()
+        spoke = []                              # (first line, name): in the order they first speak
+        for k in _kirdaar_list():
+            names = [k["name"]] + k["also"]
+            if any(n.lower() in cast_names for n in names):
+                continue
+            pat = r"^\s*(%s)\s*(?:\(|:|->)" % "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True))
+            hit = re.search(pat, text, re.M | re.I)
+            if hit:
+                spoke.append((hit.start(), k["name"]))
+        if not spoke:
+            return text, None, []
+        text = "KIRDAAR: %s\n%s" % (", ".join(n for _p, n in sorted(spoke)), text)
+        m = KIRDAAR_RE.search(text)
     body = m.group(1)
     part = None
     pm = re.search(r"\s+(?:part|ep|episode|#)?\s*(\d+)\s*$", body, re.I)
@@ -1563,7 +1600,7 @@ def apply_kirdaar(text):
         pat = r"^(\s*)(%s)(\s*(?:\(|:|->))" % "|".join(re.escape(a) for a in sorted(aliases, key=len, reverse=True))
         text = re.sub(pat, lambda m_: m_.group(1) + key + m_.group(3), text, flags=re.M | re.I)
         if key.lower() not in have:
-            extra.append("%s = %s" % (key, series_words("kirdaar_" + d["id"], key, d["words"])))
+            extra.append("%s = %s pakka" % (key, series_words("kirdaar_" + d["id"], key, d["words"])))
     add = []
     if extra and cl:
         cl = re.search(r"^\s*CAST\s*:\s*(.*)$", text, re.M | re.I)
@@ -1579,7 +1616,8 @@ def apply_kirdaar(text):
     title = " × ".join(d.get("title") or d["name"] for d in found)
     tags = [d["hashtag"] for d in found if d.get("hashtag")]
     return text, {"name": "+".join(d["id"] for d in found), "title": title, "part": part,
-                  "hashtag": tags[0] if tags else None, "hashtags": tags, "kirdaar": [d["id"] for d in found]}, warns
+                  "hashtag": tags[0] if tags else None, "hashtags": tags, "kirdaar": [d["id"] for d in found],
+                  "voices": {d["name"]: dict(d["awaaz"]) for d in found if isinstance(d.get("awaaz"), dict)}}, warns
 
 
 def parse_script(text):
@@ -1595,6 +1633,10 @@ def parse_script(text):
         if series_info or kir_info:
             _series_badge(scene, series_info or kir_info)
         if kir_info:
+            for name, v in kir_info["voices"].items():     # their own voice and way of talking, every episode
+                c = scene.get("characters", {}).get(name)
+                if c is not None:
+                    c["voice"] = dict(c.get("voice") or {}, **v)
             post = scene.setdefault("post", {})
             tags = post.get("hashtags") or []
             post["hashtags"] = kir_info["hashtags"] + [h for h in tags if h not in kir_info["hashtags"]]
@@ -1910,9 +1952,9 @@ def _parse_script(text):
                     order.remove(pan["who"])
                 order.insert(0 if pan["dir"] == "right" else len(order), pan["who"])
         for name in order:
-            if declared and name not in cast:
+            if declared and name not in cast and not name_words(name):
                 warnings.append("%s CAST me nahi hai: CAST line me '%s = <role/look>' jodo" % (name, name))
-            add_cast(name, [])
+            add_cast(name, name_words(name))
         back = None
         if sc.get("framing") == "ots":
             back = ots_back(sc, scenes[:si], order, cast)

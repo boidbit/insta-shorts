@@ -529,7 +529,7 @@ Har pakka character ki apni file `kirdaar/<naam>.json` me hai: look, aadat, pakk
 |---|---|---|
 | **Sultan** (Sultan Bhai) | brown kutta, kaala chashma, sone ki chain, ulti laal topi | gully ka don, sab pe akad; injection se darta hai |
 | **Paglet** (Doctor Paglet) | bikhre safed baal, tedha tuta chashma, maathe pe patti, gale me stethoscope, haath me injection | har ilaaj: "Injection lagega!" |
-| **Daddu** (Dada Daddu) | dada, gamchha, mooch, lathi | "humare zamane me...", aakhri twist unka |
+| **Daddu** (Dada Daddu) | dada, gamchha, mooch, lathi | "mhare zamane me..." (Haryanvi), aakhri twist unka |
 
 ```
 HOOK: Sultan ka toll tax 🐕
@@ -539,10 +539,13 @@ Sultan Bhai (akad): Ye Sultan Bhai ka area hai! | ये सुल्तान �
 ```
 
 - Lines me naam likho (`Sultan`, `Sultan Bhai`, `Paglet`, `Doctor Paglet`, `Daddu` sab chalte hain). CAST me jodne ki zarurat nahi.
+- **Pakki boli aur awaaz:** har file me `boli` (AI ko likhne ke liye: Sultan Bambaiya tapori, Paglet tez-excited galat English, Daddu Haryanvi) aur `awaaz` (apni Gemini voice, pitch, speed aur bolne ka andaaz). Teeno tez bolte hain. Chhota prompt, writer prompt aur Builder boli khud AI ko dete hain. Gemini ek video me 2 hi alag voice deta hai, teeno saath hon to teesra pitch se alag hota hai.
 - Builder me Characters ke upar "🧑 Kirdaar" ke checkbox hain. Paste ki hui lines me inka naam ho to box apne aap tick ho jaata hai.
 - Video ke upar "Sultan Bhai × Doctor Paglet • Part 2" jaisa tag aata hai, aur unke hashtag post me jud jaate hain.
 - **Kutte ke 3 angle:** chalte/sunte waqt side se; bolte waqt muh camera ki taraf; apne close-up me (ya `Sultan -> saamne`) poora saamne. `Sultan -> side` = hamesha side. (Purana `CAMERA: classic` me sirf side.)
 - Naye shabd jo kisi pe bhi lagte hain: `chain`, `tedha_chashma`, `gale_stethoscope`, baal `wild` (`pagal_baal`), nishaan `patti`, look `pagla_doctor`, feeling `pagla` / `swag` (akad); CAST me koi cheez (`lathi`, `phone`...) = haath me hamesha.
+- `KIRDAAR:` line bhool gaye? Koi baat nahi: lines me `Sultan` / `Paglet` / `Daddu` (ya unke doosre naam) bolte hain aur CAST me nahi hain, to wo apne aap aa jaate hain.
+- Bina CAST ke naam hi kaafi hai: `Bhains:` bhains banti hai (aurat ki awaaz), `Kutta:` kutta, `Billi:` billi, `Mummy:` mummy, `Doctor:` doctor. CAST me likha ho to wahi chalta hai.
 - Naya kirdaar: `kirdaar/` me ek aur file (inhi jaisi).
 
 ### CUT ab wahi karta hai jo likha hai 🎥

@@ -85,9 +85,92 @@ class Kirdaar(unittest.TestCase):
         self.assertEqual((pg["hair"], pg["prop"], pg["expression"]), ("wild", "injection", "pagla"))
         self.assertIn("tedha_chashma", pg["accessories"])
 
+    def test_own_voice_and_boli_every_episode(self):
+        voices = {}
+        for kid in ("sultan", "paglet", "daddu"):
+            d = script.load_kirdaar(kid)
+            self.assertTrue(d["boli"], kid)
+            a = d["awaaz"]
+            self.assertTrue(a["gemini"] and a["andaaz"], kid)
+            self.assertGreater(int(a["rate"].strip("+%")), 0, kid)            # all of them talk fast
+            voices[kid] = a["gemini"]
+            for order in ("HOOK: a\nKIRDAAR: %s\nCAST: A = uncle\nSCENE: room\nA: Haan. | हाँ।\n%s: Na. | ना।\n",
+                          "HOOK: b\nKIRDAAR: %s\nSCENE: room\n%s: Na. | ना।\n"):
+                sc, w = parse_script(order % (d["name"], d["name"]))
+                v = sc["characters"][d["name"]]["voice"]
+                self.assertEqual((v["gemini"], v["pitch"], v["rate"]), (a["gemini"], a["pitch"], a["rate"]), kid)
+        self.assertEqual(len(set(voices.values())), 3)                          # three different voices
+
+    def test_the_manner_goes_to_gemini(self):
+        from studio import gemini_tts
+        p = gemini_tts.build_payload([{"voice": "Charon", "text": "Apun Sultan!"}, {"voice": "Kore", "text": "Hat!"}],
+                                     gemini_tts.DEFAULT_STYLE, {"Charon": "a cocky tapori don"})
+        text = p["contents"][0]["parts"][0]["text"]
+        self.assertIn("Speaker1 sounds like a cocky tapori don.", text)
+        one = gemini_tts.build_payload([{"voice": "Charon", "text": "Apun!"}], "", {"Charon": "a cocky tapori don"})
+        self.assertIn("The speaker sounds like a cocky tapori don.", one["contents"][0]["parts"][0]["text"])
+
+    def test_the_prompts_carry_the_boli(self):
+        with open(os.path.join(ROOT, "SHORT_PROMPT.md"), encoding="utf-8") as f:
+            short = f.read()
+        from studio import director
+        with open(os.path.join(ROOT, "SCRIPT_PROMPT.md"), encoding="utf-8") as f:
+            module = director.prompt_text(f.read(), keep=("series",))
+        for text in (short, module):
+            for w in ("apun", "Haryanvi", "tension ka virus"):
+                self.assertIn(w, text)
+
+    def test_a_kirdaar_look_is_never_recoloured(self):
+        sc, w = parse_script("HOOK: x\nSCENE: chaupal\nSultan: Kya re! | क्या रे!\nPaglet: Injection! | इंजेक्शन!\n"
+                             "Daddu: Chhore! | छोरे!\n")
+        self.assertEqual(w, [])
+        for name in ("Paglet", "Daddu"):
+            spec = sc["characters"][name]
+            self.assertTrue(spec.get("fixed"), name)
+            self.assertNotIn("color", spec, name)                   # the look's own white coat / kurta
+        self.assertEqual(sc["series"]["title"], "Sultan Bhai × Doctor Paglet × Dada Daddu")   # speaking order
+
     def test_unknown_kirdaar_says_so(self):
         sc, w = parse_script("HOOK: x\nKIRDAAR: Gabbar\nCAST: A = uncle\nSCENE: room\nA: Haan. | हाँ।\n")
         self.assertTrue(any("Gabbar" in x for x in w))
+
+
+class NoCastNeeded(unittest.TestCase):
+    """A script with no CAST and no KIRDAAR line (as a chat AI writes it): the names alone decide who is who."""
+
+    def test_kirdaar_and_animals_by_their_names(self):
+        sc, w = parse_script("HOOK: x\nSCENE: gaon\nSultan -> enter left\nSultan (swag): Ae bhains! | ऐ भैंस!\n"
+                             "Bhains (akad): Hat ja! | हट जा!\nKutta: Bhau! | भौ!\nMummy: Chup! | चुप!\n")
+        self.assertEqual(w, [])
+        ch = sc["characters"]
+        self.assertEqual(ch["Sultan"]["kind"], "dog")
+        self.assertIn("sunglasses", ch["Sultan"]["accessories"])
+        self.assertEqual(ch["Bhains"]["kind"], "buffalo")
+        self.assertEqual(ch["Bhains"]["voice"]["name"], "hi-IN-SwaraNeural")     # the bhains is a she
+        self.assertEqual(ch["Kutta"]["kind"], "dog")
+        self.assertEqual(ch["Mummy"]["look"], "aunty")
+        self.assertEqual(sc["series"]["title"], "Sultan Bhai")
+        self.assertEqual(sc["scenes"][0]["background"]["type"], "gaon")          # the script's place stays
+
+    def test_the_bhains_stands_clear_of_the_dog_that_walks_in(self):
+        from studio.render import Sequence
+        from studio import animals
+        sc, w = parse_script("HOOK: x\nSCENE: gaon\nSultan -> enter left\nSultan (swag): Ae bhains! | ऐ भैंस!\n"
+                             "Bhains (akad): Hat ja! | हट जा!\n")
+        r = Sequence(sc, 1080, False, None, None).parts[0]
+        dog, bh = r.plan.chars["Sultan"], r.plan.chars["Bhains"]
+        t = r.plan.duration - 0.5
+        nose_dog = dog.draw_pos(t)[0] + animals.extent("dog", dog.scale)[0]
+        nose_bh = bh.draw_pos(t)[0] - animals.extent("buffalo", bh.scale)[0]
+        self.assertGreater(nose_bh - nose_dog, 60)
+
+    def test_cast_still_wins(self):
+        sc, w = parse_script("HOOK: x\nCAST: Sultan = boy, Bhains = uncle\nSCENE: room\nSultan: Haan. | हाँ।\n"
+                             "Bhains: Na. | ना।\n")
+        self.assertEqual(w, [])
+        self.assertIsNone(sc["characters"]["Sultan"].get("kind"))
+        self.assertIsNone(sc["characters"]["Bhains"].get("kind"))
+        self.assertNotIn("series", sc)
 
 
 class DogAngles(unittest.TestCase):
@@ -118,6 +201,13 @@ class DogAngles(unittest.TestCase):
 
 
 class Page(unittest.TestCase):
+    def test_animals_get_animal_actions(self):
+        s = page()
+        for needle in ("function suggestAnimalActs", "const lineAnimal", "lineAnimal(it))"):
+            self.assertIn(needle, s)
+        vocab = json.loads(re.search(r'<script type="application/json" id="vocab">(.*?)</script>', s, re.S).group(1))
+        self.assertEqual({k["id"]: k["animal"] for k in vocab["kirdaar"]}, {"sultan": "dog", "paglet": None, "daddu": None})
+
     def test_the_short_prompt(self):
         with open(os.path.join(ROOT, "SHORT_PROMPT.md"), encoding="utf-8") as f:
             text = f.read()

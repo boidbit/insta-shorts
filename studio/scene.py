@@ -399,6 +399,10 @@ class Char:
             head = next((e["dir"] for e in reversed(self.events) if "dir" in e and e["t"] <= t + 1e-9), -1)
             return x + head * LIE_HALF * k, y - 260.0 * k
         h = FOCUS_H.get(self.spec.get("kind"), 560.0)            # a dog's head is not where a person's is
+        if self.spec.get("kind") in BIG_ANIMALS:                 # a bhains's head is far ahead of its middle
+            from . import animals
+            front = animals.extent(self.spec["kind"], 1.0)[0]
+            return x + (-1.0 if st["facing"] == "left" else 1.0) * front * 0.62 * k, y - h * k
         return x, y - h * k
 
     def state_at(self, t):
@@ -765,19 +769,28 @@ BIG_ANIMALS = ("cow", "buffalo", "goat")
 ANIMAL_GAP = 110.0          # px between a big animal's nose and the person it stands by
 
 
-def _make_room_for_big_animals(chars):
+def _make_room_for_big_animals(chars, slots=None):
     """A cow / bhains / goat is drawn at its real size: placed by its slot it would stand on the person next to it.
     It goes beside the nearest person instead, its head towards them, a gap between (the person steps aside if
     the animal would leave the picture)."""
     from . import animals
     people = [c for c in chars.values() if not c.spec.get("kind") and not c.spec.get("hidden")]
+    if not people:                              # no person: it stands by the dog / cat it talks to (Sultan Bhai)
+        people = [c for c in chars.values() if c.spec.get("kind") in animals.QUAD
+                  and c.spec.get("kind") not in BIG_ANIMALS and not c.spec.get("hidden")]
     for a in chars.values():
         if a.spec.get("kind") not in BIG_ANIMALS or "x" in a.spec or not people:
             continue
-        p = min(people, key=lambda c: abs(c.x - a.x))
-        side = 1.0 if a.x >= p.x else -1.0
+        def home(c):                            # one who walks in starts off screen: where they will stand
+            if (c.x < 0 or c.x > LW) and slots and c.spec.get("slot") in slots:
+                return float(slots[c.spec["slot"]])
+            return c.x
+        p = min(people, key=lambda c: abs(home(c) - a.x))
+        px = home(p)
+        side = 1.0 if a.x >= px else -1.0
         front, back = animals.extent(a.spec["kind"], a.scale)
-        want = p.x + side * (front + ANIMAL_GAP)
+        nose = animals.extent(p.spec["kind"], p.scale)[0] if p.spec.get("kind") else 0.0     # the dog's snout
+        want = px + side * (front + ANIMAL_GAP + nose)
         over = (want + back - (LW + 120.0)) if side > 0 else (-120.0 - (want - back))
         if over > 0 and "x" not in p.spec:                  # slide both towards the middle
             step = min(over, (p.x - 150.0) if side > 0 else (LW - 150.0 - p.x))
@@ -1220,7 +1233,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         y = spec.get("y", GROUND_Y)
         chars[name] = Char(name, spec, float(x), float(y), i)
         chars[name].scale *= world * float(spec.get("depth_k", 1.0))    # (a driving shot's back seat: further)
-    _make_room_for_big_animals(chars)
+    _make_room_for_big_animals(chars, slots)
     if framing == "ots":
         place_over_shoulder(chars)
         for c_ in chars.values():               # the speaker facing us a bit bigger too (still well behind the back)
