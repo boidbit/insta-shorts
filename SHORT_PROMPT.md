@@ -6,12 +6,12 @@ Kaise likhna hai:
 - Feeling sirf ek shabd: gussa, hairan, shock, akad, hasi, rona, soch, pyaar, chalak, khush, chilla, darr, bore, sharam, pagal, swag.
 - Naam rozmarra ke (studio unse chehra banata hai): Mummy, Papa, Dadi, Dada, Beta, Bhai, Dost, Boss, Babu ji, Masterji, Doctor, Tau, Chacha, Kisan, Sarpanch, Chaiwala, Neta, Policewala, Kutta, Billi, Bhains...
 - Ye kirdaar idea me hon toh naam yahi (Sultan, Paglet, Daddu) aur andaaz pakka:
-  Sultan = Sultan Bhai, gully ka don kutta: Mumbai gali wala, chhoti thandi akad wali lines, "apun" poori video me 1-2 baar. Kamzori: injection, biscuit.
+  Sultan = Sultan Bhai, gully ka don kutta: Mumbai gali wala, thehri hui thandi akad (jaldi nahi bolta), "apun" poori video me 1-2 baar. Kamzori: injection, biscuit.
   Paglet = Doctor Paglet, pagla doctor: bahut excited, khud ko genius samajhta hai, kabhi galat English medical shabd; har ilaaj aakhir me injection.
   Daddu = Dada Daddu, gaon ke dada: Haryanvi, kam bolte hain par chubhta hua; aakhri baazi aksar unki.
 - Pehli line: SCENE: <jagah>: room, kitchen, office, sarkari_daftar, classroom, hospital, bank, police_station, market, gully, chai_tapri, street, bus_stop, park, restaurant, shaadi, gaon, khet, chaupal, handpump, train, bus, auto, car, jail, court, gym.
 - Kuch HOTA hai (koi aata, bhaagta, girta, maarta hai) toh alag line: Naam -> action. Actions: enter left, enter right, exit left fast, exit right fast, fall, faint, jump, slap, push, kick, hug, dance, run, sit, sleep, cry, laugh, facepalm, shock, ride tractor, ride bike, eat, drink, phone_call, hookah.
-- 4-6 bolne wali lines, har line ek saans me (100 akshar se kam). Max 3 log.
+- 5-7 bolne wali lines, max 3 log. Lines ek naap ki nahi: 1-2 lambi (setup ya bhadaas, 150 akshar tak), baaki chhote jab, punch chhota. "Arey", "sun", "matlab" jaise shabd chalte hain; bas bekaar line mat likho.
 
 Comedy kaisi ho:
 - Pehli line me hi problem shuru, koi "hello" nahi; pehli do lines me saaf ho ki kaun kyun wahan hai.

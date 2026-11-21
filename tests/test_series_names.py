@@ -92,7 +92,7 @@ class Kirdaar(unittest.TestCase):
             self.assertTrue(d["boli"], kid)
             a = d["awaaz"]
             self.assertTrue(a["gemini"] and a["andaaz"], kid)
-            self.assertGreater(int(a["rate"].strip("+%")), 0, kid)            # all of them talk fast
+            self.assertGreaterEqual(int(a["rate"].strip("+%")), 0, kid)      # none of them slow (Sultan: unhurried swag)
             voices[kid] = a["gemini"]
             for order in ("HOOK: a\nKIRDAAR: %s\nCAST: A = uncle\nSCENE: room\nA: Haan. | हाँ।\n%s: Na. | ना।\n",
                           "HOOK: b\nKIRDAAR: %s\nSCENE: room\n%s: Na. | ना।\n"):

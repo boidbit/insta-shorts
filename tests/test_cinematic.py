@@ -25,8 +25,10 @@ class Pacing(unittest.TestCase):
         cine, classic = video(), video(True)
         for v, gap in ((cine, scene.TIGHT_GAP), (classic, 0.3)):
             sp = v.parts[-1].plan.speech
-            for a, b in zip(sp, sp[1:]):
-                self.assertAlmostEqual(b["start"] - a["end"], gap - 0.12, delta=0.02)
+            punch = v is cine and len(sp) >= 3          # cine: a breath of silence before the punch line
+            for i, (a, b) in enumerate(zip(sp, sp[1:])):
+                beat = scene.PUNCH_BEAT if punch and i == len(sp) - 2 else 0.0
+                self.assertAlmostEqual(b["start"] - a["end"], gap - 0.12 + beat, delta=0.02)
         self.assertLess(cine.duration, classic.duration)
 
 

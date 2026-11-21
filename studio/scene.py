@@ -765,6 +765,7 @@ TIGHT_GAP = 0.12            # cine: seconds between one line and the next
 TIGHT_END = 0.6             # cine: share of the plain beat after a scene's last line (the reaction shot plays in it)
 TIGHT_TAIL = 0.5            # cine: seconds a scene runs on after everything is over (classic: 0.9)
 TIGHT_HOLD = 0.7            # cine: share of an action's wait (walk in, dance, sit down) before the next line
+PUNCH_BEAT = 0.45           # cine: a breath of silence before a scene's last spoken line (the punch lands)
 BIG_ANIMALS = ("cow", "buffalo", "goat")
 ANIMAL_GAP = 110.0          # px between a big animal's nose and the person it stands by
 
@@ -1297,8 +1298,16 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         voice = prepare_voice([scene], use_tts, tts_provider)[0]
     batch, per_line_edge = voice["paths"], voice["edge"]
 
-    for ti, raw in enumerate(scene.get("timeline", [])):
+    tl_ = scene.get("timeline", [])
+    says_ = [i for i, r in enumerate(tl_) if "say" in r and not r.get("subtitle")]
+    punch_at = says_[-1] if cine and len(says_) >= 3 else None    # the punch line gets a beat before it, unless
+    if punch_at is not None and (tl_[punch_at].get("t") is not None or tl_[punch_at].get("interrupt")
+                                 or (punch_at and "wait" in tl_[punch_at - 1])):    # it cuts in or waits already
+        punch_at = None
+    for ti, raw in enumerate(tl_):
         ev = dict(raw)
+        if ti == punch_at:
+            cursor += PUNCH_BEAT
         t = float(ev["t"]) if "t" in ev and ev["t"] is not None else cursor
         if lead and "t" in ev and ev["t"] is not None and not (float(ev["t"]) == 0.0 and "who" not in ev):
             t += lead                               # (the sound / shake at 0 stays with the hook card)

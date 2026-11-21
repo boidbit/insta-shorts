@@ -539,7 +539,7 @@ Sultan Bhai (akad): Ye Sultan Bhai ka area hai! | ये सुल्तान �
 ```
 
 - Lines me naam likho (`Sultan`, `Sultan Bhai`, `Paglet`, `Doctor Paglet`, `Daddu` sab chalte hain). CAST me jodne ki zarurat nahi.
-- **Pakki boli aur awaaz:** har file me `boli` (AI ko likhne ke liye: Sultan Bambaiya tapori, Paglet tez-excited galat English, Daddu Haryanvi) aur `awaaz` (apni Gemini voice, pitch, speed aur bolne ka andaaz). Teeno tez bolte hain. Chhota prompt, writer prompt aur Builder boli khud AI ko dete hain. Gemini ek video me 2 hi alag voice deta hai, teeno saath hon to teesra pitch se alag hota hai.
+- **Pakki boli aur awaaz:** har file me `boli` (AI ko likhne ke liye: Sultan Bambaiya tapori, Paglet tez-excited galat English, Daddu Haryanvi) aur `awaaz` (apni Gemini voice, pitch, speed aur bolne ka andaaz). Paglet aur Daddu tez bolte hain; Sultan thehri hui akad me (swag jaldi nahi bolta). Chhota prompt, writer prompt aur Builder boli khud AI ko dete hain. Gemini ek video me 2 hi alag voice deta hai, teeno saath hon to teesra pitch se alag hota hai.
 - Builder me Characters ke upar "🧑 Kirdaar" ke checkbox hain. Paste ki hui lines me inka naam ho to box apne aap tick ho jaata hai.
 - Video ke upar "Sultan Bhai × Doctor Paglet • Part 2" jaisa tag aata hai, aur unke hashtag post me jud jaate hain.
 - **Kutte ke 3 angle:** chalte/sunte waqt side se; bolte waqt muh camera ki taraf; apne close-up me (ya `Sultan -> saamne`) poora saamne. `Sultan -> side` = hamesha side. (Purana `CAMERA: classic` me sirf side.)
@@ -547,6 +547,12 @@ Sultan Bhai (akad): Ye Sultan Bhai ka area hai! | ये सुल्तान �
 - `KIRDAAR:` line bhool gaye? Koi baat nahi: lines me `Sultan` / `Paglet` / `Daddu` (ya unke doosre naam) bolte hain aur CAST me nahi hain, to wo apne aap aa jaate hain.
 - Bina CAST ke naam hi kaafi hai: `Bhains:` bhains banti hai (aurat ki awaaz), `Kutta:` kutta, `Billi:` billi, `Mummy:` mummy, `Doctor:` doctor. CAST me likha ho to wahi chalta hai.
 - Naya kirdaar: `kirdaar/` me ek aur file (inhi jaisi).
+
+### 🎭 Dialogue ka vajan
+
+- Prompt ab lines ko ek naap ki nahi rakhta: 1-2 lambi lines (setup ya bhadaas, ~150 akshar tak), beech me chhote jab, punch chhota; poori baat ~500 akshar.
+- "Arey", "sun", "matlab" jaise asli shabd rehne diye jaate hain; sirf bekaar lines kat'ti hain.
+- Naye camera me har scene ki aakhri line (punch) se pehle ~0.45 sec ki chuppi apne aap aati hai, taaki punch land kare (3 ya zyada lines hon tab; `wait` ya beech me kaatne wali line ho to nahi). Classic camera pehle jaisa.
 
 ### CUT ab wahi karta hai jo likha hai 🎥
 
