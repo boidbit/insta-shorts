@@ -200,6 +200,8 @@ ROLE_LOOKS = {
     "thele_wala": "thelewala", "thelawala": "thelewala", "thela_wala": "thelewala", "rehriwala": "thelewala",
     "rehri_wala": "thelewala", "rehdiwala": "thelewala", "chaatwala": "thelewala", "momowala": "thelewala",
     "golgappewala": "thelewala", "panipuriwala": "thelewala", "phalwala": "thelewala", "fruitwala": "thelewala",
+    "bhuttewala": "thelewala", "golawala": "thelewala", "gannewala": "thelewala", "pavbhajiwala": "thelewala",
+    "chholewala": "thelewala",
     "foodblogger": "food_blogger", "food_vlogger": "food_blogger", "foodie": "food_blogger",
     "food_bloggerni": "food_blogger_girl", "vloggerni": "food_blogger_girl", "youtuber_girl": "food_blogger_girl",
     "shopkeeper": "dukaandaar", "dukandar": "dukaandaar", "dukaandar": "dukaandaar", "lala": "dukaandaar",
@@ -1125,6 +1127,11 @@ DESK_PLACES = {"sarkari_daftar": {"id": "desk", "type": "desk", "x": 540, "y": 1
 from .places_plus import SHOPS as SHOP_PLACES   # noqa: E402  (a shop brings its counter: `SCENE: mithai_shop`)
 
 
+# the cart a seller's own role word brings (Golgappewala: the golgappe thela, whatever the lines say)
+ROLE_THELA = {"golgappewala": "thela_golgappe", "panipuriwala": "thela_golgappe", "chaatwala": "thela_chaat",
+              "momowala": "thela_momos", "phalwala": "thela_fruits", "fruitwala": "thela_fruits",
+              "bhuttewala": "thela_bhutta", "golawala": "thela_gola", "gannewala": "thela_ganna",
+              "pavbhajiwala": "thela_pav_bhaji", "chholewala": "thela_chole_bhature"}
 # a seller whose place has no counter of its own brings his stall (thelewala: the one his lines talk about)
 SELLER_STALL = {"kulchewala": "thela_kulche", "chaiwala": "thela_chai", "sabziwala": "thela", "thelewala": None,
                 "halwai": "counter_mithai", "dukaandaar": "counter", "chemist": "counter_medical"}
@@ -1236,8 +1243,8 @@ def bring_stalls(scenes, cast):
                     sc["lines"].insert(0, ("obj", park({"kind": talked, "at": "center", "auto": True})))
             continue
         kind = SELLER_STALL[cast[seller]["look"]]
-        if kind is None:                            # thelewala: what do the lines talk about? (chaat, momos...)
-            kind = talked or "thela"
+        if kind is None:                            # thelewala: his role (golgappewala), else what the lines talk about
+            kind = ROLE_THELA.get(cast[seller].get("role")) or talked or "thela"
         for sc in shots:
             sc["lines"].insert(0, ("obj", park({"kind": kind, "at": "center", "auto": True})))
 
