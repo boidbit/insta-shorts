@@ -1146,6 +1146,25 @@ def _seller_of(names, place, cast):
     return None
 
 
+# out in the open, where a cart the lines talk about can stand (no counter of the place's own)
+STALL_PLACES = {"street", "gully", "bus_stop", "festival_street", "night_road", "park", "gaon", "chaupal", "handpump",
+                "school_ground", "railway", "beach", "mountain_road", "cricket_ground", "khet", "school", "signal",
+                "petrol_pump"}
+STALL_PHRASES = {"pani puri": "pani_puri", "paani puri": "pani_puri", "gol gappe": "golgappe", "gol gappa": "golgappe",
+                 "pav bhaji": "pav_bhaji", "chole bhature": "chole_bhature", "barf ka gola": "barf_gola",
+                 "matar kulche": "matar_kulche"}
+STALL_ALIASES = {"golgappon": "golgappe", "golgappey": "golgappe", "paanipuri": "panipuri", "puchke": "puchka",
+                 "gupchup": "golgappe", "momo": "momos", "kulchon": "kulche", "bhutte": "bhutta"}
+
+
+def _stall_words(text):
+    """The words of the lines, with "pani puri" / "pav bhaji" joined and other spellings mapped (golgappon)."""
+    t = text.lower()
+    for a, b in STALL_PHRASES.items():
+        t = t.replace(a, b)
+    return [STALL_ALIASES.get(w, w) for w in re.findall(r"[a-z_]+", t)]
+
+
 def bring_stalls(scenes, cast):
     """A place with a seller is one fixed set, filmed by the studio:
     - the CUTs a writer put into a conversation across a counter are taken out (the studio cuts it like a film
@@ -1154,6 +1173,11 @@ def bring_stalls(scenes, cast):
       kulchewala without a thela is just a man in a lane), parked by the side of the road, not in the middle.
     Not where the place has its own counter (chai_tapri, kirana, market...), in the shops or inside a vehicle."""
     from . import counters
+    cast = dict(cast)                               # a speaker with no CAST line: their own name decides
+    for sc in scenes:                               # (Golgappewala: a thelewala)
+        for ln in sc["lines"]:
+            if ln[0] in ("say", "do") and ln[1] not in cast and ln[1] not in ("NARRATOR", "ALL") and name_words(ln[1]):
+                cast[ln[1]] = cast_spec(name_words(ln[1]), 0)
     groups = {}
     for sc in scenes:
         groups.setdefault(sc.get("place_no", id(sc)), []).append(sc)
@@ -1204,13 +1228,16 @@ def bring_stalls(scenes, cast):
                 if not counter_line(sc):
                     sc["lines"].insert(0, ("obj", dict(keep)))
             continue
+        said = _stall_words(" ".join(str(ln[3]) for sc in shots for ln in sc["lines"] if ln[0] == "say" and len(ln) > 3))
+        talked = next((objects.thela_kind(w) for w in said if objects.thela_kind(w)), None)
         if seller is None or cast[seller].get("look") not in SELLER_STALL:
+            if talked and talked != "thela_chai" and place in STALL_PLACES:
+                for sc in shots:                    # nobody sells, but they talk about golgappe in the lane: the cart
+                    sc["lines"].insert(0, ("obj", park({"kind": talked, "at": "center", "auto": True})))
             continue
         kind = SELLER_STALL[cast[seller]["look"]]
         if kind is None:                            # thelewala: what do the lines talk about? (chaat, momos...)
-            said = " ".join(str(ln[3]) for sc in shots for ln in sc["lines"] if ln[0] == "say" and len(ln) > 3)
-            kind = next((objects.thela_kind(w) for w in re.findall(r"[a-z_]+", said.lower())
-                         if objects.thela_kind(w)), "thela")
+            kind = talked or "thela"
         for sc in shots:
             sc["lines"].insert(0, ("obj", park({"kind": kind, "at": "center", "auto": True})))
 
@@ -1544,13 +1571,17 @@ def _kirdaar_list():
     return out
 
 
+PLAIN_NAME_LOOKS = {"ladki": ["college_girl"], "ladka": ["college_boy"], "aurat": ["aunty"], "aadmi": ["uncle"],
+                    "girl": ["college_girl"], "boy": ["college_boy"], "larki": ["college_girl"], "larka": ["college_boy"]}
+
+
 def name_words(name):
     """The cast words a speaker's own name gives when no CAST line casts them: `Bhains:` is a buffalo, `Kutta:` a
     dog, `Mummy:` the aunty look, `Doctor:` a doctor. Any other name: nothing (a plain person)."""
     low = name.strip().lower()
     if low in ANIMAL_WORDS or low in ROLE_LOOKS or low in LOOKS:
         return [low]
-    return []
+    return list(PLAIN_NAME_LOOKS.get(low, []))
 
 
 def apply_kirdaar(text):

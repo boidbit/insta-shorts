@@ -174,6 +174,27 @@ class NoCastNeeded(unittest.TestCase):
         self.assertNotIn("series", sc)
 
 
+class StallFromTheLines(unittest.TestCase):
+    """The cart the lines talk about stands in the lane, with or without a seller in the CAST."""
+
+    def objs(self, text):
+        sc, w = parse_script(text)
+        self.assertEqual(w, [])
+        return sc, [e["obj"].get("kind") for e in sc["scenes"][0]["timeline"] if isinstance(e.get("obj"), dict)]
+
+    def test_golgappe(self):
+        for who, place, line in (("Golgappewala", "gully", "Golgappe khilao!"), ("Bhaiya", "gully", "Bhaiya, golgappe do!"),
+                                 ("Bhaiya", "street", "Pani puri do bhaiya!"), ("Bhaiya", "park", "Do plate gol gappe!")):
+            sc, objs = self.objs("HOOK: x\nSCENE: %s\nLadki (khush): %s | अ\n%s (hasi): Teekha? | तीखा?\n"
+                                 "Ladki: Haan. | हाँ।\n" % (place, line, who))
+            self.assertEqual(objs, ["thela_golgappe"], (who, place, line))
+            self.assertEqual(sc["characters"]["Ladki"]["look"], "college_girl")
+
+    def test_not_indoors_and_not_for_a_cup_of_chai(self):
+        for place, line in (("room", "Golgappe mat khana!"), ("gully", "Chai piyoge?")):
+            self.assertEqual(self.objs("HOOK: x\nSCENE: %s\nMummy: %s | अ\nBeta: Haan. | हाँ।\n" % (place, line))[1], [])
+
+
 class DogAngles(unittest.TestCase):
     def spot(self, view, acc=()):
         spec = {"kind": "dog", "pose_view": view, "accessories": list(acc)}
