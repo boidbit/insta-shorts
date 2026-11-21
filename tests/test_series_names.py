@@ -87,7 +87,7 @@ class Kirdaar(unittest.TestCase):
 
     def test_own_voice_and_boli_every_episode(self):
         voices = {}
-        for kid in ("sultan", "paglet", "daddu"):
+        for kid in ("sultan", "paglet", "daddu", "reelesh"):
             d = script.load_kirdaar(kid)
             self.assertTrue(d["boli"], kid)
             a = d["awaaz"]
@@ -99,7 +99,8 @@ class Kirdaar(unittest.TestCase):
                 sc, w = parse_script(order % (d["name"], d["name"]))
                 v = sc["characters"][d["name"]]["voice"]
                 self.assertEqual((v["gemini"], v["pitch"], v["rate"]), (a["gemini"], a["pitch"], a["rate"]), kid)
-        self.assertEqual(len(set(voices.values())), 3)                          # three different voices
+        self.assertEqual(len(set(voices.values())), 4)                          # four different voices
+        self.assertNotIn("Puck", voices.values())                               # (Puck: every plain man's voice)
 
     def test_the_manner_goes_to_gemini(self):
         from studio import gemini_tts
@@ -241,7 +242,8 @@ class Page(unittest.TestCase):
         for needle in ("function suggestAnimalActs", "const lineAnimal", "lineAnimal(it))"):
             self.assertIn(needle, s)
         vocab = json.loads(re.search(r'<script type="application/json" id="vocab">(.*?)</script>', s, re.S).group(1))
-        self.assertEqual({k["id"]: k["animal"] for k in vocab["kirdaar"]}, {"sultan": "dog", "paglet": None, "daddu": None})
+        self.assertEqual({k["id"]: k["animal"] for k in vocab["kirdaar"]},
+                         {"sultan": "dog", "paglet": None, "daddu": None, "reelesh": None})
 
     def test_the_short_prompt(self):
         with open(os.path.join(ROOT, "SHORT_PROMPT.md"), encoding="utf-8") as f:
@@ -249,7 +251,7 @@ class Page(unittest.TestCase):
         self.assertIn("| wahi line Devanagari me", text)
         self.assertIn("Sultan, Paglet, Daddu", text)
         self.assertTrue(text.rstrip().endswith("Mera idea:"))
-        self.assertLess(len(text), 3000)
+        self.assertLess(len(text), 3300)                       # (still about one-eighth of the full prompt)
         self.assertIn('id="copyShort"', page())
         self.assertIn('fetch("SHORT_PROMPT.md"', page())
 
@@ -257,7 +259,7 @@ class Page(unittest.TestCase):
         s = page()
         vocab = json.loads(re.search(r'<script type="application/json" id="vocab">(.*?)</script>', s, re.S).group(1))
         self.assertEqual(sorted(x["id"] for x in vocab["series"]), ["office_gang", "sharma_parivar"])
-        self.assertEqual(sorted(x["id"] for x in vocab["kirdaar"]), ["daddu", "paglet", "sultan"])
+        self.assertEqual(sorted(x["id"] for x in vocab["kirdaar"]), ["daddu", "paglet", "reelesh", "sultan"])
         for needle in ("function seriesBox", "function kirdaarBox", "function kirdaarPick", "function extrasPicker",
                        "🎒 Haath me", "🔊 Awaaz", "✨ Effect"):
             self.assertIn(needle, s)
