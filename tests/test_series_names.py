@@ -117,8 +117,9 @@ class Kirdaar(unittest.TestCase):
         with open(os.path.join(ROOT, "SCRIPT_PROMPT.md"), encoding="utf-8") as f:
             module = director.prompt_text(f.read(), keep=("series",))
         for text in (short, module):
-            for w in ("apun", "Haryanvi", "tension ka virus"):
+            for w in ("apun", "Haryanvi", "1-2"):              # a flavour, not a word list stuffed into every line
                 self.assertIn(w, text)
+        self.assertNotIn("bhai log, kya re, hafta", short + module)
 
     def test_a_kirdaar_look_is_never_recoloured(self):
         sc, w = parse_script("HOOK: x\nSCENE: chaupal\nSultan: Kya re! | क्या रे!\nPaglet: Injection! | इंजेक्शन!\n"
