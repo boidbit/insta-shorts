@@ -405,6 +405,8 @@ def cast_spec(words, index, unknown=None):
             spec["role"] = w
         elif w in BEHIND_WORDS:                        # peeche: behind the nearest counter / thela; aage: in front
             spec["behind"] = BEHIND_WORDS[w]
+        elif w == "pakka":                             # a kirdaar: the look is never varied
+            spec["fixed"] = True
         elif w in ACCESSORIES:
             acc.append(w)
         elif w in ACCESSORY_WORDS:                     # gold_chain, pagla_chashma...
@@ -498,7 +500,7 @@ def vary_faces(cast):
     or the look already says is kept. (`CAMERA: classic`: not used, the faces stay as they were.)"""
     i = 0
     for name, spec in cast.items():
-        if spec.get("hidden") or spec.get("kind"):
+        if spec.get("hidden") or spec.get("kind") or spec.get("fixed"):
             continue
         look = spec.get("look", "boy")
         base = LOOKS.get(look, {})
@@ -532,7 +534,7 @@ def vary_bodies(cast):
     (uncle chubby, dada slim) keeps it and only gets a height; children and the old keep their size."""
     used = []
     for name, spec in cast.items():
-        if spec.get("hidden") or spec.get("kind"):
+        if spec.get("hidden") or spec.get("kind") or spec.get("fixed"):
             continue
         base = LOOKS.get(spec.get("look", "boy"), {})
         fixed_build = "build" in spec or "build" in base
@@ -559,8 +561,14 @@ def vary_cast(cast):
     skin tone, unless the script chose them. Only what the script left open is changed."""
     seen = {}                                   # look -> [(hair, skin), ...] already on screen
     colors = []                                 # shirt colours already on screen
+    for spec in cast.values():                  # a kirdaar's look is fixed: the others make way for it
+        if spec.get("fixed") and not spec.get("kind"):
+            base = LOOKS.get(spec.get("look", "boy"), {})
+            seen.setdefault(spec.get("look", "boy"), []).append((spec.get("hair", base.get("hair")),
+                                                                 spec.get("skin", base.get("skin"))))
+            colors.append(spec.get("color", base.get("color", "blue")))
     for name, spec in cast.items():
-        if spec.get("hidden") or spec.get("kind"):    # a voice / an animal: nothing to vary
+        if spec.get("hidden") or spec.get("kind") or spec.get("fixed"):    # a voice / an animal / a kirdaar
             continue
         look = spec.get("look", "boy")
         base = LOOKS.get(look, {})
@@ -1554,17 +1562,18 @@ def apply_kirdaar(text):
     if not m:                                   # no KIRDAAR line: a kirdaar who speaks by name (and is not in
         cl = re.search(r"^\s*CAST\s*:\s*(.*)$", text, re.M | re.I)    # the CAST) comes in all the same
         cast_names = {p_.split("=")[0].strip().lower() for p_ in cl.group(1).split(",") if "=" in p_} if cl else set()
-        spoke = []
+        spoke = []                              # (first line, name): in the order they first speak
         for k in _kirdaar_list():
             names = [k["name"]] + k["also"]
             if any(n.lower() in cast_names for n in names):
                 continue
             pat = r"^\s*(%s)\s*(?:\(|:|->)" % "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True))
-            if re.search(pat, text, re.M | re.I):
-                spoke.append(k["name"])
+            hit = re.search(pat, text, re.M | re.I)
+            if hit:
+                spoke.append((hit.start(), k["name"]))
         if not spoke:
             return text, None, []
-        text = "KIRDAAR: %s\n%s" % (", ".join(spoke), text)
+        text = "KIRDAAR: %s\n%s" % (", ".join(n for _p, n in sorted(spoke)), text)
         m = KIRDAAR_RE.search(text)
     body = m.group(1)
     part = None
@@ -1591,7 +1600,7 @@ def apply_kirdaar(text):
         pat = r"^(\s*)(%s)(\s*(?:\(|:|->))" % "|".join(re.escape(a) for a in sorted(aliases, key=len, reverse=True))
         text = re.sub(pat, lambda m_: m_.group(1) + key + m_.group(3), text, flags=re.M | re.I)
         if key.lower() not in have:
-            extra.append("%s = %s" % (key, series_words("kirdaar_" + d["id"], key, d["words"])))
+            extra.append("%s = %s pakka" % (key, series_words("kirdaar_" + d["id"], key, d["words"])))
     add = []
     if extra and cl:
         cl = re.search(r"^\s*CAST\s*:\s*(.*)$", text, re.M | re.I)

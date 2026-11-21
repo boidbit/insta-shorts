@@ -120,6 +120,16 @@ class Kirdaar(unittest.TestCase):
             for w in ("apun", "Haryanvi", "tension ka virus"):
                 self.assertIn(w, text)
 
+    def test_a_kirdaar_look_is_never_recoloured(self):
+        sc, w = parse_script("HOOK: x\nSCENE: chaupal\nSultan: Kya re! | क्या रे!\nPaglet: Injection! | इंजेक्शन!\n"
+                             "Daddu: Chhore! | छोरे!\n")
+        self.assertEqual(w, [])
+        for name in ("Paglet", "Daddu"):
+            spec = sc["characters"][name]
+            self.assertTrue(spec.get("fixed"), name)
+            self.assertNotIn("color", spec, name)                   # the look's own white coat / kurta
+        self.assertEqual(sc["series"]["title"], "Sultan Bhai × Doctor Paglet × Dada Daddu")   # speaking order
+
     def test_unknown_kirdaar_says_so(self):
         sc, w = parse_script("HOOK: x\nKIRDAAR: Gabbar\nCAST: A = uncle\nSCENE: room\nA: Haan. | हाँ।\n")
         self.assertTrue(any("Gabbar" in x for x in w))
