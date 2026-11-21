@@ -190,6 +190,19 @@ class StallFromTheLines(unittest.TestCase):
             self.assertEqual(objs, ["thela_golgappe"], (who, place, line))
             self.assertEqual(sc["characters"]["Ladki"]["look"], "college_girl")
 
+    def test_the_seller_role_brings_its_own_cart(self):
+        for role, kind in (("golgappewala", "thela_golgappe"), ("momowala", "thela_momos"), ("bhuttewala", "thela_bhutta"),
+                           ("chaatwala", "thela_chaat")):
+            sc, objs = self.objs("HOOK: x\nCAST: L = college_girl, B = %s\nSCENE: street\nL: Ek plate! | एक प्लेट!\n"
+                                 "B: Lo. | लो।\n" % role)
+            self.assertEqual(objs, [kind], role)
+
+    def test_the_page_picker_has_the_carts_once(self):
+        s = page()
+        for needle in ("function rolePicker", "function uniqueRoles", "function roleMatches", "🛒 Thele aur dukaan",
+                       'golgappewala: "golgappe"'):
+            self.assertIn(needle, s)
+
     def test_not_indoors_and_not_for_a_cup_of_chai(self):
         for place, line in (("room", "Golgappe mat khana!"), ("gully", "Chai piyoge?")):
             self.assertEqual(self.objs("HOOK: x\nSCENE: %s\nMummy: %s | अ\nBeta: Haan. | हाँ।\n" % (place, line))[1], [])
