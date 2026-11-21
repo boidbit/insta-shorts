@@ -530,6 +530,7 @@ Har pakka character ki apni file `kirdaar/<naam>.json` me hai: look, aadat, pakk
 | **Sultan** (Sultan Bhai) | brown kutta, kaala chashma, sone ki chain, ulti laal topi | gully ka don, sab pe akad; injection se darta hai |
 | **Paglet** (Doctor Paglet) | bikhre safed baal, tedha tuta chashma, maathe pe patti, gale me stethoscope, haath me injection | har ilaaj: "Injection lagega!" |
 | **Daddu** (Dada Daddu) | dada, gamchha, mooch, lathi | "mhare zamane me..." (Haryanvi), aakhri twist unka |
+| **Reelesh** (Reelesh Kumar) | influencer, neeli tshirt, dadhi, kaala chashma, vlog camera | "Ruko! Ye toh content hai!" / "Viral bukhaar chal raha hai!"; 47 followers, papa se darr |
 
 ```
 HOOK: Sultan ka toll tax 🐕
