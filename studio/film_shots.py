@@ -156,7 +156,9 @@ def _shot(kind, t0, t1, t, c, lst, people, plan):
     else:
         look.update(view="front", turn34=1.0)         # three-quarter: the face turned well towards the listener
     ov[c.name] = look
-    extra = dict(blur=True, mirror=right_one, soft=True)
+    from .scene import WRITTEN_PLACES
+    written = (getattr(plan, "background", None) or {}).get("type") in WRITTEN_PLACES
+    extra = dict(blur=True, mirror=right_one and not written, soft=True)   # (a sign would read backwards)
     if kind == "ots" and not lst.spec.get("kind"):
         z = min(2.0, max(1.35, 1920.0 * 0.40 / (0.55 * 807.0 * sk)))
         vw, vh = 1080.0 / z, 1920.0 / z
