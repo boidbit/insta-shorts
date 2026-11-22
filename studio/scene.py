@@ -522,6 +522,13 @@ def _norm_who(who, names):
     return list(who)
 
 
+def voice_feel(ev):
+    """The feeling the voice takes: with two ("shout, angry") the one that is heard, else the face's."""
+    two = ev.get("voice_feel") or []
+    from .script import VOICE_FEEL
+    return next((w for w in two if w in VOICE_FEEL), two[-1] if two else ev.get("expression"))
+
+
 def collect_lines(scene):
     """Every line of one scene that needs a voice, in speaking order, for the Gemini batch."""
     cdefs = scene.get("characters", {})
@@ -538,7 +545,8 @@ def collect_lines(scene):
         v = dict(v) if isinstance(v, dict) else {"name": v}
         v.update(raw.get("voice", {}) if isinstance(raw.get("voice"), dict) else {})
         out.append(dict(ti=ti, text=text, voice=gemini_tts.voice_for(v), pitch=v.get("pitch"), rate=v.get("rate"),
-                        who=who[0], spec=v, expression=raw.get("expression") or raw.get("emotion")))
+                        who=who[0], spec=v, expression=voice_feel(raw) or raw.get("emotion"),
+                        feel=raw.get("voice_feel")))
     return out
 
 
@@ -1399,7 +1407,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             elif per_line_edge and ev.get("tts", True):
                 rate, pitch = v.get("rate", "+0%"), v.get("pitch", "+0Hz")
                 if meta.get("emotion_voice", True):  # an angry line comes faster, a sad one slower and lower...
-                    d_rate, d_pitch = audio.EMOTION_VOICE.get(ev.get("expression") or c.state_at(t)["expression"],
+                    d_rate, d_pitch = audio.EMOTION_VOICE.get(voice_feel(ev) or c.state_at(t)["expression"],
                                                               (0, 0))
                     rate, pitch = audio.shift_value(rate, d_rate, "%"), audio.shift_value(pitch, d_pitch, "Hz")
                 path = audio.synth_tts(speak, v.get("name"), rate, pitch)
@@ -1432,6 +1440,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 sp["frozen"] = True
             c.speech.append(sp)
             plan.speech.append(sp)
+            if ev.get("expr_then") and frz is None:  # two feelings: the face changes about half-way through
+                c.events.append({"t": t + max(0.5, dur * 0.45), "expression": ev["expr_then"]})
             if ev.get("action") in BURST_ACTIONS and dur > BURST_ACTIONS[ev["action"]] + 0.4:
                 settle = {"t": t + BURST_ACTIONS[ev["action"]], "action": "idle", "_settle_from": t}
                 if ev.get("on"):

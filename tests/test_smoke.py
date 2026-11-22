@@ -88,7 +88,7 @@ class ScriptTests(unittest.TestCase):
                "CAST: A = college_boy poor [tshirt], B = college_girl rich [pink, saree, earrings]\n"
                "A (Aalu khareedne aaye ho?): Aalu khareedne aaye ho? | आलू खरीदने आए हो?\n"
                "A -> point | shock\n"
-               "B -> wink | smile\n"
+               "B -> wink | smile sad\n"
                "C (smile): Main kaun? | मैं कौन?\n"
                "CTA: Tag karo\n")
         scene, warnings = script.parse_script(bad)
@@ -96,7 +96,7 @@ class ScriptTests(unittest.TestCase):
         self.assertIn("'poor'", text)
         self.assertIn("'rich'", text)
         self.assertIn("brackets me dialogue", text)
-        self.assertIn("'wink'", text)                      # two expressions on one line
+        self.assertIn("'sad'", text)                       # three expressions on one line (two are fine)
         self.assertNotIn("'point'", text)                  # point + shock = action + face, fine
         self.assertIn("C CAST me nahi hai", text)
         self.assertEqual(scene["characters"]["A"]["outfit"], "tshirt")
