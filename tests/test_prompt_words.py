@@ -78,8 +78,8 @@ class PromptWordTests(unittest.TestCase):
 
     def test_places_times_weather(self):
         places = words(line("- Places: ").split("(street and")[0]) + words(line("- Village places: ").split("(gaon")[0])
-        photos = {(c.get("words") or [st])[0] for st, c in script.image_places().values()}    # clinic, podcast
-        self.assertEqual(sorted(places), sorted(set(script.BACKGROUNDS) | photos))
+        photos = set(script.image_places())                       # the photo places may be named too
+        self.assertEqual(sorted(set(places) - photos), sorted(script.BACKGROUNDS))
         for w in ("day", "night", "evening", "sunset", "dawn", "rain", "fog", "snow", "fireflies", "leaves"):
             self.assertIn(w, script.TIMES + script.WEATHER)
 

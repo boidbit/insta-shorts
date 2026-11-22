@@ -1,10 +1,10 @@
 {
-  "name": "Podcast studio",
+  "name": "Podcast studio (photo)",
   "words": [
-    "podcast",
+    "podcast_photo",
     "podcast_studio",
-    "studio",
-    "gappcast"
+    "studio_photo",
+    "podcast_asli"
   ],
   "people_scale": 1.0,
   "spots": [

@@ -1124,6 +1124,8 @@ PLACE_WORDS = {"sweet_shop": "mithai_shop", "halwai_shop": "mithai_shop", "mitha
 # places that come with a piece of their own: the babu's desk (with its files), the lane's hand pump
 DESK_PLACES = {"sarkari_daftar": {"id": "desk", "type": "desk", "x": 540, "y": 1640, "auto": True,
                                   "items": ["files", "register", "thappa"]},
+               "clinic": {"id": "desk", "type": "desk", "x": 780, "y": 1470, "scale": 1.0, "auto": True,
+                          "items": ["register", "pen_stand", "bottle"]},
                "handpump": {"id": "handpump", "type": "handpump", "x": 170, "y": 1630, "auto": True}}
 from .places_plus import SHOPS as SHOP_PLACES   # noqa: E402  (a shop brings its counter: `SCENE: mithai_shop`)
 
@@ -1272,8 +1274,26 @@ def image_places():
     return out
 
 
+# where people sit / stand in the drawn places made for the kirdaar (the same form as a photo place's config):
+# the clinic's doctor behind his desk (a set piece: it stands in front of him) and the patient on a chair, the
+# podcast's host and guest in the painted armchairs
+PLACE_SPOTS = {
+    "clinic": {"people_scale": 1.0, "spots": [
+        {"id": "doctor", "x": 790, "y": 1390, "k": 0.96, "sit": True, "facing": "left",
+         "for": ["doctor", "pagla_doctor", "nurse", "chemist"]},
+        {"id": "patient", "x": 215, "y": 1580, "k": 1.04, "sit": True, "facing": "right", "show_seat": True},
+        {"id": "stand", "x": 520, "y": 1700, "k": 1.1, "sit": False, "facing": "right"}]},
+    "podcast": {"people_scale": 1.0, "spots": [
+        {"id": "host", "x": 170, "y": 1480, "k": 0.98, "sit": True, "facing": "right", "for": ["podcaster", "influencer"]},
+        {"id": "guest", "x": 910, "y": 1480, "k": 0.98, "sit": True, "facing": "left"},
+        {"id": "stand", "x": 540, "y": 1720, "k": 1.1, "sit": False, "facing": "front"}]},
+}
+
+
 def place_config(bg):
-    """The config of a photo place (see image_places), or None."""
+    """The config of a photo place (see image_places) or of a drawn place with its own spots, or None."""
+    if isinstance(bg, dict) and bg.get("type") in PLACE_SPOTS:
+        return PLACE_SPOTS[bg["type"]]
     if not isinstance(bg, dict) or bg.get("type") != "image":
         return None
     stem = os.path.splitext(os.path.basename(str(bg.get("path", ""))))[0]
@@ -2213,7 +2233,7 @@ def _parse_script(text):
                     sid = "seat_" + re.sub(r"\W", "", name.lower())
                     sc.setdefault("sets", {})[sid] = {"id": sid, "type": "chair", "x": float(spot["x"]),
                                                       "y": float(spot["y"]), "scale": float(spot.get("k", 1.0)),
-                                                      "hidden": True}
+                                                      "hidden": not spot.get("show_seat")}
                     seated[name] = sid
                     tl.append({"t": 0.0, "who": name, "action": "sit", "on": sid})
         tl.append({"wait": 0.3 if si == 0 else 0.2})

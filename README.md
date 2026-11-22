@@ -550,10 +550,15 @@ Sultan Bhai (akad): Ye Sultan Bhai ka area hai! | ये सुल्तान �
 - Bina CAST ke naam hi kaafi hai: `Bhains:` bhains banti hai (aurat ki awaaz), `Kutta:` kutta, `Billi:` billi, `Mummy:` mummy, `Doctor:` doctor. CAST me likha ho to wahi chalta hai.
 - Naya kirdaar: `kirdaar/` me ek aur file (inhi jaisi).
 
+### 🩺 Paglet ka clinic aur 🎙️ podcast studio (2D + 2.5D)
+
+- `SCENE: clinic`: **Doctor Paglet ka clinic**, studio ke apne style me (DR. PAGLET M.B.B.S. (Try kiya) ka board, dawaiyon ki almaari, anatomy chart, khula darwaza). Doctor (Paglet / koi bhi doctor) table ke peeche baithta hai, table uske aage; mareez kursi pe; teesra khada. 2.5D me darwaze ki dhoop me dhool, tube light ki timtimahat.
+- `SCENE: podcast`: **Gappcast studio** (neon mic, GAPPCAST, ON AIR light, do armchair, gol table pe mic). Host (Gappu / podcaster) peeli kursi, mehmaan neeli kursi pe; teesra beech me khada. 2.5D me neon ka dhadakna, ON AIR blink.
+- Din / raat / baarish jaise baaki jagahon me chalte hain (`SCENE: clinic night`).
+
 ### 📸 Photo wali jagah (asli photo, kirdaar fit)
 
-- `SCENE: clinic` (ya dawakhana): **Doctor Paglet ka clinic**. Doctor (Paglet / koi bhi doctor) table ke peeche kursi pe baithta hai, table uske aage aati hai; mareez kursi pe; teesra khada.
-- `SCENE: podcast` (ya gappcast): **podcast studio**. Host (Gappu / podcaster) left ki kursi, mehmaan right ki kursi pe; teesra beech me khada.
+- `SCENE: clinic_photo` aur `SCENE: podcast_photo`: tumhari bheji photo wale version, wahi baithne ki jagah.
 - Nayi photo jagah: `assets/backgrounds/<naam>.jpg` (9:16) aur saath me `<naam>.json`: `words` (script me kis naam se), `people_scale`, `spots` (har jagah ka x, y, size `k`, `sit`, `facing`, aur kiske liye `for`), `front` (photo ki jo cheez kirdaar ke aage aaye, uski outline aur gehraai). Inhi do jaisi.
 
 ### 🎥 Film camera (naya default)

@@ -809,6 +809,8 @@ PRESETS = {
     "handpump_25d": _lazy("scenery_gaon", "handpump_25d"),
     "kachcha_ghar_25d": _lazy("scenery_gaon", "kachcha_ghar_25d"),
     "gaon_school_25d": _lazy("scenery_gaon", "gaon_school_25d"),
+    "clinic_25d": _lazy("scenery_studio", "clinic_25d"),
+    "podcast_25d": _lazy("scenery_studio", "podcast_25d"),
 
     "kitchen_25d": _lazy("scenery_kitchen", "kitchen_25d"),
     "gali_25d": _lazy("scenery_gali", "gali_25d"),

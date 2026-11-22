@@ -88,6 +88,8 @@ PLACES_25D = {
     "handpump": "handpump_25d",
     "kachcha_ghar": "kachcha_ghar_25d",
     "gaon_school": "gaon_school_25d",
+    "clinic": "clinic_25d",
+    "podcast": "podcast_25d",
 }
 # sets that light themselves for the scene's time (a vehicle's view is re-lit by the vehicle engine, its inside keeps
 # its own lights): no re-grading on top
@@ -96,7 +98,7 @@ OWN_TIME = {"train_25d", "bus_25d", "metro_25d", "plane_25d", "car_25d", "auto_2
                          "auto_pov", "auto_mirror")}
 # sets with writing on them (shop signs, menus, boards) are never mirrored for a reverse shot (the text would read
 # backwards). The 2d look mirrors every place, as it always has.
-NO_MIRROR = {"ghar_darwaza_25d", "lift_25d", "atm_25d", "petrol_pump_25d", "signal_25d", "buffet_25d",
+NO_MIRROR = {"clinic_25d", "podcast_25d", "ghar_darwaza_25d", "lift_25d", "atm_25d", "petrol_pump_25d", "signal_25d", "buffet_25d",
              "restaurant_25d", "interview_room_25d", "call_center_25d", "startup_office_25d", "park_25d", "sarkari_daftar_25d", "chaupal_25d", "gaon_school_25d",
              "gali_25d", "classroom_25d", "office_25d", "meeting_25d", "street_25d", "busstop_25d", "market_25d",
              "festival_25d", "railway_25d", "street_road_25d", "busstop_road_25d", "hospital_25d", "bank_25d",
@@ -160,7 +162,7 @@ NATIVE_TIME = {"kitchen_25d": "day", "gali_25d": "sunset", "diwali_rooftop": "ni
                "petrol_pump_25d": "day", "signal_25d": "day", "buffet_25d": "night", "restaurant_25d": "evening",
                "interview_room_25d": "day", "call_center_25d": "night", "startup_office_25d": "day",
                "sarkari_daftar_25d": "day", "khet_25d": "day", "chaupal_25d": "day", "handpump_25d": "day",
-               "kachcha_ghar_25d": "day", "gaon_school_25d": "day"}
+               "kachcha_ghar_25d": "day", "gaon_school_25d": "day", "clinic_25d": "day", "podcast_25d": "night"}
 
 
 def normalize(value):
