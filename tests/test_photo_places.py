@@ -108,3 +108,19 @@ class PhotoPlaces(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SeatedFacingLeft(unittest.TestCase):
+    def test_the_knees_point_where_the_face_does(self):
+        """A side pose made for the left (sitting) was turned twice in the side view: the face left, the knees
+        right (Daddu in the podcast's right chair)."""
+        from studio import actions
+        from studio.characters import build_character, resolve_spec
+        for facing, sgn in (("left", -1), ("right", 1)):
+            pose = actions.pose_for("sit", 0.5, 1.0, 1.0, 0.0, {"_facing": facing, "_dir": sgn})
+            spec = resolve_spec({"look": "dada", "view": "side", "facing": facing})
+            ops, an = build_character(spec, pose, "neutral", 0.0, 1.0, 500, 1500, 1.0)
+            xs = [x for op in ops for x, y in op["pts"] if y > 1350]          # the lap and legs, below the hips
+            reach = max(xs) - 500 if sgn > 0 else 500 - min(xs)
+            back = 500 - min(xs) if sgn > 0 else max(xs) - 500
+            self.assertGreater(reach, back + 60, facing)

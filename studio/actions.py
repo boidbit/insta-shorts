@@ -490,6 +490,7 @@ def _side(d, pose):
             out[k] = [(nm, _LR.get(h, h)) for nm, h in v]
         else:
             out[k] = v
+    out["_mirrored"] = not pose.get("_mirrored")    # (the side view draws a right-facing pose and turns it itself)
     return out
 
 

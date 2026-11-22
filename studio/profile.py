@@ -19,6 +19,9 @@ def draw_side(o, p, cols, expr, mouth_open, t, x0, ground_y, k, blink=False, pro
               tear_phase=0.0, f=1):
     """(ops, anchors) of the person `o` (resolved spec) seen from the side, facing right (f=1) or left (f=-1)."""
     f = 1 if f >= 0 else -1
+    if p.get("_mirrored"):                     # a side pose already turned to the left (sitting, lying...): back to
+        from .actions import _side             # the right-facing one, this drawing turns it by f (not twice)
+        p = _side(-1, p)
     outfit = o.get("outfit", "tshirt")
     build = o.get("build", "normal")
     bw, belly = BUILDS.get(build, BUILDS["normal"])
