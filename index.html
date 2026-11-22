@@ -108,7 +108,10 @@
           text-align: left; padding: 0; font: inherit; color: var(--ink); }
   .reel img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; display: block; background: var(--line); }
   .reel span { display: block; padding: 6px 8px; font-size: 13px; line-height: 1.3; }
-  .gallery.short .reel:nth-child(n+7) { display: none; }
+  .reel { position: relative; }
+  .reel .del { position: absolute; top: 6px; right: 6px; width: 36px; height: 36px; border-radius: 999px; border: none;
+               background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 17px; cursor: pointer; padding: 0; }
+  .reel .del:hover { background: rgba(200, 40, 40, 0.9); }
   #more { margin-top: 12px; width: 100%; }
   details.setup summary { cursor: pointer; font-weight: 600; }
   .setup ol { padding-left: 20px; margin: 8px 0; font-size: 14px; }
@@ -497,7 +500,8 @@
 
   <section class="card">
     <h2>📼 Pichli reels</h2>
-    <div class="gallery short" id="gallery"><p class="hint">Load ho raha hai…</p></div>
+    <p class="hint" id="galleryCount"></p>
+    <div class="gallery" id="gallery"><p class="hint">Load ho raha hai…</p></div>
     <button class="small hidden" id="more" type="button">Aur reels dikhao ⬇️</button>
   </section>
 </main>
@@ -1560,7 +1564,9 @@ function follow(rid, stage, startedAt) {
   tick();
 }
 
+let currentRelease = null;
 function showRelease(rel) {
+  currentRelease = rel;
   const assets = rel.assets || [];
   const pngs = Object.fromEntries(assets.filter((a) => a.name.endsWith(".png")).map((a) => [a.name.replace(/\.png$/, ""), a]));
   const vids = assets.filter((a) => a.name.endsWith(".mp4"))
@@ -1584,6 +1590,14 @@ function showRelease(rel) {
       : "🔊 Sound ke saath (sirf check karne ke liye)" })];
     return el("div", { style: "margin-bottom:14px" }, [...label, v, el("div", { className: "btns" }, links)]);
   }));
+  if (rel.tag_name && rel.tag_name.startsWith("reel-") && rel.id) {   // a finished reel: it can be deleted from here too
+    const del = el("button", { type: "button", textContent: "🗑 Ye reel delete karo" });
+    del.addEventListener("click", async () => {
+      const card = [...$("gallery").children].find((n) => n.dataset && n.dataset.id === String(rel.id));
+      await deleteReel(rel, card || null);
+    });
+    $("videos").append(el("div", { className: "btns" }, [del]));
+  }
   const [post, script] = (rel.body || "").replace(/\r\n/g, "\n").split("<!-- script -->");
   $("post").value = post.trim();
   showReelScript((script || "").trim(), assets);
@@ -1636,20 +1650,73 @@ $("relScriptCopy").addEventListener("click", async () => {
 });
 
 // ---------------------------------------------------------------- gallery
+// every reel (all the pages of releases, not just the last few), shown a dozen at a time, each with 🗑 to delete it
+const GALLERY_PAGE = 12;
+let allReels = [], reelsShown = 0;
+async function fetchAllReels() {
+  let out = [];
+  for (let page = 1; page <= 20; page++) {
+    const rels = await gh(`${REPO()}/releases?per_page=100&page=${page}`);
+    out = out.concat(rels.filter((r) => r.tag_name.startsWith("reel-")));
+    if (rels.length < 100) break;
+  }
+  return out;
+}
+function galleryCount() {
+  $("galleryCount").textContent = allReels.length ? `Kul ${allReels.length} reels · har reel pe 🗑 = delete` : "";
+  $("more").classList.toggle("hidden", reelsShown >= allReels.length);
+  if (reelsShown < allReels.length) $("more").textContent = `Aur reels dikhao ⬇️ (${allReels.length - reelsShown} baaki)`;
+}
+function reelCard(r) {
+  const png = (r.assets || []).find((a) => a.name.endsWith(".cover.png")) || (r.assets || []).find((a) => a.name.endsWith(".png"));
+  const img = el("img", { alt: "", loading: "lazy" });
+  if (png) img.src = png.browser_download_url;
+  const date = new Date(r.created_at).toLocaleDateString("hi-IN", { day: "numeric", month: "short" });
+  const del = el("button", { type: "button", className: "del", title: "Ye reel delete karo", textContent: "🗑" });
+  const card = el("div", { className: "reel", title: r.name, tabIndex: 0, role: "button" },
+    [img, el("span", { textContent: (r.name || r.tag_name) + " · " + date }), del]);
+  card.dataset.id = String(r.id);
+  const open = () => { showRelease(r); $("result").scrollIntoView({ behavior: "smooth" }); };
+  card.addEventListener("click", open);
+  card.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+  del.addEventListener("click", (e) => { e.stopPropagation(); deleteReel(r, card); });
+  return card;
+}
+function showMoreReels() {
+  const next = allReels.slice(reelsShown, reelsShown + GALLERY_PAGE);
+  $("gallery").append(...next.map(reelCard));
+  reelsShown += next.length;
+  galleryCount();
+}
+async function deleteReel(r, card) {
+  if (!store.get("token")) { alert("Delete ke liye pehle upar ⚙️ GitHub jodo (token)."); return false; }
+  if (!confirm(`"${r.name || r.tag_name}" hamesha ke liye delete karun?\nVideo, cover aur script teeno chale jayenge, wapas nahi aayenge.`)) return false;
+  try {
+    await gh(`${REPO()}/releases/${r.id}`, { method: "DELETE" });
+    try { await gh(`${REPO()}/git/refs/tags/${r.tag_name}`, { method: "DELETE" }); } catch (e) { /* the tag may be gone already */ }
+  } catch (e) {
+    alert("Delete nahi hua: " + e.message + ([401, 403, 404].includes(e.status)
+      ? "\n(Token me is repo ka 'Contents: Read and write' permission chahiye.)" : ""));
+    return false;
+  }
+  allReels = allReels.filter((x) => x.id !== r.id);
+  if (card) { card.remove(); reelsShown = Math.max(0, reelsShown - 1); }
+  if (currentRelease && currentRelease.id === r.id) { $("result").classList.add("hidden"); $("ph").classList.remove("hidden"); }
+  if (!allReels.length) $("gallery").replaceChildren(el("p", { className: "hint", textContent: "Abhi koi reel nahi." }));
+  galleryCount();
+  return true;
+}
 async function loadGallery() {
   try {
-    const rels = (await gh(`${REPO()}/releases?per_page=30`)).filter((r) => r.tag_name.startsWith("reel-"));
-    if (!rels.length) { $("gallery").replaceChildren(el("p", { className: "hint", textContent: "Abhi koi reel nahi." })); return; }
-    $("more").classList.toggle("hidden", Math.min(rels.length, 18) <= 6);     // the first 6, the rest on a tap
-    $("gallery").replaceChildren(...rels.slice(0, 18).map((r) => {
-      const png = (r.assets || []).find((a) => a.name.endsWith(".cover.png")) || (r.assets || []).find((a) => a.name.endsWith(".png"));
-      const img = el("img", { alt: "", loading: "lazy" });
-      if (png) img.src = png.browser_download_url;
-      const date = new Date(r.created_at).toLocaleDateString("hi-IN", { day: "numeric", month: "short" });
-      const card = el("button", { className: "reel", title: r.name }, [img, el("span", { textContent: (r.name || r.tag_name) + " · " + date })]);
-      card.addEventListener("click", () => { showRelease(r); $("result").scrollIntoView({ behavior: "smooth" }); });
-      return card;
-    }));
+    allReels = await fetchAllReels();
+    reelsShown = 0;
+    if (!allReels.length) {
+      $("gallery").replaceChildren(el("p", { className: "hint", textContent: "Abhi koi reel nahi." }));
+      galleryCount();
+      return;
+    }
+    $("gallery").replaceChildren();
+    showMoreReels();
   } catch (e) {
     $("gallery").replaceChildren(el("p", { className: "hint", textContent: "Gallery load nahi hui: " + e.message }));
   }
@@ -1659,7 +1726,7 @@ async function loadGallery() {
 $("voice").addEventListener("change", () => { $("tts").disabled = !$("voice").checked; });
 $("handle").value = store.get("handle");
 $("handle").addEventListener("change", () => store.set("handle", $("handle").value.trim()));
-$("more").addEventListener("click", () => { $("gallery").classList.remove("short"); $("more").classList.add("hidden"); });
+$("more").addEventListener("click", showMoreReels);
 $("example").addEventListener("click", () => {
   if (scriptText().trim() && !confirm("Box me jo likha hai uski jagah example script aa jayegi. Theek hai?")) return;
   if (mode === "cards") { drafts.script = EXAMPLE_SCRIPT; loadCards(); showLint(); return; }
