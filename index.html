@@ -1708,7 +1708,11 @@ async function deleteReel(r, card) {
     try { await gh(`${REPO()}/git/refs/tags/${r.tag_name}`, { method: "DELETE" }); } catch (e) { /* the tag may be gone already */ }
   } catch (e) {
     alert("Delete nahi hua: " + e.message + ([401, 403, 404].includes(e.status)
-      ? "\n(Token me is repo ka 'Contents: Read and write' permission chahiye.)" : ""));
+      ? "\n\nTumhare token ko delete ki ijazat nahi hai. Ek baar ye karo:\n"
+        + "1. github.com → Settings → Developer settings → Personal access tokens → Fine-grained tokens\n"
+        + "2. Studio wala token kholo → Edit\n"
+        + "3. Repository permissions → Contents → 'Read and write'\n"
+        + "4. Save (Update) karo. Token wahi rehta hai, page pe dobara daalne ki zaroorat nahi." : ""));
     return false;
   }
   allReels = allReels.filter((x) => x.id !== r.id);
