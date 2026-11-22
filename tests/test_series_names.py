@@ -132,6 +132,41 @@ class Kirdaar(unittest.TestCase):
             self.assertNotIn("color", spec, name)                   # the look's own white coat / kurta
         self.assertEqual(sc["series"]["title"], "Sultan Bhai × Doctor Paglet × Dada Daddu")   # speaking order
 
+    def test_a_letter_the_writer_gave_them_is_still_them(self):
+        # the AI wrote `S = kutta black sunglasses` and `D = dada ...` (Daddu only in the HOOK), Paglet never appears
+        sc, w = parse_script("HOOK: Sultan ne Daddu ki murgi kha li\nKIRDAAR: Paglet, Sultan\n"
+                             "CAST: D = dada kurta white turban, S = kutta black sunglasses\nSCENE: gaon\n"
+                             "D (gussa): Meri murgi? | मेरी मुर्गी?\nS (swag): Hafta thi. | हफ़्ता थी।\n")
+        self.assertEqual(w, [])
+        ch = sc["characters"]
+        self.assertEqual(sorted(ch), ["D", "S"])                                    # no Paglet standing about
+        self.assertIn("chain", ch["S"]["accessories"])                               # Sultan's own look...
+        self.assertEqual(ch["S"]["voice"]["gemini"], "Charon")                       # ...and voice
+        self.assertEqual(ch["D"]["voice"]["gemini"], "Algenib")
+        self.assertEqual(ch["D"]["prop"], "lathi")
+        self.assertEqual(sc["series"]["title"], "Sultan Bhai × Dada Daddu")
+
+    def test_an_ordinary_dog_stays_a_dog(self):
+        sc, w = parse_script("HOOK: x\nCAST: K = kutta black\nSCENE: gully\nK: Bhau! | भौ!\n")
+        self.assertNotIn("chain", sc["characters"]["K"].get("accessories") or [])
+        self.assertNotIn("series", sc)
+
+    def test_the_same_elevenlabs_voice_whoever_speaks_first(self):
+        import tempfile
+        from studio import elevenlabs_tts as e
+        calls, old = [], (e.voice_pools, e._request)
+        e.voice_pools = lambda key: (["m1", "m2", "m3", "m4", "m5"], ["f1", "f2"])
+        e._request = lambda url, key, body=None, timeout=120: calls.append(url.split("/")[-1].split("?")[0]) or b"ID3" + b"\0" * 4000
+        try:
+            one = [{"text": "a", "who": "S", "spec": {"kirdaar": "sultan"}}, {"text": "b", "who": "D", "spec": {"kirdaar": "daddu"}}]
+            e.synth_lines(one, cache_dir=tempfile.mkdtemp(), key="k")
+            first = dict(zip("SD", calls))
+            calls.clear()
+            e.synth_lines(one[::-1], cache_dir=tempfile.mkdtemp(), key="k")
+            self.assertEqual(dict(zip("DS", calls)), first)
+        finally:
+            e.voice_pools, e._request = old
+
     def test_unknown_kirdaar_says_so(self):
         sc, w = parse_script("HOOK: x\nKIRDAAR: Gabbar\nCAST: A = uncle\nSCENE: room\nA: Haan. | हाँ।\n")
         self.assertTrue(any("Gabbar" in x for x in w))

@@ -124,8 +124,15 @@ def synth_lines(items, model=None, cache_dir=None, key=None):
         free = [v for v in pool if v not in blocked and v not in taken] or [v for v in pool if v not in blocked]
         if not free:
             raise ElevenLabsError("no voice this plan can use")
-        taken.add(free[0])
-        return free[0]
+        pick_ = free[0]
+        if spec.get("kirdaar"):                 # a kirdaar: the same voice every episode, whoever speaks first
+            import zlib
+            ok = [v for v in pool if v not in blocked]
+            start = zlib.crc32(str(spec["kirdaar"]).encode("utf-8")) % len(ok)
+            pick_ = next((ok[(start + i) % len(ok)] for i in range(len(ok)) if ok[(start + i) % len(ok)] not in taken),
+                         pick_)
+        taken.add(pick_)
+        return pick_
 
     paths = []
     for it in items:
