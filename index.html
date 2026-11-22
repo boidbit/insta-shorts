@@ -107,7 +107,8 @@
   .reel { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); cursor: pointer;
           text-align: left; padding: 0; font: inherit; color: var(--ink); }
   .reel img { width: 100%; aspect-ratio: 9 / 16; object-fit: cover; display: block; background: var(--line); }
-  .reel span { display: block; padding: 6px 8px; font-size: 13px; line-height: 1.3; }
+  .reel span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; padding: 6px 8px; font-size: 13px; line-height: 1.3; }
+  .reel .nocover { width: 100%; aspect-ratio: 9 / 16; display: grid; place-items: center; background: var(--line); font-size: 40px; }
   .reel { position: relative; }
   .reel .del { position: absolute; top: 6px; right: 6px; width: 36px; height: 36px; border-radius: 999px; border: none;
                background: rgba(0, 0, 0, 0.6); color: #fff; font-size: 17px; cursor: pointer; padding: 0; }
@@ -1667,14 +1668,23 @@ function galleryCount() {
   $("more").classList.toggle("hidden", reelsShown >= allReels.length);
   if (reelsShown < allReels.length) $("more").textContent = `Aur reels dikhao ⬇️ (${allReels.length - reelsShown} baaki)`;
 }
+// a release name: the hook only (some old reels have the whole script in their name)
+function reelName(r) {
+  return ((r.name || r.tag_name).split(/\s+(?:STYLE|CAST|SCENE|HOOK|KIRDAAR|CAMERA):/)[0].trim() || r.tag_name).slice(0, 80);
+}
 function reelCard(r) {
   const png = (r.assets || []).find((a) => a.name.endsWith(".cover.png")) || (r.assets || []).find((a) => a.name.endsWith(".png"));
-  const img = el("img", { alt: "", loading: "lazy" });
-  if (png) img.src = png.browser_download_url;
+  const noCover = () => el("div", { className: "nocover", textContent: "🎬" });
+  let img = noCover();
+  if (png) {
+    img = el("img", { alt: "", loading: "lazy" });
+    img.addEventListener("error", () => img.replaceWith(noCover()));   // a reel whose cover is missing
+    img.src = png.browser_download_url;
+  }
   const date = new Date(r.created_at).toLocaleDateString("hi-IN", { day: "numeric", month: "short" });
   const del = el("button", { type: "button", className: "del", title: "Ye reel delete karo", textContent: "🗑" });
   const card = el("div", { className: "reel", title: r.name, tabIndex: 0, role: "button" },
-    [img, el("span", { textContent: (r.name || r.tag_name) + " · " + date }), del]);
+    [img, el("span", { textContent: reelName(r) + " · " + date }), del]);
   card.dataset.id = String(r.id);
   const open = () => { showRelease(r); $("result").scrollIntoView({ behavior: "smooth" }); };
   card.addEventListener("click", open);
@@ -1690,13 +1700,19 @@ function showMoreReels() {
 }
 async function deleteReel(r, card) {
   if (!store.get("token")) { alert("Delete ke liye pehle upar ⚙️ GitHub jodo (token)."); return false; }
-  if (!confirm(`"${r.name || r.tag_name}" hamesha ke liye delete karun?\nVideo, cover aur script teeno chale jayenge, wapas nahi aayenge.`)) return false;
+  const day = new Date(r.created_at).toLocaleDateString("hi-IN", { day: "numeric", month: "short" });
+  const name = reelName(r);
+  if (!confirm(`Ye reel delete karun?\n"${name}" (${day})\n\nVideo, cover aur script hamesha ke liye chale jayenge, wapas nahi aayenge.\nOK = delete, Cancel = rehne do.`)) return false;
   try {
     await gh(`${REPO()}/releases/${r.id}`, { method: "DELETE" });
     try { await gh(`${REPO()}/git/refs/tags/${r.tag_name}`, { method: "DELETE" }); } catch (e) { /* the tag may be gone already */ }
   } catch (e) {
     alert("Delete nahi hua: " + e.message + ([401, 403, 404].includes(e.status)
-      ? "\n(Token me is repo ka 'Contents: Read and write' permission chahiye.)" : ""));
+      ? "\n\nTumhare token ko delete ki ijazat nahi hai. Ek baar ye karo:\n"
+        + "1. github.com → Settings → Developer settings → Personal access tokens → Fine-grained tokens\n"
+        + "2. Studio wala token kholo → Edit\n"
+        + "3. Repository permissions → Contents → 'Read and write'\n"
+        + "4. Save (Update) karo. Token wahi rehta hai, page pe dobara daalne ki zaroorat nahi." : ""));
     return false;
   }
   allReels = allReels.filter((x) => x.id !== r.id);
