@@ -1591,6 +1591,50 @@ def name_words(name):
     return list(PLAIN_NAME_LOOKS.get(low, []))
 
 
+def _cast_entries(text):
+    """{key: words} of the CAST line(s)."""
+    out = {}
+    for cl in re.finditer(r"^\s*CAST\s*:\s*(.*)$", text, re.M | re.I):
+        for part in re.split(r",\s*(?=[A-Za-z_]\w*\s*=)", cl.group(1)):
+            if "=" in part:
+                k, w = part.split("=", 1)
+                out[k.strip()] = w.strip()
+    return out
+
+
+def _letter_for(d, entries):
+    """The CAST key the writer used for this kirdaar (S = kutta black sunglasses for Sultan), or None: an entry
+    of the same kind (a dog) or look (dada; any doctor for Paglet); with several, the one with the name's
+    initial; none when that stays unclear."""
+    if not d or not entries:
+        return None
+    base = cast_spec(d["words"].split(), 0)
+    hits = []
+    for k, w in entries.items():
+        if "@" in w or k.lower() in [n.lower() for n in [d["name"]] + list(d.get("also") or [])]:
+            continue
+        spec = cast_spec(w.lower().split(), 0)
+        if base.get("kind"):
+            same = spec.get("kind") == base["kind"]
+        else:
+            same = not spec.get("kind") and (spec.get("look") == base.get("look") or
+                                             (base.get("look") == "pagla_doctor" and spec.get("look") == "doctor"))
+        if same:
+            hits.append(k)
+    if len(hits) > 1:
+        hits = [k for k in hits if k[:1].lower() == d["name"][:1].lower()]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _recast(text, key, words):
+    """The CAST entry `key = ...` becomes `key = <words>`."""
+    def fix(m):
+        parts = re.split(r",\s*(?=[A-Za-z_]\w*\s*=)", m.group(2))
+        parts = ["%s = %s" % (key, words) if p.split("=", 1)[0].strip() == key else p.strip() for p in parts]
+        return m.group(1) + ", ".join(parts)
+    return re.sub(r"^(\s*CAST\s*:\s*)(.*)$", fix, text, flags=re.M | re.I)
+
+
 def apply_kirdaar(text):
     """`KIRDAAR: Sultan, Paglet` (or `KIRDAAR: Sultan part 3`): each named character comes in from kirdaar/ with its
     own fixed look and face, whatever else is in the script; together only when the script names more than one (a
@@ -1608,6 +1652,12 @@ def apply_kirdaar(text):
             pat = r"^\s*(%s)\s*(?:\(|:|->)" % "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True))
             hit = re.search(pat, text, re.M | re.I)
             if hit:
+                spoke.append((hit.start(), k["name"]))
+        for k in _kirdaar_list():               # named somewhere (the HOOK...) and a CAST letter has their look
+            if k["name"] in [n for _p, n in spoke]:
+                continue
+            hit = re.search(r"\b(%s)\b" % "|".join(re.escape(n) for n in [k["name"]] + k["also"]), text, re.I)
+            if hit and _letter_for(load_kirdaar(k["id"]), _cast_entries(text)):
                 spoke.append((hit.start(), k["name"]))
         if not spoke:
             return text, None, []
@@ -1627,18 +1677,36 @@ def apply_kirdaar(text):
             warns.append("KIRDAAR %r: kirdaar/ folder me nahi mila (naam ki file banao)" % w)
         elif d["id"] not in [x["id"] for x in found]:
             found.append(d)
+    for k in _kirdaar_list():                   # named elsewhere (the HOOK) and a CAST letter has their look: them too
+        if k["id"] in [x["id"] for x in found]:
+            continue
+        if re.search(r"\b(%s)\b" % "|".join(re.escape(n) for n in [k["name"]] + k["also"]), text, re.I):
+            d = load_kirdaar(k["id"])
+            if _letter_for(d, _cast_entries(text)):
+                found.append(d)
     if not found:
         return text, None, warns
     cl = re.search(r"^\s*CAST\s*:\s*(.*)$", text, re.M | re.I)
     have = {p_.split("=")[0].strip().lower() for p_ in cl.group(1).split(",") if "=" in p_} if cl else set()
-    extra = []
+    extra, who_is = [], {}
     for d in found:
         key = d["name"]
         aliases = [a for a in [d["name"]] + list(d.get("also") or []) if a]
         pat = r"^(\s*)(%s)(\s*(?:\(|:|->))" % "|".join(re.escape(a) for a in sorted(aliases, key=len, reverse=True))
         text = re.sub(pat, lambda m_: m_.group(1) + key + m_.group(3), text, flags=re.M | re.I)
-        if key.lower() not in have:
+        speaks = re.search(r"^\s*%s\s*(?:\(|:|->)" % re.escape(key), text, re.M | re.I)
+        letter = None if speaks else _letter_for(d, _cast_entries(text))
+        if letter:                              # the writer gave them a letter (S = kutta black): S is Sultan
+            text = _recast(text, letter, "%s pakka" % series_words("kirdaar_" + d["id"], key, d["words"]))
+            who_is[d["id"]] = letter
+        elif key.lower() not in have:
             extra.append("%s = %s pakka" % (key, series_words("kirdaar_" + d["id"], key, d["words"])))
+    on_screen = [d for d in found if d["id"] in who_is or re.search(
+        r"^\s*%s\s*(?:\(|:|->)" % re.escape(d["name"]), text, re.M | re.I)]
+    if on_screen and len(on_screen) < len(found):   # named on the KIRDAAR line but never in the story: left out
+        gone = {d["name"] for d in found if d not in on_screen}
+        extra = [e for e in extra if e.split(" = ")[0] not in gone]
+        found = on_screen
     add = []
     if extra and cl:
         cl = re.search(r"^\s*CAST\s*:\s*(.*)$", text, re.M | re.I)
@@ -1655,7 +1723,8 @@ def apply_kirdaar(text):
     tags = [d["hashtag"] for d in found if d.get("hashtag")]
     return text, {"name": "+".join(d["id"] for d in found), "title": title, "part": part,
                   "hashtag": tags[0] if tags else None, "hashtags": tags, "kirdaar": [d["id"] for d in found],
-                  "voices": {d["name"]: dict(d["awaaz"]) for d in found if isinstance(d.get("awaaz"), dict)}}, warns
+                  "voices": {who_is.get(d["id"], d["name"]): dict(d["awaaz"], kirdaar=d["id"]) for d in found
+                             if isinstance(d.get("awaaz"), dict)}}, warns
 
 
 def parse_script(text):
