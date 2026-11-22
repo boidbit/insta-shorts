@@ -585,6 +585,10 @@ def _draw_prop(S, prop, hand, fore_angle, color_hint):
     elif prop == "phone":
         S.poly([pt(-12, -20), pt(-12, 20), pt(62, 20), pt(62, -20)], (40, 44, 52), INK, 5)
         S.poly([pt(-4, -14), pt(-4, 14), pt(54, 14), pt(54, -14)], (120, 190, 235), None)
+    elif prop == "phone_ear":                 # on a call: upright against the ear, the hand round its lower half
+        x, y = hand
+        S.poly([(x - 17, y - 66), (x + 17, y - 66), (x + 17, y + 14), (x - 17, y + 14)], (40, 44, 52), INK, 5)
+        S.poly([(x - 11, y - 58), (x + 11, y - 58), (x + 11, y + 6), (x - 11, y + 6)], (120, 190, 235), None)
     elif prop == "mic":
         S.line([pt(-14, 0), pt(40, 0)], 12, (70, 70, 76))
         S.dot(pt(56, 0), 22, (60, 60, 66), INK, 5)

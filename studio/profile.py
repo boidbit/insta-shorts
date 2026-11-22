@@ -129,6 +129,8 @@ def draw_side(o, p, cols, expr, mouth_open, t, x0, ground_y, k, blink=False, pro
     held = [(nm, hs) for nm, hs in (p.get("props") or [])]
     if prop:
         held.append((prop, "R"))
+    on_call = any(nm == "phone_ear" for nm, _h in held)
+    held = [(nm, hs) for nm, hs in held if nm != "phone_ear"]      # (drawn on the ear, after the head)
     for nm, _side in held:
         if nm == "vlog_cam":                   # the selfie stick held up over the head, the camera turned to the face
             top_ = (hc[0] - f * 70, hc[1] - HEAD_RY * HEAD_SCALE - 60)
@@ -330,6 +332,10 @@ def draw_side(o, p, cols, expr, mouth_open, t, x0, ground_y, k, blink=False, pro
         _headphones(S, HH, front=False, side=-6)
     if "earrings" in acc:
         S.dot(HH((-8, 34)), 7, GOLD, INK, 3)
+    if on_call:                                # the phone upright on the ear, the hand holding it
+        S.poly([HH(q) for q in [(-22, -40), (8, -40), (8, 40), (-22, 40)]], (40, 44, 52), INK, 5)
+        S.poly([HH(q) for q in [(-17, -33), (3, -33), (3, 33), (-17, 33)]], (120, 190, 235), None)
+        _hand(S, HH((-14, 30)), -90.0, "R" if f > 0 else "L", skin)
     if "bindi" in acc:
         hpoly(closed_ellipse(86, -36, 5, 6, 12), (200, 30, 50), None)
     if "tilak" in acc:
