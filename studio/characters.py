@@ -1569,7 +1569,7 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
     eyes, mouth, brows = EXPRESSIONS.get(expr, EXPRESSIONS["neutral"])
     if blink and eyes not in NO_BLINK:
         eyes = "closed"
-    fdx = (face_f if face_f is not None else facing) * 14 + p["look_x"] * 5
+    fdx = (face_f if face_f is not None else facing) * (14 + 12 * float(o.get("turn34", 0))) + p["look_x"] * 5
     lx, ly = p["look_x"] * 7, p["look_y"] * 5
     side_k = -1.0 if (face_f if face_f is not None else facing) > 0 else 1.0    # a side-eye looks the other way
 

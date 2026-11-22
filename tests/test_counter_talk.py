@@ -87,8 +87,11 @@ class CounterTalk(unittest.TestCase):
         self.assertEqual(plan.counter_shots, [])
         plan, _ = plan_of(TALK.replace("F (point):", "F (point, zoom):"))
         self.assertEqual(plan.counter_shots, [])                           # the script directs the camera itself
+        plan, _ = plan_of("HOOK: h\nCAST: A = boy, B = girl\nSCENE: room\nA: Hi | हाय\nB: Hello | हेलो\n"
+                          "CAMERA: seedha\n")
+        self.assertEqual(plan.counter_shots, [])                           # no counter, the plain camera: as before
         plan, _ = plan_of("HOOK: h\nCAST: A = boy, B = girl\nSCENE: room\nA: Hi | हाय\nB: Hello | हेलो\n")
-        self.assertEqual(plan.counter_shots, [])                           # no counter: as before
+        self.assertNotIn("open", [sh["kind"] for sh in plan.counter_shots])  # no counter: the film shots, not these
 
     def test_painted_counter(self):
         plan, _ = plan_of("HOOK: h\nCAST: B = college_boy, C = chaiwala\nSCENE: chai_tapri\nB: Ek cutting! | एक कटिंग!\n"

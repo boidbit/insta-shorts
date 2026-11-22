@@ -4,7 +4,7 @@ import math
 import os
 import sys
 
-from . import audio, counter_shots, counters, decor, effects, elevenlabs_tts, gemini_tts, objects, rides, styles, vehicles
+from . import audio, counter_shots, counters, film_shots, decor, effects, elevenlabs_tts, gemini_tts, objects, rides, styles, vehicles
 from . import sets as _sets
 from .characters import assign_faces, color_of, resolve_spec
 from .util import LW, LH, asset_path, clamp, deep_merge, ease_in_out, ease_out, ease_out_back, lerp
@@ -864,6 +864,19 @@ def _card_over_faces(plan, t):
     return False
 
 
+SITCOM_ZOOM = 1.15
+SHOT_STYLES = {"film": "film", "filmi": "film", "movie": "film", "cine": "film", "new": "film", "naya": "film",
+               "sitcom": "sitcom", "serial": "sitcom", "tv": "sitcom",
+               "seedha": "seedha", "straight": "seedha", "plain": "seedha", "simple": "seedha"}
+
+
+def shot_style(meta=None):
+    """How the new camera directs a conversation: film (cuts like a film, the default), sitcom (mostly wide) or
+    seedha (the plain zooming camera)."""
+    v = os.environ.get("STUDIO_SHOTS") or (meta or {}).get("shots") or "film"
+    return SHOT_STYLES.get(str(v).strip().lower(), "film")
+
+
 def camera_style(meta=None):
     v = os.environ.get("STUDIO_CAMERA") or (meta or {}).get("camera") or "cine"
     return "classic" if str(v).strip().lower() in ("classic", "old", "purana", "off") else "cine"
@@ -1598,6 +1611,10 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         if cine:
             auto_camera_cine(plan, chars, cam_events, shakes, plan.rolls)
             plan.drift = not scene.get("chat")      # the camera never stands completely still
+            if shot_style(meta) == "sitcom":        # a TV serial: mostly wide, the camera only leans in
+                for c_ in cam_events:
+                    if "zoom" in c_:
+                        c_["zoom"] = min(float(c_["zoom"]), SITCOM_ZOOM)
         else:
             auto_camera(plan, chars, cam_events, shakes)
         cam_events[:] = [c_ for c_ in cam_events if not any(h0 <= c_["t"] <= h1 for h0, h1 in cam_hold)]
@@ -1634,6 +1651,10 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     plan.shakes = shakes
     # a conversation across a counter: cut like a film (over the shoulder / the reverse shot / a side two-shot)
     plan.counter_shots = counter_shots.plan_shots(plan, own_camera_)
+    # any other conversation: cut like a film too (over the shoulder, singles, reactions...), unless CAMERA says not
+    plan.shot_style = shot_style(meta)
+    if not plan.counter_shots:
+        plan.counter_shots = film_shots.plan_shots(plan, own_camera_, plan.shot_style)
 
     # ---- audio ----
     m = scene.get("music") or meta.get("music")

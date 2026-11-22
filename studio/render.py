@@ -559,8 +559,17 @@ class Renderer(Output):
             (z, cx, cy), dx, dy = self.cam_override, 0.0, 0.0
         else:
             shot = self._shot_at(t)
-            if shot is not None:                    # a counter conversation's shot: its own fixed camera
+            if shot is not None:                    # a directed shot (counter / film): its own fixed camera
                 (z, cx, cy), dx, dy = shot["cam"], 0.0, 0.0
+                if shot.get("cam1"):                # the punch line: a slow push in over the shot
+                    u = clamp((t - shot["t0"]) / max(0.3, min(shot["t1"], self.plan.duration) - shot["t0"]))
+                    u = u * u * (3 - 2 * u)
+                    z1, cx1, cy1 = shot["cam1"]
+                    z, cx, cy = z + (z1 - z) * u, cx + (cx1 - cx) * u, cy + (cy1 - cy) * u
+                if shot.get("insert"):              # an insert: close on the hand with what they hold
+                    hand = self._insert_hand(shot["insert"], t)
+                    if hand is not None:
+                        cx, cy = hand
         if dx or dy:
             z = max(z, 1.05)
         s = self.s
@@ -586,7 +595,9 @@ class Renderer(Output):
 
     def _foreground(self, t):
         """The place's foreground props, placed like the background of this shot (angle zoom / mirror)."""
-        crowd = self._crowd_pieces(t) if self._crowd is not None else []
+        shot_ = self._shot_at(t)
+        crowd = self._crowd_pieces(t) if self._crowd is not None and not (shot_ and shot_.get("soft")) else []
+        # (a film single / over the shoulder: the passers-by would stand sharp in front of the blurred place)
         if self.bd25 is not None and not self._auto25:
             return self.bd25.floor_items(self._view25(t)) + crowd
         if self.bd25 is not None and self.bd25.layered.sprites:      # auto 2.5D: its counters, then the place's props
@@ -943,8 +954,8 @@ class Renderer(Output):
         if moving or action in self.DOG_SIDE_ACTIONS or not self._natural():     # (classic: the old profile dog)
             return "side"
         v = (c.ov or {}).get("view") or st.get("view")
-        if v == "side":
-            return "side"
+        if v in ("side", "turn"):                   # (a film shot turns it: profile / head to us)
+            return v
         if v == "front" or self._close_on(c, t):
             return "front"
         if any(sp["start"] - 0.12 <= t < sp["end"] + 0.35 for sp in c.speech):
@@ -1322,7 +1333,7 @@ class Renderer(Output):
                 other = self._partner(c, t, x)
                 spec["facing"] = "left" if other is not None and other < x else "right"
         if c.ov:                                    # this shot turns them (back to us / to the side / to someone)
-            for key in ("view", "facing"):
+            for key in ("view", "facing", "turn34"):
                 if key in c.ov:
                     spec[key] = c.ov[key]
         own = st["prop"]
@@ -1394,8 +1405,11 @@ class Renderer(Output):
 
     def _shot_at(self, t):
         """The shot of a counter conversation at time t (studio.counter_shots), or None."""
+        m = self.mystery
         for sh in getattr(self.plan, "counter_shots", None) or ():
             if sh["t0"] <= t < sh["t1"]:
+                if sh.get("soft") and m and m["t0"] - 0.3 <= t <= m["t1"] + 0.3:
+                    return None                     # the strange thing behind them: a wide moment to see it
                 return sh if sh["kind"] != "free" else None
         return None
 
@@ -1415,6 +1429,27 @@ class Renderer(Output):
         finally:
             for c in chars:
                 c.ov = None
+
+    def _insert_hand(self, name, t):
+        """(x, y) of the hand that holds the prop of `name` at t (the insert shot's centre), or None."""
+        c = self.plan.chars.get(name)
+        if c is None or c.spec.get("kind"):
+            return None
+        key = (name, round(t, 3))
+        if getattr(self, "_hand_at", None) and self._hand_at[0] == key:
+            return self._hand_at[1]
+        saved, c.ov = c.ov, (self._shot_at(t) or {}).get("ov", {}).get(name)
+        try:
+            an = self._prep(c, t, {})["an"]
+        finally:
+            c.ov = saved
+        x, y = c.draw_pos(t)
+        hands = [an.get("hand_r"), an.get("hand_l")]
+        hands = [h for h in hands if h]
+        h = min(hands, key=lambda p: p[1]) if hands else None     # the raised hand holds it up
+        v = (h[0], h[1] - 30.0) if h else None
+        self._hand_at = (key, v)
+        return v
 
     def _counter_edge(self):
         """The counter's top, blurred, for the bottom of a reverse shot (the camera looks over it from behind, so
@@ -1467,7 +1502,9 @@ class Renderer(Output):
         img = self._background(t)
         if shot is not None and shot.get("blur"):  # the reverse shot: the other side of the place, out of focus
             from PIL import ImageFilter
-            img = ImageOps.mirror(img).filter(ImageFilter.GaussianBlur(max(2.0, 9 * s)))
+            if shot.get("mirror", True):
+                img = ImageOps.mirror(img)
+            img = img.filter(ImageFilter.GaussianBlur(max(2.0, (6 if shot.get("soft") else 9) * s)))
         skip = set(shot.get("hide_objects", ())) if shot else set()
         self._draw_objects(img, t, False, skip)
         light = self._light_level(t)
