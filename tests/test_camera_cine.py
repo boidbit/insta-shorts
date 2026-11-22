@@ -130,7 +130,8 @@ class CineTests(unittest.TestCase):
 
 class EntryTests(unittest.TestCase):
     def one(self, line):
-        sc, w = script.parse_script(HEAD + "B (smile): Koi hai? | कोई है?\n" + line + "\nA (grin): Main hoon | मैं हूँ\n")
+        after = "B (grin): Arey, gaya! | अरे, गया!" if "exit" in line else "A (grin): Main hoon | मैं हूँ"   # (gone for good)
+        sc, w = script.parse_script(HEAD + "B (smile): Koi hai? | कोई है?\n" + line + "\n" + after + "\n")
         self.assertEqual(w, [], line)
         sub = S.split_scenes(sc)[0]
         ev = next(e for e in sub["timeline"] if "entry" in e or "leave" in e)

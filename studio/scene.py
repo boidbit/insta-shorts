@@ -459,6 +459,8 @@ def compile_entry(plan, c, spec, t):
     side = spec.get("side") if spec.get("side") in ("left", "right") else ("left" if x1 < LW / 2.0 else "right")
     edge = -170.0 if side == "left" else LW + 170.0
     face = "right" if side == "left" else "left"
+    back_again = any(m[0] < t for m in c.moves)    # came in once, walked out, comes back: in sight until they left
+    x_before = c.x
 
     def sound(name, at, volume=0.6):
         path = audio.sfx_path(name)
@@ -494,6 +496,8 @@ def compile_entry(plan, c, spec, t):
         c.moves.append((t, t + 0.001, edge, y1, x0, y1, False))
         c.moves.append((t + 0.001, t + 1.25, x0, y1, x1, y1, False))
         c.events.append({"t": t, "facing": "front"})
+    if back_again:
+        c.x = x_before
     return ENTRY_HOLD.get(style, 1.0)
 
 

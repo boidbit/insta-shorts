@@ -2238,6 +2238,7 @@ def _parse_script(text):
                     tl.append({"t": 0.0, "who": name, "action": "sit", "on": sid})
         tl.append({"wait": 0.3 if si == 0 else 0.2})
         first = True
+        gone = {}                                       # who walked out of this scene: {name: (side, fast)}
         for ln in sc["lines"]:
             if ln[0] == "wait":
                 tl.append({"wait": ln[1]})
@@ -2259,6 +2260,23 @@ def _parse_script(text):
             who = "all" if ln[1].upper() == "ALL" else ln[1]
             ev = {"who": who}
             move, unknown, lost = _stage(ln[2], ev, order, who)
+            if who in gone and not (move and move[0] == "enter"):
+                # walked out, then speaks / acts again with no `-> enter`: they come back the way they went
+                side, fast = gone.pop(who)
+                x, _slot = _slot_x(order, who)
+                if fast:
+                    tl.append({"who": who, "entry": {"style": "fast", "x": x, "side": side},
+                               "hold": ENTRY_HOLD["fast"]})
+                else:
+                    tl.append({"who": who, "facing": "left" if side == "right" else "right",
+                               "move": {"x": x, "dur": 1.1}, "hold": 1.1})
+                warnings.append("%s exit ke baad phir aaya bina `%s -> enter %s` ke: studio use %s se wapas le aaya"
+                                % (who, who, side, side))
+            if move and who != "all":
+                if move[0] == "exit":
+                    gone[who] = (move[1], len(move) > 2 and bool(move[2]))
+                elif move[0] == "enter":
+                    gone.pop(who, None)
             if unknown:
                 warnings.append("line %r: %s samajh nahi aaye (acting words ki list dekho)"
                                 % (ln[-1][:50], ", ".join(repr(u) for u in unknown)))
