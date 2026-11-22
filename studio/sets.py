@@ -1173,6 +1173,8 @@ class Sets:
         """[(depth y, image, px, py)] of floor pieces, depth-sorted with the characters."""
         out = []
         for oid, ob in self.objs.items():
+            if ob.get("hidden"):
+                continue                            # a seat painted in the photo: sat on, never drawn
             if ob.get("type") in SPEC and not SPEC[ob["type"]][3]:
                 st, _x, y = self.state(oid, t)
                 im, (px, py) = self._image(ob, st, t)

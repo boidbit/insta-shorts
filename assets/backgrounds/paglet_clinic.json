@@ -1,0 +1,77 @@
+{
+  "name": "Doctor Paglet ka clinic (photo)",
+  "words": [
+    "clinic_photo",
+    "paglet_clinic",
+    "dawakhana_photo",
+    "clinic_asli"
+  ],
+  "people_scale": 1.0,
+  "spots": [
+    {
+      "id": "doctor",
+      "x": 850,
+      "y": 985,
+      "k": 0.86,
+      "sit": true,
+      "facing": "left",
+      "for": [
+        "doctor",
+        "pagla_doctor",
+        "nurse",
+        "chemist"
+      ]
+    },
+    {
+      "id": "patient",
+      "x": 232,
+      "y": 1258,
+      "k": 1.0,
+      "sit": true,
+      "facing": "right"
+    },
+    {
+      "id": "stand",
+      "x": 470,
+      "y": 1420,
+      "k": 1.06,
+      "sit": false,
+      "facing": "right"
+    },
+    {
+      "id": "door",
+      "x": 130,
+      "y": 1500,
+      "k": 1.1,
+      "sit": false,
+      "facing": "right"
+    }
+  ],
+  "front": [
+    {
+      "pts": [
+        [
+          549,
+          817
+        ],
+        [
+          1080,
+          803
+        ],
+        [
+          1080,
+          1194
+        ],
+        [
+          606,
+          1199
+        ],
+        [
+          585,
+          872
+        ]
+      ],
+      "depth": 1199
+    }
+  ]
+}

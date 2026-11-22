@@ -531,6 +531,7 @@ Har pakka character ki apni file `kirdaar/<naam>.json` me hai: look, aadat, pakk
 | **Paglet** (Doctor Paglet) | bikhre safed baal, tedha tuta chashma, maathe pe patti, gale me stethoscope, haath me injection | har ilaaj: "Injection lagega!" |
 | **Daddu** (Dada Daddu) | dada, gamchha, mooch, lathi | "mhare zamane me..." (Haryanvi), aakhri twist unka |
 | **Reelesh** (Reelesh Kumar) | influencer, neeli tshirt, dadhi, kaala chashma, vlog camera | "Ruko! Ye toh content hai!" / "Viral bukhaar chal raha hai!"; 47 followers, papa se darr |
+| **Gappu** (Gappu Gupta) | podcaster: headphones, gol chashma, kaali tshirt | "Gappcast" ka host, FM-RJ jaisi gehri awaaz; "Toh bataiye... aapka struggle kya tha?" / "Ye clip viral hogi!"; views sirf 12 |
 
 ```
 HOOK: Sultan ka toll tax 🐕
@@ -548,6 +549,17 @@ Sultan Bhai (akad): Ye Sultan Bhai ka area hai! | ये सुल्तान �
 - `KIRDAAR:` line bhool gaye? Koi baat nahi: lines me `Sultan` / `Paglet` / `Daddu` (ya unke doosre naam) bolte hain aur CAST me nahi hain, to wo apne aap aa jaate hain.
 - Bina CAST ke naam hi kaafi hai: `Bhains:` bhains banti hai (aurat ki awaaz), `Kutta:` kutta, `Billi:` billi, `Mummy:` mummy, `Doctor:` doctor. CAST me likha ho to wahi chalta hai.
 - Naya kirdaar: `kirdaar/` me ek aur file (inhi jaisi).
+
+### 🩺 Paglet ka clinic aur 🎙️ podcast studio (2D + 2.5D)
+
+- `SCENE: clinic`: **Doctor Paglet ka clinic**, studio ke apne style me (DR. PAGLET M.B.B.S. (Try kiya) ka board, dawaiyon ki almaari, anatomy chart, khula darwaza). Doctor (Paglet / koi bhi doctor) table ke peeche baithta hai, table uske aage; mareez kursi pe; teesra khada. 2.5D me darwaze ki dhoop me dhool, tube light ki timtimahat.
+- `SCENE: podcast`: **Gappcast studio** (neon mic, GAPPCAST, ON AIR light, do armchair, gol table pe mic). Host (Gappu / podcaster) peeli kursi, mehmaan neeli kursi pe; teesra beech me khada. 2.5D me neon ka dhadakna, ON AIR blink.
+- Din / raat / baarish jaise baaki jagahon me chalte hain (`SCENE: clinic night`).
+
+### 📸 Photo wali jagah (asli photo, kirdaar fit)
+
+- `SCENE: clinic_photo` aur `SCENE: podcast_photo`: tumhari bheji photo wale version, wahi baithne ki jagah.
+- Nayi photo jagah: `assets/backgrounds/<naam>.jpg` (9:16) aur saath me `<naam>.json`: `words` (script me kis naam se), `people_scale`, `spots` (har jagah ka x, y, size `k`, `sit`, `facing`, aur kiske liye `for`), `front` (photo ki jo cheez kirdaar ke aage aaye, uski outline aur gehraai). Inhi do jaisi.
 
 ### 🎥 Film camera (naya default)
 

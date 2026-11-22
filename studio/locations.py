@@ -994,3 +994,7 @@ from .places_gaon import HORIZON as _HORIZON_GAON, NEW as _PLACES_GAON   # noqa:
 
 LOCATIONS.update(_PLACES_GAON)
 LOC_HORIZON.update(_HORIZON_GAON)
+from .places_studio import HORIZON as _HORIZON_STUDIO, NEW as _PLACES_STUDIO   # noqa: E402  (clinic, podcast)
+
+LOCATIONS.update(_PLACES_STUDIO)
+LOC_HORIZON.update(_HORIZON_STUDIO)

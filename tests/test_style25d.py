@@ -63,8 +63,9 @@ class StyleWordsTests(unittest.TestCase):
 
     def test_every_place_has_depth_in_2_5d(self):
         from studio.style25d.autoset import build_auto, place_function
+        photos = set(script.image_places())                       # a photo place: the photo itself, as it is
         for place in script.vocab()["places"]:
-            if place in styles.FLAT_IN_25D:
+            if place in styles.FLAT_IN_25D or place in photos:
                 continue
             self.assertTrue(styles.has_depth(place), place)
             if place_function(place):                              # the automatic layering still works for every
@@ -241,7 +242,7 @@ class RenderTests(unittest.TestCase):
         """In 2.5D every studio place is a hand-made set (vehicles included); only your own photo and the plain
         colour stay flat."""
         left = [p for p in script.vocab()["places"]
-                if p not in styles.PLACES_25D and p not in styles.FLAT_IN_25D]
+                if p not in styles.PLACES_25D and p not in styles.FLAT_IN_25D and p not in script.image_places()]
         self.assertEqual(left, [])
         self.assertEqual(styles.FLAT_IN_25D, {"image", "plain"})
 

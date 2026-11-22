@@ -1,0 +1,41 @@
+{
+  "name": "Podcast studio (photo)",
+  "words": [
+    "podcast_photo",
+    "podcast_studio",
+    "studio_photo",
+    "podcast_asli"
+  ],
+  "people_scale": 1.0,
+  "spots": [
+    {
+      "id": "host",
+      "x": 178,
+      "y": 1298,
+      "k": 0.86,
+      "sit": true,
+      "facing": "right",
+      "for": [
+        "podcaster",
+        "influencer"
+      ]
+    },
+    {
+      "id": "guest",
+      "x": 905,
+      "y": 1298,
+      "k": 0.86,
+      "sit": true,
+      "facing": "left"
+    },
+    {
+      "id": "stand",
+      "x": 540,
+      "y": 1560,
+      "k": 1.12,
+      "sit": false,
+      "facing": "front"
+    }
+  ],
+  "front": []
+}

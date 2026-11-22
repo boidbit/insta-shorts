@@ -53,6 +53,13 @@ class FilmShots(unittest.TestCase):
                 self.assertEqual(s["ov"][talker]["facing"], "right" if left else "left")   # looks across the frame
                 self.assertEqual(s["mirror"], not left)                  # the right one: the other side of the place
 
+    def test_no_mirror_where_something_is_written(self):
+        p, _ = part("HOOK: x\nSCENE: podcast\nGappu (khush): Toh bataiye Daddu ji, aapka struggle kya tha?\n"
+                    "Daddu (soch): Roj subah tera podcast sunna, chhore.\nGappu (hairan): Wow, ye clip viral hogi!\n"
+                    "Daddu (chalak): Tere bara views me se gyarah toh main hi hoon.\n")
+        self.assertTrue(p.plan.counter_shots)
+        self.assertFalse(any(s.get("mirror") for s in p.plan.counter_shots))     # GAPPCAST never reads backwards
+
     def test_the_punch_line_pushes_in(self):
         p, _ = part(OFFICE)
         last = p.plan.counter_shots[-1]

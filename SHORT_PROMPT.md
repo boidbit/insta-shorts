@@ -5,12 +5,13 @@ Kaise likhna hai:
   Devanagari me shabd bilkul wahi rakho, na sudhaaro na translate karo; slang jaisa hai waisa (abey = अबे, yaar = यार, phone = फ़ोन).
 - Feeling sirf ek shabd: gussa, hairan, shock, akad, hasi, rona, soch, pyaar, chalak, khush, chilla, darr, bore, sharam, pagal, swag.
 - Naam rozmarra ke (studio unse chehra banata hai): Mummy, Papa, Dadi, Beta, Dost, Boss, Doctor, Tau, Chaiwala, Golgappewala, Neta, Kutta, Bhains...
-- Ye kirdaar idea me hon toh naam yahi (Sultan, Paglet, Daddu, Reelesh) aur andaaz pakka:
+- Ye kirdaar idea me hon toh naam yahi (Sultan, Paglet, Daddu, Reelesh, Gappu) aur andaaz pakka:
   Sultan = Sultan Bhai, gully ka don kutta: Mumbai gali wala, thehri hui thandi akad (jaldi nahi bolta), "apun" poori video me 1-2 baar. Kamzori: injection, biscuit.
   Paglet = Doctor Paglet, pagla doctor: bahut excited, khud ko genius samajhta hai, kabhi galat English medical shabd; har ilaaj aakhir me injection.
   Daddu = Dada Daddu, gaon ke dada: Haryanvi, kam bolte hain par chubhta hua; aakhri baazi aksar unki.
   Reelesh = Reelesh Kumar, ghar ka influencer: tez, excited, "guys"; har musibat me "Ruko! Ye toh content hai!" (ya "Viral bukhaar chal raha hai!"), 1-2 baar. Kamzori: 47 followers, papa.
-- Pehli line: SCENE: <jagah>: room, kitchen, office, sarkari_daftar, classroom, hospital, bank, police_station, market, gully, chai_tapri, street, bus_stop, park, restaurant, shaadi, gaon, khet, chaupal, handpump, train, bus, auto, car, jail, court, gym.
+  Gappu = Gappu Gupta, "Gappcast" podcast ka host (SCENE: podcast): FM-RJ jaisa gehra, dramatic pause; "Toh bataiye... aapka struggle kya tha?" / "Ye clip viral hogi!", 1-2 baar. Kamzori: views sirf 12.
+- Pehli line: SCENE: <jagah>: room, kitchen, office, sarkari_daftar, classroom, hospital, bank, police_station, market, gully, chai_tapri, street, bus_stop, park, restaurant, shaadi, clinic (Paglet ka), podcast, gaon, khet, chaupal, handpump, train, bus, auto, car, jail, court, gym.
 - Kuch HOTA hai (koi aata, bhaagta, girta, maarta hai) toh alag line: Naam -> action. Actions: enter left, enter right, exit left fast, fall, faint, jump, slap, push, hug, dance, run, sit, cry, laugh, facepalm, shock, ride bike, eat, phone_call, selfie.
 - 5-7 bolne wali lines, max 3 log. Lines ek naap ki nahi: 1-2 lambi (setup ya bhadaas, 150 akshar tak), baaki chhote jab, punch chhota. "Arey", "sun", "matlab" jaise shabd chalte hain; bas bekaar line mat likho.
 
