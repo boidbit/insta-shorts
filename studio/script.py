@@ -2343,10 +2343,13 @@ def _parse_script(text):
             warnings.append("STYLE %r: 2d ya 2.5d likho" % meta["STYLE"])
     if meta.get("CAMERA"):                              # CAMERA: classic = the old camera; cine (default) = the new one
         cam = meta["CAMERA"].strip().lower()
+        from .scene import SHOT_STYLES
         if cam in ("classic", "old", "purana"):
             scene["meta"]["camera"] = "classic"
-        elif cam not in ("cine", "new", "naya"):
-            warnings.append("CAMERA %r: cine (naya, default) ya classic (purana) likho" % meta["CAMERA"])
+        elif cam in SHOT_STYLES:
+            scene["meta"]["shots"] = SHOT_STYLES[cam]      # film (default) / sitcom / seedha
+        else:
+            warnings.append("CAMERA %r: film (default), sitcom, seedha ya classic (purana) likho" % meta["CAMERA"])
     if scene.get("style") == "2.5d":
         flat = sorted({str(sc["background"].get("type")) for sc in scenes
                        if not styles.has_depth(sc["background"].get("type"))})

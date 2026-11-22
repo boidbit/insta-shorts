@@ -439,6 +439,13 @@
             <option value="lime">Lime (hara)</option>
           </select>
         </label>
+        <label title="Camera kaise chale. Film = filmon jaisa: bolne wale pe kandhe ke upar se ya akele tircha shot, peeche dhundhla, reaction shots, punch pe dheere andar. Sitcom = TV serial jaisa, zyada wide. Seedha = pehle jaisa (zoom karta hua).">Camera 🎥
+          <select id="shots">
+            <option value="film">Film (filmi shots) ⭐</option>
+            <option value="sitcom">Sitcom (zyada wide)</option>
+            <option value="seedha">Seedha (pehle jaisa)</option>
+          </select>
+        </label>
         <label title="CTA (Tag karo...) kaise dikhe. End card = aakhir me 2 second ka card. Sticker = punch line ke saath chhota sa, video lambi nahi hoti. Caption = sirf post ke caption me.">CTA 📣
           <select id="ctaStyle">
             <option value="card">End card</option>
@@ -714,7 +721,7 @@ function lintScript(text) {
         continue;
       }
       if (key === "CAMERA") {
-        if (!["cine", "new", "naya", "classic", "old", "purana"].includes(val.toLowerCase())) out.push(`CAMERA: cine (naya, default) ya classic (purana) likho`);
+        if (!["cine", "new", "naya", "classic", "old", "purana", "film", "filmi", "movie", "sitcom", "serial", "tv", "seedha", "straight", "plain", "simple"].includes(val.toLowerCase())) out.push(`CAMERA: film (default), sitcom, seedha ya classic (purana) likho`);
         continue;
       }
       if (key === "LOOP") {
@@ -1471,6 +1478,7 @@ function withVideoOptions(text) {
   const has = (k) => new RegExp("^\\s*" + k + "\\s*:", "im").test(text);
   if ($("color").value !== "auto" && !has("COLOR")) add.push("COLOR: " + $("color").value);
   if ($("ctaStyle").value !== "card" && !has("CTA_STYLE")) add.push("CTA_STYLE: " + $("ctaStyle").value);
+  if ($("shots").value !== "film" && !has("CAMERA")) add.push("CAMERA: " + $("shots").value);
   const handle = $("handle").value.trim();
   if (handle && !has("HANDLE")) add.push("HANDLE: " + handle);
   if ($("loop").value === "on" && !/^\s*LOOP\s*:/im.test(text)) add.push("LOOP: on");
@@ -1728,7 +1736,7 @@ try { builder = Object.assign(builder, JSON.parse(store.get("builder") || "{}"))
 const saveBuilder = () => store.set("builder", JSON.stringify(builder));
 if (store.get("tts_v") !== "2") { store.set("tts", ""); store.set("tts_v", "2"); }   // Gemini is the default voice again
 if (store.get("dialogue_v") !== "2") { store.set("dialogue", ""); store.set("dialogue_v", "2"); }   // short subtitles are the default now
-for (const id of ["dialogue", "intro", "loop", "mascot", "tts", "color", "ctaStyle"]) {      // the video options are remembered
+for (const id of ["dialogue", "intro", "loop", "mascot", "tts", "color", "ctaStyle", "shots"]) {      // the video options are remembered
   const v = store.get(id);
   if (v && [...$(id).options].some((o) => o.value === v)) $(id).value = v;
   $(id).addEventListener("change", () => store.set(id, $(id).value));

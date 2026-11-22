@@ -549,6 +549,22 @@ Sultan Bhai (akad): Ye Sultan Bhai ka area hai! | ये सुल्तान �
 - Bina CAST ke naam hi kaafi hai: `Bhains:` bhains banti hai (aurat ki awaaz), `Kutta:` kutta, `Billi:` billi, `Mummy:` mummy, `Doctor:` doctor. CAST me likha ho to wahi chalta hai.
 - Naya kirdaar: `kirdaar/` me ek aur file (inhi jaisi).
 
+### 🎥 Film camera (naya default)
+
+Baatcheet ab filmon jaisi kat'ti hai. Bolne wala camera ki taraf nahi mudta; camera uske paas jaata hai:
+- **Shuru:** wide shot, poori jagah aur sab log.
+- **Kandhe ke upar se (OTS):** sunne wale ka sar/kandha kone me, bolne wala tircha (3/4), uski taraf dekhta hua.
+- **Akela shot:** bolne wala tircha, nazar saamne wale pe, chehre ke aage jagah, peeche ki jagah dhundhli.
+- **Reverse angle:** daayein wale pe shot me jagah ki "doosri taraf" (ulta aur dhundhla background), jaise camera ghooma ho.
+- **180° niyam:** jo left khada hai wo har shot me right dekhta hai.
+- **Reaction shot:** bina bole wala reaction (`B -> facepalm`, shock, double_take...) apna shot leta hai.
+- **Neeche se (low angle):** akad / smug / proud / evil lines. **Upar se (high angle):** dar / dukh / rona.
+- **Insert:** line me us cheez ki baat ho jo haath me hai (phone, injection, chai...) to 1 second uska close-up.
+- **Punch line:** dheere-dheere andar zoom. Chalna, girna, nachna: wide shot.
+- Kutte (Sultan) ke liye: kandhe wala shot nahi, uska tircha shot (body side, sar saamne wale ki taraf).
+
+Page pe video options me **Camera 🎥: Film / Sitcom (zyada wide, TV serial jaisa) / Seedha (pehle jaisa)**. Script me `CAMERA: film | sitcom | seedha | classic`. Kisi line pe apna shot (`CUT close B`, `CUT ots`, `zoom`...) likho to us scene me director beech me nahi aata. Dukaan/thele ki baatcheet apne counter wale shots rakhti hai.
+
 ### 🎭 Dialogue ka vajan
 
 - Prompt ab lines ko ek naap ki nahi rakhta: 1-2 lambi lines (setup ya bhadaas, ~150 akshar tak), beech me chhote jab, punch chhota; poori baat ~500 akshar.
