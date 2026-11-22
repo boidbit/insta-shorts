@@ -322,6 +322,9 @@ def draw_side(o, p, cols, expr, mouth_open, t, x0, ground_y, k, blink=False, pro
         sun = "sunglasses" in acc
         hpoly(closed_ellipse(ex + 4, ey, 22, 20, 20), (22, 22, 28) if sun else None, INK, 5)
         hline([(ex - 18, ey - 4), (-6, ey - 2)], 5)
+    if "headphones" in acc:                    # the band over the head, the cup on the ear
+        from .characters import _headphones
+        _headphones(S, HH, front=False, side=-6)
     if "earrings" in acc:
         S.dot(HH((-8, 34)), 7, GOLD, INK, 3)
     if "bindi" in acc:

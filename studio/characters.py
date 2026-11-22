@@ -122,10 +122,11 @@ FACE_WORDS.update({
 })
 ACCESSORIES = ("glasses", "sunglasses", "cap", "turban", "moustache", "beard", "bindi", "tilak", "earrings", "tuft",
                "topi", "beanie", "nurse_cap", "beret", "bowtie", "backpack", "gamchha", "ghunghat",
-               "chain", "tedha_chashma", "gale_stethoscope")
+               "chain", "tedha_chashma", "gale_stethoscope", "headphones")
 # other words for them (a script may say any of these)
 ACCESSORY_WORDS = {"gold_chain": "chain", "sone_ki_chain": "chain", "pagla_chashma": "tedha_chashma",
-                   "crooked_glasses": "tedha_chashma", "steth": "gale_stethoscope", "neck_stethoscope": "gale_stethoscope"}
+                   "crooked_glasses": "tedha_chashma", "steth": "gale_stethoscope", "neck_stethoscope": "gale_stethoscope",
+                   "headphone": "headphones", "headset": "headphones"}
 
 # Ready-made Indian looks. Anything in the character spec overrides these.
 LOOKS = {
@@ -257,6 +258,9 @@ LOOKS = {
     "pagla_doctor": dict(skin="wheatish", hair="wild", hair_color="grey", outfit="blazer", color="white", pants="purple",
                          accent="lime", shoes="red", build="slim", prop="injection", marks=["patti"],
                          accessories=["tedha_chashma", "gale_stethoscope"], expression="pagla"),
+    # the podcaster (Gappu Gupta): headphones on, round glasses, a black tshirt, very pleased with himself
+    "podcaster": dict(skin="wheatish", hair="curly", outfit="tshirt", color="black", pants="denim", shoes="white",
+                      beard="stubble", accessories=["glasses", "headphones"], expression="smug"),
     # the village pack
     "kisan": dict(skin="dark", hair="short", outfit="kurta", color="cream", pants="white", shoes="chappal",
                   build="slim", turban_color="mustard", moustache="thick", marks=["age_lines"],
@@ -1166,6 +1170,21 @@ def _front_hair(S, HH, style, hc):
             side_y=30)
 
 
+HEADPHONE = (38, 38, 46)
+
+
+def _headphones(S, HH, front=True, side=0.0):
+    """The podcaster's headphones: the band over the head and the cups (both from the front / back, one from the
+    side at the ear, side = its x)."""
+    band = ellipse_pts(0, -6, HEAD_RX + 10, HEAD_RY + 14, 24, 190, 350)
+    S.line([HH(q) for q in band], 15, INK)
+    S.line([HH(q) for q in band], 8, HEADPHONE)
+    cups = [(-HEAD_RX - 4, 8), (HEAD_RX + 4, 8)] if front else [(side, 8)]
+    for cx, cy in cups:
+        S.poly([HH(q) for q in closed_ellipse(cx, cy, 20, 33, 20)], HEADPHONE, INK, 5)
+        S.poly([HH(q) for q in closed_ellipse(cx, cy, 9, 20, 14)], (200, 60, 70), None)
+
+
 def _ghunghat_color(o, cols):
     return color_of(o["ghunghat_color"]) if o.get("ghunghat_color") else cols["main"]
 
@@ -1247,6 +1266,8 @@ def _back_of_head(S, HH, style, hc, acc, o, cols):
     if "earrings" in acc:
         for sgn in (-1, 1):
             S.dot(HH((sgn * (HEAD_RX - 2), 36)), 7, GOLD, INK, 3)
+    if "headphones" in acc:
+        _headphones(S, HH, front=True)
 
 
 def _mix(a, b, k):
@@ -1846,6 +1867,8 @@ def build_character(spec, pose, expr, mouth_open, t, x0, ground_y, k=1.0,
             hpoly(closed_ellipse(fdx, -38, 7, 7, 14), (200, 30, 50), None)
         elif a == "tilak":
             hpoly([(fdx - 5, -60), (fdx + 5, -60), (fdx + 3, -20), (fdx - 3, -20)], (220, 70, 40), None)
+        elif a == "headphones":                     # a band over the head, a cushioned cup on each ear
+            _headphones(S, HH, front=True)
 
     if "moustache" not in acc and not shave and o.get("moustache", "none") != "none":
         _moustache(hline, hpoly, o["moustache"], hcol, fdx)

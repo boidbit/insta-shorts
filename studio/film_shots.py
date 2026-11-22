@@ -87,7 +87,8 @@ def plan_shots(plan, own_camera=False, style="film"):
         st = c.state_at(sp["start"] + 0.05)
         expr, act = st.get("expression"), st.get("action")
         lst = chars[other]
-        if act in WIDE or _moving(c, sp["start"], sp["end"]) or _moving(lst, sp["start"], sp["end"]):
+        seated = act in ("sit", "lie_down", "sleep") and st.get("on")      # (already on a seat: talking, not moving)
+        if (act in WIDE and not seated) or _moving(c, sp["start"], sp["end"]) or _moving(lst, sp["start"], sp["end"]):
             kind = "free"
         elif i == len(speech) - 1:
             kind = "punch"
@@ -115,7 +116,8 @@ def plan_shots(plan, own_camera=False, style="film"):
                     and not any(sp["start"] - 0.05 <= e["t"] < sp["end"] for sp in speech):
                 other = last_other.get(c.name) or next((p.name for p in people if p is not c), None)
                 cuts.append((e["t"], "react", c.name, other))
-            elif a in WIDE and e["t"] > open_end and not any(sp["start"] <= e["t"] < sp["end"] for sp in speech):
+            elif a in WIDE and not e.get("on") and e["t"] > open_end \
+                    and not any(sp["start"] <= e["t"] < sp["end"] for sp in speech):
                 cuts.append((e["t"], "free", c.name, None))
     cuts.sort(key=lambda x: x[0])
     merged = []

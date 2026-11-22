@@ -1,0 +1,23 @@
+{
+  "name": "Gappu",
+  "also": [
+    "Gappu Gupta",
+    "Gappu Bhai",
+    "GappuGupta"
+  ],
+  "title": "Gappu Gupta",
+  "words": "podcaster",
+  "about": "'Gappcast' ka host: headphones, gol chashma, kaali tshirt. Har mehmaan se 'deep' sawaal, khud ke views 12.",
+  "aadat": "Har jawab ko 'life lesson' bana deta hai aur har baat pe 'Ye clip viral hogi!'. Kamzori: podcast ke views sirf 12, aur mehmaan ka naam bhool jaata hai.",
+  "line": "Toh bataiye... aapka struggle kya tha?",
+  "place": "podcast",
+  "hashtag": "#gappcast",
+  "boli": "FM wale RJ jaisa: gehri, dheemi, 'deep' awaaz, beech me dramatic pause; 'Toh bataiye... aapka struggle kya tha?' ya 'Ye clip viral hogi!' poori video me 1-2 baar.",
+  "awaaz": {
+    "gemini": "Algieba",
+    "name": "hi-IN-MadhurNeural",
+    "pitch": "-4Hz",
+    "rate": "+4%",
+    "andaaz": "a smooth, self-important podcast host with a deep FM-radio voice and dramatic pauses"
+  }
+}

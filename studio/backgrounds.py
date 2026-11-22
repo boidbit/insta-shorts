@@ -2,6 +2,7 @@
 plus support for your own PNG/JPG backgrounds."""
 import contextlib
 import math
+import os
 import random
 
 import numpy as np
@@ -729,6 +730,28 @@ def _cloud_sprite(s, scale):
 
 
 class Background:
+    def _photo_fronts(self, path, k):
+        """A photo place's pieces that stand in front of the people behind them (the doctor's desk): cut out of the
+        picture along their outline, depth-sorted with the people (<photo>.json "front")."""
+        import json
+        from PIL import ImageDraw
+        cfg_path = asset_path(os.path.splitext(path)[0] + ".json")
+        try:
+            with open(cfg_path, encoding="utf-8") as f:
+                fronts = json.load(f).get("front") or []
+        except (OSError, ValueError):
+            return
+        for fr in fronts:
+            pts = [(x * k, y * k) for x, y in fr["pts"]]
+            mask = Image.new("L", self.static.size, 0)
+            ImageDraw.Draw(mask).polygon(pts, fill=255)
+            bb = mask.getbbox()
+            if not bb:
+                continue
+            piece = self.static.convert("RGBA").crop(bb)
+            piece.putalpha(mask.crop(bb))
+            self.fg.append((float(fr.get("depth", 1700)), piece, bb[0], bb[1], None))
+
     def __init__(self, spec, out_w, out_h):
         self.out_w, self.out_h = out_w, out_h
         s = out_w / float(LW)
@@ -801,6 +824,7 @@ class Background:
             im = im.resize((int(im.width * r + 1), int(im.height * r + 1)), Image.LANCZOS)
             l, t = (im.width - out_w) // 2, (im.height - out_h) // 2
             self.static = im.crop((l, t, l + out_w, t + out_h))
+            self._photo_fronts(spec["path"], out_w / 1080.0)
         elif self.kind == "night_road":
             sky, wides = night_road(s, footpath=footpath)
             self.static = sky

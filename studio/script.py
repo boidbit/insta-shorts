@@ -183,6 +183,7 @@ ROLE_LOOKS = {
     "sweeper": "safai_wala", "safaiwala": "safai_wala", "safai_karmachari": "safai_wala",
     "sadhu": "baba", "babaji": "baba", "jyotishi": "baba", "swami": "baba", "tantrik": "baba",
     "pujari": "pandit", "panditji": "pandit", "policewala": "police", "inspector": "police", "havaldar": "police",
+    "podcaster": "podcaster", "host": "podcaster", "anchor": "podcaster", "youtuber_host": "podcaster",
     "daroga": "police", "dactor": "doctor", "pagla_doctor": "pagla_doctor", "paglet": "pagla_doctor",
     "jholachhap": "pagla_doctor", "groom": "dulha", "bride": "dulhan",
     "netaji": "neta", "mantri": "neta", "politician": "neta", "sarpanch": "sarpanch", "mla": "neta",
@@ -230,7 +231,7 @@ MOVE_WORDS = ("enter", "exit", "walk", "left", "right", "center", "up", "down", 
 def vocab():
     """Every word the script format understands (the web page keeps a copy for its checker)."""
     return {
-        "places": sorted(BACKGROUNDS),
+        "places": sorted(set(BACKGROUNDS) | {(c.get("words") or [st])[0] for st, c in image_places().values()}),
         "looks": sorted(LOOKS), "roles": sorted(ROLE_LOOKS),
         "extras": sorted(set(ACCESSORIES) | set(ACCESSORY_WORDS) | set(HAIR_STYLES) | set(HAIR_WORDS) | set(OUTFITS) | set(SKIN_TONES)
                          | set(JACKET_WORDS) | set(BANYAN_WORDS)
@@ -1249,11 +1250,68 @@ def bring_stalls(scenes, cast):
             sc["lines"].insert(0, ("obj", park({"kind": kind, "at": "center", "auto": True})))
 
 
+def image_places():
+    """{word: (stem, config)} of the photo places: assets/backgrounds/<stem>.jpg with a <stem>.json beside it
+    (its words, the people's scale, where they stand / sit, what stands in front of them)."""
+    import json
+    out = {}
+    folder = asset_path(os.path.join("assets", "backgrounds"))
+    for f in sorted(os.listdir(folder)) if os.path.isdir(folder) else []:
+        if not f.endswith(".json"):
+            continue
+        stem = f[:-5]
+        if not any(os.path.isfile(os.path.join(folder, stem + e)) for e in IMAGE_EXT):
+            continue
+        try:
+            with open(os.path.join(folder, f), encoding="utf-8") as fh:
+                cfg = json.load(fh)
+        except (OSError, ValueError):
+            continue
+        for w in [stem] + list(cfg.get("words") or []):
+            out[w.lower()] = (stem, cfg)
+    return out
+
+
+def place_config(bg):
+    """The config of a photo place (see image_places), or None."""
+    if not isinstance(bg, dict) or bg.get("type") != "image":
+        return None
+    stem = os.path.splitext(os.path.basename(str(bg.get("path", ""))))[0]
+    hit = image_places().get(stem.lower())
+    return hit[1] if hit else None
+
+
+def assign_spots(cfg, names, cast):
+    """{name: spot}: each person to a spot of the photo place, the ones a spot is meant for first (the doctor
+    behind the desk), then the rest in order."""
+    spots = list(cfg.get("spots") or [])
+    out, free = {}, list(spots)
+
+    def wants(spot, name):
+        spec = cast.get(name, {})
+        keys = {spec.get("look"), spec.get("role"), name.lower()}
+        return bool(set(spot.get("for") or []) & keys)
+    for name in names:
+        hit = next((sp for sp in free if wants(sp, name)), None)
+        if hit:
+            out[name] = hit
+            free.remove(hit)
+    for name in names:                              # the rest take the free spots in their order (seats first)
+        if name not in out and free:
+            out[name] = free.pop(0)
+    return out
+
+
 def resolve_background(raw):
     """`street` / `gali` (= assets/backgrounds/gali.png) / `assets/backgrounds/x.jpg` -> (background dict, warning)."""
     name = raw.strip()
     low = name.lower().replace(" ", "_")
     low = PLACE_WORDS.get(low, low)
+    photo = image_places().get(low)
+    if photo:                                       # a photo place: SCENE: clinic / podcast
+        stem = photo[0]
+        ext = next(e for e in IMAGE_EXT if os.path.isfile(asset_path(os.path.join("assets", "backgrounds", stem + e))))
+        return {"type": "image", "path": "assets/backgrounds/%s%s" % (stem, ext)}, None
     if low in BACKGROUNDS:
         return {"type": low}, None
     words = name.lower().split()
@@ -1579,6 +1637,7 @@ def _kirdaar_list():
 
 
 PLAIN_NAME_LOOKS = {"ladki": ["college_girl"], "ladka": ["college_boy"], "aurat": ["aunty"], "aadmi": ["uncle"],
+                    "mareez": ["uncle"], "patient": ["uncle"], "guest": ["boy"], "mehmaan": ["boy"],
                     "girl": ["college_girl"], "boy": ["college_boy"], "larki": ["college_girl"], "larka": ["college_boy"]}
 
 
@@ -1807,7 +1866,9 @@ def _parse_script(text):
         if m and m.group(1).upper() in HEADERS:
             key, val = m.group(1).upper(), m.group(2).strip()
             if key == "CAST":
-                declared = True
+                parts_ = [p_ for p_ in re.split(r",\s*(?=[A-Za-z_]\w*\s*=)", val) if "=" in p_]
+                if not parts_ or not all(p_.rstrip().endswith(" pakka") for p_ in parts_):
+                    declared = True                 # (a CAST of kirdaar only came by itself: the rest by name)
                 # split before every "NAME =", so commas inside a character's words don't break it
                 for part in re.split(r",\s*(?=[A-Za-z_]\w*\s*=)", val):
                     if "=" in part:
@@ -2140,6 +2201,21 @@ def _parse_script(text):
                 sc.setdefault("sets", {})[sid] = piece
                 seated[name] = sid
                 tl.append({"t": 0.0, "who": name, "action": "sit", "on": sid})
+        photo_cfg = None if veh else place_config(sc["background"])
+        if photo_cfg:                               # a photo place: each one at their spot, seated where it has a seat
+            for name, spot in assign_spots(photo_cfg, [n for n in fronts if not cast.get(n, {}).get("hidden")],
+                                           cast).items():
+                spec_ = cast.get(name, {})
+                chars[name].update(x=float(spot["x"]), y=float(spot["y"]), depth_k=float(spot.get("k", 1.0)))
+                if spot.get("facing") in ("left", "right"):
+                    chars[name]["facing"] = spot["facing"]
+                if spot.get("sit") and not spec_.get("kind"):
+                    sid = "seat_" + re.sub(r"\W", "", name.lower())
+                    sc.setdefault("sets", {})[sid] = {"id": sid, "type": "chair", "x": float(spot["x"]),
+                                                      "y": float(spot["y"]), "scale": float(spot.get("k", 1.0)),
+                                                      "hidden": True}
+                    seated[name] = sid
+                    tl.append({"t": 0.0, "who": name, "action": "sit", "on": sid})
         tl.append({"wait": 0.3 if si == 0 else 0.2})
         first = True
         for ln in sc["lines"]:
@@ -2192,7 +2268,7 @@ def _parse_script(text):
                 else:
                     ev["move"] = {"x": SLOTS[3][side], "dur": 1.0}
                     ev.setdefault("hold", 1.0)
-            if who in seated:                           # inside a vehicle, seated
+            if who in seated:                           # inside a vehicle / on a photo place's seat
                 act = ev.get("action")
                 if move or "entry" in ev or "leave" in ev or act in STAND_UP:
                     seated.pop(who, None)               # gets up
@@ -2287,6 +2363,10 @@ def _parse_script(text):
             item["cut_shot"] = sc["cut_shot"]
             if sc.get("cut_focus"):
                 item["cut_focus"] = sc["cut_focus"]
+        pcfg = place_config(sc["background"])
+        if pcfg:                                    # a photo: the people at its own scale, the picture as it is
+            item["meta"] = dict(item.get("meta") or {}, people_scale=float(pcfg.get("people_scale", 1.0)))
+            item["angle"] = {"zoom": 1.0, "x": 540.0, "mirror": False}
         if pov_place:                               # a driving shot is composed: the camera stays on it whole
             item["meta"] = {"people_scale": pov_place["scale"], "auto_camera": False}
             item["angle"] = {"zoom": 1.0, "x": 540.0, "mirror": False}
@@ -2352,7 +2432,7 @@ def _parse_script(text):
             warnings.append("CAMERA %r: film (default), sitcom, seedha ya classic (purana) likho" % meta["CAMERA"])
     if scene.get("style") == "2.5d":
         flat = sorted({str(sc["background"].get("type")) for sc in scenes
-                       if not styles.has_depth(sc["background"].get("type"))})
+                       if not styles.has_depth(sc["background"].get("type")) and not place_config(sc["background"])})
         if flat:
             warnings.append("STYLE 2.5d: %s 2.5D me flat dikhegi (baaki har jagah 2.5D me gehraai ke saath banti hai)"
                             % ", ".join(flat))
