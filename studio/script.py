@@ -675,6 +675,17 @@ def sound_time(word):
     return None if not m else int(m.group(1) or 0) * 60 + float(m.group(2))
 
 
+# a feeling that is heard more than seen: with a second one, that one is the face and this one the voice
+VOICE_FEEL = {"shout", "relaxed", "bored", "sleepy"}
+FEEL_FAMILIES = ({"angry", "shout", "determined", "disgust"}, {"smug", "sly", "proud", "swag", "relaxed", "evil"},
+                 {"scared", "nervous", "embarrassed", "shy", "cringe"}, {"surprised", "shock", "confused"},
+                 {"laugh", "lol", "grin", "smile", "excited"}, {"sad", "cry", "hurt"})
+
+
+def _feel_family(w):
+    return next((i for i, f in enumerate(FEEL_FAMILIES) if w in f), w)
+
+
 def _stage(tokens, ev, scene_cast, who):
     """Apply bracket / arrow words to an event dict.
     Returns (move request or None, unknown words, words that were overridden)."""
@@ -824,6 +835,18 @@ def _stage(tokens, ev, scene_cast, who):
         i += 1
     if ev.get("action") == "point" and "point" not in ev and who in scene_cast:
         ev["point"] = "right" if scene_cast.index(who) < len(scene_cast) / 2.0 else "left"
+    feel = list(dict.fromkeys(exprs))
+    if len(feel) >= 2:                  # two feelings: one for the face (changing mid-line), both for the voice
+        a, b = feel[0], feel[1]
+        if (a in VOICE_FEEL) != (b in VOICE_FEEL):           # "shout, angry": an angry face, a shouting voice
+            ev["expression"] = b if a in VOICE_FEEL else a
+        elif _feel_family(a) == _feel_family(b):              # "smug, sly": nearly the same face, the last one
+            ev["expression"] = b
+        else:                                                 # "hairan, nervous": surprised, then nervous
+            ev["expression"] = a
+            ev["expr_then"] = b
+        ev["voice_feel"] = [a, b]
+        exprs = [w for w in exprs if w not in (a, b)] + [ev["expression"]]
     lost = acts[:-1] + exprs[:-1]       # only the last action / expression of a line is used
     if acts and not exprs and ev.get("action") in EXPRESSIONS:
         ev["expression"] = ev["action"]        # "A (shock): ..." also gets the shocked face

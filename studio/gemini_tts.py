@@ -93,6 +93,20 @@ def read_wav(path):
 
 
 # ------------------------------------------------------------------ the single API call
+FEEL_EN = {"angry": "angry", "shout": "shouting loudly", "relaxed": "relaxed and unhurried", "smug": "smug",
+           "sly": "sly", "proud": "proud", "swag": "with swagger", "evil": "menacing", "surprised": "surprised",
+           "shock": "shocked", "confused": "confused", "nervous": "nervous, a little shaky", "scared": "scared, trembling",
+           "embarrassed": "embarrassed", "shy": "shy", "laugh": "laughing", "lol": "laughing", "grin": "amused",
+           "smile": "warm", "excited": "excited", "sad": "sad", "cry": "close to tears", "hurt": "hurt",
+           "bored": "bored, flat", "sleepy": "sleepy", "determined": "determined", "disgust": "disgusted",
+           "think": "thoughtful", "love": "loving", "pagla": "manic", "money_eyes": "greedy"}
+
+
+def delivery(feel):
+    """["shout", "angry"] -> "shouting loudly and angry" (for Gemini)."""
+    return " and ".join(FEEL_EN.get(w, w.replace("_", " ")) for w in feel)
+
+
 def build_payload(lines, style=DEFAULT_STYLE, notes=None):
     """lines: [{"voice": "Kore", "text": "..."}] in speaking order. 1 voice -> single-speaker request,
     2 voices -> multi-speaker request (Gemini allows at most 2 speakers)."""
@@ -111,6 +125,12 @@ def build_payload(lines, style=DEFAULT_STYLE, notes=None):
         speech = {"multiSpeakerVoiceConfig": {"speakerVoiceConfigs": [
             {"speaker": label[v], "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": v}}} for v in voices]}}
     notes = notes or {}
+    hows = [(i, ln) for i, ln in enumerate(lines) if ln.get("how")]
+    if hows:                                    # per line: "line 2 (Speaker1, 'Oye ruk ja...'): angry, shouting"
+        lab = (lambda v: label[v]) if len(voices) > 1 else (lambda v: "the speaker")
+        style = ((style or "").strip() + " How some lines are said: " + "; ".join(
+            "line %d (%s, \"%s...\"): %s" % (i + 1, lab(ln["voice"]), " ".join(ln["text"].split()[:4]), ln["how"])
+            for i, ln in hows) + ".").strip()
     if notes:                                   # a character's own way of talking (kirdaar: Sultan Bhai's swagger)
         if len(voices) == 1:
             how = "The speaker sounds like %s." % notes[voices[0]] if voices[0] in notes else ""
@@ -356,6 +376,9 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
             voices.append(it["voice"])
     remap = {v: voices[i if i < 2 else i % 2] for i, v in enumerate(voices)}
     lines = [{"voice": remap[it["voice"]], "text": it["text"]} for it in items]
+    for ln, it in zip(lines, items):            # a line with two feelings: how it is said ("shout, angry")
+        if it.get("feel"):
+            ln["how"] = delivery(it["feel"])
     notes = {}
     for it in items:                                # the first character on a voice gives its manner
         how = (it.get("spec") or {}).get("andaaz")
