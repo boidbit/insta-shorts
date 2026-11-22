@@ -1005,8 +1005,11 @@ def drink(t, sp, I, ph, o):
 
 def phone_call(t, sp, I, ph, o):
     d = _d(o)
-    return _side(d, _P(hand("R", (96, -372), (1, 1)), hand("L", (-72, -92), (-1, -0.3)), prop="phone",
-                       tilt=1.5 * sin(2 * pi * 0.4 * t), look_x=0.3 * sin(2 * pi * 0.2 * t), ll1=-9, rl1=9))
+    # the hand on the ear and the phone upright against it (phone_ear), held in that hand (prop_hand: a person
+    # facing left holds it in the other hand, the one the pose is mirrored onto)
+    return _side(d, _P(hand("R", (100, -398), (1, 1)), hand("L", (-72, -92), (-1, -0.3)), prop="phone_ear",
+                       prop_hand="R", tilt=1.5 * sin(2 * pi * 0.4 * t), look_x=0.3 * sin(2 * pi * 0.2 * t),
+                       ll1=-9, rl1=9))
 
 
 def text(t, sp, I, ph, o):

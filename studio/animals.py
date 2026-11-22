@@ -291,10 +291,14 @@ def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_ope
     if turn:                                        # the head turned to us (it is talking)
         mouth = _front_head(H, hr, poly, line, col, dk, light, t, speak, mouth_open, expr, action)
         _front_acc(S, X, H, hr, poly, line, acc, spec, chain=False)
+        if action in ("phone_call", "call"):
+            _dog_phone(poly, H, -1.02, 0.12, -12)
     else:
         mouth = _head(kind, H, hr, poly, line, limb, col, dk, light, t, speak, mouth_open, expr, action, lie, graze, at)
         if kind == "dog":
             _side_acc(S, X, H, hr, poly, line, acc, spec)
+        if action in ("phone_call", "call"):
+            _dog_phone(poly, H, -0.62, 0.05, 18)
     head_top = X(H(0.0, -1.2))
     anchors = dict(head_top=S.T(head_top), head_center=S.T(X((hx_, hy_))), mouth=S.T(X(mouth)),
                    feet=S.T((0, 0)), hand_l=S.T(X(mouth)), hand_r=S.T(X(mouth)))
@@ -330,6 +334,16 @@ def _side_chain(S, X, line, base, end, width):
     line([b, tip], 4, GOLD)
     S.dot(X(tip), 15, GOLD, INK, 4)
     S.dot(X(tip), 6, (180, 136, 40), None)
+
+
+def _dog_phone(poly, H, cx, cy, lean):
+    """On a call (phone_call): the phone tucked against the ear, a little slanted."""
+    c, s_ = math.cos(math.radians(lean)), math.sin(math.radians(lean))
+
+    def q(u, v):
+        return H(cx + u * c - v * s_, cy + u * s_ + v * c)
+    poly([q(-0.2, -0.46), q(0.2, -0.46), q(0.2, 0.46), q(-0.2, 0.46)], (40, 44, 52), INK, 4)
+    poly([q(-0.13, -0.37), q(0.13, -0.37), q(0.13, 0.37), q(-0.13, 0.37)], (120, 190, 235), None)
 
 
 def _side_acc(S, X, H, hr, poly, line, acc, spec):
@@ -462,6 +476,8 @@ def _dog_front(S, X, poly, line, limb, P, col, dk, light, t, at, action, speak, 
     spec = dict(spec, _fur=col)
     mouth = _front_head(H, hr, poly, line, col, dk, light, t, speak, mouth_open, expr, action)
     _front_acc(S, X, H, hr, poly, line, acc, spec)
+    if action in ("phone_call", "call"):
+        _dog_phone(poly, H, 1.02, 0.12, 12)
     anchors = dict(head_top=S.T(X(H(0.0, -1.2))), head_center=S.T(X(H(0.0, 0.0))), mouth=S.T(X(mouth)),
                    feet=S.T((0, 0)), hand_l=S.T(X(mouth)), hand_r=S.T(X(mouth)))
     return S.ops, anchors
