@@ -112,7 +112,7 @@ BURST_ACTIONS = {"jump": 0.95, "celebrate": 1.6, "fist_pump": 1.2, "jumping_jack
                  "shy": 1.4, "facepalm": 1.6, "dizzy": 1.6}
 
 CHAR_ATTRS = ("action", "expression", "prop", "label", "look", "facing", "style", "point", "dir",
-              "lean", "speed", "intensity", "hands", "tint", "on", "visible", "view")
+              "lean", "speed", "intensity", "hands", "tint", "on", "visible", "view", "pose")
 
 
 OBJ_Y = {"truck": 1640.0, "auto": 1650.0, "car": 1640.0, "scooter": 1660.0, "cow": 1690.0, "dustbin": 1690.0,
@@ -425,7 +425,7 @@ class Char:
             for key in ("speed", "intensity"):
                 if key in ev:
                     st[key] = ev[key]
-            for key in ("style", "point", "dir", "lean", "hands"):
+            for key in ("style", "point", "dir", "lean", "hands", "pose"):
                 if key in ev:
                     st["opts"][key] = ev[key]
         for sp in self.speech:
@@ -550,6 +550,46 @@ def collect_lines(scene):
     return out
 
 
+# ---------------------------------------------------------------- voice pack: the same voice when a reel is made again
+# VOICE_PACK_OUT=<dir>: every spoken line's voice file is kept there (+ index.json), zipped into the release;
+# VOICE_PACK_IN=<dir>: a reel made again (the Harkat editor) takes each unchanged line's voice from there, so only a
+# changed line gets a new voice (and no voice API call at all when nothing was said differently).
+def pack_key(who, text):
+    import hashlib
+    return hashlib.sha1(("%s|%s" % (str(who).strip().lower(), " ".join(str(text).split()))).encode("utf-8")).hexdigest()[:16]
+
+
+def voice_pack_in():
+    import json
+    d = os.environ.get("VOICE_PACK_IN")
+    idx = os.path.join(d, "index.json") if d else None
+    if not idx or not os.path.isfile(idx):
+        return {}
+    with open(idx, encoding="utf-8") as f:
+        index = json.load(f)
+    return {k: os.path.join(d, v["file"]) for k, v in index.items() if os.path.isfile(os.path.join(d, v["file"]))}
+
+
+def voice_pack_save(who, text, path):
+    import json
+    import shutil
+    d = os.environ.get("VOICE_PACK_OUT")
+    if not d or not path or not os.path.isfile(path):
+        return
+    os.makedirs(d, exist_ok=True)
+    key = pack_key(who, text)
+    name = key + os.path.splitext(path)[1]
+    shutil.copyfile(path, os.path.join(d, name))
+    idx = os.path.join(d, "index.json")
+    index = {}
+    if os.path.isfile(idx):
+        with open(idx, encoding="utf-8") as f:
+            index = json.load(f)
+    index[key] = {"file": name, "who": who, "text": " ".join(str(text).split())}
+    with open(idx, "w", encoding="utf-8") as f:
+        json.dump(index, f, ensure_ascii=False, indent=1)
+
+
 def prepare_voice(scenes, use_tts=True, tts_provider=None):
     """Voice for a whole VIDEO (all its scenes) with ONE Gemini request.
 
@@ -563,6 +603,23 @@ def prepare_voice(scenes, use_tts=True, tts_provider=None):
     cfg = (scenes[0].get("meta") or {}).get("tts") or {}
     provider, explicit = audio.resolve_provider(tts_provider, cfg)
     per_scene = [collect_lines(sc) for sc in scenes]
+    pack, known = voice_pack_in(), {}
+    if pack:                                        # made again from an earlier reel: its voice, line by line
+        for si, lines in enumerate(per_scene):
+            for it in lines:
+                p = pack.get(pack_key(it["who"], it["text"]))
+                if p:
+                    known[(si, it["ti"])] = p
+        per_scene = [[it for it in lines if (si, it["ti"]) not in known] for si, lines in enumerate(per_scene)]
+        print("  [tts] voice pack: %d line(s) reused, %d new" % (len(known), sum(map(len, per_scene))), file=sys.stderr)
+    out = _prepare(scenes, per_scene, provider, explicit, cfg)
+    for (si, ti), p in known.items():
+        out[si]["paths"][ti] = p
+    return out
+
+
+def _prepare(scenes, per_scene, provider, explicit, cfg):
+    silent = [{"paths": {}, "edge": False} for _ in scenes]
     flat = [it for lines in per_scene for it in lines]
     if provider == "elevenlabs" and flat:
         try:
@@ -1418,6 +1475,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 elif not warned[0]:
                     print("  [tts] unavailable -> using estimated timing, video will have no voice", file=sys.stderr)
                     warned[0] = True
+            if path and ev.get("tts", True):
+                voice_pack_save(c.name, str(speak).strip(), path)
             if dur is None:
                 dur = float(ev.get("duration", audio.estimate_duration(speak)))
             bubble = ev.get("bubble", True)
@@ -1433,7 +1492,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
             else:
                 span, step = dur + 0.12, dur + gap
             sp = dict(who=c.name, text=text, start=t, end=t + span, audio=path, bubble=bubble,
-                      shot=ev.get("shot"))
+                      shot=ev.get("shot"), dur=span)
             if ev.get("lip_src"):                   # sound mode: the mouth follows the SOUND at this time
                 sp["lip_src"] = ev["lip_src"]
             if frz is not None:
@@ -1452,6 +1511,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 if prev["end"] > t and prev["who"] != sp["who"]:      # the other person gets cut off
                     prev["end"] = t + 0.1
                     prev["cut"] = t + 0.1 - prev["start"]
+                    prev["dur"] = prev["cut"]
             if subtitle:                            # voice-over / subtitle mode: the words at the bottom while spoken
                 pos_ = ("bottom" if ev.get("subtitle") else                                # (narrator)
                         "upper" if c.spec.get("kind") in FOCUS_H else "lower")             # not over a dog's body

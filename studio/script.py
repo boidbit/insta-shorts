@@ -121,6 +121,17 @@ PUT_WORDS = ("put", "rakh", "rakho", "rakhna", "place")       # A -> put bag des
 TAKE_WORDS = ("take", "utha", "uthao", "uthana", "pick")       # A -> take file desk
 
 
+FRAC = re.compile(r"0?\.\d+|[01](\.0+)?|\d{1,2}%")
+
+
+def _frac(w):
+    """`0.35` / `35%` -> 0.35 (a place across the width), else None."""
+    w = str(w).strip()
+    if not FRAC.fullmatch(w):
+        return None
+    return min(1.0, max(0.0, float(w[:-1]) / 100.0 if w.endswith("%") else float(w)))
+
+
 def parse_set(raw, placed):
     """`door right` / `sofa left big` / `tv right on` / `signboard center CHAI POINT` / `door open`.
     Returns (kind, spec, problems): kind "place" (new piece) or "state" (a piece already in this place)."""
@@ -131,11 +142,15 @@ def parse_set(raw, placed):
     items = [_sets.ITEM_WORDS[w.lower()] for w in rest if w.lower() in _sets.ITEM_WORDS and typ in _sets.SURFACE]
     rest = [w for w in rest if not (w.lower() in _sets.ITEM_WORDS and typ in _sets.SURFACE)]
     state = next((w.lower() for w in rest if w.lower() in SET_STATES), None)
+    frac = next((_frac(w) for w in rest if _frac(w) is not None), None)       # `OBJ: chair 0.3` (the editor)
+    rest = [w for w in rest if _frac(w) is None]
     pos = next((w.lower() for w in rest if w.lower() in SET_X), None)
     flags = {w.lower() for w in rest}
     if typ in placed and pos is None and state is not None:
         return "state", {"set": typ if placed.get(typ) else typ, "state": state}, []
     spec = {"type": typ, "x": SET_X.get(pos, 540 if typ in ("fan", "tubelight", "clock") else 760)}
+    if frac is not None:
+        spec["x"] = round(70.0 + frac * 940.0, 1)
     if state:
         spec["state"] = state
     if "big" in flags:
@@ -686,6 +701,9 @@ def _feel_family(w):
     return next((i for i, f in enumerate(FEEL_FAMILIES) if w in f), w)
 
 
+POSE_WORD = re.compile(r"(ra|la|rl|ll)=-?\d+(\.\d+)?/-?\d+(\.\d+)?|(tilt|head)=-?\d+(\.\d+)?")
+
+
 def _stage(tokens, ev, scene_cast, who):
     """Apply bracket / arrow words to an event dict.
     Returns (move request or None, unknown words, words that were overridden)."""
@@ -778,6 +796,19 @@ def _stage(tokens, ev, scene_cast, who):
         elif w == "walk" and nxt in ("left", "center", "right"):
             move = ("walk", nxt)
             i += 1
+        elif w == "pose":                           # A -> pose ra=95/-140 la=-14/-8 rl=7/2 ll=-7/-2 head=10
+            spec = {}                               # (the Harkat editor's puppet: each limb's two angles)
+            while i + 1 < len(tokens) and POSE_WORD.fullmatch(tokens[i + 1]):
+                k, v = tokens[i + 1].split("=")
+                vals = [max(-400.0, min(400.0, float(x))) for x in v.split("/")]
+                if k in ("ra", "la", "rl", "ll") and len(vals) == 2:
+                    spec[k + "1"], spec[k + "2"] = vals
+                elif k in ("tilt", "head") and len(vals) == 1:
+                    spec["head_tilt" if k == "head" else "tilt"] = max(-40.0, min(40.0, vals[0]))
+                i += 1
+            ev["action"] = "pose"
+            ev["pose"] = spec
+            acts.append("pose")
         elif w in ("move", "walk", "to") and nxt is not None and re.fullmatch(r"(0?\.\d+|[01](\.0+)?|\d{1,2}%)", nxt):
             frac = float(nxt[:-1]) / 100.0 if nxt.endswith("%") else float(nxt)   # A -> move 0.35: walks to 35%
             move = ("to", min(1.0, max(0.0, frac)))                               # of the width (the editor)
@@ -1415,6 +1446,8 @@ def parse_obj(rest):
             i += 1
         elif w in ("left", "right", "center"):
             spec["at"] = w
+        elif _frac(w) is not None:                  # `OBJ: cycle 0.3` (the editor): where across the width
+            spec["at"] = round(70.0 + _frac(w) * 940.0, 1)
         elif w == "front":
             spec["front"] = True
         elif w in ("big", "small"):

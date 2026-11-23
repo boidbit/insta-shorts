@@ -90,6 +90,10 @@ on:
         description: "Set by the web page: a short viral sound for sound mode (leave empty)"
         required: false
         default: ""
+      voice_from:
+        description: "Set by the Harkat editor: an earlier reel (reel-<id>) whose voice is used again, line by line (leave empty)"
+        required: false
+        default: ""
   push:
     paths:
       - "scenes/*.json"
@@ -243,6 +247,21 @@ jobs:
             --title "Draft: ${TITLE:-script}" --notes-file scenes/generated/draft.txt
           echo "Draft: $TAG" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: The earlier reel's voice (made again from the Harkat editor)
+        if: (env.STAGE == 'video') && inputs.voice_from != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VOICE_FROM: ${{ inputs.voice_from }}
+        run: |
+          mkdir -p voicepack
+          if gh release download "$VOICE_FROM" -p '*.voice.zip' -D voicepack; then
+            for z in voicepack/*.voice.zip; do python -m zipfile -e "$z" voicepack/in; done
+            echo "VOICE_PACK_IN=$PWD/voicepack/in" >> "$GITHUB_ENV"
+            echo "Voice from $VOICE_FROM" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning title=Purani awaaz nahi mili::$VOICE_FROM me voice pack nahi hai (purani reel): nayi awaaz banegi"
+          fi
+
       - name: Render
         if: env.STAGE == 'video' || env.STAGE == 'sound_video'
         env:
@@ -260,7 +279,10 @@ jobs:
           [ "$STYLE" != "auto" ] && FLAGS="$FLAGS --style $STYLE"      # auto = the script's own STYLE line
           for f in $LIST; do
             name=$(basename "$f" .json)
-            python -m studio.render "$f" -o "out/$name.mp4" --width "$WIDTH" $FLAGS
+            VOICE_PACK_OUT="out/$name.voice" python -m studio.render "$f" -o "out/$name.mp4" --width "$WIDTH" $FLAGS
+            if [ -d "out/$name.voice" ]; then                      # each line's voice: the Harkat editor makes it again
+              (cd "out/$name.voice" && python -m zipfile -c "../$name.voice.zip" .)
+            fi
             python -m studio.render "$f" --frame 1.0 -o "out/$name.png" --width 540 $FLAGS
             python -m studio.render "$f" --cover -o "out/$name.cover.png" --width 1080 $FLAGS || true    # Instagram cover
             [ -f "${f%.json}.post.txt" ] && cp "${f%.json}.post.txt" "out/$name.post.txt"
@@ -297,7 +319,7 @@ jobs:
             cp "$FILE" out/script.txt
           fi
           for f in $LIST; do [ -f "$f" ] && cp "$f" "out/$(basename "$f" .json).scene.json"; done
-          files=(out/*.mp4 out/*.png out/*.post.txt out/script.txt out/*.scene.json)
+          files=(out/*.mp4 out/*.png out/*.post.txt out/script.txt out/*.scene.json out/*.project.json out/*.voice.zip)
           first=$(echo $LIST | awk '{print $1}')
           TITLE="$(python -c 'import sys; from studio.util import load_scene; s = load_scene(sys.argv[1]); print(s.get("hook") or s.get("vars", {}).get("hook") or "Reel")' "$first")"
           cat out/*.post.txt > notes.md 2>/dev/null || true
@@ -305,6 +327,10 @@ jobs:
           if [ -f out/script.txt ]; then
             { echo; echo "<!-- script -->"; cat out/script.txt; } >> notes.md    # to read, change and make again
           fi
+          for pj in out/*.project.json; do                 # when each line is said (the Harkat editor's timeline)
+            { echo; echo "<!-- project $(tr -d '\n' < "$pj") -->"; } >> notes.md
+            break
+          done
           gh release create "$TAG" "${files[@]}" --title "$TITLE" --notes-file notes.md --target "$GITHUB_SHA" --latest=false
           echo "Release: $TAG" >> "$GITHUB_STEP_SUMMARY"
           # the approved draft has done its job

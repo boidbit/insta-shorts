@@ -2137,6 +2137,22 @@ def main(argv=None):
         print("saved %s (with the sound) and %s (without it)" % (out, insta))
         return
     r.render_video(out)                             # (sound mode: the sound is in it, from the first frame)
+    write_project(r, os.path.splitext(out)[0] + ".project.json")
+
+
+def write_project(r, path):
+    """When each line is said in the finished video (for the Harkat editor: the reel's own timeline)."""
+    import json
+    src = getattr(r, "speech", None)
+    if src is None and hasattr(r, "v"):
+        src = getattr(r.v, "speech", [])
+    lines = [dict(who=sp.get("who"), text=sp.get("text"), start=round(float(sp["start"]), 3),
+                  end=round(float(sp["start"]) + float(sp.get("dur", 0.0)), 3))
+             for sp in (src or [])]
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(dict(version=1, duration=round(float(getattr(r, "duration", 0.0)), 3), fps=getattr(r, "fps", 30),
+                       lines=lines), f, ensure_ascii=False)
+    print("saved", path)
 
 
 def with_sound(video, sound_path, out):
