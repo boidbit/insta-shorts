@@ -225,7 +225,7 @@ TURN_WORDS = {"side": "side", "profile": "side", "mud": "side", "mudke": "side",
               "samne": "front", "seedha": "front"}
 MOVE_WORDS = ("enter", "exit", "walk", "left", "right", "center", "up", "down", "up_left", "up_right", "fast",
               "pump", "swing", "cheer", "disco", "shake", "drop", "noprop", "interrupt", "beech_me",
-              "freeze", "slowmo", "slow_motion", "zoom", "reveal") + tuple(TURN_WORDS)
+              "freeze", "slowmo", "slow_motion", "zoom", "reveal", "move") + tuple(TURN_WORDS)
 
 
 def vocab():
@@ -777,6 +777,10 @@ def _stage(tokens, ev, scene_cast, who):
             i += 2 if side else 1
         elif w == "walk" and nxt in ("left", "center", "right"):
             move = ("walk", nxt)
+            i += 1
+        elif w in ("move", "walk", "to") and nxt is not None and re.fullmatch(r"(0?\.\d+|[01](\.0+)?|\d{1,2}%)", nxt):
+            frac = float(nxt[:-1]) / 100.0 if nxt.endswith("%") else float(nxt)   # A -> move 0.35: walks to 35%
+            move = ("to", min(1.0, max(0.0, frac)))                               # of the width (the editor)
             i += 1
         elif w == "point":
             ev["action"] = "point"
@@ -2326,6 +2330,9 @@ def _parse_script(text):
                     ev["facing"] = side
                     ev["move"] = {"x": -160 if side == "left" else 1240, "dur": 1.1}
                     ev.setdefault("hold", 1.1)
+                elif kind == "to":
+                    ev["move"] = {"x": round(70.0 + side * 940.0, 1), "dur": 1.0}
+                    ev.setdefault("hold", 1.0)
                 else:
                     ev["move"] = {"x": SLOTS[3][side], "dur": 1.0}
                     ev.setdefault("hold", 1.0)

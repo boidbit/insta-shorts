@@ -26,6 +26,13 @@ class Gallery(unittest.TestCase):
         self.assertIn('method:"DELETE"', self.page.replace(" ", ""))
         self.assertIn("confirm(", self.page)
 
+    def test_one_colour_is_the_default(self):
+        sel = self.page[self.page.index('<select id="color">'):]
+        sel = sel[:sel.index("</select>")]
+        self.assertTrue(sel.split("<option")[1].startswith(' value="classic" selected>Default'))   # first, chosen
+        self.assertIn('value="auto"', sel)                                                     # still there, last
+        self.assertIn('store.get("color_v") !== "2"', self.page)     # an old remembered "auto" gives way once
+
 
 if __name__ == "__main__":
     unittest.main()

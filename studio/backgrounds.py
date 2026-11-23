@@ -851,6 +851,10 @@ class Background:
                 self.static = plain(s, spec.get("colors"))
             if self.static.size != (out_w, out_h):
                 self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
+            if fn and not spec.get("classic") and spec.get("finish", True):   # light, shadow, texture (studio.finish)
+                from .dressing import dress
+                from .finish import finish
+                self.static = finish(dress(self.static, self.kind), self.kind)
         if self.layers and self.static.size != (out_w, out_h):
             self.static = self.static.resize((out_w, out_h), Image.LANCZOS)
         if spec.get("time"):                      # night / evening / sunset / dawn / rain re-lighting

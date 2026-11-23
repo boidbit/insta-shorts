@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Harkat Editor</title>
+<meta name="description" content="Script ki har line pe kirdaar ki harkat, chehra, camera aur jagah khud chuno. Studio baaki khud karta hai.">
+<style>
+  :root {
+    --bg: #f6f1e7; --card: #ffffff; --ink: #1d1a17; --muted: #6b645b; --line: #e3dccf;
+    --accent: #ffd400; --accent-ink: #1d1a17; --brand: #e4572e; --ok: #2f9e44; --err: #c92a2a; --sel: #fff3c4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #17140f; --card: #221e18; --ink: #f3ede3; --muted: #a79f93; --line: #3a342b;
+                                      --sel: #3a3220; }
+  }
+  :root[data-theme="dark"] { --bg: #17140f; --card: #221e18; --ink: #f3ede3; --muted: #a79f93; --line: #3a342b;
+                             --sel: #3a3220; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 14px 16px 120px; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  h1 { margin: 0; font-size: 22px; }
+  a.back { color: var(--brand); text-decoration: none; font-size: 15px; white-space: nowrap; }
+  .hint { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-top: 12px; }
+  textarea { width: 100%; min-height: 150px; font: 14px/1.45 ui-monospace, Menlo, monospace; padding: 10px;
+             border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); }
+  button, select { font: inherit; }
+  .btn { border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 10px 14px; border-radius: 12px;
+         cursor: pointer; min-height: 44px; }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border: 2px solid var(--ink); font-weight: 700; }
+  .btn.small { padding: 6px 10px; min-height: 36px; font-size: 14px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .lines { list-style: none; padding: 0; margin: 12px 0 0; }
+  .line { display: flex; gap: 10px; align-items: flex-start; background: var(--card); border: 1px solid var(--line);
+          border-radius: 12px; padding: 10px; margin-bottom: 8px; cursor: pointer; }
+  .line.sel { border-color: var(--brand); background: var(--sel); }
+  .line.act { border-style: dashed; }
+  .line.meta { display: none; }
+  .ava { width: 44px; height: 44px; border-radius: 10px; background: var(--bg); flex: none; display: grid;
+         place-items: center; overflow: hidden; font-size: 26px; border: 1px solid var(--line); }
+  .ava img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .who { font-weight: 700; font-size: 15px; }
+  .say { font-size: 15px; overflow-wrap: anywhere; }
+  .tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+  .tag { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line);
+         color: var(--muted); }
+  .tag.changed { border-color: var(--brand); color: var(--brand); }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 2px solid var(--ink);
+           border-radius: 18px 18px 0 0; padding: 12px 16px calc(16px + env(safe-area-inset-bottom)); max-height: 78vh;
+           overflow-y: auto; box-shadow: 0 -8px 24px rgba(0,0,0,.18); z-index: 5; }
+  .sheet .inner { max-width: 640px; margin: 0 auto; }
+  .sheet h2 { margin: 0; font-size: 17px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .grid label { display: flex; flex-direction: column; font-size: 13px; color: var(--muted); gap: 3px; }
+  .grid select { padding: 9px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+                 min-height: 44px; width: 100%; }
+  .stage { position: relative; width: 100%; aspect-ratio: 16 / 10; border-radius: 12px; overflow: hidden; margin-top: 10px;
+           background: #cfe3f3 center 70% / cover no-repeat; border: 1px solid var(--line); touch-action: none; }
+  .stage .floor { position: absolute; left: 0; right: 0; bottom: 0; height: 14%; background: rgba(0,0,0,.08); }
+  .actor { position: absolute; bottom: 6%; width: 17%; transform: translateX(-50%); text-align: center; cursor: grab;
+           touch-action: none; user-select: none; -webkit-user-select: none; transition: left .25s ease; }
+  .actor.drag { transition: none; cursor: grabbing; }
+  .actor.dim { opacity: .45; }
+  .actor .fig { width: 100%; aspect-ratio: 3 / 4; display: grid; place-items: end center; font-size: 54px; }
+  .actor .fig img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; pointer-events: none; }
+  .actor .nm { font-size: 12px; font-weight: 700; background: var(--card); border: 1px solid var(--line);
+               border-radius: 999px; padding: 0 6px; display: inline-block; margin-top: 2px; }
+  .actor.off { opacity: .3; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); border-top: 1px solid var(--line);
+         padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); z-index: 4; }
+  .bar .inner { max-width: 640px; margin: 0 auto; display: flex; gap: 8px; }
+  .bar .btn { flex: 1; }
+  .hidden { display: none !important; }
+  .toast { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+           padding: 8px 14px; border-radius: 999px; font-size: 14px; z-index: 9; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🎬 Harkat Editor</h1>
+    <a class="back" href="index.html">← Studio</a>
+  </header>
+  <p class="hint">Studio har line pe harkat khud chunta hai. Yahan sirf wo badlo jo pasand nahi: kisi line pe tap karo.</p>
+
+  <details class="card" id="srcBox">
+    <summary>📝 Script (paste karo ya studio se aayi)</summary>
+    <textarea id="src" spellcheck="false" placeholder="HOOK: ...&#10;CAST: ...&#10;SCENE: ...&#10;Naam (feeling): dialogue | देवनागरी"></textarea>
+    <div class="row"><button class="btn small" id="load" type="button">↻ Is script se shuru karo</button></div>
+  </details>
+
+  <p class="hint" id="info"></p>
+  <ul class="lines" id="lines"></ul>
+  <p class="hint" id="empty">Upar script daalo, ya studio page pe "🎬 Harkat editor" dabao.</p>
+</main>
+
+<div class="sheet hidden" id="sheet" role="dialog" aria-label="Line badlo">
+  <div class="inner">
+    <div class="row" style="margin-top:0;justify-content:space-between">
+      <h2 id="shTitle"></h2>
+      <button class="btn small" id="shClose" type="button">✓ Ho gaya</button>
+    </div>
+    <p class="hint" id="shText"></p>
+    <div class="stage" id="stage"><div class="floor"></div></div>
+    <p class="hint">Kirdaar ko ungli se khiskao: is line ke baad wo wahan chal ke jaayega.</p>
+    <div class="grid" id="shGrid"></div>
+    <div class="row">
+      <button class="btn small" id="addAct" type="button">＋ Iske baad harkat</button>
+      <button class="btn small" id="delLine" type="button">🗑 Ye harkat hatao</button>
+      <button class="btn small" id="undo" type="button">↶ Undo</button>
+    </div>
+  </div>
+</div>
+
+<div class="bar" id="bar">
+  <div class="inner">
+    <button class="btn" id="copy" type="button">📋 Copy</button>
+    <button class="btn primary" id="send" type="button">🚀 Studio me bhejo</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+const store = {
+  get(k, d = "") { try { return localStorage.getItem("dts_" + k) ?? d; } catch { return d; } },
+  set(k, v) { try { v ? localStorage.setItem("dts_" + k, v) : localStorage.removeItem("dts_" + k); } catch {} },
+};
+const $ = (id) => document.getElementById(id);
+const el = (tag, props = {}, kids = []) => { const e = Object.assign(document.createElement(tag), props); e.append(...kids); return e; };
+const toast = (msg) => { const t = el("div", { className: "toast", textContent: msg }); document.body.append(t); setTimeout(() => t.remove(), 1600); };
+
+const HEADER = /^\s*([A-Z_]{2,})\s*:/;
+const ANIMAL_EMOJI = { kutta: "🐕", dog: "🐕", doggy: "🐕", billi: "🐈", cat: "🐈", bhains: "🐃", bhainsa: "🐃", bhais: "🐃",
+  bhens: "🐃", buffalo: "🐃", gaay: "🐄", gai: "🐄", cow: "🐄", bakri: "🐐", bakra: "🐐", goat: "🐐", bandar: "🐒",
+  monkey: "🐒", murga: "🐓", murgi: "🐔", hen: "🐔", rooster: "🐓", tota: "🦜", parrot: "🦜", kauwa: "🐦‍⬛", crow: "🐦‍⬛" };
+let V = null, SET = {}, FEEL = {}, ALIAS = {};
+let lines = [], sel = -1, undoStack = [], looks = {}, kirdaarWords = {};
+
+// ---------------------------------------------------------------- words (the studio page's word list)
+async function loadVocab() {
+  const html = await (await fetch("index.html", { cache: "no-cache" })).text();
+  const m = html.match(/<script type="application\/json" id="vocab">([\s\S]*?)<\/script>/);
+  V = JSON.parse(m[1]);
+  for (const k of ["looks", "roles", "expressions", "actions", "props", "shots", "depth", "animals", "places"]) SET[k] = new Set(V[k]);
+  FEEL = Object.fromEntries(V.feel_words);
+  for (const [canon, al] of Object.entries(V.action_aliases)) for (const a of al) ALIAS[a] = canon;
+  await Promise.all(V.kirdaar.map(async (k) => {
+    try { kirdaarWords[k.name.toLowerCase()] = (await (await fetch(`kirdaar/${k.id}.json`)).json()).words || ""; } catch {}
+  }));
+}
+
+// what a bracket / arrow word is: the face, an action, the camera, what they hold, where they turn, a move
+function kindOf(w) {
+  const f = FEEL[w] || ALIAS[w] || w;
+  if (/^(move|walk|enter|exit|to|left|right|center|fast|back|pop|peek)$/.test(w) || /^(0?\.\d+|[01](\.0+)?|\d{1,2}%)$/.test(w)) return "move";
+  if (SET.expressions.has(f) && !SET.actions.has(f)) return "face";
+  if (SET.actions.has(f)) return "act";
+  if (SET.expressions.has(f)) return "face";
+  if (SET.shots.has(w) || w === "zoom") return "cam";
+  if (SET.props.has(w)) return "prop";
+  if (["side", "profile", "mud", "mudke", "saamne", "samne", "seedha"].includes(w)) return "turn";
+  if (SET.depth.has(w)) return "depth";
+  return "other";
+}
+
+// ---------------------------------------------------------------- the script <-> lines
+function parse(text) {
+  const out = [];
+  for (const raw of text.replace(/\r/g, "").split("\n")) {
+    const t = raw.trim();
+    let m;
+    if (!t || isHeader(t)) { out.push({ type: "meta", raw }); continue; }
+    if ((m = t.match(/^(.+?)\s*->\s*(.+)$/))) {
+      out.push({ type: "act", who: m[1].trim(), words: m[2].split(/[\s,]+/).filter(Boolean) }); continue;
+    }
+    if ((m = t.match(/^([^:(|]+?)\s*(?:\(([^)]*)\))?\s*:\s*(.*)$/)) && !isHeader(t)) {
+      out.push({ type: "say", who: m[1].trim(), words: (m[2] || "").split(/[\s,]+/).filter(Boolean), rest: m[3] }); continue;
+    }
+    out.push({ type: "meta", raw });
+  }
+  return out;
+}
+function isHeader(t) {
+  const m = t.match(HEADER);
+  return !!m && !/^[A-Z_]{2,}\s*\(/.test(t) && ["HOOK", "CAST", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION",
+    "STYLE", "CAMERA", "LOOP", "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "DRESS", "OBJ", "LIGHTS", "LIGHT", "AMBIENCE",
+    "CROWD", "LOOK", "MYSTERY", "SERIES", "KIRDAAR", "SOUND", "CUT", "NARRATOR", "SET", "WAIT", "UI", "MODE", "TITLE",
+    "SECONDS", "SABAK", "BG", "END", "AYAT", "CHAT"].includes(m[1]);
+}
+function render(ln) {
+  if (ln.type === "meta") return ln.raw;
+  if (ln.type === "act") return `${ln.who} -> ${ln.words.join(" ")}`;
+  return `${ln.who}${ln.words.length ? ` (${ln.words.join(", ")})` : ""}: ${ln.rest}`;
+}
+const scriptOut = () => lines.map(render).join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+
+// ---------------------------------------------------------------- who is who (pictures)
+function castMap() {
+  const cast = {};
+  for (const ln of lines) {
+    if (ln.type !== "meta") continue;
+    const m = ln.raw.match(/^\s*CAST\s*:\s*(.*)$/i);
+    if (!m) continue;
+    for (const part of m[1].split(",")) {
+      const [n, desc] = part.split("=").map((x) => (x || "").trim());
+      if (n) cast[n.toLowerCase()] = (desc || "").toLowerCase();
+    }
+  }
+  return cast;
+}
+function lookOf(name) {
+  const key = name.toLowerCase();
+  if (looks[key]) return looks[key];
+  const cast = castMap();
+  const words = (cast[key] || kirdaarWords[key] || key).split(/\s+/);
+  const rl = Object.fromEntries(V.role_looks);
+  let look = null;
+  for (const w of words) {
+    if (ANIMAL_EMOJI[w]) { look = { emoji: ANIMAL_EMOJI[w] }; break; }
+    if (SET.looks.has(w)) { look = { img: w }; break; }
+    if (rl[w]) { look = { img: rl[w] }; break; }
+  }
+  if (!look) look = rl[key] ? { img: rl[key] } : { img: "boy" };
+  return (looks[key] = look);
+}
+function avatar(name) {
+  const lk = lookOf(name);
+  if (lk.emoji) return el("div", { className: "ava", textContent: lk.emoji });
+  return el("div", { className: "ava" }, [el("img", { src: `assets/looks/${lk.img}.png`, alt: "" })]);
+}
+const people = () => {
+  const seen = [];
+  for (const ln of lines) if (ln.type !== "meta" && !/^(narrator|all)$/i.test(ln.who) && !seen.includes(ln.who)) seen.push(ln.who);
+  return seen;
+};
+const place = () => {
+  for (const ln of lines) { const m = ln.type === "meta" && ln.raw.match(/^\s*SCENE\s*:\s*([a-z_]+)/i); if (m) return m[1].toLowerCase(); }
+  return "room";
+};
+
+// where everybody stands after line i (0..1 of the width; null = not in the picture)
+function positions(upto) {
+  const ps = people(), pos = {};
+  ps.forEach((p, i) => (pos[p] = ps.length === 1 ? 0.5 : 0.18 + (0.64 * i) / (ps.length - 1)));
+  const home = { ...pos };
+  for (let i = 0; i <= upto && i < lines.length; i++) {
+    const ln = lines[i];
+    if (ln.type !== "act" && ln.type !== "say") continue;
+    const w = ln.words;
+    for (let j = 0; j < w.length; j++) {
+      if (w[j] === "enter" && (w[j + 1] === "left" || w[j + 1] === "right")) pos[ln.who] = home[ln.who];
+      if (w[j] === "exit") pos[ln.who] = null;
+      if (["move", "walk", "to"].includes(w[j]) && /^(0?\.\d+|[01](\.0+)?|\d{1,2}%)$/.test(w[j + 1] || ""))
+        pos[ln.who] = w[j + 1].endsWith("%") ? parseFloat(w[j + 1]) / 100 : parseFloat(w[j + 1]);
+      if (w[j] === "walk" && ["left", "center", "right"].includes(w[j + 1]))
+        pos[ln.who] = { left: 0.18, center: 0.5, right: 0.82 }[w[j + 1]];
+    }
+  }
+  // somebody whose first line is an `enter` is not there before it
+  for (const p of ps) {
+    const first = lines.findIndex((l) => l.who === p);
+    const ent = first >= 0 && lines[first].words && lines[first].words.includes("enter");
+    if (ent && first > upto) pos[p] = null;
+  }
+  return pos;
+}
+
+// ---------------------------------------------------------------- the list
+function draw() {
+  const ul = $("lines");
+  ul.replaceChildren();
+  lines.forEach((ln, i) => {
+    if (ln.type === "meta") return;
+    const shown = [];
+    for (let j = 0; j < ln.words.length; j++) {            // `move 0.30` -> one chip "📍 30%"
+      const w = ln.words[j], nx = ln.words[j + 1] || "";
+      if (["move", "walk", "to"].includes(w) && /^(0?\.\d+|[01](\.0+)?|\d{1,2}%)$/.test(nx)) {
+        shown.push([`📍 ${nx.endsWith("%") ? parseFloat(nx) : Math.round(parseFloat(nx) * 100)}% pe jaao`, w]);
+        j++;
+      } else shown.push([w.replace(/_/g, " "), w]);
+    }
+    const tags = el("div", { className: "tags" }, shown.map(([txt, w]) =>
+      el("span", { className: "tag" + (ln.changed && ln.changed.includes(w) ? " changed" : ""), textContent: txt })));
+    const body = el("div", {}, [
+      el("div", { className: "who", textContent: ln.who + (ln.type === "act" ? " → harkat" : "") }),
+      ln.type === "say" ? el("div", { className: "say", textContent: ln.rest.split("|")[0].trim() }) : "",
+      tags,
+    ]);
+    const li = el("li", { className: "line" + (ln.type === "act" ? " act" : "") + (i === sel ? " sel" : "") }, [avatar(ln.who), body]);
+    li.addEventListener("click", () => openSheet(i));
+    ul.append(li);
+  });
+  const n = lines.filter((l) => l.type !== "meta").length;
+  $("empty").classList.toggle("hidden", n > 0);
+  $("info").textContent = n ? `${n} lines · jagah: ${place()} · ${people().join(", ")}` : "";
+  store.set("editor_script", scriptOut());
+}
+
+// ---------------------------------------------------------------- the sheet: one line's choices
+function choice(label, kind, ln, options) {
+  const cur = ln.words.find((w) => kindOf(w) === kind) || "";
+  const s = el("select", {});
+  s.append(el("option", { value: "", textContent: "— studio khud —" }));
+  for (const o of options) {
+    if (Array.isArray(o)) {
+      const g = el("optgroup", { label: o[0] });
+      for (const v of o[1]) g.append(el("option", { value: v, textContent: v.replace(/_/g, " ") }));
+      s.append(g);
+    } else s.append(el("option", { value: o, textContent: o.replace(/_/g, " ") }));
+  }
+  const canon = FEEL[cur] || ALIAS[cur] || cur;
+  if (cur && ![...s.options].some((x) => x.value === canon)) s.append(el("option", { value: cur, textContent: cur }));
+  s.value = [...s.options].some((x) => x.value === canon) ? canon : cur;
+  s.addEventListener("change", () => {
+    snapshot();
+    const keep = ln.words.filter((w) => kindOf(w) !== kind);
+    ln.words = s.value ? (kind === "act" && ln.type === "act" ? [s.value, ...keep] : [...keep, s.value]) : keep;
+    ln.changed = [...(ln.changed || []), s.value];
+    if (ln.type === "act" && !ln.words.length) ln.words = ["idle"];
+    draw();
+    drawStage();
+  });
+  return el("label", {}, [label, s]);
+}
+function openSheet(i) {
+  sel = i;
+  const ln = lines[i];
+  $("shTitle").textContent = ln.who + (ln.type === "act" ? " → harkat" : "");
+  $("shText").textContent = ln.type === "say" ? ln.rest.split("|")[0].trim() : "Bina dialogue ki harkat";
+  const grid = $("shGrid");
+  grid.replaceChildren(
+    choice("😃 Chehra", "face", ln, V.expressions),
+    choice("🤸 Harkat", "act", ln, V.action_groups),
+    choice("🎥 Camera", "cam", ln, ["close", "medium", "wide", "two_shot", "zoom"]),
+    choice("✋ Haath me", "prop", ln, V.props),
+    choice("↪️ Mudna", "turn", ln, ["side", "saamne"]),
+    choice("↕️ Aage / peeche", "depth", ln, V.depth),
+  );
+  $("delLine").classList.toggle("hidden", ln.type !== "act");
+  $("sheet").classList.remove("hidden");
+  $("bar").classList.add("hidden");
+  draw();
+  drawStage();
+}
+function closeSheet() {
+  sel = -1;
+  $("sheet").classList.add("hidden");
+  $("bar").classList.remove("hidden");
+  draw();
+}
+
+// ---------------------------------------------------------------- the stage: drag somebody to where they go next
+function drawStage() {
+  const st = $("stage");
+  st.style.backgroundImage = `url(assets/places/${place()}.jpg)`;
+  st.querySelectorAll(".actor").forEach((a) => a.remove());
+  let upto = sel;                                    // (with the moves just added after this line)
+  while (lines[upto + 1] && lines[upto + 1].type === "act" && lines[upto + 1].words[0] === "move") upto++;
+  const pos = positions(upto);
+  const speaker = lines[sel] && lines[sel].who;
+  for (const p of people()) {
+    const lk = lookOf(p);
+    const fig = el("div", { className: "fig" }, [lk.emoji ? lk.emoji : el("img", { src: `assets/looks/${lk.img}.png`, alt: "" })]);
+    const a = el("div", { className: "actor" + (pos[p] == null ? " off" : "") + (p !== speaker ? " dim" : "") },
+      [fig, el("div", { className: "nm", textContent: p })]);
+    a.style.left = `${100 * (pos[p] == null ? (p === people()[0] ? 0.06 : 0.94) : pos[p])}%`;
+    a.addEventListener("pointerdown", (e) => startDrag(e, a, p));
+    st.append(a);
+  }
+}
+function startDrag(e, a, who) {
+  e.preventDefault();
+  const st = $("stage").getBoundingClientRect();
+  a.classList.add("drag");
+  a.setPointerCapture(e.pointerId);
+  const frac = (x) => Math.min(0.95, Math.max(0.05, (x - st.left) / st.width));
+  const move = (ev) => { a.style.left = `${100 * frac(ev.clientX)}%`; };
+  const up = (ev) => {
+    a.removeEventListener("pointermove", move);
+    a.removeEventListener("pointerup", up);
+    a.classList.remove("drag");
+    const f = Math.round(frac(ev.clientX) * 100) / 100;
+    const before = positions(sel + (lines[sel + 1] && lines[sel + 1].words[0] === "move" && lines[sel + 1].who === who ? 1 : 0))[who];
+    if (before != null && Math.abs(before - f) < 0.03) { drawStage(); return; }
+    snapshot();
+    // a move line right after this one (for the same person) is updated, else one is added
+    const nx = lines[sel + 1];
+    const mv = { type: "act", who, words: ["move", f.toFixed(2)], changed: ["move", f.toFixed(2)] };
+    if (nx && nx.type === "act" && nx.who === who && nx.words[0] === "move") lines[sel + 1] = mv;
+    else lines.splice(sel + 1, 0, mv);
+    draw();
+    drawStage();
+    toast(`${who} ab ${Math.round(f * 100)}% pe jaayega`);
+  };
+  a.addEventListener("pointermove", move);
+  a.addEventListener("pointerup", up);
+}
+
+// ---------------------------------------------------------------- buttons
+function snapshot() { undoStack.push(JSON.stringify(lines)); if (undoStack.length > 50) undoStack.shift(); }
+function start(text) {
+  lines = parse(text);
+  looks = {};
+  undoStack = [];
+  sel = -1;
+  $("src").value = text;
+  draw();
+}
+$("load").addEventListener("click", () => start($("src").value));
+$("shClose").addEventListener("click", closeSheet);
+$("undo").addEventListener("click", () => {
+  if (!undoStack.length) return toast("Kuch undo karne ko nahi");
+  lines = JSON.parse(undoStack.pop());
+  if (sel >= lines.length) sel = lines.length - 1;
+  openSheet(sel);
+});
+$("addAct").addEventListener("click", () => {
+  snapshot();
+  const who = lines[sel].who;
+  lines.splice(sel + 1, 0, { type: "act", who, words: ["shock"], changed: ["shock"] });
+  openSheet(sel + 1);
+  toast("Nayi harkat judi: neeche se badlo");
+});
+$("delLine").addEventListener("click", () => {
+  if (lines[sel].type !== "act") return;
+  snapshot();
+  lines.splice(sel, 1);
+  closeSheet();
+});
+$("copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(scriptOut()); toast("✅ Script copy ho gayi"); }
+  catch { $("srcBox").open = true; $("src").value = scriptOut(); $("src").select(); }
+});
+$("send").addEventListener("click", () => {
+  store.set("editor_out", scriptOut());
+  location.href = "index.html";
+});
+
+(async () => {
+  try { await loadVocab(); }
+  catch (e) { $("info").textContent = "Word list load nahi hui: " + e.message; return; }
+  const incoming = store.get("editor_in");
+  store.set("editor_in", "");
+  const text = incoming || store.get("editor_script");
+  if (text && text.trim()) start(text); else $("srcBox").open = true;
+})();
+</script>
+</body>
+</html>
