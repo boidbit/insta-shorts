@@ -72,27 +72,32 @@ class PromptTests(unittest.TestCase):
                 self.assertIn(must, text, (name, must))
         s = read("SCRIPT_PROMPT.md")
         self.assertIn("Dark comedy craft", s)
-        self.assertIn("up to 10 and 40 s", s)
+        self.assertIn("Length follows the comedy, never a count", s)   # no line / letter counts any more
         self.assertIn("three different premises", s)
         self.assertIn("Story facts first", s)                        # the logic rule (who owes whom stays the same)
         self.assertIn("contradict an earlier one", s)                # ...and the logic check before answering
         self.assertIn("Story facts first", read("DIRECTOR_PROMPT.md"))
 
     def test_long_stories_are_not_rejected(self):
-        """Length never fails a video: a long script only gets a soft note (the writer is asked once to tighten)."""
-        line = "Ye ek lambi si line hai jo kaafi der tak chalti hai aur poori baat saaf saaf samjhati hai"
-        body = "\n".join("A (smile): %s | ये एक लंबी सी लाइन है जो काफ़ी देर तक चलती है" % line for _ in range(14))
-        text = "HOOK: h\nCAST: A = dost\nSCENE: room\n%s\nCTA: c\nCAPTION: c\n" % body
-        _, warns = parse_script(text)
-        self.assertFalse([w for w in warns if "long" in w], warns)
+        """Length follows the comedy: long lines and a long talk are fine; only a runaway script (minutes of speech)
+        gets a soft note (the writer is asked once to tighten what repeats)."""
         import tempfile
-        probs = director.script_problems(text, os.path.join(tempfile.mkdtemp(), "x.json"))
-        long_ = [p for p in probs if "long" in p]
-        self.assertEqual(len(long_), 1, probs)
-        self.assertTrue(long_[0].startswith(director.SOFT))
-        short = text.replace(line, "Chhoti line")
-        self.assertFalse([p for p in director.script_problems(short, os.path.join(tempfile.mkdtemp(), "y.json"))
+        line = "Ye ek lambi si line hai jo kaafi der tak chalti hai aur poori baat saaf saaf samjhati hai"
+
+        def script(n):
+            body = "\n".join("A (smile): %s | ये एक लंबी सी लाइन है जो काफ़ी देर तक चलती है" % line for _ in range(n))
+            return "HOOK: h\nCAST: A = dost\nSCENE: room\n%s\nCTA: c\nCAPTION: c\n" % body
+        _, warns = parse_script(script(14))
+        self.assertFalse([w for w in warns if "long" in w], warns)
+        probs = director.script_problems(script(14), os.path.join(tempfile.mkdtemp(), "x.json"))
+        self.assertFalse([p for p in probs if "long" in p], probs)              # ~1200 letters of talk: fine
+        rant = script(3).replace(line, line * 6, 1)                               # one long rant: fine too
+        self.assertFalse([p for p in director.script_problems(rant, os.path.join(tempfile.mkdtemp(), "r.json"))
                           if "long" in p])
+        probs = director.script_problems(script(45), os.path.join(tempfile.mkdtemp(), "y.json"))
+        long_ = [p for p in probs if "long" in p]
+        self.assertEqual(len(long_), 1, probs)                                    # minutes of speech: one note
+        self.assertTrue(long_[0].startswith(director.SOFT))
 
     def test_a_long_script_is_asked_once_then_accepted(self):
         calls = []

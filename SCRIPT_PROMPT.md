@@ -156,7 +156,7 @@ WRONG: A -> wink | smile      RIGHT: A -> shrug grin pop      (one action + one 
 1. HOOK = the promise of THIS video: everything it says happens in the story. It grabs attention in one glance.
 2. The first spoken line sets up the situation (who, where, what problem), funny or dramatic, said in the first second by somebody already in the place. No "hello", no introductions or own traits.
 3. Build: setup -> escalation -> twist, without skipping logical steps (when a condition is set, the characters say it clearly). One gag once, each line a step further; nobody explains the joke: show it with an action line and a short reaction. The punch line is the LAST spoken line and a surprise. Silently think of three different premises / punch lines and use the least expected one that still feels inevitable. Avoid worn-out jokes (mummy ki chappal, "bill kaun dega", "exam me fail" as the whole joke) unless you turn them upside down. Give the punch line a reaction (sound + action, maybe shake); a `wait 1` before it can help it land.
-4. Length follows the video: a quick reel (15-20 s) has 3-5 spoken lines, the default (20-35 s) 5-8, a dark twist or satire up to 10 and 40 s. Vary the rhythm: one or two long lines (setup or rant, up to ~150 letters) among short jabs, the punch short; ~500 letters in all for 35 s. Keep a natural "arey", "sun"; cut only lines that add nothing.
+4. Length follows the comedy, never a count: lines as many and as long as the joke needs; a long rant or story is fine where the fun is (new details, a turn at its end). Mix long and short; punch short. Keep "arey", "sun"; cut lines that add nothing.
 5. Every spoken line has ` | ` followed by the same sentence in Devanagari.
 6. Max 4 characters, all in CAST. 4 only for a group joke (family dinner, office team, friends' gang); 2-3 are usually funnier. The camera cuts by itself (to each speaker, to the listener's reaction), so most scripts need few or no CUT lines. Write `CUT` for a comic beat or a special view: `CUT wide` (everybody, e.g. the last reaction), `CUT ots` for a tense face-off, `CUT reverse`; a shot shows ONLY those who speak or act in it. Never write CUT in a talk across a counter. A new SCENE only when the story moves to another place or time.
 6a. Write for the camera, which directs itself: after a beat it shows the listener, so end a beat on a line that deserves a reaction and write the reaction when it matters (`B -> facepalm`, `B (shock): ...`). Rapid questioning reads best as three or more very short lines back and forth. An `angry`, `shout`, `evil` or `scared` line tilts the frame. `A -> exit left fast` followed by the other one's reaction is a complete ending.
@@ -223,7 +223,7 @@ HASHTAGS: #sarkaridaftar #pension #bank #desicomedy #darkcomedy
 # Before you answer, check every line
 
 - Brackets hold only allowed acting words (at most one action and one expression); every spoken line has ` | ` + Devanagari.
-- Length: long and short lines mixed, none over ~150, ~500 in all.
+- Length: each line as long as the comedy needs, none padded; long and short mixed, the punch short.
 - Voice: raw desi, never kitaabi; would a real person say this line, and does each character sound like themselves and unlike the others?
 - CAST uses only roles/looks/extras from the lists, no brackets. Nobody walks in during the first 2 seconds.
 - The HOOK's promise happens; a CTA (if any) fits; the last spoken line is the twist; every shot ends on something worth seeing.

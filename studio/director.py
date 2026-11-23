@@ -178,8 +178,8 @@ def _char_problems(name, spec):
 
 
 SOFT = "(soft) "            # a problem worth one more try, never a reason to fail
-LINE_MAX = 80               # letters (Roman) of one spoken line
-TOTAL_MAX = 380             # letters of all spoken lines together (about 30 seconds of speech)
+LINE_MAX = 700              # letters (Roman) of one spoken line: only a runaway speech (a long rant is fine)
+TOTAL_MAX = 3500            # letters of all spoken lines together (about 3 minutes: past what a reel can hold)
 
 
 def problems(scene_dict, tmp_path):
@@ -213,14 +213,14 @@ def problems(scene_dict, tmp_path):
             if "say" in raw and not raw.get("speak"):
                 out.append(where + "line %r has no 'speak' (Devanagari) text" % str(raw["say"])[:30])
 
-    # length: never a reason to fail a video, but the writer is asked ONCE to tighten too-long lines (a reel of
-    # 20-35 s holds; 60 s of long speeches does not)
+    # length: the comedy decides it (a long rant is fine); only a runaway script (minutes of speech) is sent back
+    # ONCE to be tightened
     said = [str(raw["say"]) for sub in subs for raw in sub.get("timeline", []) if raw.get("say")]
     long_ = [ln for ln in said if len(ln) > LINE_MAX]
     if long_ or sum(len(ln) for ln in said) > TOTAL_MAX:
-        out.append(SOFT + "the spoken lines are too long for a 20-35 second reel (%d letters in all, keep it under "
-                   "%d%s): shorten them (one breath each, split a long explanation into two short lines), keep the "
-                   "story, the order and every joke" % (
+        out.append(SOFT + "the spoken lines run far too long for a reel (%d letters in all, more than %d%s): tighten "
+                   "only what repeats or adds nothing; long lines that carry the comedy stay long; keep the story, "
+                   "the order and every joke" % (
                        sum(len(ln) for ln in said), TOTAL_MAX,
                        "; over %d letters: %s" % (LINE_MAX, ", ".join(repr(ln[:28] + "...") for ln in long_[:4]))
                        if long_ else ""))

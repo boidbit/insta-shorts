@@ -25,6 +25,12 @@ ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateC
 DEFAULT_MALE, DEFAULT_FEMALE = "Puck", "Kore"
 DEFAULT_STYLE = ("Read this as a natural, lively everyday Hindi conversation between friends. "
                  "Leave a clear silent pause of about one second between the lines.")
+# the same character must sound like the same person in every line and every episode: feelings change how a line is
+# said, never whose voice it is
+SAME_VOICE = ("Keep each speaker's voice identity (age, pitch, timbre, accent) exactly the same from the first line "
+              "to the last; feelings change only how a line is said, never whose voice it is.")
+TEMPERATURE = 0.6                              # (lower than the default: the same voice, take after take)
+PIECE_MAX = 200                                # letters: a longer line goes to Gemini in pieces (its voice drifts)
 
 
 class GeminiTTSError(RuntimeError):
@@ -137,9 +143,10 @@ def build_payload(lines, style=DEFAULT_STYLE, notes=None):
         else:
             how = " ".join("%s sounds like %s." % (label[v], notes[v]) for v in voices if v in notes)
         style = ((style or "").strip() + " " + how).strip()
+    style = ((style or "").strip() + " " + SAME_VOICE).strip()
     text = (style.strip() + "\n\n" + body) if style else body
     return {"contents": [{"parts": [{"text": text}]}],
-            "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": speech}}
+            "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": speech, "temperature": TEMPERATURE}}
 
 
 def _retry_delay(body):
@@ -175,6 +182,11 @@ def request_audio(payload, model=DEFAULT_MODEL, key=None, attempts=3, timeout=24
                     wait = 20.0
             elif e.code in (500, 502, 503, 504):
                 wait = 4.0 * (attempt + 1)
+            elif e.code == 400 and "temperature" in body.lower() and "temperature" in payload.get("generationConfig", {}):
+                payload = dict(payload, generationConfig={k: v for k, v in payload["generationConfig"].items()
+                                                          if k != "temperature"})      # (a model without it)
+                req_data = json.dumps(payload).encode("utf-8")
+                wait = 0.0
             else:
                 msg = re.search(r'"message"\s*:\s*"([^"]{0,300})', body)
                 raise GeminiTTSError("Gemini HTTP %d: %s" % (e.code, msg.group(1) if msg else body[:200])) from None
@@ -214,6 +226,52 @@ def _silence_runs(rms, thr, min_len):
                 runs.append((start, i))
             start = None
     return runs
+
+
+def pieces(text, limit=None):
+    """A line longer than PIECE_MAX letters -> its sentences grouped into pieces of at most ~PIECE_MAX (said as
+    separate lines, so Gemini's voice does not drift in a long speech; joined again into one clip)."""
+    limit = limit or PIECE_MAX
+    text = " ".join(str(text).split())
+    if len(text) <= limit:
+        return [text]
+    parts = [p for p in re.split(r"(?<=[।!?.…])\s+", text) if p]
+    out = []
+    for p in parts:
+        while len(p) > limit * 1.5:                 # a very long sentence: at a comma near the middle
+            cut = p.rfind(",", 0, limit)
+            if cut < limit // 3:
+                break
+            out.append(p[:cut + 1].strip())
+            p = p[cut + 1:].strip()
+        if out and len(out[-1]) + 1 + len(p) <= limit:
+            out[-1] = out[-1] + " " + p
+        else:
+            out.append(p)
+    return out or [text]
+
+
+def join_pieces(x, spans, sr=SR, gap=0.16):
+    """The clip of one line said in pieces: each piece without its silences around, a short breath between."""
+    if len(spans) == 1:
+        t0, t1 = spans[0]
+        return x[int(t0 * sr): int(t1 * sr)]
+    out = []
+    for i, (t0, t1) in enumerate(spans):
+        seg = x[int(t0 * sr): int(t1 * sr)]
+        hop = int(sr * 0.01)
+        m = len(seg) // hop
+        if m > 3:
+            rms = np.sqrt((seg[: m * hop].reshape(m, hop) ** 2).mean(axis=1))
+            voiced = np.flatnonzero(rms >= max(float(rms.max()) * 0.06, 1e-4))
+            if voiced.size:
+                a = 0 if i == 0 else max(0, int(voiced[0]) - 3) * hop
+                b = len(seg) if i == len(spans) - 1 else min(len(seg), (int(voiced[-1]) + 4) * hop)
+                seg = seg[a:b]
+        if out:
+            out.append(np.zeros(int(gap * sr), dtype=seg.dtype))
+        out.append(seg)
+    return np.concatenate(out)
 
 
 def split_audio(x, texts, sr=SR, pad=0.12):
@@ -369,19 +427,36 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
     """
     if not items:
         return []
-    # Gemini allows 2 speakers per request: extra voices share the 2 first ones (pitch/rate keep them apart)
+    # Gemini allows 2 speakers per request: a third voice (a narrator, a third person) gets a request of its own,
+    # in its own voice (it used to borrow one of the first two: the narrator talked in the host's voice)
     voices = []
     for it in items:
         if it["voice"] not in voices:
             voices.append(it["voice"])
-    remap = {v: voices[i if i < 2 else i % 2] for i, v in enumerate(voices)}
-    lines = [{"voice": remap[it["voice"]], "text": it["text"]} for it in items]
-    for ln, it in zip(lines, items):            # a line with two feelings: how it is said ("shout, angry")
-        if it.get("feel"):
-            ln["how"] = delivery(it["feel"])
+    if len(voices) > 2:
+        first = set(voices[:2])
+        a = [i for i, it in enumerate(items) if it["voice"] in first]
+        b = [i for i, it in enumerate(items) if it["voice"] not in first]
+        out = [None] * len(items)
+        for idx in (a, b):
+            for i, pth in zip(idx, synth_script([items[i] for i in idx], model, style, cache_dir)):
+                out[i] = pth
+        return out
+    remap = {v: v for v in voices}
+    lines, owner = [], []                       # a long line goes in pieces (sentences), joined again after
+    for k, it in enumerate(items):
+        for j, piece in enumerate(pieces(it["text"])):
+            ln = {"voice": remap[it["voice"]], "text": piece}
+            if j == 0 and it.get("feel"):       # a line with two feelings: how it is said ("shout, angry")
+                ln["how"] = delivery(it["feel"])
+            lines.append(ln)
+            owner.append(k)
     notes = {}
     for it in items:                                # the first character on a voice gives its manner
-        how = (it.get("spec") or {}).get("andaaz")
+        spec = it.get("spec") or {}
+        how = spec.get("andaaz")
+        if spec.get("hulia"):                       # the voice itself (age, pitch, accent): the same every episode
+            how = ("%s, always with the voice of %s" % (how, spec["hulia"])) if how else "the voice of " + spec["hulia"]
         if how and remap[it["voice"]] not in notes:
             notes[remap[it["voice"]]] = how
 
@@ -390,7 +465,7 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
     d = os.path.join(cache_dir, "gemini_" + key)
     os.makedirs(d, exist_ok=True)
     full = os.path.join(d, "full.wav")
-    texts = [it["text"] for it in items]
+    texts = [ln["text"] for ln in lines]
     x = None
     if os.path.isfile(full) and os.path.getsize(full) > 2000:
         x, _ = read_wav(full)
@@ -404,7 +479,7 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
     if x is None:
         bad = None
         for attempt in range(TAKE_TRIES):
-            print("  [gemini] 1 request for %d lines (%s)%s" % (len(items), model,
+            print("  [gemini] 1 request for %d lines (%s)%s" % (len(lines), model,
                                                                " - try %d" % (attempt + 1) if attempt else ""),
                   file=sys.stderr)
             x = request_audio(build_payload(lines, style, notes), model)
@@ -422,10 +497,14 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
     if method != "pauses":
         print("  [gemini] pauses unclear, split lines by text length instead (check lip-sync)", file=sys.stderr)
     paths = []
-    for i, ((t0, t1), it) in enumerate(zip(spans, items)):
-        print("  [gemini] line %d  %5.2f-%5.2fs  %s" % (i + 1, t0, t1, it["text"][:40]), file=sys.stderr)
+    for i, it in enumerate(items):
+        mine = [sp for sp, k in zip(spans, owner) if k == i]
+        t0, t1 = mine[0][0], mine[-1][1]
+        print("  [gemini] line %d  %5.2f-%5.2fs  %s%s" % (i + 1, t0, t1, it["text"][:40],
+                                                         "  (%d pieces)" % len(mine) if len(mine) > 1 else ""),
+              file=sys.stderr)
         raw = os.path.join(d, "line_%03d.wav" % i)
-        write_wav(raw, x[int(t0 * SR): int(t1 * SR)])
+        write_wav(raw, join_pieces(x, mine))
         tag = hashlib.sha1(("%s|%s" % (it.get("pitch"), it.get("rate"))).encode()).hexdigest()[:6]
         paths.append(_shape(raw, os.path.join(d, "line_%03d_%s.wav" % (i, tag)),
                             semitones(it.get("pitch")), rate_factor(it.get("rate"))))
