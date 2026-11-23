@@ -579,7 +579,7 @@ Page pe video options me **Camera 🎥: Film / Sitcom (zyada wide, TV serial jai
 
 ### 🎭 Dialogue ka vajan
 
-- Prompt ab lines ko ek naap ki nahi rakhta: 1-2 lambi lines (setup ya bhadaas, ~150 akshar tak), beech me chhote jab, punch chhota; poori baat ~500 akshar.
+- Prompt lambai pe koi ginti nahi rakhta: jitni lines aur jitni lambi baat comedy ko chahiye (bhadaas ya kissa lamba ho sakta hai, har lambi line me nayi detail aur aakhir me mod), lambi-chhoti mix, punch chhota.
 - "Arey", "sun", "matlab" jaise asli shabd rehne diye jaate hain; sirf bekaar lines kat'ti hain.
 - Naye camera me har scene ki aakhri line (punch) se pehle ~0.45 sec ki chuppi apne aap aati hai, taaki punch land kare (3 ya zyada lines hon tab; `wait` ya beech me kaatne wali line ho to nahi). Classic camera pehle jaisa.
 
