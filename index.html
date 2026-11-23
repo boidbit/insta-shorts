@@ -431,16 +431,16 @@
             <option value="edge">Free (Edge)</option>
           </select>
         </label>
-        <label title="Har video ka apna rang: hook card, CTA, poori tasveer ki roshni aur jagah ke rang. Auto = har video alag (kahani se chuna hua).">Rang 🎨
+        <label title="Har video ka rang: hook card, CTA, poori tasveer ki roshni aur jagah ke rang. Default = asli rang, koi filter nahi, har video ek jaisi (page ki pehchaan). Auto = har video alag (kahani se chuna hua).">Rang 🎨
           <select id="color">
-            <option value="auto">Auto (har video alag)</option>
-            <option value="classic">Classic (peela)</option>
+            <option value="classic" selected>Default (asli rang, peela hook)</option>
             <option value="golden">Golden (sunehra)</option>
             <option value="cool">Cool (neela)</option>
             <option value="rose">Rose (gulabi)</option>
             <option value="teal_orange">Teal-orange</option>
             <option value="punchy">Punchy (kaala)</option>
             <option value="lime">Lime (hara)</option>
+            <option value="auto">Auto (har video alag)</option>
           </select>
         </label>
         <label title="Camera kaise chale. Film = filmon jaisa: bolne wale pe kandhe ke upar se ya akele tircha shot, peeche dhundhla, reaction shots, punch pe dheere andar. Sitcom = TV serial jaisa, zyada wide. Seedha = pehle jaisa (zoom karta hua).">Camera 🎥
@@ -1820,6 +1820,7 @@ try { builder = Object.assign(builder, JSON.parse(store.get("builder") || "{}"))
 const saveBuilder = () => store.set("builder", JSON.stringify(builder));
 if (store.get("tts_v") !== "2") { store.set("tts", ""); store.set("tts_v", "2"); }   // Gemini is the default voice again
 if (store.get("dialogue_v") !== "2") { store.set("dialogue", ""); store.set("dialogue_v", "2"); }   // short subtitles are the default now
+if (store.get("color_v") !== "2") { store.set("color", ""); store.set("color_v", "2"); }   // one colour for every video is the default now
 for (const id of ["dialogue", "intro", "loop", "mascot", "tts", "color", "ctaStyle", "shots"]) {      // the video options are remembered
   const v = store.get(id);
   if (v && [...$(id).options].some((o) => o.value === v)) $(id).value = v;
