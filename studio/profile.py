@@ -51,8 +51,12 @@ def draw_side(o, p, cols, expr, mouth_open, t, x0, ground_y, k, blink=False, pro
     top = -TORSO_H + 6
     shoulder = (f * 4.0, -TORSO_H + 34)
     def fwd(a, lo=-30.0):                      # an arm swings back only a little (no twisted shoulders)
+        if a < -45.0:                          # a front pose reaching across the body (hand to the chin, the chest,
+            a = -a                             # a cup to the mouth, arms crossed): from the side that is forward
         return f * max(lo, a)
     ua_n = fwd(p["ra1"] - 10)
+    if p["ra2"] < -45.0:                       # (the hand comes back to the face / chest: the elbow stays low, in front)
+        ua_n = fwd(min(abs(p["ra1"] - 10), 30.0))
     fa_n = fwd(p["ra2"] - 2, -40.0)
     ua_f = fwd(p["la1"] + 10)
     fa_f = fwd(p["la2"] + 6, -40.0)
