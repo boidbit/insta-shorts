@@ -74,9 +74,25 @@
   .bar .inner { max-width: 640px; margin: 0 auto; display: flex; gap: 8px; }
   .bar .btn { flex: 1; }
   .hidden { display: none !important; }
+  #puppet { width: 100%; max-width: 360px; display: block; margin: 6px auto 0; background: var(--bg); border-radius: 12px;
+            border: 1px solid var(--line); touch-action: none; }
+  .actor { z-index: 2; }
+  .obj { z-index: 1; position: absolute; bottom: 6%; transform: translateX(-50%); font-size: 40px; cursor: grab; touch-action: none;
+         user-select: none; -webkit-user-select: none; text-align: center; line-height: 1; }
+  .obj small { display: block; font-size: 10px; background: var(--card); border-radius: 999px; padding: 0 4px; }
   .toast { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); background: var(--ink); color: var(--bg);
            padding: 8px 14px; border-radius: 999px; font-size: 14px; z-index: 9; }
   details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  .player { margin-top: 12px; background: #000; border-radius: 14px; overflow: hidden; position: sticky; top: 0; z-index: 3; }
+  .player video { width: 100%; max-height: 46vh; display: block; background: #000; }
+  .tl { position: relative; height: 34px; background: var(--card); border-top: 1px solid var(--line); }
+  .tl .blk { position: absolute; top: 5px; height: 24px; border-radius: 6px; font-size: 11px; font-weight: 700;
+             color: #fff; overflow: hidden; white-space: nowrap; padding: 3px 4px; cursor: pointer; opacity: .85; }
+  .tl .blk.on { opacity: 1; outline: 2px solid var(--ink); }
+  .tl .now { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--brand); pointer-events: none; }
+  .ptools { display: flex; gap: 8px; padding: 8px; background: var(--card); }
+  .ptools .btn { flex: 1; }
+  .line .tm { font-size: 12px; color: var(--muted); margin-left: 6px; font-weight: 400; }
 </style>
 </head>
 <body>
@@ -93,6 +109,13 @@
     <div class="row"><button class="btn small" id="load" type="button">↻ Is script se shuru karo</button></div>
   </details>
 
+  <div class="player hidden" id="player">
+    <video id="vid" controls playsinline preload="metadata"></video>
+    <div class="tl" id="tl"><div class="now" id="now"></div></div>
+    <div class="ptools">
+      <button class="btn small" id="editHere" type="button">✏️ Is pal pe badlo</button>
+    </div>
+  </div>
   <p class="hint" id="info"></p>
   <ul class="lines" id="lines"></ul>
   <p class="hint" id="empty">Upar script daalo, ya studio page pe "🎬 Harkat editor" dabao.</p>
@@ -109,6 +132,24 @@
     <p class="hint">Kirdaar ko ungli se khiskao: is line ke baad wo wahan chal ke jaayega.</p>
     <div class="grid" id="shGrid"></div>
     <div class="row">
+      <button class="btn small" id="poseBtn" type="button">🧍 Haath-pair hilao</button>
+      <button class="btn small" id="objBtn" type="button">🪑 Saaman rakho</button>
+    </div>
+    <div class="hidden" id="puppetBox">
+      <p class="hint">Gol nishaan (haath, pair, sir) ko kheencho. Ye pose is line ke baad lagega, aur video me haath-pair
+        dheere-dheere yahan aayenge.</p>
+      <canvas id="puppet" width="600" height="820"></canvas>
+      <div class="row" id="presets"></div>
+      <div class="row">
+        <button class="btn small" id="poseReset" type="button">↺ Seedha khada</button>
+        <button class="btn small primary" id="poseApply" type="button">✓ Pose lagao</button>
+      </div>
+    </div>
+    <div class="hidden" id="objBox">
+      <p class="hint">Saaman chuno, phir upar stage pe kheench ke rakho. Ye poori video me wahin rahega.</p>
+      <div class="row" id="objList"></div>
+    </div>
+    <div class="row">
       <button class="btn small" id="addAct" type="button">＋ Iske baad harkat</button>
       <button class="btn small" id="delLine" type="button">🗑 Ye harkat hatao</button>
       <button class="btn small" id="undo" type="button">↶ Undo</button>
@@ -120,6 +161,8 @@
   <div class="inner">
     <button class="btn" id="copy" type="button">📋 Copy</button>
     <button class="btn primary" id="send" type="button">🚀 Studio me bhejo</button>
+    <button class="btn hidden" id="preview" type="button">👀 Jaldi preview</button>
+    <button class="btn primary hidden" id="remake" type="button">🔁 Dobara banao</button>
   </div>
 </div>
 
@@ -278,6 +321,8 @@ function draw() {
     const shown = [];
     for (let j = 0; j < ln.words.length; j++) {            // `move 0.30` -> one chip "📍 30%"
       const w = ln.words[j], nx = ln.words[j + 1] || "";
+      if (w.includes("=")) continue;                       // (a pose's angles: one chip)
+      if (w === "pose") { shown.push(["🧍 apna pose", w]); continue; }
       if (["move", "walk", "to"].includes(w) && /^(0?\.\d+|[01](\.0+)?|\d{1,2}%)$/.test(nx)) {
         shown.push([`📍 ${nx.endsWith("%") ? parseFloat(nx) : Math.round(parseFloat(nx) * 100)}% pe jaao`, w]);
         j++;
@@ -286,7 +331,8 @@ function draw() {
     const tags = el("div", { className: "tags" }, shown.map(([txt, w]) =>
       el("span", { className: "tag" + (ln.changed && ln.changed.includes(w) ? " changed" : ""), textContent: txt })));
     const body = el("div", {}, [
-      el("div", { className: "who", textContent: ln.who + (ln.type === "act" ? " → harkat" : "") }),
+      el("div", { className: "who" }, [ln.who + (ln.type === "act" ? " → harkat" : ""),
+        ln.t != null ? el("span", { className: "tm", textContent: `${ln.t.toFixed(1)}s` }) : ""]),
       ln.type === "say" ? el("div", { className: "say", textContent: ln.rest.split("|")[0].trim() }) : "",
       tags,
     ]);
@@ -298,6 +344,7 @@ function draw() {
   $("empty").classList.toggle("hidden", n > 0);
   $("info").textContent = n ? `${n} lines · jagah: ${place()} · ${people().join(", ")}` : "";
   store.set("editor_script", scriptOut());
+  if (reel) drawTimeline();
 }
 
 // ---------------------------------------------------------------- the sheet: one line's choices
@@ -317,7 +364,7 @@ function choice(label, kind, ln, options) {
   s.value = [...s.options].some((x) => x.value === canon) ? canon : cur;
   s.addEventListener("change", () => {
     snapshot();
-    const keep = ln.words.filter((w) => kindOf(w) !== kind);
+    const keep = ln.words.filter((w) => kindOf(w) !== kind && !(kind === "act" && w.includes("=")));
     ln.words = s.value ? (kind === "act" && ln.type === "act" ? [s.value, ...keep] : [...keep, s.value]) : keep;
     ln.changed = [...(ln.changed || []), s.value];
     if (ln.type === "act" && !ln.words.length) ln.words = ["idle"];
@@ -341,6 +388,9 @@ function openSheet(i) {
     choice("↕️ Aage / peeche", "depth", ln, V.depth),
   );
   $("delLine").classList.toggle("hidden", ln.type !== "act");
+  $("puppetBox").classList.add("hidden");
+  $("objBox").classList.add("hidden");
+  $("poseBtn").classList.toggle("hidden", !!lookOf(ln.who).emoji || /^narrator$/i.test(ln.who));
   $("sheet").classList.remove("hidden");
   $("bar").classList.add("hidden");
   draw();
@@ -371,6 +421,7 @@ function drawStage() {
     a.addEventListener("pointerdown", (e) => startDrag(e, a, p));
     st.append(a);
   }
+  drawObjs();
 }
 function startDrag(e, a, who) {
   e.preventDefault();
@@ -404,6 +455,7 @@ function startDrag(e, a, who) {
 function snapshot() { undoStack.push(JSON.stringify(lines)); if (undoStack.length > 50) undoStack.shift(); }
 function start(text) {
   lines = parse(text);
+  timeLines();
   looks = {};
   undoStack = [];
   sel = -1;
@@ -440,9 +492,351 @@ $("send").addEventListener("click", () => {
   location.href = "index.html";
 });
 
+// ---------------------------------------------------------------- the puppet: the studio's own skeleton (characters.py)
+const SK = { TORSO_H: 290, UA: 114, LA: 108, TH: 146, SH: 146, NECK_H: 24, HEAD_RY: 90, HEAD_SCALE: 1.14, HEAD_RX: 78 };
+const DEFAULT_POSE = { la1: -14, la2: -8, ra1: 14, ra2: 8, ll1: -7, ll2: -2, rl1: 7, rl2: 2, head_tilt: 0 };
+const PRESETS = [
+  ["🙌 Dono haath upar", { ra1: 160, ra2: 175, la1: -160, la2: -175 }],
+  ["👉 Ishaara", { ra1: 95, ra2: 95 }],
+  ["🙅 Kamar pe haath", { ra1: 40, ra2: -55, la1: -40, la2: 55 }],
+  ["🤦 Sir pe haath", { ra1: 150, ra2: -130 }],
+  ["🤷 Kandhe uchkao", { ra1: 70, ra2: 150, la1: -70, la2: -150 }],
+  ["🦵 Ek pair upar", { rl1: 70, rl2: 10 }],
+];
+let P = { ...DEFAULT_POSE }, dragging = null;
+const rad = (d) => (d * Math.PI) / 180, deg = (r) => (r * 180) / Math.PI;
+const vec = (a, l) => [l * Math.sin(rad(a)), l * Math.cos(rad(a))];
+const add = (p, q) => [p[0] + q[0], p[1] + q[1]];
+function skel(p) {
+  const hipL = [-32, 0], hipR = [32, 0];
+  const kneeL = add(hipL, vec(p.ll1, SK.TH)), footL = add(kneeL, vec(p.ll2, SK.SH));
+  const kneeR = add(hipR, vec(p.rl1, SK.TH)), footR = add(kneeR, vec(p.rl2, SK.SH));
+  const shL = [-56, -SK.TORSO_H + 22], shR = [56, -SK.TORSO_H + 22];
+  const elbL = add(shL, vec(p.la1, SK.UA)), handL = add(elbL, vec(p.la2, SK.LA));
+  const elbR = add(shR, vec(p.ra1, SK.UA)), handR = add(elbR, vec(p.ra2, SK.LA));
+  const neck = [0, -SK.TORSO_H + 4], r = SK.NECK_H + SK.HEAD_RY * 0.8 * SK.HEAD_SCALE, a = rad(p.head_tilt);
+  const hc = [neck[0] + r * Math.sin(a), neck[1] - r * Math.cos(a)];
+  return { hipL, hipR, kneeL, footL, kneeR, footR, shL, shR, elbL, handL, elbR, handR, neck, hc };
+}
+// two bones from `base` reaching for `t`; the joint bends outwards (side +1 = to the right)
+function ik(base, t, l1, l2, side) {
+  const dx = t[0] - base[0], dy = t[1] - base[1];
+  const d = Math.min(l1 + l2 - 0.5, Math.max(Math.abs(l1 - l2) + 1, Math.hypot(dx, dy)));
+  const a0 = Math.atan2(dx, dy), A = Math.acos((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d));
+  let best = null;
+  for (const a1 of [a0 + A, a0 - A]) {
+    const j = [base[0] + l1 * Math.sin(a1), base[1] + l1 * Math.cos(a1)];
+    const end = [base[0] + d * Math.sin(a0), base[1] + d * Math.cos(a0)];
+    const a2 = Math.atan2(end[0] - j[0], end[1] - j[1]);
+    if (!best || j[0] * side > best.j[0] * side) best = { j, a1: deg(a1), a2: deg(a2) };
+  }
+  return [Math.round(best.a1), Math.round(best.a2)];
+}
+const PK = 0.88, PO = [300, 500];                        // skeleton -> canvas
+const toC = (q) => [PO[0] + q[0] * PK, PO[1] + q[1] * PK];
+const fromC = (x, y) => [(x - PO[0]) / PK, (y - PO[1]) / PK];
+function drawPuppet() {
+  const cv = $("puppet"), g = cv.getContext("2d"), k = skel(P);
+  const css = getComputedStyle(document.documentElement);
+  g.clearRect(0, 0, cv.width, cv.height);
+  const fy = Math.max(k.footL[1], k.footR[1]) + 12;
+  g.strokeStyle = css.getPropertyValue("--line"); g.lineWidth = 3;
+  g.beginPath(); g.moveTo(20, toC([0, fy])[1]); g.lineTo(580, toC([0, fy])[1]); g.stroke();
+  const limb = (pts, w, col) => {
+    g.lineCap = "round"; g.lineJoin = "round";
+    g.strokeStyle = "#1d1a17"; g.lineWidth = (w + 8) * PK; g.beginPath(); pts.forEach((q, i) => g[i ? "lineTo" : "moveTo"](...toC(q))); g.stroke();
+    g.strokeStyle = col; g.lineWidth = w * PK; g.beginPath(); pts.forEach((q, i) => g[i ? "lineTo" : "moveTo"](...toC(q))); g.stroke();
+  };
+  limb([k.hipL, k.kneeL, k.footL], 34, "#5b6b8c");
+  limb([k.hipR, k.kneeR, k.footR], 34, "#5b6b8c");
+  g.fillStyle = "#5aa0d8"; g.strokeStyle = "#1d1a17"; g.lineWidth = 6;
+  const [x0, y0] = toC([-70, -SK.TORSO_H + 4]), [x1, y1] = toC([70, 10]);
+  g.beginPath(); g.roundRect(x0, y0, x1 - x0, y1 - y0, 40); g.fill(); g.stroke();
+  limb([k.shL, k.elbL, k.handL], 28, "#c98b5e");
+  limb([k.shR, k.elbR, k.handR], 28, "#c98b5e");
+  const [hx, hy] = toC(k.hc);
+  g.fillStyle = "#c98b5e"; g.beginPath(); g.ellipse(hx, hy, SK.HEAD_RX * SK.HEAD_SCALE * PK, SK.HEAD_RY * SK.HEAD_SCALE * PK, rad(-P.head_tilt), 0, 7); g.fill(); g.stroke();
+  const img = $("puppet").dataset.face && document.getElementById("pface");
+  if (img && img.complete && img.naturalWidth) {
+    g.save(); g.beginPath(); g.ellipse(hx, hy, SK.HEAD_RX * SK.HEAD_SCALE * PK - 3, SK.HEAD_RY * SK.HEAD_SCALE * PK - 3, rad(-P.head_tilt), 0, 7); g.clip();
+    const w = img.naturalWidth, h = img.naturalHeight, sz = SK.HEAD_RY * SK.HEAD_SCALE * PK * 2.3;
+    g.drawImage(img, w * 0.18, 0, w * 0.64, w * 0.64 * 1.05, hx - sz / 2, hy - sz * 0.52, sz, sz * 1.05);
+    g.restore();
+  }
+  for (const [q, c] of [[k.handL, "#e4572e"], [k.handR, "#e4572e"], [k.footL, "#2f7dd1"], [k.footR, "#2f7dd1"],
+                        [[k.hc[0], k.hc[1] - SK.HEAD_RY * SK.HEAD_SCALE], "#2f9e44"]]) {
+    const [x, y] = toC(q);
+    g.fillStyle = c; g.strokeStyle = "#fff"; g.lineWidth = 4;
+    g.beginPath(); g.arc(x, y, 22, 0, 7); g.fill(); g.stroke();
+  }
+}
+function puppetPoint(e) {
+  const r = $("puppet").getBoundingClientRect();
+  return fromC(((e.clientX - r.left) * $("puppet").width) / r.width, ((e.clientY - r.top) * $("puppet").height) / r.height);
+}
+$("puppet").addEventListener("pointerdown", (e) => {
+  const q = puppetPoint(e), k = skel(P);
+  const handles = { handL: k.handL, handR: k.handR, footL: k.footL, footR: k.footR,
+                    head: [k.hc[0], k.hc[1] - SK.HEAD_RY * SK.HEAD_SCALE] };
+  let best = null, bd = 60;
+  for (const [n, h] of Object.entries(handles)) { const d = Math.hypot(h[0] - q[0], h[1] - q[1]); if (d < bd) { bd = d; best = n; } }
+  if (!best) return;
+  dragging = best;
+  $("puppet").setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+$("puppet").addEventListener("pointermove", (e) => {
+  if (!dragging) return;
+  const q = puppetPoint(e), k = skel(P);
+  if (dragging === "handR") [P.ra1, P.ra2] = ik(k.shR, q, SK.UA, SK.LA, 1);
+  if (dragging === "handL") [P.la1, P.la2] = ik(k.shL, q, SK.UA, SK.LA, -1);
+  if (dragging === "footR") [P.rl1, P.rl2] = ik(k.hipR, q, SK.TH, SK.SH, 1);
+  if (dragging === "footL") [P.ll1, P.ll2] = ik(k.hipL, q, SK.TH, SK.SH, -1);
+  if (dragging === "head") P.head_tilt = Math.round(Math.max(-35, Math.min(35, deg(Math.atan2(q[0] - k.neck[0], k.neck[1] - q[1])))));
+  drawPuppet();
+});
+for (const ev of ["pointerup", "pointercancel"]) $("puppet").addEventListener(ev, () => (dragging = null));
+const poseWords = (p) => ["pose", `ra=${Math.round(p.ra1)}/${Math.round(p.ra2)}`, `la=${Math.round(p.la1)}/${Math.round(p.la2)}`,
+  `rl=${Math.round(p.rl1)}/${Math.round(p.rl2)}`, `ll=${Math.round(p.ll1)}/${Math.round(p.ll2)}`, `head=${Math.round(p.head_tilt)}`];
+function poseFrom(words) {
+  const p = { ...DEFAULT_POSE };
+  for (const w of words) {
+    const m = w.match(/^(ra|la|rl|ll)=(-?[\d.]+)\/(-?[\d.]+)$/);
+    if (m) { p[m[1] + "1"] = +m[2]; p[m[1] + "2"] = +m[3]; }
+    const h = w.match(/^head=(-?[\d.]+)$/);
+    if (h) p.head_tilt = +h[1];
+  }
+  return p;
+}
+function openPuppet() {
+  const who = lines[sel].who;
+  let last = null;                                     // the pose they are in at this line (else standing)
+  for (let i = 0; i <= sel + 1 && i < lines.length; i++)
+    if (lines[i].who === who && lines[i].words && lines[i].words[0] === "pose") last = lines[i];
+  P = last ? poseFrom(last.words) : { ...DEFAULT_POSE };
+  const lk = lookOf(who);
+  let img = document.getElementById("pface");
+  if (!img) { img = el("img", { id: "pface", className: "hidden", alt: "" }); document.body.append(img); }
+  img.onload = drawPuppet;
+  img.src = lk.img ? `assets/looks/${lk.img}.png` : "";
+  $("puppet").dataset.face = lk.img ? "1" : "";
+  $("presets").replaceChildren(...PRESETS.map(([name, v]) => {
+    const b = el("button", { className: "btn small", type: "button", textContent: name });
+    b.addEventListener("click", () => { P = { ...DEFAULT_POSE, ...v }; drawPuppet(); });
+    return b;
+  }));
+  $("objBox").classList.add("hidden");
+  $("puppetBox").classList.remove("hidden");
+  drawPuppet();
+  $("puppetBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+$("poseBtn").addEventListener("click", openPuppet);
+$("poseReset").addEventListener("click", () => { P = { ...DEFAULT_POSE }; drawPuppet(); });
+$("poseApply").addEventListener("click", () => {
+  snapshot();
+  const who = lines[sel].who;
+  const ln = { type: "act", who, words: poseWords(P), changed: ["pose"] };
+  const nx = lines[sel + 1];
+  if (lines[sel].type === "act" && lines[sel].words[0] === "pose") { lines[sel] = ln; }
+  else if (nx && nx.type === "act" && nx.who === who && nx.words[0] === "pose") lines[sel + 1] = ln;
+  else lines.splice(sel + 1, 0, ln);
+  $("puppetBox").classList.add("hidden");
+  draw(); drawStage();
+  toast(`${who} ka pose laga`);
+});
+
+// ---------------------------------------------------------------- things in the place (OBJ lines, the whole scene)
+const OBJ_EMOJI = { chair: "🪑", sofa: "🛋️", bed: "🛏️", tv: "📺", plant: "🪴", fridge: "🧊", cooler: "❄️", lamp: "💡",
+  bench: "🪑", khaat: "🛏️", matka: "🏺", bucket: "🪣", door: "🚪", window: "🪟", mirror: "🪞", clock: "🕰️", fan: "🌀",
+  tree: "🌳", stool: "🪑", cupboard: "🗄️", washing_machine: "🧺", desk: "🗄️", lantern: "🏮", phone: "☎️", rock: "🪨",
+  bush: "🌿", fence: "🚧", signboard: "🪧", stairs: "🪜", wheelchair: "🦽", handpump: "🚰", chulha: "🔥", hookah: "🪔",
+  table: "🍽️", cycle: "🚲", bike: "🏍️", scooter: "🛵", car: "🚗", auto: "🛺", dustbin: "🗑️", thela: "🛒", cow: "🐄",
+  tractor: "🚜", box: "📦", tubelight: "💡", painting: "🖼️", blackboard: "🧑‍🏫" };
+const OBJ_PICK = () => [...V.sets.filter((k) => !["jail_door", "drip", "uple", "bhoosa", "bijooka"].includes(k)),
+  "table", "cycle", "bike", "scooter", "car", "auto", "dustbin", "thela", "cow", "tractor"];
+const SETX = { far_left: 0.05, left: 0.17, center: 0.5, right: 0.83, far_right: 0.95 };
+// the OBJ lines of the scene the chosen line is in: [{i, kind, x}]
+function sceneRange() {
+  let a = 0, b = lines.length;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].type === "meta" && /^\s*SCENE\s*:/i.test(lines[i].raw)) { if (i <= Math.max(sel, 0)) a = i; else { b = i; break; } }
+  }
+  return [a, b];
+}
+function objsHere() {
+  const [a, b] = sceneRange(), out = [];
+  for (let i = a; i < b; i++) {
+    const m = lines[i].type === "meta" && lines[i].raw.match(/^\s*OBJ\s*:\s*(\S+)(.*)$/i);
+    if (!m) continue;
+    const words = m[2].trim().split(/\s+/);
+    let x = 0.65;
+    for (const w of words) {
+      if (/^(0?\.\d+|[01](\.0+)?|\d{1,2}%)$/.test(w)) x = w.endsWith("%") ? parseFloat(w) / 100 : parseFloat(w);
+      else if (SETX[w] != null) x = SETX[w];
+    }
+    out.push({ i, kind: m[1].toLowerCase(), x, rest: words.filter((w) => !/^(0?\.\d+|[01](\.0+)?|\d{1,2}%)$/.test(w) && SETX[w] == null) });
+  }
+  return out;
+}
+function setObj(o, x) {           // o = an existing one ({i, kind, rest}) or {kind} for a new one
+  snapshot();
+  const raw = `OBJ: ${o.kind}${o.rest && o.rest.length ? " " + o.rest.join(" ") : ""} ${x.toFixed(2)}`;
+  if (o.i != null) lines[o.i] = { type: "meta", raw };
+  else {
+    const [a] = sceneRange();
+    let at = a + 1;
+    while (lines[at] && lines[at].type === "meta" && /^\s*(OBJ|CAST|KIRDAAR|DRESS|CAMERA|STYLE)\s*:/i.test(lines[at].raw)) at++;
+    lines.splice(at, 0, { type: "meta", raw });
+    if (at <= sel) sel++;
+  }
+  draw(); drawStage();
+}
+function dropObj(o) {
+  snapshot();
+  lines.splice(o.i, 1);
+  if (o.i <= sel) sel--;
+  draw(); drawStage();
+}
+function drawObjs() {
+  const st = $("stage");
+  st.querySelectorAll(".obj").forEach((n) => n.remove());
+  for (const o of objsHere()) {
+    const x = el("button", { type: "button", textContent: "✕", className: "btn small",
+                             style: "min-height:0;padding:0 6px;font-size:11px;margin-top:2px" });
+    const n = el("div", { className: "obj" }, [OBJ_EMOJI[o.kind] || "📦", el("small", { textContent: o.kind.replace(/_/g, " ") }), x]);
+    n.style.left = `${100 * o.x}%`;
+    x.addEventListener("pointerdown", (e) => e.stopPropagation());
+    x.addEventListener("click", (e) => { e.stopPropagation(); dropObj(o); });
+    n.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      const r = st.getBoundingClientRect();
+      n.setPointerCapture(e.pointerId);
+      const f = (cx) => Math.min(0.97, Math.max(0.03, (cx - r.left) / r.width));
+      const mv = (ev) => { n.style.left = `${100 * f(ev.clientX)}%`; };
+      const up = (ev) => {
+        n.removeEventListener("pointermove", mv); n.removeEventListener("pointerup", up);
+        const v = Math.round(f(ev.clientX) * 100) / 100;
+        if (Math.abs(v - o.x) > 0.02) setObj(o, v);
+      };
+      n.addEventListener("pointermove", mv); n.addEventListener("pointerup", up);
+    });
+    st.append(n);
+  }
+}
+$("objBtn").addEventListener("click", () => {
+  $("puppetBox").classList.add("hidden");
+  $("objList").replaceChildren(...OBJ_PICK().map((k) => {
+    const b = el("button", { className: "btn small", type: "button", textContent: `${OBJ_EMOJI[k] || "📦"} ${k.replace(/_/g, " ")}` });
+    b.addEventListener("click", () => {
+      setObj({ kind: k }, 0.5);
+      $("stage").scrollIntoView({ block: "center" });       // (the stage, to drag it to its place)
+      toast(`${k} rakha: stage pe kheench ke jagah do`);
+    });
+    return b;
+  }));
+  $("objBox").classList.toggle("hidden");
+});
+
+// ---------------------------------------------------------------- a finished reel: its video, its timeline, its voice
+let reel = null;                    // {tag, project}
+const COLORS = ["#e4572e", "#2f7dd1", "#2f9e44", "#9c36b5", "#e8590c", "#0c8599"];
+const norm = (t) => String(t || "").split("|")[0].replace(/\s+/g, " ").trim().toLowerCase();
+
+async function api(path) {
+  const headers = { Accept: "application/vnd.github+json" };
+  const tok = store.get("token");
+  if (tok) headers.Authorization = "Bearer " + tok;
+  const r = await fetch("https://api.github.com" + path, { headers });
+  if (!r.ok) throw new Error("GitHub " + r.status);
+  return r.json();
+}
+function repoPath() {
+  const m = location.hostname.match(/^([\w-]+)\.github\.io$/);
+  const seg = location.pathname.split("/").filter(Boolean)[0];
+  const owner = m ? m[1] : "boidbit", repo = m && seg && !seg.includes(".") ? seg : "insta-shorts";
+  return `/repos/${owner}/${repo}`;
+}
+// each spoken line of the reel -> its line in the script (same words, in order)
+function timeLines() {
+  if (!reel || !reel.project) return;
+  const said = reel.project.lines.filter((l) => l.who !== "NARRATOR");
+  let k = 0;
+  for (const ln of lines) {
+    if (ln.type !== "say" || /^narrator$/i.test(ln.who)) continue;
+    let j = said.findIndex((l, i) => i >= k && norm(l.text) === norm(ln.rest));
+    if (j < 0) j = k < said.length ? k : -1;
+    if (j >= 0) { ln.t = said[j].start; ln.t1 = said[j].end; k = j + 1; }
+  }
+}
+async function openReel(tag) {
+  const rel = await api(`${repoPath()}/releases/tags/${encodeURIComponent(tag)}`);
+  const body = (rel.body || "").replace(/\r\n/g, "\n");
+  const pm = body.match(/<!-- project ([\s\S]*?) -->/);
+  const script = body.replace(/\n*<!-- project [\s\S]*?-->\s*/g, "\n").split("<!-- script -->")[1] || "";
+  if (!script.trim()) throw new Error("Is reel me script save nahi hai");
+  const vid = (rel.assets || []).find((a) => a.name.endsWith(".mp4") && !a.name.endsWith(".insta.mp4"));
+  const hasVoice = (rel.assets || []).some((a) => a.name.endsWith(".voice.zip"));
+  reel = { tag, project: pm ? JSON.parse(pm[1]) : null, hasVoice };
+  start(script.trim() + "\n");
+  if (vid) {
+    $("vid").src = vid.browser_download_url;
+    $("player").classList.remove("hidden");
+  }
+  for (const id of ["preview", "remake"]) $(id).classList.remove("hidden");
+  for (const id of ["send"]) $(id).classList.add("hidden");
+  $("info").textContent += hasVoice ? " · 🔊 isi reel ki awaaz dobara lagegi"
+    : " · ⚠️ purani reel: iski awaaz save nahi hai, dobara banane pe nayi awaaz banegi";
+}
+function drawTimeline() {
+  const tl = $("tl"), dur = (reel && reel.project && reel.project.duration) || $("vid").duration || 0;
+  tl.querySelectorAll(".blk").forEach((b) => b.remove());
+  if (!dur) return;
+  const who = people();
+  lines.forEach((ln, i) => {
+    if (ln.t == null) return;
+    const b = el("div", { className: "blk", textContent: ln.who, title: ln.rest });
+    b.style.left = `${(100 * ln.t) / dur}%`;
+    b.style.width = `${Math.max(2, (100 * (ln.t1 - ln.t)) / dur)}%`;
+    b.style.background = COLORS[Math.max(0, who.indexOf(ln.who)) % COLORS.length];
+    b.dataset.i = i;
+    b.addEventListener("click", () => { $("vid").currentTime = ln.t + 0.05; $("vid").pause(); openSheet(i); });
+    tl.append(b);
+  });
+}
+// the line being said at time t (or the last one before it)
+function lineAt(t) {
+  let best = -1;
+  lines.forEach((ln, i) => { if (ln.t != null && ln.t <= t + 0.01) best = i; });
+  if (best < 0) return lines.findIndex((l) => l.type !== "meta");
+  // an action written right after that line belongs to the moment after it
+  while (lines[best + 1] && lines[best + 1].type === "act" && lines[best].t1 != null && t > lines[best].t1) best++;
+  return best;
+}
+$("vid").addEventListener("timeupdate", () => {
+  const v = $("vid"), dur = v.duration || 1;
+  $("now").style.left = `${(100 * v.currentTime) / dur}%`;
+  const i = lineAt(v.currentTime);
+  document.querySelectorAll("#tl .blk").forEach((b) => b.classList.toggle("on", Number(b.dataset.i) === i));
+});
+$("vid").addEventListener("loadedmetadata", drawTimeline);
+$("editHere").addEventListener("click", () => { $("vid").pause(); openSheet(lineAt($("vid").currentTime)); });
+function remake(width) {
+  if (!store.get("token")) return toast("Pehle studio page pe ⚙️ GitHub jodo");
+  store.set("editor_out", scriptOut());
+  store.set("editor_go", JSON.stringify({ voice_from: reel && reel.hasVoice ? reel.tag : "", width }));
+  location.href = "index.html";
+}
+$("remake").addEventListener("click", () => remake("1080"));
+$("preview").addEventListener("click", () => remake("480"));
+
 (async () => {
   try { await loadVocab(); }
   catch (e) { $("info").textContent = "Word list load nahi hui: " + e.message; return; }
+  const tag = new URLSearchParams(location.search).get("reel");
+  if (tag) {
+    try { await openReel(tag); return; }
+    catch (e) { toast("Reel nahi khuli: " + e.message); }
+  }
   const incoming = store.get("editor_in");
   store.set("editor_in", "");
   const text = incoming || store.get("editor_script");

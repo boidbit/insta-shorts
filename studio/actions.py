@@ -1989,6 +1989,18 @@ ACTIONS = {
 }
 
 
+def custom_pose(t, sp, I, ph, o):
+    """`A -> pose ra=95/-140 ...`: the pose made with the Harkat editor's puppet (its exact angles), breathing."""
+    from .characters import DEFAULT_POSE
+    p = {k: DEFAULT_POSE[k] for k in ("la1", "la2", "ra1", "ra2", "ll1", "ll2", "rl1", "rl2", "tilt", "head_tilt")}
+    p.update({k: float(v) for k, v in (o.get("pose") or {}).items() if k in p})
+    p["lift"] = 1.5 * sin(2 * pi * 0.35 * t)        # (alive: a slow breath)
+    return _P(p)
+
+
+ACTIONS["pose"] = custom_pose
+
+
 def pose_for(action, t, speed=1.0, intensity=1.0, phase=0.0, opts=None):
     fn = ACTIONS.get(action or "idle", idle)
     return fn(max(0.0, t), speed or 1.0, intensity if intensity is not None else 1.0, phase, opts or {})
