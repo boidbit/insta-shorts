@@ -30,7 +30,10 @@ DEFAULT_STYLE = ("Read this as a natural, lively everyday Hindi conversation bet
 SAME_VOICE = ("Keep each speaker's voice identity (age, pitch, timbre, accent) exactly the same from the first line "
               "to the last; feelings change only how a line is said, never whose voice it is.")
 TEMPERATURE = 0.6                              # (lower than the default: the same voice, take after take)
-PIECE_MAX = 200                                # letters: a longer line goes to Gemini in pieces (its voice drifts)
+# A long line used to go to Gemini in pieces (sentences as separate lines). Off: Gemini says one speaker's pieces
+# without a pause between them, so the take could not be cut at the right places and every later line got the
+# wrong voice clip (a reel's actions ran ahead of / behind the words). A line goes whole again.
+PIECE_MAX = None
 
 
 class GeminiTTSError(RuntimeError):
@@ -228,12 +231,78 @@ def _silence_runs(rms, thr, min_len):
     return runs
 
 
+LEVEL_RMS = 0.11            # every line as loud as the others (the speech itself, not its pauses)
+
+
+def _same(a, k):
+    """Convolution the length of `a` (also when the kernel is longer than `a`), centred."""
+    full = np.convolve(a, k, mode="full")
+    s0 = (len(k) - 1) // 2
+    return full[s0: s0 + len(a)]
+
+
+def level(x, sr=SR, target=LEVEL_RMS, max_gain=16.0, window=1.2):
+    """One line's voice at the same loudness as every other line, and steady inside a long line. Gemini now and
+    then says part of a take very softly (once, the first half-minute of a reel came out near-silent: mouths
+    moving, no voice heard); one gain for the whole take kept those words quiet. The gain follows the speech
+    slowly (about a second), holds through pauses (breaths and silence are not pumped up), and peaks are bent
+    softly instead of clipped."""
+    x = np.asarray(x, dtype=np.float32)
+    hop = int(sr * 0.02)
+    m = len(x) // hop
+    if m < 3:
+        return x
+    rms = np.sqrt((x[: m * hop].reshape(m, hop) ** 2).mean(axis=1))
+    voiced = rms >= max(float(rms.max()) * 0.015, 3e-4)       # (soft speech is speech; a pause's hiss is not)
+    if not voiced.any():
+        return x
+    w = max(1, int(window / 0.02))
+    k = np.ones(2 * w + 1, dtype=np.float64)
+    energy = _same(np.where(voiced, rms ** 2, 0.0), k)
+    count = _same(voiced.astype(np.float64), k)
+    have = count > 0
+    local = np.full(m, np.nan)
+    local[have] = np.sqrt(energy[have] / count[have])
+    idx = np.arange(m)                                    # (no speech near: the nearest speech's level)
+    local = np.interp(idx, idx[have], local[have])
+    gain = np.clip(target / np.maximum(local, 1e-6), 0.25, max_gain)
+    gain = _same(gain, np.ones(w) / w)                     # smooth: no pumping
+    t_frames = (np.arange(m) + 0.5) * hop
+    g = np.interp(np.arange(len(x)), t_frames, gain).astype(np.float32)
+    y = x * g
+    knee, room = 0.8, 0.17
+    a = np.abs(y)
+    over = a > knee
+    y[over] = np.sign(y[over]) * (knee + room * np.tanh((a[over] - knee) / room))
+    return y.astype(np.float32)
+
+
+def split_problem(x, texts):
+    """None if the take cuts into lines that fit their words, else a short reason. A clip far longer or shorter than
+    its words (for this take's own speed) means the cut went to a wrong pause: from there every line would get
+    another line's voice (the picture's actions running ahead of / behind the words)."""
+    if len(texts) < 3:
+        return None
+    try:
+        spans, _method = split_audio(x, texts)
+    except GeminiTTSError as e:
+        return str(e)
+    rates = [(t1 - t0) / _letters(t) for (t0, t1), t in zip(spans, texts)]
+    mid = float(np.median(rates))
+    for (t0, t1), t, r in zip(spans, texts, rates):
+        long_enough = _letters(t) >= 25                  # (a two-word line may be said slowly or quickly)
+        if long_enough and (r > 2.0 * mid or r < 0.45 * mid):
+            return "the take does not cut into its lines (line %r: %.1f s for %d letters)" % (t[:24], t1 - t0,
+                                                                                              _letters(t))
+    return None
+
+
 def pieces(text, limit=None):
     """A line longer than PIECE_MAX letters -> its sentences grouped into pieces of at most ~PIECE_MAX (said as
     separate lines, so Gemini's voice does not drift in a long speech; joined again into one clip)."""
     limit = limit or PIECE_MAX
     text = " ".join(str(text).split())
-    if len(text) <= limit:
+    if not limit or len(text) <= limit:
         return [text]
     parts = [p for p in re.split(r"(?<=[।!?.…])\s+", text) if p]
     out = []
@@ -469,7 +538,7 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
     x = None
     if os.path.isfile(full) and os.path.getsize(full) > 2000:
         x, _ = read_wav(full)
-        bad = take_problem(x, texts)
+        bad = take_problem(x, texts) or split_problem(x, texts)
         if bad:                                                    # a cut-off take from before this check
             print("  [gemini] cached voice is broken (%s), asking again" % bad, file=sys.stderr)
             os.remove(full)
@@ -483,7 +552,7 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
                                                                " - try %d" % (attempt + 1) if attempt else ""),
                   file=sys.stderr)
             x = request_audio(build_payload(lines, style, notes), model)
-            bad = take_problem(x, texts)
+            bad = take_problem(x, texts) or split_problem(x, texts)
             if not bad:
                 break
             print("  [gemini] %s" % bad, file=sys.stderr)
@@ -504,7 +573,7 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
                                                          "  (%d pieces)" % len(mine) if len(mine) > 1 else ""),
               file=sys.stderr)
         raw = os.path.join(d, "line_%03d.wav" % i)
-        write_wav(raw, join_pieces(x, mine))
+        write_wav(raw, level(join_pieces(x, mine)))
         tag = hashlib.sha1(("%s|%s" % (it.get("pitch"), it.get("rate"))).encode()).hexdigest()[:6]
         paths.append(_shape(raw, os.path.join(d, "line_%03d_%s.wav" % (i, tag)),
                             semitones(it.get("pitch")), rate_factor(it.get("rate"))))
