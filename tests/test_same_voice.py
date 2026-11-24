@@ -52,15 +52,20 @@ class SameVoice(unittest.TestCase):
                 dict(text=LONG, voice="Sadachbia", spec={"andaaz": "an excited vlogger", "hulia": hul}),
                 dict(text="बने रहिए", voice="Charon", spec={})]
 
-    def test_a_long_line_in_pieces_one_clip(self):
+    def test_a_long_line_goes_whole(self):
+        """(Pieces are off: Gemini says one speaker's pieces without a pause, the take is cut in the wrong places
+        and every later line gets another line's voice.)"""
+        self.assertIsNone(G.PIECE_MAX)
+        self.assertEqual(G.pieces(LONG), [" ".join(LONG.split())])
         paths = G.synth_script(self.items()[:2], cache_dir=self.cache)
         body = self.calls[0]["contents"][0]["parts"][0]["text"].split("\n\n")[1:]
-        self.assertEqual(len(body), 1 + len(G.pieces(LONG)))
-        self.assertGreater(len(G.pieces(LONG)), 1)
-        self.assertEqual(len(paths), 2)                                   # still one clip per line
+        self.assertEqual(len(body), 2)                                    # one line, one paragraph
+        self.assertEqual(len(paths), 2)
         x, _ = G.read_wav(paths[1])
-        self.assertGreater(len(x) / G.SR, len(LONG) / 14.0 * 0.8)        # the whole speech is in it
-        self.assertLess(len(x) / G.SR, len(LONG) / 14.0 + 2.0)          # ... without the long pauses between pieces
+        self.assertGreater(len(x) / G.SR, len(LONG) / 14.0 * 0.8)
+
+    def test_pieces_still_join_when_asked(self):
+        self.assertGreater(len(G.pieces(LONG, limit=200)), 1)             # (kept for later, with its own splitting)
 
     def test_the_voice_rule_the_hulia_and_a_lower_temperature(self):
         G.synth_script(self.items()[:2], cache_dir=self.cache)
@@ -89,3 +94,44 @@ class SameVoice(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SteadyLoudness(unittest.TestCase):
+    """Gemini once said the first half-minute of a take very softly: one gain for the take left those lines near
+    silent in the reel. Each line is levelled, and steady inside a long line."""
+
+    def speech(self, amp, secs):
+        t = np.arange(int(G.SR * secs)) / G.SR
+        return (amp * np.sin(2 * np.pi * 160 * t) * (0.6 + 0.4 * np.sin(2 * np.pi * 3 * t))).astype(np.float32)
+
+    def rms(self, x):
+        return float(np.sqrt((x ** 2).mean()))
+
+    def test_a_soft_line_is_lifted(self):
+        y = G.level(self.speech(0.01, 4.0))
+        self.assertGreater(self.rms(y), 0.07)
+        self.assertLessEqual(float(np.abs(y).max()), 0.98)
+
+    def test_soft_then_loud_inside_one_line(self):
+        x = np.concatenate([self.speech(0.02, 6.0), self.speech(0.3, 6.0)])     # 15x softer, then loud
+        y = G.level(x)
+        a, b = self.rms(y[G.SR: 5 * G.SR]), self.rms(y[7 * G.SR: 11 * G.SR])
+        self.assertGreater(a / b, 0.6)                                   # was 1:15
+
+    def test_pauses_are_not_pumped_up(self):
+        x = np.concatenate([self.speech(0.2, 2.0), np.random.RandomState(1).randn(G.SR * 2).astype(np.float32) * 1e-4,
+                            self.speech(0.2, 2.0)])
+        y = G.level(x)
+        self.assertLess(self.rms(y[int(2.6 * G.SR): int(3.4 * G.SR)]), 0.01)
+
+    def test_lines_are_levelled_when_cut(self):
+        G_calls = []
+        with mock.patch.object(G, "request_audio", side_effect=lambda p, m=None: G_calls.append(p) or
+                               np.concatenate([np.zeros(G.SR // 4, np.float32), self.speech(0.01, 3.0),
+                                               np.zeros(G.SR, np.float32), self.speech(0.4, 3.0),
+                                               np.zeros(G.SR, np.float32)])):
+            paths = G.synth_script([dict(text="पहली लाइन धीरे से", voice="Algieba", spec={}),
+                                    dict(text="दूसरी लाइन ज़ोर से", voice="Sadachbia", spec={})],
+                                   cache_dir=tempfile.mkdtemp())
+        a, b = (self.rms(G.read_wav(p)[0]) for p in paths)
+        self.assertGreater(a / b, 0.6)

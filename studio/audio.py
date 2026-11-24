@@ -2,6 +2,7 @@
 import hashlib
 import math
 import os
+import re
 import subprocess
 import sys
 import wave
@@ -536,9 +537,13 @@ SFX_NAMES = ("pop", "boing", "whoosh", "ding", "thud", "clap", "beep", "laugh_tr
 
 
 def sfx_path(name):
-    """name can be a builtin sfx name or a path to an audio file."""
+    """name can be a builtin sfx name or a path to an audio file. A builtin name with a recording in assets/sfx
+    (CC0, see assets/sfx/CREDITS.md) plays that recording; the others are made here (SFX_RECORDED=0: always made)."""
     if os.path.isfile(asset_path(name) or ""):
         return asset_path(name)
+    rec = asset_path(os.path.join("assets", "sfx", "%s.ogg" % name))
+    if os.environ.get("SFX_RECORDED", "1") != "0" and re.fullmatch(r"[a-z0-9_]+", str(name)) and os.path.isfile(rec):
+        return rec
     out = os.path.join(_cache("sfx"), name + ".wav")
     if not os.path.isfile(out):
         data = _gen_sfx(name)

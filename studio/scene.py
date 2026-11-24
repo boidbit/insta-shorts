@@ -567,7 +567,26 @@ def voice_pack_in():
         return {}
     with open(idx, encoding="utf-8") as f:
         index = json.load(f)
-    return {k: os.path.join(d, v["file"]) for k, v in index.items() if os.path.isfile(os.path.join(d, v["file"]))}
+    out = {}
+    for k, v in index.items():
+        p = os.path.join(d, v["file"])
+        if os.path.isfile(p):
+            out[k] = _leveled(p)
+    return out
+
+
+def _leveled(path):
+    """An earlier reel's voice clip at the steady loudness of today's clips (gemini_tts.level); the file itself if
+    it cannot be read."""
+    lv = os.path.splitext(path)[0] + ".lvl.wav"
+    if os.path.isfile(lv):
+        return lv
+    try:
+        x, sr = gemini_tts.read_wav(path)
+        gemini_tts.write_wav(lv, gemini_tts.level(x, sr=sr), sr=sr)
+        return lv
+    except Exception:
+        return path
 
 
 def voice_pack_save(who, text, path):

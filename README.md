@@ -134,6 +134,7 @@ HASHTAGS: #desicomedy #mummy
 - `SCENE: jagah | title`: kitchen, room, street, school, market, office, bus_stop, night_road, plain. street/bus_stop/school me badal, parinde aur peeche se gaadiyan apne aap chalte hain. Title ek card ki tarah 1.4s dikhta hai.
 - CAST me role likh sakte ho (mummy, papa, dadi, dada, dost, bhai, behen, teacher, boss, bachcha) ya look naam + extra: `chubby glasses beard bindi saree red ...`.
 - `wait 1.5` = ruko.
+- **Asli recorded sound:** `boing, whoosh, pop, thud, punch, slap, cash, applause, crowd_cheer, glass_break, thunder, footsteps, knock, bat_hit` ab asli recordings bajate hain (`assets/sfx/*.ogg`, CC0, credit ki zaroorat nahi, list: `assets/sfx/CREDITS.md`). Likhne ka tareeka wahi hai: `A (shock, boing): ...` ya `A -> fall thud`. Baaki sound (doorbell, siren, record_scratch...) pehle jaise studio khud banata hai. Purani banayi hui awaaz chahiye to `SFX_RECORDED=0`. Naya sound jodna ho to `assets/sfx/<naam>.ogg` daal do (sirf CC0 / apni recording).
 
 Command line se: `python -m studio.script scripts/doodh_story.txt -o scenes/doodh.json` phir render.
 

@@ -129,9 +129,11 @@ class PropTests(unittest.TestCase):
 
 class SoundTests(unittest.TestCase):
     def test_sounds_are_made_and_not_clipped(self):
+        from unittest import mock
         for name in NEW_SFX:
             self.assertIn(name, script.SFX)
-            p = audio.sfx_path(name)
+            with mock.patch.dict(os.environ, {"SFX_RECORDED": "0"}):     # the studio's own (made) sound
+                p = audio.sfx_path(name)
             with wave.open(p) as w_:
                 x = np.frombuffer(w_.readframes(w_.getnframes()), dtype="<i2").astype(float) / 32767
             self.assertGreater(x.size / audio.SR, 0.8, name)
