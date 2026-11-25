@@ -67,13 +67,13 @@ class SameVoice(unittest.TestCase):
     def test_pieces_still_join_when_asked(self):
         self.assertGreater(len(G.pieces(LONG, limit=200)), 1)             # (kept for later, with its own splitting)
 
-    def test_the_voice_rule_the_hulia_and_a_lower_temperature(self):
+    def test_the_voice_rule_and_the_hulia(self):
         G.synth_script(self.items()[:2], cache_dir=self.cache)
         pl = self.calls[0]
         text = pl["contents"][0]["parts"][0]["text"]
         self.assertIn(G.SAME_VOICE, text)
         self.assertIn("always with the voice of a young man of about twenty-two", text)
-        self.assertEqual(pl["generationConfig"]["temperature"], G.TEMPERATURE)
+        self.assertNotIn("temperature", pl["generationConfig"])          # (default: 0.6 came with empty takes)
 
     def test_a_third_voice_has_its_own_request(self):
         paths = G.synth_script(self.items(), cache_dir=self.cache)
@@ -135,3 +135,42 @@ class SteadyLoudness(unittest.TestCase):
                                    cache_dir=tempfile.mkdtemp())
         a, b = (self.rms(G.read_wav(p)[0]) for p in paths)
         self.assertGreater(a / b, 0.6)
+
+
+class EmptyTakes(unittest.TestCase):
+    """Once Gemini sent the first minute of a take as a silent low rumble (no words): it passed as sound, the reel's
+    first lines had no voice, and making it again reused the same empty clips. A line with no voice is caught."""
+
+    def rumble(self, secs):
+        t = np.arange(int(G.SR * secs)) / G.SR
+        return (0.1 * np.sin(2 * np.pi * 3 * t) + 0.02 * np.sin(2 * np.pi * 11 * t)).astype(np.float32)
+
+    def voice(self, secs):
+        t = np.arange(int(G.SR * secs)) / G.SR
+        return (0.3 * np.sin(2 * np.pi * 180 * t) * (0.6 + 0.4 * np.sin(2 * np.pi * 3 * t))).astype(np.float32)
+
+    def test_rumble_is_not_speech(self):
+        self.assertFalse(G.is_speech(self.rumble(5)))
+        self.assertTrue(G.is_speech(self.voice(5)))
+        self.assertLess(float(np.abs(G.highpass(self.rumble(5))).max()), 0.02)   # and it is not pumped up
+
+    def test_a_take_with_an_empty_line_is_asked_again(self):
+        z = np.zeros(G.SR, np.float32)
+        x = np.concatenate([z[: G.SR // 4], self.rumble(6), z, self.voice(3), z, self.voice(3), z])
+        texts = ["आख़िरी सवाल रीलेश जी, जब घरवाले हँसते थे", "उफ़ गूज़बम्प्स आ गए भाई", "अंकल जी नमस्ते आराम से"]
+        self.assertIn("no voice", G.split_problem(x, texts) or "")
+        good = np.concatenate([z[: G.SR // 4], self.voice(6), z, self.voice(3), z, self.voice(3), z])
+        self.assertIsNone(G.split_problem(good, texts))
+
+    def test_an_empty_clip_in_an_earlier_reels_voice_is_said_again(self):
+        import json
+        from studio import scene as S
+        d = tempfile.mkdtemp()
+        G.write_wav(os.path.join(d, "a.wav"), self.rumble(4))
+        G.write_wav(os.path.join(d, "b.wav"), self.voice(2))
+        with open(os.path.join(d, "index.json"), "w", encoding="utf-8") as f:
+            json.dump({"ka": {"file": "a.wav", "who": "Gappu", "text": "x"},
+                       "kb": {"file": "b.wav", "who": "Papa", "text": "y"}}, f)
+        with mock.patch.dict(os.environ, {"VOICE_PACK_IN": d}):
+            pack = S.voice_pack_in()
+        self.assertEqual(sorted(pack), ["kb"])                            # the empty one is left out: said again
