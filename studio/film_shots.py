@@ -119,6 +119,19 @@ def plan_shots(plan, own_camera=False, style="film"):
             elif a in WIDE and not e.get("on") and e["t"] > open_end \
                     and not any(sp["start"] <= e["t"] < sp["end"] for sp in speech):
                 cuts.append((e["t"], "free", c.name, None))
+    # running in / out of the place (`exit left fast`, `enter ...`): the wide shot, so it is seen. `exit` is a move,
+    # not an action, so it made no cut of its own: the shot before it went on (Papa's `ghoorna` single hid everyone
+    # else, Reelesh ran out unseen, and the camera stayed on the empty spot where Papa had been)
+    away = []
+    for c in people:
+        for m in c.moves:
+            m0, m1, x0, x1 = m[0], m[1], m[2], m[4]
+            out_of_frame = not (-40.0 <= x1 <= 1120.0) or not (-40.0 <= x0 <= 1120.0)
+            if m0 > open_end and m1 - m0 > 0.05 and x0 != x1 and out_of_frame:
+                away.append((m0 - 0.15, m1 + 0.35))
+                cuts.append((m0 - 0.15, "free", c.name, None))
+    if away:
+        cuts = [cut for cut in cuts if cut[1] == "free" or not any(a0 < cut[0] < a1 for a0, a1 in away)]
     cuts.sort(key=lambda x: x[0])
     merged = []
     for cut in cuts:

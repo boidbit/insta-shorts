@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from studio import audio, elevenlabs_tts, scene                # noqa: E402
 from studio.script import parse_script                         # noqa: E402
+os.environ.setdefault("ALIGN", "off")          # (no speech recogniser model in the unit tests)
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 STORY = """HOOK: h
