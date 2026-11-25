@@ -559,6 +559,15 @@ def pack_key(who, text):
     return hashlib.sha1(("%s|%s" % (str(who).strip().lower(), " ".join(str(text).split()))).encode("utf-8")).hexdigest()[:16]
 
 
+# A pack's clips are cut out of ONE Gemini take. When a take went wrong (it began with a minute of silent rumble),
+# every cut after it was shifted: each clip held an EARLIER line's words (the reel's "Uff! Goosebumps" clip said
+# Reelesh's speech). Only the empty clips were said again, the shifted ones were reused, and every reel made again
+# from it came out with voice and action out of step. So:
+#  - one clip with no voice in it -> the whole pack is said again (its other clips cannot be trusted either);
+#  - packs from before this check (no "v") are said again once.
+PACK_VERSION = 2
+
+
 def voice_pack_in():
     import json
     d = os.environ.get("VOICE_PACK_IN")
@@ -567,15 +576,20 @@ def voice_pack_in():
         return {}
     with open(idx, encoding="utf-8") as f:
         index = json.load(f)
+    if index and any(int(v.get("v", 1)) < PACK_VERSION for v in index.values()):
+        print("::warning title=Purani awaaz dobara banegi::Is reel ka voice pack purane (galat-kat) tareeke se bana "
+              "tha, isliye saari lines ki awaaz nayi banegi (aawaz aur action ab mel khayenge)", file=sys.stderr)
+        return {}
     out = {}
     for k, v in index.items():
         p = os.path.join(d, v["file"])
         if os.path.isfile(p):
             lv = _leveled(p)
-            if lv:                                  # (a clip with no voice in it is said again)
-                out[k] = lv
-            else:
-                print("  [tts] voice pack: %r has no voice in it, said again" % v.get("text", "")[:30], file=sys.stderr)
+            if not lv:
+                print("  [tts] voice pack: %r has no voice in it -> the whole pack is said again (its take was "
+                      "broken, the other clips are shifted)" % v.get("text", "")[:30], file=sys.stderr)
+                return {}
+            out[k] = lv
     return out
 
 
@@ -610,7 +624,7 @@ def voice_pack_save(who, text, path):
     if os.path.isfile(idx):
         with open(idx, encoding="utf-8") as f:
             index = json.load(f)
-    index[key] = {"file": name, "who": who, "text": " ".join(str(text).split())}
+    index[key] = {"file": name, "who": who, "text": " ".join(str(text).split()), "v": PACK_VERSION}
     with open(idx, "w", encoding="utf-8") as f:
         json.dump(index, f, ensure_ascii=False, indent=1)
 

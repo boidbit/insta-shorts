@@ -265,6 +265,19 @@ def highpass(x, sr=SR, hz=80.0):
     return (x - _same(x, np.ones(n) / n)).astype(np.float32)
 
 
+def no_rumble(x, sr=SR, hz=80.0):
+    """The whole take with everything under ~80 Hz taken out (FFT, a soft 60-80 Hz edge). highpass() is a short
+    moving average: it leaves about a tenth of a slow rumble, still loud enough to pass as voice when the take is
+    cut into lines, so a rumbling first minute took the first lines and every later cut was shifted by a line."""
+    x = np.asarray(x, dtype=np.float32)
+    if x.size < 16:
+        return x
+    X = np.fft.rfft(x.astype(np.float64))
+    f = np.fft.rfftfreq(x.size, 1.0 / sr)
+    X *= np.clip((f - 0.75 * hz) / (0.25 * hz), 0.0, 1.0)
+    return np.fft.irfft(X, n=x.size).astype(np.float32)
+
+
 def _same(a, k):
     """Convolution the length of `a` (also when the kernel is longer than `a`), centred."""
     full = np.convolve(a, k, mode="full")
@@ -572,6 +585,7 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
     x = None
     if os.path.isfile(full) and os.path.getsize(full) > 2000:
         x, _ = read_wav(full)
+        x = no_rumble(x)                                           # (rumble is not voice: it must not hold a line)
         bad = take_problem(x, texts) or split_problem(x, texts)
         if bad:                                                    # a cut-off take from before this check
             print("  [gemini] cached voice is broken (%s), asking again" % bad, file=sys.stderr)
@@ -585,7 +599,7 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
             print("  [gemini] 1 request for %d lines (%s)%s" % (len(lines), model,
                                                                " - try %d" % (attempt + 1) if attempt else ""),
                   file=sys.stderr)
-            x = request_audio(build_payload(lines, style, notes), model)
+            x = no_rumble(request_audio(build_payload(lines, style, notes), model))
             bad = take_problem(x, texts) or split_problem(x, texts)
             if not bad:
                 break
