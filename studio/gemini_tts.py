@@ -536,6 +536,33 @@ def _shape(src, dst, st, rate):
         return src
 
 
+def _heard_spans(d, x, texts, spans):
+    """The pause cut checked by ear (studio.align: speech recognition says which pause is each line break; a comma's
+    pause is not). Done once per take: kept next to it (a reel renders the video, a frame and a cover)."""
+    if os.environ.get("ALIGN", "on") == "off" or len(texts) < 2:
+        return spans
+    path = os.path.join(d, "heard_spans.json")
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                kept = json.load(f)
+            if kept.get("pause") == [list(s) for s in spans]:
+                return [tuple(s) for s in kept["heard"]]
+        except Exception:
+            pass
+    from . import align
+    heard, moved = align.fix_spans(x, SR, texts, spans)
+    if moved:
+        print("  [align] %d line break(s) were at the wrong pause (a comma inside a line): cut where the words end"
+              % moved, file=sys.stderr)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"pause": [list(s) for s in spans], "heard": [list(s) for s in heard]}, f)
+    except OSError:
+        pass
+    return heard
+
+
 def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".cache/tts"):
     """items: [{"text": str, "voice": gemini voice name, "pitch": '+0Hz', "rate": '+0%'}] in speaking order.
 
@@ -613,6 +640,7 @@ def synth_script(items, model=DEFAULT_MODEL, style=DEFAULT_STYLE, cache_dir=".ca
     spans, method = split_audio(x, texts)
     if method != "pauses":
         print("  [gemini] pauses unclear, split lines by text length instead (check lip-sync)", file=sys.stderr)
+    spans = _heard_spans(d, x, texts, spans)
     paths = []
     for i, it in enumerate(items):
         mine = [sp for sp, k in zip(spans, owner) if k == i]

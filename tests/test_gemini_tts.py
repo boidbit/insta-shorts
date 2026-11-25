@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from studio import audio, gemini_tts as g   # noqa: E402
 from studio.scene import compile_scene      # noqa: E402
+os.environ.setdefault("ALIGN", "off")          # (no speech recogniser model in the unit tests)
 
 SR = g.SR
 

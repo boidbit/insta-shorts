@@ -150,6 +150,8 @@ jobs:
 
       - name: Tests
         if: env.STAGE == 'video' || env.STAGE == 'sound_video'
+        env:
+          ALIGN: "off"
         run: python -m unittest discover -s tests
 
       - name: Cache generated voice lines
@@ -159,6 +161,13 @@ jobs:
           path: .cache/tts
           key: tts-${{ github.run_id }}
           restore-keys: tts-
+
+      - name: Cache the speech recogniser (checks where each voice line ends)
+        if: env.STAGE == 'video' || env.STAGE == 'sound_video'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-small-v1
 
       - name: Write the story
         id: pick

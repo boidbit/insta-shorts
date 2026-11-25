@@ -105,6 +105,20 @@ class FilmShots(unittest.TestCase):
         p, _ = part(OFFICE.replace("Sharma -> facepalm", "Sharma -> faint"))
         self.assertNotIn("react", [s["kind"] for s in p.plan.counter_shots])
 
+    def test_running_out_is_seen_wide(self):
+        """`Papa -> ghoorna` then `Reelesh -> exit left fast`, `Papa -> exit left fast`: the reaction single on Papa hid
+        everybody else and went on through both exits, so Reelesh ran out unseen and the camera stayed on the empty
+        spot. An exit is a wide shot with everybody in it."""
+        p, w = part(OFFICE + "Boss -> ghoorna angry\nSharma -> exit left fast\nBoss -> exit left fast\n")
+        shots = p.plan.counter_shots
+        for name in ("Sharma", "Boss"):
+            c = p.plan.chars[name]
+            m = next(m for m in c.moves if m[4] < -100)
+            run = (m[0] + m[1]) / 2.0
+            shot = next(s for s in shots if s["t0"] <= run < s["t1"])
+            self.assertEqual(shot["kind"], "free", (name, shot))
+            self.assertFalse(shot.get("ov", {}).get(name, {}).get("hidden"))
+
     def test_the_page_has_the_camera_option(self):
         with open(os.path.join(os.path.dirname(__file__), "..", "index.html"), encoding="utf-8") as f:
             page = f.read()

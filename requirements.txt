@@ -2,3 +2,4 @@ Pillow>=10.0
 numpy>=1.24
 edge-tts>=6.1
 anthropic>=0.40      # only for the AI director with ANTHROPIC_API_KEY (Gemini needs nothing extra)
+faster-whisper>=1.0   # checks where each voice line ends (studio/align.py); optional

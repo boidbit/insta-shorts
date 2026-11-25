@@ -13,6 +13,7 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from studio import gemini_tts as G                        # noqa: E402
+os.environ.setdefault("ALIGN", "off")          # (no speech recogniser model in the unit tests)
 
 LONG = ("भाई नंबर मत देख, क्वालिटी देख! मेरे पास भीड़ नहीं है, मेरे पास एक कोर कल्ट कम्युनिटी है... ऐसे लोग जो मेरे "
         "एक इशारे पे जान दे दें! अब देख हिसाब—बीस तो मेरी ख़ुद की बैकअप और फ़ैन-पेज आईडीज़ हैं, ग्यारह मम्मी के किटी "
