@@ -145,6 +145,10 @@ class EmptyTakes(unittest.TestCase):
         t = np.arange(int(G.SR * secs)) / G.SR
         return (0.1 * np.sin(2 * np.pi * 3 * t) + 0.02 * np.sin(2 * np.pi * 11 * t)).astype(np.float32)
 
+    def low(self, secs):
+        t = np.arange(int(G.SR * secs)) / G.SR
+        return (0.03 * np.sin(2 * np.pi * 35 * t)).astype(np.float32)
+
     def voice(self, secs):
         t = np.arange(int(G.SR * secs)) / G.SR
         return (0.3 * np.sin(2 * np.pi * 180 * t) * (0.6 + 0.4 * np.sin(2 * np.pi * 3 * t))).astype(np.float32)
@@ -169,8 +173,29 @@ class EmptyTakes(unittest.TestCase):
         G.write_wav(os.path.join(d, "a.wav"), self.rumble(4))
         G.write_wav(os.path.join(d, "b.wav"), self.voice(2))
         with open(os.path.join(d, "index.json"), "w", encoding="utf-8") as f:
-            json.dump({"ka": {"file": "a.wav", "who": "Gappu", "text": "x"},
-                       "kb": {"file": "b.wav", "who": "Papa", "text": "y"}}, f)
+            json.dump({"ka": {"file": "a.wav", "who": "Gappu", "text": "x", "v": S.PACK_VERSION},
+                       "kb": {"file": "b.wav", "who": "Papa", "text": "y", "v": S.PACK_VERSION}}, f)
         with mock.patch.dict(os.environ, {"VOICE_PACK_IN": d}):
             pack = S.voice_pack_in()
-        self.assertEqual(sorted(pack), ["kb"])                            # the empty one is left out: said again
+        # one empty clip = a broken take: the other clips were cut from it too (shifted by a line), all said again
+        self.assertEqual(pack, {})
+
+    def test_a_pack_from_before_the_check_is_said_again(self):
+        import json
+        from studio import scene as S
+        d = tempfile.mkdtemp()
+        G.write_wav(os.path.join(d, "b.wav"), self.voice(2))
+        with open(os.path.join(d, "index.json"), "w", encoding="utf-8") as f:
+            json.dump({"kb": {"file": "b.wav", "who": "Papa", "text": "y"}}, f)     # (no "v": an old pack)
+        with mock.patch.dict(os.environ, {"VOICE_PACK_IN": d}):
+            self.assertEqual(S.voice_pack_in(), {})
+        with open(os.path.join(d, "index.json"), "w", encoding="utf-8") as f:
+            json.dump({"kb": {"file": "b.wav", "who": "Papa", "text": "y", "v": S.PACK_VERSION}}, f)
+        with mock.patch.dict(os.environ, {"VOICE_PACK_IN": d}):
+            self.assertEqual(sorted(S.voice_pack_in()), ["kb"])
+
+    def test_rumble_before_the_voice_does_not_take_the_first_lines(self):
+        z = np.zeros(G.SR, np.float32)
+        x = np.concatenate([self.rumble(20) * 2 + self.low(20), z, self.voice(4), z, self.voice(2), z, self.voice(3), z])
+        spans, _ = G.split_audio(G.no_rumble(x), ["एक दो तीन चार पाँच छह सात आठ", "नौ दस ग्यारह", "बारह तेरह चौदह पंद्रह"])
+        self.assertGreater(spans[0][0], 20.5)                                   # line 1 starts at the voice
