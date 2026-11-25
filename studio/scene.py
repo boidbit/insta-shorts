@@ -571,22 +571,28 @@ def voice_pack_in():
     for k, v in index.items():
         p = os.path.join(d, v["file"])
         if os.path.isfile(p):
-            out[k] = _leveled(p)
+            lv = _leveled(p)
+            if lv:                                  # (a clip with no voice in it is said again)
+                out[k] = lv
+            else:
+                print("  [tts] voice pack: %r has no voice in it, said again" % v.get("text", "")[:30], file=sys.stderr)
     return out
 
 
 def _leveled(path):
     """An earlier reel's voice clip at the steady loudness of today's clips (gemini_tts.level); the file itself if
-    it cannot be read."""
-    lv = os.path.splitext(path)[0] + ".lvl.wav"
+    it cannot be read; None if there is no voice in it (an empty take: that line is said again)."""
+    lv = os.path.splitext(path)[0] + ".lvl2.wav"
     if os.path.isfile(lv):
         return lv
     try:
         x, sr = gemini_tts.read_wav(path)
-        gemini_tts.write_wav(lv, gemini_tts.level(x, sr=sr), sr=sr)
-        return lv
     except Exception:
         return path
+    if not gemini_tts.is_speech(x, sr):
+        return None
+    gemini_tts.write_wav(lv, gemini_tts.level(x, sr=sr), sr=sr)
+    return lv
 
 
 def voice_pack_save(who, text, path):

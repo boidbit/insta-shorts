@@ -29,7 +29,7 @@ DEFAULT_STYLE = ("Read this as a natural, lively everyday Hindi conversation bet
 # said, never whose voice it is
 SAME_VOICE = ("Keep each speaker's voice identity (age, pitch, timbre, accent) exactly the same from the first line "
               "to the last; feelings change only how a line is said, never whose voice it is.")
-TEMPERATURE = 0.6                              # (lower than the default: the same voice, take after take)
+TEMPERATURE = None                             # (0.6 was tried: the takes that came back empty began with it)
 # A long line used to go to Gemini in pieces (sentences as separate lines). Off: Gemini says one speaker's pieces
 # without a pause between them, so the take could not be cut at the right places and every later line got the
 # wrong voice clip (a reel's actions ran ahead of / behind the words). A line goes whole again.
@@ -149,7 +149,8 @@ def build_payload(lines, style=DEFAULT_STYLE, notes=None):
     style = ((style or "").strip() + " " + SAME_VOICE).strip()
     text = (style.strip() + "\n\n" + body) if style else body
     return {"contents": [{"parts": [{"text": text}]}],
-            "generationConfig": {"responseModalities": ["AUDIO"], "speechConfig": speech, "temperature": TEMPERATURE}}
+            "generationConfig": dict({"responseModalities": ["AUDIO"], "speechConfig": speech},
+                                     **({"temperature": TEMPERATURE} if TEMPERATURE is not None else {}))}
 
 
 def _retry_delay(body):
@@ -234,6 +235,36 @@ def _silence_runs(rms, thr, min_len):
 LEVEL_RMS = 0.11            # every line as loud as the others (the speech itself, not its pauses)
 
 
+def speech_share(x, sr=SR):
+    """How much of a clip's sound is in the band of a voice (100-4000 Hz): about 0.5-0.95 for speech, near 0 for
+    an empty take (once Gemini sent the first minute of a take as a silent low rumble: no words, but loud enough
+    to pass as sound)."""
+    x = np.asarray(x, dtype=np.float64)
+    if x.size < sr // 10:
+        return 1.0
+    S = np.abs(np.fft.rfft(x)) ** 2
+    f = np.fft.rfftfreq(x.size, 1.0 / sr)
+    total = float(S.sum())
+    return float(S[(f >= 100) & (f <= 4000)].sum() / total) if total > 1e-12 else 0.0
+
+
+def is_speech(x, sr=SR):
+    x = np.asarray(x, dtype=np.float64)
+    if x.size < sr // 10:
+        return True
+    band = speech_share(x, sr)
+    return band >= 0.2 and float(np.sqrt((x ** 2).mean())) * np.sqrt(band) >= 0.002
+
+
+def highpass(x, sr=SR, hz=80.0):
+    """No rumble or drift under ~80 Hz (it is not voice, and it would be pumped up by the levelling)."""
+    x = np.asarray(x, dtype=np.float32)
+    n = max(3, int(sr / hz))
+    if x.size <= n:
+        return x - float(x.mean())
+    return (x - _same(x, np.ones(n) / n)).astype(np.float32)
+
+
 def _same(a, k):
     """Convolution the length of `a` (also when the kernel is longer than `a`), centred."""
     full = np.convolve(a, k, mode="full")
@@ -247,7 +278,7 @@ def level(x, sr=SR, target=LEVEL_RMS, max_gain=16.0, window=1.2):
     moving, no voice heard); one gain for the whole take kept those words quiet. The gain follows the speech
     slowly (about a second), holds through pauses (breaths and silence are not pumped up), and peaks are bent
     softly instead of clipped."""
-    x = np.asarray(x, dtype=np.float32)
+    x = highpass(x, sr)
     hop = int(sr * 0.02)
     m = len(x) // hop
     if m < 3:
@@ -281,13 +312,16 @@ def split_problem(x, texts):
     """None if the take cuts into lines that fit their words, else a short reason. A clip far longer or shorter than
     its words (for this take's own speed) means the cut went to a wrong pause: from there every line would get
     another line's voice (the picture's actions running ahead of / behind the words)."""
-    if len(texts) < 3:
-        return None
     try:
         spans, _method = split_audio(x, texts)
     except GeminiTTSError as e:
         return str(e)
+    for (t0, t1), t in zip(spans, texts):            # a line with no voice in it: an empty / broken take
+        if not is_speech(x[int(t0 * SR): int(t1 * SR)]):
+            return "line %r has no voice in the take (silence or rumble)" % t[:24]
     rates = [(t1 - t0) / _letters(t) for (t0, t1), t in zip(spans, texts)]
+    if len(texts) < 3:
+        return None
     mid = float(np.median(rates))
     for (t0, t1), t, r in zip(spans, texts, rates):
         long_enough = _letters(t) >= 25                  # (a two-word line may be said slowly or quickly)
