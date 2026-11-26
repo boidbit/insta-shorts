@@ -25,7 +25,7 @@ from .characters import LA, SH, TH, UA, DEFAULT_POSE, build_character, render_op
 from .scene import (DIALOGUE_MODES, GROUND_Y, HOOK_MODES, apply_options, camera_at, camera_roll, camera_whip,
                     apply_cta, apply_loop, compile_music, compile_scene, ease_travel, mascot_kind,
                     prepare_voice, split_scenes, start_xs, static_overlays)
-from .animals import ANIMALS, build_animal
+from .animals import ANIMALS, DOG_BODY_ACTIONS, build_animal
 from .effects import Effects, Patch
 from .sets import Sets
 from .style25d import shading
@@ -951,7 +951,7 @@ class Renderer(Output):
         """The dog's angle: in profile while it walks, lies or listens; its head turned to us while it talks (from just
         before the line to just after, so it does not flick between two close lines); all of it facing us in its own
         close-up or when the script turns it (`Sultan -> saamne`). `Sultan -> side` keeps it in profile."""
-        if moving or action in self.DOG_SIDE_ACTIONS or not self._natural():     # (classic: the old profile dog)
+        if moving or action in self.DOG_SIDE_ACTIONS or action in DOG_BODY_ACTIONS or not self._natural():     # (classic: the old profile dog)
             return "side"
         v = (c.ov or {}).get("view") or st.get("view")
         if v in ("side", "turn"):                   # (a film shot turns it: profile / head to us)
