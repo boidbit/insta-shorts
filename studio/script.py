@@ -2468,6 +2468,10 @@ def _parse_script(text):
         if pcfg:                                    # a photo: the people at its own scale, the picture as it is
             item["meta"] = dict(item.get("meta") or {}, people_scale=float(pcfg.get("people_scale", 1.0)))
             item["angle"] = {"zoom": 1.0, "x": 540.0, "mirror": False}
+        if pcfg and pcfg.get("cutaway"):
+            item["meta"]["auto_camera"] = False
+            for name in cast:
+                item["characters"].setdefault(name, {})["hidden"] = True
         if pov_place:                               # a driving shot is composed: the camera stays on it whole
             item["meta"] = {"people_scale": pov_place["scale"], "auto_camera": False}
             item["angle"] = {"zoom": 1.0, "x": 540.0, "mirror": False}

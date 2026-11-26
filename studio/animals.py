@@ -102,6 +102,10 @@ def _mix(c, d, u):
     return tuple(int(c[i] + (d[i] - c[i]) * u) for i in range(3))
 
 
+# These cues read through the dog's silhouette: lifted paw, raised chest, tucked tail or folded legs.
+DOG_BODY_ACTIONS = {"wag", "arms_crossed", "proud", "point_self", "shiver", "ghoorna", "faint"}
+
+
 def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_open, expr):
     kind = spec.get("kind", "dog")
     P = QUAD.get(kind, QUAD["dog"])
@@ -144,10 +148,19 @@ def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_ope
     tilt = -24.0 if sit else 0.0
     if lie:
         body_y = -ry * 0.95
+    dog_cue = action if kind == "dog" and action in DOG_BODY_ACTIONS else None
+    settle = min(1.0, max(0.0, at / 0.28))
+    proud = settle if dog_cue in ("arms_crossed", "proud") else 0.0
+    nervous = settle if dog_cue == "shiver" else 0.0
+    collapse = min(1.0, max(0.0, (at - 0.18) / 0.62)) if dog_cue == "faint" else 0.0
+    collapse *= collapse * (3 - 2 * collapse)
+    body_y += -12 * proud + nervous * (13 + 3 * math.sin(22 * t))
+    body_y += (-ry * 0.85 - body_y) * collapse
+    tilt += -5 * proud + nervous * 2.5 * math.sin(18 * t)
     bc = (0.0, body_y)
     view = spec.get("pose_view") if kind == "dog" else None
     acc = set(spec.get("accessories") or ())
-    if view == "front" and not lie:
+    if view == "front" and not lie and not dog_cue:
         return _dog_front(S, X, poly, line, limb, P, col, dk, light, t, at, action, speak, mouth_open, expr,
                           lift, sit, acc, spec)
 
@@ -185,6 +198,14 @@ def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_ope
             hock = (top[0] - L * 0.1 + sw * 0.7, top[1] + L * 0.62 - raise_ * 0.6)
             fet = (foot[0] + 4, -L * 0.13 - raise_)
             pts, wid = [top, stifle, hock, fet, foot], [thick * 1.2, thick * 0.78, thick * 0.4, thick * 0.32, thick * 0.34]
+        if collapse:
+            pts = [(x + collapse * j / (len(pts) - 1) * (45 if front else 75),
+                    y * (1 - 0.65 * collapse) if 0 < j < len(pts) - 1 else y)
+                   for j, (x, y) in enumerate(pts)]
+        if i == 3 and dog_cue in ("point_self", "proud", "arms_crossed"):
+            paw = settle * (1.0 if dog_cue == "point_self" else 0.55)
+            pts = [(x + 32 * paw * j / (len(pts) - 1), y - 52 * paw * (j / (len(pts) - 1)) ** 1.4)
+                   for j, (x, y) in enumerate(pts)]
         legs.append((pts, wid, i))
 
     def foot_end(pts, c):
@@ -215,7 +236,12 @@ def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_ope
         poly(_spline([(tip[0] - 12, tip[1] - 26), (tip[0] + 12, tip[1] - 26), (tip[0] + 16, tip[1] + 22),
                       (tip[0], tip[1] + 44), (tip[0] - 16, tip[1] + 22)]), (46, 40, 38), INK, 3)
     elif P["tail"] == "up":
-        path = bezier(root, (root[0] - 60, root[1] - 30 + wag * 0.5), (root[0] - 70 + wag, root[1] - 120), 6)
+        wag = 72 * settle * math.sin(17 * t) if dog_cue == "wag" else wag
+        if dog_cue == "ghoorna":
+            wag = 0.0
+        tuck = max(nervous, collapse)
+        path = bezier(root, (root[0] - 60, root[1] - 30 + wag * 0.5 + 58 * tuck),
+                      (root[0] - 70 + wag + 74 * tuck, root[1] - 120 + 162 * tuck), 6)
         limb(path, _taper(len(path), 18, 4), col)
     elif P["tail"] == "curl":
         path = bezier(root, (root[0] - 100, root[1] + 20), (root[0] - 80 + wag, root[1] - 120), 6)[:-1] + \
@@ -237,8 +263,13 @@ def _quad(spec, action, at, t, x0, ground_y, k, dirn, moving, running, mouth_ope
     bob = 6 * math.sin(ph * 2) if moving else (2 * math.sin(t * 2) + (3 * math.sin(t * 9) if graze else 0.0))
     hx_, hy_ = hcen[0], hcen[1] + bob
 
+    hx_ += 20 * proud
+    hy_ += -26 * proud + 16 * nervous + 60 * collapse
+    pitch = math.radians(-12 * proud + 9 * nervous + 35 * collapse)
+    cs, sn = math.cos(pitch), math.sin(pitch)
+
     def H(u, v):
-        return (hx_ + u * hr, hy_ + v * hr)
+        return (hx_ + (u * cs - v * sn) * hr, hy_ + (u * sn + v * cs) * hr)
 
     # ---- neck (under the body's outline at one end, under the head at the other)
     base = B((rx * 0.72, -ry * 0.22))
