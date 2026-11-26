@@ -202,6 +202,19 @@ def phone_chat(o, lt, s):
 def insta(o, lt, s):
     """INSTA: a post: the user, a picture (a colour gradient with an emoji), the heart, the likes counting up, the
     caption."""
+    if "followers" in o:
+        W, H = 720 * s, 1100 * s
+        im, d = _canvas(W, H)
+        _rr(d, (0, 0, W - 1, H - 1), 54 * s, (255, 250, 241), (35, 33, 45), max(2, int(12 * s)))
+        tapped = lt >= 1.2
+        count = max(0, int(o["followers"]) - int(tapped))
+        _rr(d, (100*s, 788*s, 620*s, 940*s), 30*s, (79, 65, 130) if tapped else (228, 223, 215))
+        for label, size, y, col in [("@" + str(o.get("user", "user")), 61, 185, INK),
+                                    (str(count), 115, 455, INK), ("followers", 52, 610, INK),
+                                    ("Follow" if tapped else "Following", 54, 860, (255, 255, 255) if tapped else INK)]:
+            tb = text_block(label, size*s, 600*s, fill=col)
+            im.alpha_composite(tb, (int((W-tb.width)/2), int(y*s-tb.height/2)))
+        return im
     W, H = 860 * s, 1040 * s
     im, d = _canvas(W, H)
     _rr(d, [0, 0, W - 1, H - 1], 40 * s, (255, 255, 255), INK, max(2, int(5 * s)))
