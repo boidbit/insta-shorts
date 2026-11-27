@@ -1410,6 +1410,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
     shot_events = []        # camera moves from shot words on action lines (do not switch the auto camera off)
     cam_hold = []           # (t0, t1): a zoom / reveal is playing, the automatic camera keeps out
     shakes = []
+    own_rolls = []                                  # CAM: dutch (a directed tilt)
     plan.speech = []
     warned = [False]
     plan_end = 0.0
@@ -1648,6 +1649,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         if "camera" in ev:
             cam = dict(ev["camera"])
             cam["t"] = t
+            if "roll" in cam:                       # CAM: dutch: a directed tilt of the frame
+                own_rolls.append((t, t + float(cam.get("dur", 1.5)), float(cam["roll"])))
             if "shake" in cam:
                 shakes.append((t, float(cam["shake"]), float(cam.get("shake_dur", 0.5))))
             if cam.get("punch"):                    # quick snap zoom onto a face (the automatic camera stays on)
@@ -1715,6 +1718,7 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
         stand_up_in_frame(chars, set_by_id)
         round_the_bed(chars, set_by_id)             # ...and nobody stands over somebody lying on it
     plan.camera, plan.rolls, plan.drift = ("cine" if cine else "classic"), [], False
+    plan.rolls += own_rolls
     plan.auto_react = bool(meta.get("auto_react", True))
     own_camera_ = bool(cam_events) or any(not e_.get("auto") for e_ in shot_events) \
         or not meta.get("auto_camera", True)        # directed by the script (not the studio's own opening)
@@ -1738,6 +1742,8 @@ def compile_scene(scene, use_tts=True, fps=None, tts_provider=None, voice=None):
                 if st_["action"] in LIE_ACTIONS and st_.get("on"):
                     c_["zoom"] = min(c_.get("zoom", 1.0), LIE_ZOOM)
         plan.rolls = [r for r in plan.rolls if not any(h0 <= r[0] <= h1 for h0, h1 in cam_hold)]
+    if scene.get("drift"):                          # CAM lines: the directed camera breathes too
+        plan.drift = True
     cam_events += shot_events
     segs = []
     z, cx, cy = 1.0, LW / 2.0, LH / 2.0
