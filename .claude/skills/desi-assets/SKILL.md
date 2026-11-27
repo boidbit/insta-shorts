@@ -27,7 +27,10 @@ description: Use when a reel needs a place, prop, look, animal, vehicle, recurri
 
 ## Sounds
 `assets/sfx/<name>.ogg` replaces the made sound of the same name (`audio.py` SFX names). Only CC0 (or licences
-that allow monetised use), credited in `assets/sfx/CREDITS.md`; never copyrighted meme clips. Freesound CC0 is
-reachable from the cloud environment (key injected by the proxy).
+that allow monetised use), credited in `assets/sfx/CREDITS.md`; never copyrighted meme clips (real "emotional
+damage", film dialogues): look-alike CC0 only. New sounds: run the GitHub workflow `fetch-sfx.yml` (secret
+FREESOUND_API_KEY) with `sounds: "name: search words [--id N] [--max S]; ..."`: first `list: true`, read the run
+summary, then `list: false` with the chosen `--id`s; it pushes branch `sfx/<run id>` → PR into desi-toons-studio.
+Each new `.ogg` becomes a script sound word by itself (`A (shock, vine_boom): ...`).
 
 Tell the owner one line per new asset ("Naya: `kabadi_shop` — taraazu hilta hai, aage bhi kaam aayega").
