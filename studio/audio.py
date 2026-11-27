@@ -536,6 +536,17 @@ SFX2 = {"slap": _s_slap, "punch": _s_punch, "knock": _s_knock, "doorbell": _s_do
 SFX_NAMES = ("pop", "boing", "whoosh", "ding", "thud", "clap", "beep", "laugh_track") + tuple(SFX2)
 
 
+def _recorded_only():
+    """Sounds that exist only as a recording (assets/sfx/<name>.ogg, added with scripts/fetch_sfx.py: meme
+    reactions like vine_boom, bruh_horn...): script words too, in a stable order."""
+    d = os.path.join(ROOT, "assets", "sfx")
+    names = sorted(f[:-4] for f in os.listdir(d) if f.endswith(".ogg")) if os.path.isdir(d) else []
+    return tuple(n for n in names if re.fullmatch(r"[a-z0-9_]+", n) and n not in SFX_NAMES)
+
+
+SFX_NAMES = SFX_NAMES + _recorded_only()
+
+
 def sfx_path(name):
     """name can be a builtin sfx name or a path to an audio file. A builtin name with a recording in assets/sfx
     (CC0, see assets/sfx/CREDITS.md) plays that recording; the others are made here (SFX_RECORDED=0: always made)."""

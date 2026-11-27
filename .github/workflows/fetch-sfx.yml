@@ -1,0 +1,64 @@
+name: Fetch sounds (Freesound CC0)
+
+# Actions > "Fetch sounds" > Run workflow (Claude can run it from chat too). Needs the repository secret
+# FREESOUND_API_KEY (freesound.org > API > apply for a key). Only CC0 sounds are taken.
+#   sounds: one per line (or separated by ;), "<name>: <search words> [--id N] [--max S] [--loud L]"
+#           e.g. "vine_boom: boom impact --max 2; sad_trombone: sad trombone"
+#   list:   true = only show the best matches in the run summary, change nothing
+# A fetch commits assets/sfx/<name>.ogg + CREDITS.md + word lists to the branch "sfx/<run id>" (then open a PR).
+on:
+  workflow_dispatch:
+    inputs:
+      sounds:
+        description: "name: search words [--id N] [--max S] (one per line or ;)"
+        required: true
+      list:
+        description: "Only list matches (no download)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    env:
+      FREESOUND_API_KEY: ${{ secrets.FREESOUND_API_KEY }}
+      SOUNDS: ${{ inputs.sounds }}
+      LIST: ${{ inputs.list }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: which ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+      - name: Fetch
+        run: |
+          [ -n "$FREESOUND_API_KEY" ] || { echo "::error title=Freesound key nahi mili::Settings > Secrets and variables > Actions > New repository secret: FREESOUND_API_KEY"; exit 1; }
+          set -f
+          printf '%s\n' "$SOUNDS" | tr ';' '\n' | while IFS= read -r line; do
+            line="$(echo "$line" | sed 's/^ *//; s/ *$//')"; [ -z "$line" ] && continue
+            name="${line%%:*}"; rest="${line#*:}"
+            query="$(echo "$rest" | sed 's/ --.*//; s/^ *//')"; opts="$(echo "$rest" | grep -o ' --.*' || true)"
+            echo "### $name ($query)" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$LIST" = true ]; then
+              python scripts/fetch_sfx.py "$name" "$query" --list $opts | tee -a "$GITHUB_STEP_SUMMARY"
+            else
+              python scripts/fetch_sfx.py "$name" "$query" $opts | tee -a "$GITHUB_STEP_SUMMARY"
+            fi
+            echo >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Commit to sfx/<run id>
+        if: ${{ !inputs.list }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "sfx/${{ github.run_id }}"
+          git add assets/sfx SCRIPT_PROMPT.md index.html
+          git diff --cached --quiet && { echo "nothing new"; exit 0; }
+          git commit -m "Sounds from Freesound (CC0): $(git diff --cached --name-only assets/sfx | grep -o '[a-z0-9_]*\.ogg' | tr '\n' ' ')"
+          git push origin "sfx/${{ github.run_id }}"
+          echo "Branch: sfx/${{ github.run_id }} (open a PR into ${{ github.ref_name }})" >> "$GITHUB_STEP_SUMMARY"
