@@ -28,6 +28,9 @@ Script format (one thing per line):
 - `STYLE: 2.5d` (optional, after HOOK) = the 2.5D look: kitchen, gully, chai_tapri, kirana and terrace become layered
   sets with depth (parallax, depth blur, glowing lights). Default `STYLE: 2d` = the normal look.
 - `wait 1.5` (or `...`) pauses.
+- Directed camera (chat / cine mode): `CAM: push B [zoom] [secs]`, `CAM: snap B`, `CAM: whip B`, `CAM: follow B`,
+  `CAM: pull [zoom] [secs]`, `CAM: frame X Y [zoom] [secs]`, `CAM: dutch [deg] [secs]`, `CAM: shake [amount]`
+  (see cam_spec). A shot with CAM lines is directed by them: no automatic camera, no studio opening shot.
 - Shots: `CUT` starts a new shot in the same place (a hard cut) and shows only the characters who speak or act in it;
   `CUT wide` = everybody small so a whole vehicle fits, `CUT inside` = the inside of a vehicle (the driver big, in
   the middle), `CUT medium` (default) = people big. `SCENE: place | title | wide` sets the framing of a scene too.
@@ -75,6 +78,53 @@ from .util import asset_path
 from .scene import (CTA_STYLES, DEPTHS, ENTRY_HOLD, SHOT_ALIASES, SHOT_ZOOM, SLOTS, apply_cta, apply_loop, auto_slots,
                     chat_length, slots_for,
                     mascot_kind)
+
+CAM_MOVES = ("push", "snap", "pull", "whip", "follow", "dutch", "shake", "frame")
+
+
+def cam_spec(text, cast):
+    """`CAM:` = one directed camera move at this point of the shot (cine mode, written by a director):
+      push B [zoom] [secs]    slow push in on B (default 1.7x over 1.8 s): realisation, tension, emotion
+      snap B [zoom]           snap zoom onto B's face (2.1x in 0.12 s): shock, comic hit
+      pull [zoom] [secs]      pull back (default to the whole picture over 1.4 s): reveal, loneliness, ending
+      whip B                  fast swing onto B, same zoom (0.22 s): a reaction, the other side of a face-off
+      follow B [zoom]         stay on B while B moves (walks, runs), eased (0.6 s)
+      frame X Y [zoom] [secs] look at a point of the 1080x1920 picture (a prop, a door, the sky)
+      dutch [deg] [secs]      tilt the frame (default 7 degrees for 1.5 s): fear, chaos, drunk
+      shake [amount]          a hit (default 0.6)
+    Returns (spec, None) or (None, warning)."""
+    w = text.split()
+    if not w or w[0].lower() not in CAM_MOVES:
+        return None, "CAM %r: push / snap / pull / whip / follow / frame / dutch / shake likho" % text
+    kind, rest = w[0].lower(), w[1:]
+    who = rest[0] if rest and rest[0] in cast else None
+    nums = []
+    for x in rest[1 if who else 0:]:
+        try:
+            nums.append(float(x))
+        except ValueError:
+            return None, "CAM %r: %r samajh nahi aaya" % (text, x)
+    n = lambda i, d: nums[i] if len(nums) > i else d
+    if kind in ("push", "snap", "whip", "follow") and not who:
+        return None, "CAM %s: kis pe? (CAST ka naam likho, jaise 'CAM: %s B')" % (kind, kind)
+    if kind == "push":
+        return {"zoom": n(0, 1.7), "focus": who, "dur": n(1, 1.8)}, None
+    if kind == "snap":
+        return {"zoom": n(0, 2.1), "focus": who, "dur": 0.12}, None
+    if kind == "whip":
+        return {"focus": who, "dur": 0.22}, None
+    if kind == "follow":
+        return {"zoom": n(0, 1.5), "focus": who, "dur": 0.6}, None
+    if kind == "pull":
+        return {"zoom": n(0, 1.0), "dur": n(1, 1.4)}, None
+    if kind == "frame":
+        if len(nums) < 2:
+            return None, "CAM frame: x y likho (0-1080, 0-1920)"
+        return {"zoom": n(2, 1.6), "focus": [nums[0], nums[1]], "dur": n(3, 0.8)}, None
+    if kind == "dutch":
+        return {"roll": n(0, 7.0), "dur": n(1, 1.5)}, None
+    return {"shake": n(0, 0.6)}, None
+
 
 HEADERS = ("HOOK", "CAST", "SOUND", "SCENE", "CTA", "CAPTION", "HASHTAGS", "MUSIC", "TRANSITION", "STYLE", "CAMERA", "LOOP",
            "MASCOT", "COLOR", "CTA_STYLE", "HANDLE", "COVER", "CROWD", "LOOK", "MYSTERY", "SERIES")
@@ -2004,6 +2054,15 @@ def _parse_script(text):
             warnings.append("chat alag format hai, story script me nahi chalta (chat ke liye alag text likho: "
                             "'< samne wala' / '> aap'): %r" % line[:40])
             continue
+        m = re.match(r"^CAM\b\s*:?\s*(.+)$", line)
+        if m:                                       # a directed camera move (cine mode): see cam_spec()
+            spec_, err_ = cam_spec(m.group(1), cast)
+            if err_:
+                warnings.append(err_)
+            else:
+                cur["lines"].append(("cam", spec_))
+                cur["drift"] = True                 # a directed shot still breathes (never a frozen picture)
+            continue
         m = re.match(r"^(?:CUT|SHOT)\b\s*:?\s*([\w\s,]*)$", line, re.I)
         if m and sound_mode:                        # one take: the camera cuts to the speakers by itself
             once("cut", "SOUND ke saath CUT ki zarurat nahi: camera khud har bolne wale pe jaata hai (CUT chhod diye)")
@@ -2156,7 +2215,8 @@ def _parse_script(text):
     if not scenes:
         raise ValueError("script has no lines")
     classic = meta.get("CAMERA", "").strip().lower() in ("classic", "old", "purana") or _classic_env()
-    if not classic:                                 # every video opens on its own kind of first shot
+    directed_open = any(ln[0] == "cam" for ln in scenes[0]["lines"])     # CAM lines: the director opens it
+    if not classic and not directed_open:           # every video opens on its own kind of first shot
         first = next((ln for ln in scenes[0]["lines"] if ln[0] == "say" and ln[1] != "NARRATOR"), None)
         camera_words = set(SHOTS) | {"zoom", "reveal"}
         if first and len(first[3]) >= 18 and not any(w in camera_words for w in first[2]):   # (not on quick banter)
@@ -2309,6 +2369,9 @@ def _parse_script(text):
             if ln[0] == "lights":
                 tl.append({"lights": ln[1]})
                 continue
+            if ln[0] == "cam":
+                tl.append({"camera": dict(ln[1])})
+                continue
             if ln[0] == "ui":
                 tl.append({"overlay": dict(ln[1]), "hold": ln[2]})
                 continue
@@ -2460,6 +2523,8 @@ def _parse_script(text):
             item["angle"] = sc["shot"]
         if sc.get("reverse"):
             item["reverse"] = True
+        if sc.get("drift"):                         # CAM lines: the directed camera keeps a slow breath
+            item["drift"] = True
         if sc.get("cut_shot"):                      # the writer's own shot: the camera does exactly this
             item["cut_shot"] = sc["cut_shot"]
             if sc.get("cut_focus"):
