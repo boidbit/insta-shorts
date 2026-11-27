@@ -107,7 +107,7 @@ def main():
         subprocess.run(["curl", "-s", "-L", "--max-time", "120", "-o", src, snd["previews"]["preview-hq-mp3"]], check=True)
         filters = ",".join(["silenceremove=start_periods=1:start_threshold=-45dB"] + ([a.filter] if a.filter else []) +
                            ["atrim=0:%s" % a.max, "afade=t=in:d=0.01", "areverse,afade=t=in:d=%s,areverse" % fade,
-                            "loudnorm=I=%s:TP=-1.5:LRA=11" % a.loud])
+                            "loudnorm=I=%s:TP=-1.5:LRA=11" % a.loud, "alimiter=limit=0.84:level=false"])
         out = os.path.join(SFX_DIR, a.name + ".ogg")
         subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", src, "-af", filters, "-ar", "44100",
                         "-ac", "1", "-c:a", "libvorbis", "-q:a", "5", out], check=True)
