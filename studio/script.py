@@ -1175,6 +1175,10 @@ def ui_line(key, val):
         hold = 0.4 + 1.1 * len(msgs) + 1.0
         return {"type": "phone_chat", "title": parts[0], "messages": msgs, "dur": hold + 0.3}, hold, None
     if key == "INSTA":                                  # INSTA: bittu_official | 2 | Exam ke pehle chill 😎 | 🏖️
+        if len(parts) >= 3 and parts[1].lower() == "unfollow":
+            if not parts[2].isascii() or not parts[2].isdigit() or not 1 <= len(parts[2]) <= 10 or int(parts[2]) < 1:
+                return None, 0, "INSTA: @user | unfollow | 47 (followers pehle kitne the?)"
+            return {"type": "insta", "user": parts[0].lstrip("@"), "followers": int(parts[2]), "dur": 2.6}, 2.4, None
         likes = re.sub(r"[^\d]", "", parts[1]) if len(parts) > 1 else ""
         spec = {"type": "insta", "user": parts[0].lstrip("@"), "likes": int(likes or 0),
                 "caption": parts[2] if len(parts) > 2 else "", "dur": 3.0}
